@@ -106,7 +106,8 @@ namespace
     uint32_t s_failNoTex = 0, s_failNoShader = 0, s_failRect = 0;
     float s_lastC1[4] = {};
     // TextureMaskDebugFlags: 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader,
-    // 8 = UIMaskDebugC (constants as color), 16 = UIMaskDebugT (stage 1 texture)
+    // 8 = UIMaskDebugC (constants as color), 16 = UIMaskDebugT (stage 1 texture),
+    // 32 = Desaturate created by this DLL, 64 = the client's own Desaturate (dword_B47934[1])
     int s_debugFlags = 0;
 
     void* s_renderBatch = nullptr;
@@ -291,7 +292,11 @@ namespace
         s_lastC1[0] = c1[0]; s_lastC1[1] = c1[1]; s_lastC1[2] = c1[4]; s_lastC1[3] = c1[5];
 
         void* useShader = maskShader;
-        if ((s_debugFlags & 8) && s_debugCShader)
+        if (s_debugFlags & 64)
+            useShader = reinterpret_cast<void**>(ADDR_SHADERS)[1];
+        else if ((s_debugFlags & 32) && s_testShader)
+            useShader = s_testShader;
+        else if ((s_debugFlags & 8) && s_debugCShader)
             useShader = s_debugCShader;
         else if ((s_debugFlags & 16) && s_debugTShader)
             useShader = s_debugTShader;
@@ -430,10 +435,10 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
 {
     char buffer[1024];
     int n = snprintf(buffer, sizeof(buffer),
-        "flags=%d vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d debugC=%p debugT=%p | "
+        "flags=%d vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d clientDesaturate=%p debugC=%p debugT=%p | "
         "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
         s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
-        s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid, s_debugCShader, s_debugTShader,
+        s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid, reinterpret_cast<void**>(ADDR_SHADERS)[1], s_debugCShader, s_debugTShader,
         s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
         s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
 
@@ -453,7 +458,8 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
     return 1;
 }
 
-// TextureMaskDebugFlags(flags): 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader
+// TextureMaskDebugFlags(flags): 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader,
+// 8 / 16 = debug shaders, 32 = Desaturate created by this DLL, 64 = the client's Desaturate
 int32_t MaskTexture::TextureMaskDebugFlags(lua_State* L)
 {
     s_debugFlags = static_cast<int>(FrameScript::GetNumber(L, 1));
