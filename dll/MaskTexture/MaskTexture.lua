@@ -6,7 +6,10 @@ if not TextureAddMask then
 	return;
 end
 
-local textureMethods = getmetatable(WorldFrame:CreateTexture()).__index;
+-- loaded early (FrameXML.toc snippets): no WorldFrame/UIParent yet
+local helper = CreateFrame("Frame");
+helper:Hide();
+local textureMethods = getmetatable(helper:CreateTexture()).__index;
 
 function textureMethods:AddMaskTexture(mask)
 	TextureAddMask(self, mask);
@@ -49,3 +52,35 @@ for _, frameType in ipairs(frameTypes) do
 		frame:Hide();
 	end
 end
+
+-- /masktest: a round question mark icon in the middle of the screen (again to hide it)
+-- registered at login: SlashCmdList comes from ChatFrame, later in the toc
+local function MaskTest()
+	local f = MaskTestFrame;
+	if f then
+		if f:IsShown() then f:Hide(); else f:Show(); end
+		return;
+	end
+	f = CreateFrame("Frame", "MaskTestFrame", UIParent);
+	f:SetSize(128, 128);
+	f:SetPoint("CENTER");
+	local icon = f:CreateTexture(nil, "ARTWORK");
+	icon:SetAllPoints();
+	icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
+	local mask = f:CreateMaskTexture();
+	mask:SetAllPoints(icon);
+	mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
+	icon:AddMaskTexture(mask);
+	-- the same icon without a mask on the right, for comparison
+	local plain = f:CreateTexture(nil, "ARTWORK");
+	plain:SetSize(128, 128);
+	plain:SetPoint("LEFT", f, "RIGHT", 16, 0);
+	plain:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
+	print("masktest: TextureGetMask =", TextureGetMask(icon));
+end
+
+helper:RegisterEvent("PLAYER_LOGIN");
+helper:SetScript("OnEvent", function()
+	SLASH_MASKTEST1 = "/masktest";
+	SlashCmdList["MASKTEST"] = MaskTest;
+end);
