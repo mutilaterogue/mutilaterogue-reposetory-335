@@ -17,6 +17,8 @@ import sys
 ITEM_CLASS_RECIPE = 9
 ITEM_CLASS_QUEST = 12
 MIN_QUALITY = 2          # uncommon and better
+MIN_RAID_QUALITY = 3     # raid bosses: rare and better, green world drops come from
+                         # trash creatures that share a boss model
 
 
 def main():
@@ -26,6 +28,8 @@ def main():
 
     # ---- item cache: id -> (quality, class) -------------------------------
     keep_item = {}
+    item_quality = {}
+    item_class = {}
     known = set()
 
     for m in re.finditer(
@@ -35,6 +39,8 @@ def main():
         quality = int(m.group(2))
         cls = int(m.group(3))
         known.add(itemID)
+        item_quality[itemID] = quality
+        item_class[itemID] = cls
         keep_item[itemID] = (quality >= MIN_QUALITY
                              or cls in (ITEM_CLASS_QUEST, ITEM_CLASS_RECIPE))
 
@@ -44,6 +50,13 @@ def main():
 
     # ---- walk the journal data -------------------------------------------
     text = open(src, encoding="utf-8", errors="replace").read()
+
+    raid_instances = set(int(i) for i in re.findall(
+        r"EJ_DATA\.instances\[(\d+)\] = \{[^\n]*?isRaid = true", text))
+    raid_encounters = set(int(e) for e, i in re.findall(
+        r"EJ_DATA\.encounters\[(\d+)\] = \{ (?:floor = \d+, )?instanceID = (\d+)", text)
+        if int(i) in raid_instances)
+    dropped_raid_green = 0
 
     kept_rows = []
     by_encounter = collections.defaultdict(list)
@@ -66,6 +79,10 @@ def main():
         if not keep_item[itemID]:
             dropped_quality += 1
             continue
+        if (encID in raid_encounters and item_quality[itemID] < MIN_RAID_QUALITY
+                and item_class[itemID] not in (ITEM_CLASS_QUEST, ITEM_CLASS_RECIPE)):
+            dropped_raid_green += 1
+            continue
 
         kept_rows.append((rowID, encID, itemID, difficulty))
         by_encounter[encID].append(rowID)
@@ -75,6 +92,7 @@ def main():
     print("loot rows kept          %d" % kept, file=sys.stderr)
     print("dropped, not in cache   %d" % dropped_unknown, file=sys.stderr)
     print("dropped, grey or white  %d" % dropped_quality, file=sys.stderr)
+    print("dropped, raid greens    %d" % dropped_raid_green, file=sys.stderr)
 
     # ---- splice ------------------------------------------------------------
     block = ["", "-- Loot pruned by ejprune.py: nothing below uncommon except",

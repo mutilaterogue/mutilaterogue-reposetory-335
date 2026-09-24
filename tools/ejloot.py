@@ -187,6 +187,28 @@ def resolve_entry(model, model2entry, heroic):
 
 MAX_CHEST_DISTANCE = 150.0
 
+# type 3 gameobjects are also herbs, ore, trash chests and quest objects. A boss chest is
+# one whose items are mostly rare or better (ItemCache.lua next to the csv files).
+MIN_CHEST_RARE_SHARE = 0.5
+# chests standing farther than MAX_CHEST_DISTANCE from the boss spawn (big arenas, events):
+# gameobject name -> journal encounter IDs
+CHEST_ENCOUNTERS = {
+    "Cache of Storms": (11631,),              # Thorim
+    "Champions' Cache": (1620, 1621),         # Faction Champions, Alliance and Horde
+    "Tribunal Chest": (606,),                 # Tribunal of Ages
+    "Dark Runed Chest": (11618,),             # Mal'Ganis
+    "Tanzar's Trunk": (187,),                 # Nalorakk's hostage
+}
+CHEST_NAME_BLACKLIST = ("Scarab Coffer", "Unfired Plate", "Unforged Runic", "Dusty Tome")
+
+
+def load_item_quality(path):
+    if not os.path.exists(path):
+        return {}
+    return {int(i): int(q) for i, q in re.findall(
+        r'ITEM_CACHE\[(\d+)\] = \{ "(?:[^"\\]|\\.)*", (\d+),',
+        open(path, encoding="utf-8", errors="replace").read())}
+
 
 def load_chests(csvdir, text, model2entry, reference_loot):
     """encounterID -> [set per difficulty index 0..3] of chest items; prints unmatched chests."""
@@ -199,6 +221,10 @@ def load_chests(csvdir, text, model2entry, reference_loot):
         return chests
 
     go_loot = load_loot(loot_path, 5)
+    quality = load_item_quality(os.path.join(csvdir, "ItemCache.lua"))
+    if not quality:
+        print("chests: ItemCache.lua missing next to the csv files, herbs / ore are not filtered",
+              file=sys.stderr)
 
     inst_map = {int(i): int(m) for i, m in re.findall(
         r"EJ_DATA\.instances\[(\d+)\] = \{ mapID = (\d+)", text)}
@@ -235,6 +261,21 @@ def load_chests(csvdir, text, model2entry, reference_loot):
             mask = int(p[7]) or 1
         except ValueError:
             continue
+        if any(word in name for word in CHEST_NAME_BLACKLIST):
+            continue
+        items = expand(lootid, go_loot, reference_loot)
+        known = [i for i in items if i in quality]
+        if quality and (not known or sum(1 for i in known if quality[i] >= 3) < MIN_CHEST_RARE_SHARE * len(known)):
+            continue   # not a boss chest
+        if name in CHEST_ENCOUNTERS:
+            for encid in CHEST_ENCOUNTERS[name]:
+                for index in range(4):
+                    if mask & (1 << index):
+                        chests[encid][index] |= items
+            print("  %s -> encounter %s (by name, spawnMask %d)"
+                  % (name, "/".join(str(e) for e in CHEST_ENCOUNTERS[name]), mask), file=sys.stderr)
+            matched += 1
+            continue
         best = None
         for encid, bx, by, bz in boss_pos.get(mapID, ()):
             dist = ((x - bx) ** 2 + (y - by) ** 2 + (z - bz) ** 2) ** 0.5
@@ -242,12 +283,13 @@ def load_chests(csvdir, text, model2entry, reference_loot):
                 best = (dist, encid)
         if not best or best[0] > MAX_CHEST_DISTANCE:
             unmatched += 1
-            print("  chest without a boss nearby: %s (entry %s, map %d)" % (name, p[0], mapID), file=sys.stderr)
+            print("  chest without a boss nearby: %s (entry %s, map %d%s)"
+                  % (name, p[0], mapID, ", %.0f yd" % best[0] if best else ""), file=sys.stderr)
             continue
-        items = expand(lootid, go_loot, reference_loot)
         for index in range(4):
             if mask & (1 << index):
                 chests[best[1]][index] |= items
+        print("  %s -> encounter %d (%.0f yd, spawnMask %d)" % (name, best[1], best[0], mask), file=sys.stderr)
         matched += 1
     print("chests given to a boss      %d, without a boss %d" % (matched, unmatched), file=sys.stderr)
     return chests
