@@ -21,7 +21,6 @@ namespace
     constexpr uint32_t ADDR_TEX_GETTRANSFORM = 0x4B5490;	// void __cdecl (HTEXTURE, float* offset2, float* scale)
     constexpr uint32_t ADDR_SHADERS = 0xB47934;			// CGxShader* [2]: "UI", "Desaturate"
     constexpr uint32_t ADDR_UI_SHADERS_CREATE = 0x483060;	// void __cdecl: creates dword_B47934 (UI init / device restore)
-    constexpr uint32_t ADDR_UI_SHADERS_RELEASE = 0x4830A0;	// void __cdecl: releases them
     constexpr uint32_t ADDR_SHADER_VALID = 0x689A50;		// bool __thiscall CGxShader::Valid()
     constexpr uint32_t ADDR_BATCHING = 0xB47948;			// int: merge batch items
     constexpr uint32_t ADDR_DEVICE = 0xC5DF88;			// CGxDevice*
@@ -80,7 +79,6 @@ namespace
     using TexGetTransform_t = void(__cdecl*)(uint32_t, float*, float*);
     using ShaderValid_t = bool(__thiscall*)(void*);
     using ShaderCreate_t = void(__thiscall*)(void*, void**, int, const char*, const char*, int);
-    using ShaderRelease_t = void(__thiscall*)(void*, void**);
     using UiShaders_t = void(__cdecl*)();
     using ShaderConstants_t = void(__thiscall*)(void*, int, int, const float*, int);
     using IsA_t = bool(__thiscall*)(void*, int);
@@ -114,7 +112,8 @@ namespace
     float s_lastC1[4] = {};
     // TextureMaskDebugFlags: 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader,
     // 8 = UIMaskDebugC (constants as color), 16 = UIMaskDebugT (stage 1 texture),
-    // 32 = Desaturate created by this DLL, 64 = the client's own Desaturate (dword_B47934[1])
+    // 32 = Desaturate created by this DLL, 64 = the client's own Desaturate (dword_B47934[1]),
+    // 128 = the client's Desaturate object carrying our D3D shader (+0x20) for the item
     int s_debugFlags = 0;
 
     void* s_renderBatch = nullptr;
@@ -124,6 +123,20 @@ namespace
     template <typename T> T* At(void* base, uint32_t offset)
     {
         return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(base) + offset);
+    }
+
+    // flag 128: a client shader object lent our D3D shader until the item is drawn
+    constexpr uint32_t SHADER_D3D = 0x20;
+    void* s_swapObject = nullptr;
+    void* s_swapSaved = nullptr;
+
+    void RestoreSwap()
+    {
+        if (s_swapObject)
+        {
+            *At<void*>(s_swapObject, SHADER_D3D) = s_swapSaved;
+            s_swapObject = nullptr;
+        }
     }
 
     void* Device()
@@ -160,33 +173,13 @@ namespace
             s_debugTShader = nullptr;
     }
 
-    void ReleaseShaders()
-    {
-        void* device = Device();
-        auto release = reinterpret_cast<ShaderRelease_t>(VFunc(device, VT_SHADER_RELEASE));
-        for (void** shader : { &s_maskShader, &s_maskDesatShader, &s_debugCShader, &s_debugTShader, &s_testShader })
-        {
-            if (*shader)
-                release(device, shader);
-            *shader = nullptr;
-        }
-        s_shadersLoaded = false;
-    }
-
-    // The client creates its UI shaders in sub_483060; a shader created in the middle of a frame is
-    // not drawn (tested: the same Desaturate created by the DLL in the render draws nothing).
+    // The client creates its UI shaders in sub_483060. Ours are created with them, once: shaders are
+    // cached by name (sub_6897C0), releasing and creating again may give back a stale object.
     void __cdecl UiShadersCreateHook()
     {
         reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_CREATE)();
-        ReleaseShaders();
         LoadShaders();
         s_createdWithClient++;
-    }
-
-    void __cdecl UiShadersReleaseHook()
-    {
-        ReleaseShaders();
-        reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_RELEASE)();
     }
 
     // uv of corner i after the texture's own atlas transform (the UV the shader gets in t0)
@@ -279,6 +272,7 @@ namespace
         s_renderItem = 0;
         int result = reinterpret_cast<BatchRender_t>(ADDR_BATCH_RENDER)(batch);
         s_renderBatch = nullptr;
+        RestoreSwap();
         batching = oldBatching;
         if (s_texture1Bound)
         {
@@ -298,6 +292,9 @@ namespace
             gxRsSet(device, state, shader);
             return;
         }
+
+        // the previous item is drawn by now (the render draws a group before setting the next one)
+        RestoreSwap();
 
         uint32_t count = *At<uint32_t>(batch, BATCH_COUNT);
         auto* items = *At<BatchItem*>(batch, BATCH_ITEMS);
@@ -339,7 +336,18 @@ namespace
             useShader = s_debugTShader;
         else if (s_debugFlags & 4)
             useShader = shader;
-        gxRsSet(device, state, useShader);
+        void* host = reinterpret_cast<void**>(ADDR_SHADERS)[1];
+        if ((s_debugFlags & 128) && host && useShader && useShader != host)
+        {
+            // a different value first: RsSet only marks a changed state
+            gxRsSet(device, state, reinterpret_cast<void**>(ADDR_SHADERS)[0]);
+            gxRsSet(device, state, host);
+            s_swapObject = host;
+            s_swapSaved = *At<void*>(host, SHADER_D3D);
+            *At<void*>(host, SHADER_D3D) = *At<void*>(useShader, SHADER_D3D);
+        }
+        else
+            gxRsSet(device, state, useShader);
         if (!(s_debugFlags & 1))
         {
             gxRsSet(device, GXRS_TEXTURE1, maskTex);
@@ -426,7 +434,6 @@ void MaskTexture::ApplyPatches()
     {
         // our shaders live and die with the client's UI shaders
         s_createHooks = PatchAllCalls(ADDR_UI_SHADERS_CREATE, reinterpret_cast<void*>(&UiShadersCreateHook));
-        PatchAllCalls(ADDR_UI_SHADERS_RELEASE, reinterpret_cast<void*>(&UiShadersReleaseHook));
         s_renderCallsPatched = PatchRenderCalls();
     }
 }
