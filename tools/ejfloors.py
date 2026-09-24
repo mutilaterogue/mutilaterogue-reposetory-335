@@ -68,6 +68,18 @@ def read_dungeon_map_chunks(path):
     return out
 
 
+def read_table(path, ncols):
+    """Tab separated rows, or a quoted CSV export (the header row is skipped by the int parse)."""
+    import csv
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as fh:
+        sample = fh.readline()
+        fh.seek(0)
+        if "\t" in sample:
+            return [line.rstrip("\r\n").split("\t") for line in fh
+                    if len(line.split("\t")) >= ncols]
+        return [row for row in csv.reader(fh) if len(row) >= ncols]
+
+
 def read_csv(path, ncols):
     rows = []
     for encoding in ("utf-8", "cp1251"):
@@ -117,7 +129,7 @@ def main():
 
     # creature entry -> spawn points per map
     spawns = collections.defaultdict(list)
-    for p in read_csv(os.path.join(datadir, "spawns.csv"), 4):
+    for p in read_table(os.path.join(datadir, "spawns.csv"), 4):
         try:
             entry = int(p[0])
             mapID = int(p[1])
