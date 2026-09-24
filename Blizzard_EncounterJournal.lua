@@ -2,6 +2,7 @@
 -- retail API: Blizzard_EncounterJournal_Compat335.lua, boss models: EncounterJournalModel.lua.
 --
 -- Stage 1: tabs Dungeons / Raids, tier (expansion) dropdown, instance grid, navigation bar.
+-- Stage 3: item sets tab (data: EncounterJournalItemSets.lua from tools/ejsets.py).
 -- Stage 2: the book - boss list on the left page; on the right page the instance lore or the boss
 --          tabs (overview / abilities / loot / model), difficulty, loot filters; search.
 
@@ -17,6 +18,9 @@ local SEARCH_PREVIEW_ROWS, SEARCH_PREVIEW_HEIGHT = 5, 27;
 local MAX_CREATURES = 9;
 local HEADER_HEIGHT, HEADER_SPACING, HEADER_INDENT = 29, 4, 15;
 local EJ_MIN_CHARACTER_SEARCH = 3;
+local ITEMSET_ROWS, ITEMSET_ROW_HEIGHT = 7, 50;	-- set rows are 46 high
+local ITEMSET_MAX_ITEMS = 9;
+local itemSetClassID = 0;					-- class filter of the sets tab (classID, 0 = all)
 
 local EJ_STYPE_ITEM = 0;
 local EJ_STYPE_ENCOUNTER = 1;
@@ -193,6 +197,10 @@ function EncounterJournal_OnLoad(self)
 	self.raidsTabID = self:AddNamedTab(RAIDS or "Рейды");
 	self:SetTabCallback(self.dungeonsTabID, function() EncounterJournal_SetListRaids(false); end);
 	self:SetTabCallback(self.raidsTabID, function() EncounterJournal_SetListRaids(true); end);
+	if EJ_ITEMSETS then
+		self.itemSetsTabID = self:AddNamedTab("Комплекты");
+		self:SetTabCallback(self.itemSetsTabID, function() EncounterJournal_ShowLootJournal(); end);
+	end
 
 	-- instance grid
 	local select = self.instanceSelect;
@@ -221,6 +229,7 @@ function EncounterJournal_OnLoad(self)
 	end);
 
 	EncounterJournal_InitEncounterFrame(self);
+	EncounterJournal_InitLootJournal(self);
 	EncounterJournal_InitSearch(self);
 
 	self.listRaids = false;
@@ -316,7 +325,7 @@ function EncounterJournal_InitEncounterFrame(self)
 	model.creatureButtons = {};
 	for index = 1, MAX_CREATURES do
 		local button = CreateFrame("Button", "EncounterJournalCreatureButton" .. index, model, "EncounterCreatureButtonTemplate");
-		button:SetPoint("TOPLEFT", model, "TOPLEFT", 4, -4 - (index - 1) * 46);
+		button:SetPoint("TOPLEFT", model, "TOPLEFT", 4, -4 - (index - 1) * 42);
 		button:SetFrameLevel(model.modelFrame:GetFrameLevel() + 2);
 		model.creatureButtons[index] = button;
 	end
@@ -358,17 +367,21 @@ end
 -- tiers
 ---------------------------------------------------------------------------
 function EncounterJournal_UpdateTierText()
-	local dropdown = EncounterJournal.instanceSelect.ExpansionDropdown;
 	local name = EJ_GetTierInfo(EJ_GetCurrentTier());
-	if dropdown.SetText and name then
-		dropdown:SetText(name);
+	if name then
+		EncounterJournal.instanceSelect.ExpansionDropdown:SetText(name);
+		EncounterJournal.LootJournal.ExpansionDropdown:SetText(name);
 	end
 end
 
 function EncounterJournal_TierDropdown_Select(tierIndex)
 	EJ_SelectTier(tierIndex);
 	EncounterJournal_UpdateTierText();
-	EncounterJournal_ListInstances();
+	if EncounterJournal.LootJournal:IsShown() then
+		EncounterJournal_UpdateItemSets(true);
+	else
+		EncounterJournal_ListInstances();
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -389,6 +402,7 @@ function EncounterJournal_ShowInstanceSelect()
 	end
 	journal.instanceID = nil;
 	journal.encounterID = nil;
+	journal.LootJournal:Hide();
 	journal.instanceSelect:Show();
 	EncounterJournal_ListInstances();
 end
@@ -1089,7 +1103,7 @@ function EncounterJournal_UpdateCreatures()
 			button.id = creature.id;
 			button.name = creature.name;
 			button.displayInfo = creature.displayInfo;
-			button.portraitID = nil;
+			SetCreatureIcon(button.creature, creature.icon);
 			button:Show();
 		else
 			button:Hide();
@@ -1110,19 +1124,6 @@ function EncounterJournal_ShowModel()
 		model.dungeonBG:SetTexture(0, 0, 0, 0.6);
 	end
 	model.displayedID = nil;
-	-- round 3D portraits: set while shown, a model set on a hidden frame is not drawn
-	for _, button in ipairs(model.creatureButtons) do
-		if button:IsShown() and button.displayInfo and button.displayInfo > 0 and EncounterJournal_SetModelByDisplayID then
-			if not button.portraitHooked then
-				button.portraitHooked = true;
-				hooksecurefunc(button.portrait, "SetCreature", function(portrait)
-					portrait:SetCamera(0);
-				end);
-			end
-			button.portraitID = button.displayInfo;
-			EncounterJournal_SetModelByDisplayID(button.portrait, button.displayInfo);
-		end
-	end
 	local creature = (journal.creatures or {})[model.shownCreatureIndex or 1] or (journal.creatures or {})[1];
 	if creature then
 		EncounterJournal_DisplayCreatureData(creature, model.shownCreatureIndex or 1);
@@ -1143,9 +1144,9 @@ function EncounterJournal_DisplayCreatureData(creature, index)
 
 	for buttonIndex, button in ipairs(model.creatureButtons) do
 		if buttonIndex == index then
-			button.ring.selected:Show();
+			button:LockHighlight();
 		else
-			button.ring.selected:Hide();
+			button:UnlockHighlight();
 		end
 	end
 end
@@ -1477,4 +1478,191 @@ end
 function EncounterJournal_OpenJournalLink(tag, jtype, id, difficulty)
 	local instanceID, encounterID, sectionID = EJ_HandleLinkPath(tonumber(jtype), id);
 	EncounterJournal_OpenJournal(nil, instanceID, encounterID, sectionID);
+end
+
+---------------------------------------------------------------------------
+-- item sets tab (retail LootJournal): sets of the selected expansion
+---------------------------------------------------------------------------
+local CLASS_TOKENS_BY_ID = {
+	"WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "DEATHKNIGHT", "SHAMAN", "MAGE", "WARLOCK", nil, "DRUID",
+};
+
+local function ItemSetsHaveClasses()
+	for _, set in ipairs(EJ_ITEMSETS or {}) do
+		if set.classMask and set.classMask > 0 then
+			return true;
+		end
+	end
+	return false;
+end
+
+function EncounterJournal_InitLootJournal(self)
+	local lootJournal = self.LootJournal;
+	lootJournal.title:SetText("Комплекты");
+	lootJournal.rows = {};
+	for index = 1, ITEMSET_ROWS do
+		local row = CreateFrame("Frame", "EncounterJournalItemSet" .. index, lootJournal.list, "EncounterItemSetTemplate");
+		row:SetPoint("TOPLEFT", lootJournal.list, "TOPLEFT", 0, -(index - 1) * ITEMSET_ROW_HEIGHT);
+		row.itemButtons = {};
+		for itemIndex = 1, ITEMSET_MAX_ITEMS do
+			local button = CreateFrame("Button", row:GetName() .. "Item" .. itemIndex, row, "EncounterItemSetItemTemplate");
+			button:SetPoint("LEFT", row, "LEFT", 280 + (itemIndex - 1) * 38, 0);
+			row.itemButtons[itemIndex] = button;
+		end
+		lootJournal.rows[index] = row;
+	end
+	SetupFauxScroll(lootJournal.ScrollFrame, lootJournal.list, ITEMSET_ROW_HEIGHT, EncounterJournal_UpdateItemSetRows);
+
+	lootJournal.ExpansionDropdown:SetupMenu(function(dropdown, rootDescription)
+		for tierIndex = 1, EJ_GetNumTiers() do
+			rootDescription:CreateRadio(EJ_GetTierInfo(tierIndex), function(index)
+				return EJ_GetCurrentTier() == index;
+			end, function(index)
+				EncounterJournal_TierDropdown_Select(index);
+			end, tierIndex);
+		end
+	end);
+
+	-- the class filter needs item_template's AllowableClass (items_ext.csv for tools/ejsets.py)
+	if ItemSetsHaveClasses() then
+		lootJournal.ClassDropdown:SetupMenu(function(dropdown, rootDescription)
+			rootDescription:CreateRadio(ALL_CLASSES or "Все классы", function(classID)
+				return itemSetClassID == classID;
+			end, function(classID)
+				EncounterJournal_SetItemSetClass(classID);
+			end, 0);
+			for classID, token in pairs(CLASS_TOKENS_BY_ID) do
+				local name = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[token] or token;
+				local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[token];
+				if color then
+					name = ("|cff%02x%02x%02x%s|r"):format(color.r * 255, color.g * 255, color.b * 255, name);
+				end
+				rootDescription:CreateRadio(name, function(id)
+					return itemSetClassID == id;
+				end, function(id)
+					EncounterJournal_SetItemSetClass(id);
+				end, classID);
+			end
+		end);
+		EncounterJournal_SetItemSetClass(0);
+	else
+		lootJournal.ClassDropdown:Hide();
+	end
+end
+
+function EncounterJournal_SetItemSetClass(classID)
+	itemSetClassID = classID or 0;
+	local text = ALL_CLASSES or "Все классы";
+	local token = CLASS_TOKENS_BY_ID[itemSetClassID];
+	if token then
+		text = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[token] or token;
+	end
+	EncounterJournal.LootJournal.ClassDropdown:SetText(text);
+	if EncounterJournal.LootJournal:IsShown() then
+		EncounterJournal_UpdateItemSets(true);
+	end
+end
+
+function EncounterJournal_ShowLootJournal()
+	local journal = EncounterJournal;
+	NavBar_Reset(journal.navBar);
+	journal.instanceSelect:Hide();
+	journal.encounter:Hide();
+	journal.searchResults:Hide();
+	for _, data in ipairs(INFO_TABS) do
+		journal[data.button]:Hide();
+	end
+	journal.instanceID = nil;
+	journal.encounterID = nil;
+	journal.LootJournal:Show();
+	EncounterJournal_UpdateTierText();
+	EncounterJournal_UpdateItemSets(true);
+end
+
+function EncounterJournal_UpdateItemSets(resetScroll)
+	local lootJournal = EncounterJournal.LootJournal;
+	local expansion = EJ_GetExpansion and EJ_GetExpansion() or 2;
+	lootJournal.bg:SetTexture(TIER_BACKGROUNDS[expansion] or "Interface\\EncounterJournal\\UI-EJ-Cataclysm");
+
+	local list = {};
+	local classBit = itemSetClassID > 0 and 2 ^ (itemSetClassID - 1) or 0;
+	for _, set in ipairs(EJ_ITEMSETS or {}) do
+		if set.expansion == expansion then
+			local mask = set.classMask or 0;
+			if classBit == 0 or mask == 0 or bit.band(mask, classBit) ~= 0 then
+				table.insert(list, set);
+			end
+		end
+	end
+	lootJournal.sets = list;
+	if resetScroll then
+		ResetFauxScroll(lootJournal.ScrollFrame);
+	end
+	EncounterJournal_UpdateItemSetRows();
+end
+
+function EncounterJournal_UpdateItemSetRows()
+	local lootJournal = EncounterJournal.LootJournal;
+	local sets = lootJournal.sets or {};
+	FauxScrollFrame_Update(lootJournal.ScrollFrame, #sets, ITEMSET_ROWS, ITEMSET_ROW_HEIGHT);
+	local offset = FauxScrollFrame_GetOffset(lootJournal.ScrollFrame);
+
+	for index, row in ipairs(lootJournal.rows) do
+		local set = sets[offset + index];
+		if set then
+			row.set = set;
+			local nameButton = row.nameButton;
+			nameButton.name:SetText(set.name);
+			local color = ITEM_QUALITY_COLORS[set.quality or 4];
+			if color then
+				nameButton.name:SetTextColor(color.r, color.g, color.b);
+			end
+			if set.itemLevel and set.itemLevel > 0 then
+				nameButton.itemLevel:SetFormattedText("Уровень предмета: %d", set.itemLevel);
+			else
+				nameButton.itemLevel:SetFormattedText("Предметов: %d", #set.items);
+			end
+			for itemIndex, button in ipairs(row.itemButtons) do
+				local itemID = set.items[itemIndex];
+				if itemID then
+					local _, _, _, _, _, icon = GetItemInfoCached(itemID);
+					button.itemID = itemID;
+					button.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
+					button:Show();
+				else
+					button:Hide();
+				end
+			end
+			row:Show();
+		else
+			row.set = nil;
+			row:Hide();
+		end
+	end
+end
+
+-- set name: the set bonuses
+function EncounterJournalItemSet_OnEnter(self)
+	local set = self:GetParent().set;
+	if not set then
+		return;
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	local color = ITEM_QUALITY_COLORS[set.quality or 4];
+	if color then
+		GameTooltip:SetText(set.name, color.r, color.g, color.b);
+	else
+		GameTooltip:SetText(set.name);
+	end
+	for _, bonus in ipairs(set.bonuses or {}) do
+		GameTooltip:AddLine(("(%d) Комплект: %s"):format(bonus[1], bonus[2]), 0.5, 0.5, 0.5, true);
+	end
+	GameTooltip:Show();
+end
+
+function EncounterJournalItemSetItem_OnClick(self)
+	local link = GetItemLink(self.itemID);
+	if link then
+		HandleModifiedItemClick(link);
+	end
 end

@@ -7,5 +7,6 @@
 	<Script file="Blizzard_EncounterJournal_Compat335.lua"/>
 	<Script file="Blizzard_EncounterJournal_Bootstrap.lua"/>
 	<Script file="EncounterJournalModel.lua"/>
+	<Script file="EncounterJournalItemSets.lua"/>
 	<Include file="Blizzard_EncounterJournal.xml"/>
 </Ui>

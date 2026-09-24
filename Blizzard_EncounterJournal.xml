@@ -3,6 +3,7 @@
 	<!--
 		Blizzard_EncounterJournal (retail) for 3.3.5 on the 3.3.5 data.
 		Stage 1: journal frame, Dungeons / Raids tabs, tier (expansion) dropdown, instance grid, navigation bar.
+		Stage 3: item sets tab (EncounterJournalItemSets.lua, tools/ejsets.py).
 		Stage 2: instance / encounter book (boss list, lore, overview / abilities / loot / model tabs,
 		difficulty, loot filters) and search.
 		3.3.5 has no relativeKey: anchors between regions use $parent names.
@@ -637,60 +638,40 @@
 		</Scripts>
 	</Button>
 
-	<!--
-		creature button on the model tab (retail EncounterCreatureButtonTemplate): a round portrait.
-		3.3.5 has no texture masks, so the portrait is the creature's model with the portrait
-		camera, between the round background and the ring (the ring is a child frame, above the model).
-	-->
+	<!-- creature button on the model tab (retail EncounterCreatureButtonTemplate) -->
 	<Button name="EncounterCreatureButtonTemplate" virtual="true" hidden="true">
-		<Size x="50" y="50"/>
+		<Size x="45" y="44"/>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture inherits="UI-EJ-CreatureHeaderFrameSm-bg">
-					<Size x="50" y="49"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="creature">
+					<Size x="36" y="36"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture inherits="UI-EJ-CreatureHeaderFrameSm">
 					<Anchors>
 						<Anchor point="CENTER"/>
 					</Anchors>
 				</Texture>
 			</Layer>
 		</Layers>
-		<Frames>
-			<PlayerModel name="$parentPortrait" parentKey="portrait">
-				<Size x="36" y="36"/>
-				<Anchors>
-					<Anchor point="CENTER"/>
-				</Anchors>
-			</PlayerModel>
-			<Frame name="$parentRing" parentKey="ring" setAllPoints="true">
-				<Layers>
-					<Layer level="OVERLAY">
-						<Texture inherits="UI-EJ-CreatureHeaderFrameSm">
-							<Size x="50" y="49"/>
-							<Anchors>
-								<Anchor point="CENTER"/>
-							</Anchors>
-						</Texture>
-						<Texture name="$parentSelected" parentKey="selected" file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD" hidden="true">
-							<Size x="44" y="44"/>
-							<Anchors>
-								<Anchor point="CENTER"/>
-							</Anchors>
-						</Texture>
-					</Layer>
-				</Layers>
-			</Frame>
-		</Frames>
-		<HighlightTexture file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD">
-			<Size x="44" y="44"/>
+		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD">
+			<Size x="34" y="34"/>
 			<Anchors>
 				<Anchor point="CENTER"/>
 			</Anchors>
 		</HighlightTexture>
 		<Scripts>
-			<OnLoad>
-				self.portrait:SetFrameLevel(self:GetFrameLevel() + 1);
-				self.ring:SetFrameLevel(self:GetFrameLevel() + 2);
-			</OnLoad>
 			<OnClick>
 				EncounterJournal_DisplayCreature(self);
 				PlaySound("igMainMenuOptionCheckBoxOn");
@@ -784,6 +765,70 @@
 		</Scripts>
 	</Button>
 
+	<!-- item sets tab: one set (retail LootJournalItemSetTemplate); item buttons are made in Lua -->
+	<Frame name="EncounterItemSetTemplate" virtual="true" hidden="true">
+		<Size x="730" y="46"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="bg">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.45"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parentNameButton" parentKey="nameButton">
+				<Size x="270" y="46"/>
+				<Anchors>
+					<Anchor point="LEFT"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString name="$parentName" parentKey="name" inherits="GameFontNormalMed3" justifyH="LEFT">
+							<Size x="255" y="16"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="12" y="-7"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="itemLevel" inherits="GameFontHighlightSmall" justifyH="LEFT">
+							<Size x="255" y="12"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter function="EncounterJournalItemSet_OnEnter"/>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Button>
+		</Frames>
+	</Frame>
+
+	<!-- item set piece -->
+	<Button name="EncounterItemSetItemTemplate" virtual="true" hidden="true">
+		<Size x="32" y="32"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="icon" setAllPoints="true"/>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+		<Scripts>
+			<OnEnter>
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:" .. self.itemID);
+				GameTooltip:Show();
+			</OnEnter>
+			<OnLeave function="GameTooltip_Hide"/>
+			<OnClick function="EncounterJournalItemSetItem_OnClick"/>
+		</Scripts>
+	</Button>
+
 	<!-- The journal -->
 	<Frame name="EncounterJournal" inherits="ButtonFrameTemplate" toplevel="true" enableMouse="true" parent="UIParent" hidden="true">
 		<Size x="800" y="496"/>
@@ -874,6 +919,58 @@
 						</Anchors>
 					</ScrollFrame>
 					<Frame name="$parentGrid" parentKey="Grid" enableMouseWheel="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentScrollFrame"/>
+							<Anchor point="BOTTOMRIGHT" relativeTo="$parentScrollFrame"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+			</Frame>
+
+			<!-- item sets tab (retail LootJournal) -->
+			<Frame name="$parentLootJournal" parentKey="LootJournal" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="0" y="-2"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-3" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="bg" file="Interface\EncounterJournal\UI-EJ-Cataclysm">
+							<Size x="787" y="425"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="3" y="-1"/>
+							</Anchors>
+							<TexCoords left="0" right="0.76855469" top="0" bottom="0.83007813"/>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString parentKey="title" inherits="GameFontNormalHuge" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="20" y="-16"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="$parentExpansionDropdown" parentKey="ExpansionDropdown" inherits="WowStyle1DropdownTemplate">
+						<Size x="170" y="25"/>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-18" y="-12"/>
+						</Anchors>
+					</Button>
+					<Button name="$parentClassDropdown" parentKey="ClassDropdown" inherits="WowStyle1DropdownTemplate">
+						<Size x="150" y="25"/>
+						<Anchors>
+							<Anchor point="RIGHT" relativeTo="$parentExpansionDropdown" relativePoint="LEFT" x="-8" y="0"/>
+						</Anchors>
+					</Button>
+					<ScrollFrame name="$parentScrollFrame" parentKey="ScrollFrame" inherits="FauxScrollFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="18" y="-50"/>
+							<Anchor point="BOTTOMRIGHT" x="-30" y="8"/>
+						</Anchors>
+					</ScrollFrame>
+					<Frame name="$parentList" parentKey="list" enableMouseWheel="true">
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeTo="$parentScrollFrame"/>
 							<Anchor point="BOTTOMRIGHT" relativeTo="$parentScrollFrame"/>
