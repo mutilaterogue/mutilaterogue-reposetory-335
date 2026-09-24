@@ -5,15 +5,17 @@
 -- Up to 3 masks per texture are drawn. A mask must stay shown (a hidden region is not laid out);
 -- it is never drawn anyway. Outside its rect a mask repeats its edge pixels (keep the edges transparent).
 -- Loaded early (FrameXML.toc snippets, after XMLExt.lua): no WorldFrame/UIParent yet.
-if not TextureAddMask then
-	return;
-end
+-- Everything is defined unconditionally: the DLL functions (TextureAddMask & co) are looked up
+-- when used, their registration may come after this file.
 
 local helper = CreateFrame("Frame");
 helper:Hide();
 local textureMethods = getmetatable(helper:CreateTexture()).__index;
 
 function textureMethods:AddMaskTexture(mask)
+	if not TextureAddMask then
+		return;
+	end
 	TextureAddMask(self, mask);
 	local masks = self.maskTextures;
 	if not masks then
@@ -29,7 +31,9 @@ function textureMethods:AddMaskTexture(mask)
 end
 
 function textureMethods:RemoveMaskTexture(mask)
-	TextureRemoveMask(self, mask);
+	if TextureRemoveMask then
+		TextureRemoveMask(self, mask);
+	end
 	local masks = self.maskTextures;
 	if not masks then
 		return;
@@ -51,7 +55,9 @@ end
 
 local function CreateMaskTexture(self, name, layer, inherits)
 	local mask = self:CreateTexture(name, layer or "ARTWORK", inherits);
-	TextureSetIsMask(mask, true);
+	if TextureSetIsMask then
+		TextureSetIsMask(mask, true);
+	end
 	return mask;
 end
 
@@ -95,7 +101,7 @@ end
 
 -- the texture of a <MaskTexture> node: a mask; its masked textures are resolved after the frame's load
 function __XMLExt_Mask(mask, parent, keys)
-	if type(mask) ~= "table" then
+	if type(mask) ~= "table" or not TextureSetIsMask then
 		return;
 	end
 	TextureSetIsMask(mask, true);
