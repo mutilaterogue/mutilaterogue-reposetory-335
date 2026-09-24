@@ -304,7 +304,8 @@ namespace
         GxRsSet(device, state, maskShader);
         for (size_t k = 0; k < used; k++)
             GxRsSet(device, GXRS_TEXTURE0 + 1 + static_cast<int>(k), maskTex[k]);
-        s_boundMasks = std::max(s_boundMasks, used);
+        if (used > s_boundMasks)
+            s_boundMasks = used;
         reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(
             device, GXSH_PIXEL, 1, constants, static_cast<int>(used * 3));
     }
