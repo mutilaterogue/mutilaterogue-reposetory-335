@@ -6,8 +6,8 @@ Inputs:
     ItemSet.dbc      set name, items, bonus spells and thresholds (3.3.5 12340)
     Spell.dbc        bonus descriptions ($s1 / ${...} tokens are resolved here)
     ItemCache.lua    names, quality, icons of the items (sets with unknown items are dropped)
-    items_ext.csv    optional, tab separated dump of item_template:
-                         entry, ItemLevel, AllowableClass
+    items_ext.csv    optional dump of item_template (tab separated or CSV with a header):
+                         SELECT entry, ItemLevel, AllowableClass FROM item_template;
                      gives the item level line and the class filter
 
 The expansion comes from the set ID: ItemSet.dbc rows were added in patch order
@@ -197,17 +197,22 @@ def load_item_cache(path):
 
 
 def load_items_ext(path):
+    """entry -> (ItemLevel, AllowableClass); tab separated or a quoted CSV export with a header."""
+    import csv
     ext = {}
     if not path or not os.path.exists(path):
         return ext
-    for line in open(path, encoding="utf-8", errors="replace"):
-        parts = line.rstrip("\r\n").split("\t")
-        if len(parts) < 3:
-            continue
-        try:
-            ext[int(parts[0])] = (int(parts[1]), int(parts[2]))
-        except ValueError:
-            continue
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as fh:
+        sample = fh.readline()
+        fh.seek(0)
+        delimiter = "\t" if "\t" in sample else ","
+        for parts in csv.reader(fh, delimiter=delimiter):
+            if len(parts) < 3:
+                continue
+            try:
+                ext[int(parts[0])] = (int(parts[1]), int(parts[2]))
+            except ValueError:
+                continue   # header
     return ext
 
 

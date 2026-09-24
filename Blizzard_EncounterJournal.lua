@@ -1544,7 +1544,15 @@ function EncounterJournal_InitLootJournal(self)
 				end, classID);
 			end
 		end);
-		EncounterJournal_SetItemSetClass(0);
+		-- like retail: the player's class first
+		local _, playerToken = UnitClass("player");
+		local playerClassID = 0;
+		for classID, token in pairs(CLASS_TOKENS_BY_ID) do
+			if token == playerToken then
+				playerClassID = classID;
+			end
+		end
+		EncounterJournal_SetItemSetClass(playerClassID);
 	else
 		lootJournal.ClassDropdown:Hide();
 	end
