@@ -24,6 +24,7 @@ public:
     static int32_t TextureSetIsMask(lua_State* L);
     static int32_t TextureMaskDebug(lua_State* L);
     static int32_t TextureMaskDebugFlags(lua_State* L);
+    static int32_t TextureMaskDumpShaders(lua_State* L);
 
 private:
     MaskTexture() = delete;

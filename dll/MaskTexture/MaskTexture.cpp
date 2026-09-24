@@ -512,3 +512,28 @@ int32_t MaskTexture::TextureMaskDebugFlags(lua_State* L)
     s_debugFlags = static_cast<int>(FrameScript::GetNumber(L, 1));
     return 0;
 }
+
+// TextureMaskDumpShaders() -> the device vtable entries used here and the first 0x40 bytes of
+// UIMask (created by the DLL) next to the client's Desaturate (dword_B47934[1]), to compare
+int32_t MaskTexture::TextureMaskDumpShaders(lua_State* L)
+{
+    char buffer[1024];
+    void* device = Device();
+    int n = snprintf(buffer, sizeof(buffer), "device=%p vt272=%p vt276=%p vt280=%p vt288=%p",
+        device, VFunc(device, VT_SHADER_CREATE), VFunc(device, VT_SHADER_RELEASE),
+        VFunc(device, VT_SHADER_CONSTANTS), VFunc(device, 288));
+
+    void* shaders[2] = { s_maskShader, reinterpret_cast<void**>(ADDR_SHADERS)[1] };
+    const char* names[2] = { "UIMask", "Desaturate" };
+    for (int i = 0; i < 2 && n > 0 && n < static_cast<int>(sizeof(buffer)); i++)
+    {
+        n += snprintf(buffer + n, sizeof(buffer) - n, " | %s=%p:", names[i], shaders[i]);
+        if (!shaders[i])
+            continue;
+        const uint32_t* d = reinterpret_cast<const uint32_t*>(shaders[i]);
+        for (int k = 0; k < 16 && n > 0 && n < static_cast<int>(sizeof(buffer)); k++)
+            n += snprintf(buffer + n, sizeof(buffer) - n, " %X", d[k]);
+    }
+    FrameScript::PushString(L, buffer);
+    return 1;
+}
