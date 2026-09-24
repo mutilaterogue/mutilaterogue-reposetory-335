@@ -107,7 +107,8 @@ DCL3_MASK = [
     0x0200001F, 0x90000000, 0xA00F0801,	# dcl_2d s1
 ]
 SAMPLE3_MASK = [
-    0x04000004, 0x800F0001, 0x90440001, 0xA0E40001, 0xA0E40002,	# mad r1, v1.xyxy, c1, c2 (c1.zw = c2.zw = 0)
+    0x03000005, 0x800F0001, 0x90440001, 0xA0E40001,	# mul r1, v1.xyxy, c1 (c1.zw = 0)
+    0x03000002, 0x800F0001, 0x80E40001, 0xA0E40002,	# add r1, r1, c2 (c2.zw = 0; one constant per instruction)
     0x03000042, 0x800F0000, 0x90440001, 0xA0E40800,			# texld r0, v1.xyxy, s0
     0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
 ]
