@@ -1499,6 +1499,13 @@ end
 function EncounterJournal_InitLootJournal(self)
 	local lootJournal = self.LootJournal;
 	lootJournal.title:SetText("Комплекты");
+	-- "no sets" text; made here too, in case an older Blizzard_EncounterJournal.xml is installed
+	if not lootJournal.empty then
+		lootJournal.empty = lootJournal:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
+		lootJournal.empty:SetPoint("CENTER", 0, -20);
+		lootJournal.empty:SetText("Нет комплектов");
+		lootJournal.empty:Hide();
+	end
 	lootJournal.rows = {};
 	for index = 1, ITEMSET_ROWS do
 		local row = CreateFrame("Frame", "EncounterJournalItemSet" .. index, lootJournal.list, "EncounterItemSetTemplate");
