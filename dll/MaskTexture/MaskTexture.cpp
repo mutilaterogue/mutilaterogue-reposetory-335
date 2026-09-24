@@ -11,7 +11,7 @@ namespace
 {
     // ---------------- client functions ----------------
     constexpr uint32_t ADDR_BATCH_RENDER = 0x484B00;		// int __cdecl CSimpleBatch_Render(CSimpleBatch*)
-    constexpr uint32_t ADDR_GXRS_SET = 0x685F50;		// void __cdecl GxRsSet(int state, void* value)
+    constexpr uint32_t ADDR_GXRS_SET = 0x685F50;		// void __thiscall CGxDevice::RsSet(int state, void* value) (ecx = device)
     constexpr uint32_t ADDR_TEXTURE_DRAW = 0x485140;		// int __thiscall CSimpleTexture::Draw(CSimpleBatch*)
     constexpr uint32_t ADDR_TEXTURE_VTABLE_DRAW = 0x9EA1D8 + 23 * 4;	// slot 23 = 0x9EA234
     constexpr uint32_t ADDR_TEX_GETGX = 0x4B6CB0;		// CGxTex* __cdecl (HTEXTURE, int, int)
@@ -68,7 +68,7 @@ namespace
     static_assert(sizeof(BatchItem) == ITEM_SIZE);
 
     using BatchRender_t = int(__cdecl*)(void*);
-    using GxRsSet_t = void(__cdecl*)(int, void*);
+    using GxRsSet_t = void(__thiscall*)(void*, int, void*);
     using TextureDraw_t = int(__thiscall*)(void*, void*);
     using TexGetGx_t = void* (__cdecl*)(uint32_t, int, int);
     using TexHasTransform_t = int(__cdecl*)(uint32_t);
@@ -212,19 +212,20 @@ namespace
         batching = oldBatching;
         if (s_texture1Bound)
         {
-            reinterpret_cast<GxRsSet_t>(ADDR_GXRS_SET)(GXRS_TEXTURE1, nullptr);
+            reinterpret_cast<GxRsSet_t>(ADDR_GXRS_SET)(Device(), GXRS_TEXTURE1, nullptr);
             s_texture1Bound = false;
         }
         return result;
     }
 
-    void __cdecl PixelShaderSetHook(int state, void* shader)
+    // replaces "call CGxDevice::RsSet" (thiscall): fastcall gets the device in ecx and pops the 2 args the same way
+    void __fastcall PixelShaderSetHook(void* device, void* /*edx*/, int state, void* shader)
     {
         auto gxRsSet = reinterpret_cast<GxRsSet_t>(ADDR_GXRS_SET);
         void* batch = s_renderBatch;
         if (!batch || state != GXRS_PIXELSHADER)
         {
-            gxRsSet(state, shader);
+            gxRsSet(device, state, shader);
             return;
         }
 
@@ -242,14 +243,13 @@ namespace
 
         if (!maskTex || !maskShader || !MaskConstants(item, mask, c1))
         {
-            gxRsSet(state, shader);
+            gxRsSet(device, state, shader);
             return;
         }
 
-        gxRsSet(state, maskShader);
-        gxRsSet(GXRS_TEXTURE1, maskTex);
+        gxRsSet(device, state, maskShader);
+        gxRsSet(device, GXRS_TEXTURE1, maskTex);
         s_texture1Bound = true;
-        void* device = Device();
         reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(device, GXSH_PIXEL, 1, c1, 1);
     }
 
