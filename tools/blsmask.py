@@ -39,7 +39,8 @@ DCL_MASK = [
     0x0200001F, 0x90000000, 0xA00F0801,	# dcl_2d s1
 ]
 SAMPLE_MASK = [
-    0x04000004, 0x800F0001, 0xB0E40000, 0xA0E40001, 0xA0E40002,	# mad r1, t0, c1, c2 (all of r1: texld reads it whole)
+    0x03000005, 0x800F0001, 0xB0E40000, 0xA0E40001,	# mul r1, t0, c1 (all of r1: texld reads it whole)
+    0x03000002, 0x800F0001, 0x80E40001, 0xA0E40002,	# add r1, r1, c2 (one constant per instruction)
     0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40800,			# texld r0, t0, s0
     0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
 ]

@@ -103,6 +103,8 @@ namespace
     uint32_t s_maskedItems = 0;			// masked items drawn with the mask
     uint32_t s_failNoTex = 0, s_failNoShader = 0, s_failRect = 0;
     float s_lastC1[4] = {};
+    // TextureMaskDebugFlags: 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader
+    int s_debugFlags = 0;
 
     void* s_renderBatch = nullptr;
     uint32_t s_renderItem = 0;
@@ -279,10 +281,14 @@ namespace
         s_maskedItems++;
         s_lastC1[0] = c1[0]; s_lastC1[1] = c1[1]; s_lastC1[2] = c1[4]; s_lastC1[3] = c1[5];
 
-        gxRsSet(device, state, maskShader);
-        gxRsSet(device, GXRS_TEXTURE1, maskTex);
-        s_texture1Bound = true;
-        reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(device, GXSH_PIXEL, 1, c1, 2);
+        gxRsSet(device, state, (s_debugFlags & 4) ? shader : maskShader);
+        if (!(s_debugFlags & 1))
+        {
+            gxRsSet(device, GXRS_TEXTURE1, maskTex);
+            s_texture1Bound = true;
+        }
+        if (!(s_debugFlags & 2))
+            reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(device, GXSH_PIXEL, 1, c1, 2);
     }
 
     // ---------------- patching ----------------
@@ -408,9 +414,9 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
 {
     char buffer[1024];
     int n = snprintf(buffer, sizeof(buffer),
-        "vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d | "
+        "flags=%d vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d | "
         "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
-        s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
+        s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
         s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid,
         s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
         s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
@@ -429,4 +435,11 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
     }
     FrameScript::PushString(L, buffer);
     return 1;
+}
+
+// TextureMaskDebugFlags(flags): 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader
+int32_t MaskTexture::TextureMaskDebugFlags(lua_State* L)
+{
+    s_debugFlags = static_cast<int>(FrameScript::GetNumber(L, 1));
+    return 0;
 }
