@@ -28,7 +28,7 @@ function ScenarioObjectiveTrackerMixin:InitModule()
 	self.StageBlock.height = 83;
 	self.StageBlock.fixedHeight = true;
 	self.StageBlock.fixedWidth = true;
-	self.ObjectivesBlock.offsetX = 32;
+	self.ObjectivesBlock.offsetX = 14;
 	self.ObjectivesBlock:Init();
 	self.ObjectivesBlock:Reset();
 

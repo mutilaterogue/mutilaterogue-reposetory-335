@@ -50,7 +50,10 @@ end
 -- current instance -> journal instance
 ---------------------------------------------------------------------------
 local current;			-- { instanceID, name, isRaid, bosses = { {encounterID, name, names = {}} }, key }
-local killedByRun = {};	-- [run key] = { [encounterID] = true }, kept for the session (re-entering the run)
+-- [run key] = { killed = { [encounterID] = true }, expires = time, lockID = id }
+-- saved in ScenarioCompatDB (SavedVariables of the Blizzard_ScenarioSaved addon), a session table without it
+local killedByRun = {};
+local RUN_KEEP_SECONDS = 2 * 60 * 60;	-- an unsaved run (normal 5-man): kept 2 h after the last kill / entry
 
 local function FindJournalInstance(zoneName, isRaid)
 	if not EJ_DATA then
@@ -138,7 +141,15 @@ local function UpdateCurrentInstance()
 				bosses = BuildBosses(instanceID),
 				key = key,
 			};
-			killedByRun[key] = killedByRun[key] or {};
+			local run = killedByRun[key];
+			if not run or (run.expires or 0) < time() then
+				run = { killed = {} };
+				killedByRun[key] = run;
+			end
+			if not run.lockID then
+				run.expires = math.max(run.expires or 0, time() + RUN_KEEP_SECONDS);
+			end
+			RequestRaidInfo();
 		end
 	end
 
@@ -152,7 +163,7 @@ local function NumKilled()
 	if not current then
 		return 0;
 	end
-	local killed, count = killedByRun[current.key], 0;
+	local killed, count = killedByRun[current.key].killed, 0;
 	for _, boss in ipairs(current.bosses) do
 		if killed[boss.encounterID] then
 			count = count + 1;
@@ -166,7 +177,8 @@ local function OnUnitDied(destName)
 		return;
 	end
 	local lowerName = ULower(destName);
-	local killed = killedByRun[current.key];
+	local run = killedByRun[current.key];
+	local killed = run.killed;
 	for index, boss in ipairs(current.bosses) do
 		if not killed[boss.encounterID] and boss.names[lowerName] then
 			killed[boss.encounterID] = true;
@@ -180,7 +192,49 @@ local function OnUnitDied(destName)
 	end
 end
 
+-- the raid / heroic lock of the current run: a new lock ID means a new run, the kills expire with the lock
+local function SyncLock()
+	if not current then
+		return;
+	end
+	local run = killedByRun[current.key];
+	local zoneName, _, difficultyIndex = GetInstanceInfo();
+	for i = 1, GetNumSavedInstances() do
+		local name, lockID, reset, difficulty, locked = GetSavedInstanceInfo(i);
+		if locked and name == zoneName and difficulty == difficultyIndex then
+			if run.lockID and run.lockID ~= lockID then
+				wipe(run.killed);
+				Fire("SCENARIO_UPDATE", true);
+			end
+			run.lockID = lockID;
+			run.expires = time() + reset;
+			return;
+		end
+	end
+end
+
+local function LoadSaved()
+	ScenarioCompatDB = ScenarioCompatDB or {};
+	ScenarioCompatDB.runs = ScenarioCompatDB.runs or {};
+	local runs = ScenarioCompatDB.runs;
+	for key, run in pairs(killedByRun) do
+		runs[key] = run;	-- kills made before the variables loaded
+	end
+	local now = time();
+	for key, run in pairs(runs) do
+		if type(run) ~= "table" or type(run.killed) ~= "table" or (run.expires or 0) < now then
+			runs[key] = nil;
+		end
+	end
+	killedByRun = runs;
+	current = nil;
+	UpdateCurrentInstance();
+	Fire("SCENARIO_UPDATE", true);
+end
+
 local watcher = CreateFrame("Frame");
+watcher:RegisterEvent("VARIABLES_LOADED");
+watcher:RegisterEvent("UPDATE_INSTANCE_INFO");
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD");
 watcher:RegisterEvent("ZONE_CHANGED_NEW_AREA");
 watcher:RegisterEvent("ZONE_CHANGED");
@@ -191,6 +245,10 @@ watcher:SetScript("OnEvent", function(self, event, ...)
 		if subEvent == "UNIT_DIED" then
 			OnUnitDied(destName);
 		end
+	elseif event == "VARIABLES_LOADED" then
+		LoadSaved();
+	elseif event == "UPDATE_INSTANCE_INFO" then
+		SyncLock();
 	else
 		UpdateCurrentInstance();
 	end
@@ -265,7 +323,7 @@ function C_ScenarioInfo.GetCriteriaInfo(criteriaIndex)
 	if not boss then
 		return nil;
 	end
-	local completed = killedByRun[current.key][boss.encounterID] == true;
+	local completed = killedByRun[current.key].killed[boss.encounterID] == true;
 	return {
 		description = SCENARIO_BOSS_DEFEATED:format(boss.name),
 		criteriaType = 0,
