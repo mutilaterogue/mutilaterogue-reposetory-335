@@ -204,7 +204,7 @@ def load_item_cache(path):
     pattern = re.compile(r'ITEM_CACHE\[(\d+)\] = \{ "((?:[^"\\]|\\.)*)", (\d+), (\d+), (\d+), (\d+), "([^"]*)"')
     for m in pattern.finditer(open(path, encoding="utf-8", errors="replace").read()):
         items[int(m.group(1))] = {"quality": int(m.group(3)), "class": int(m.group(4)),
-                                  "invType": int(m.group(6))}
+                                  "subclass": int(m.group(5)), "invType": int(m.group(6))}
     return items
 
 
@@ -237,6 +237,35 @@ def load_items_ext(path):
 
 # classID (EJ class filter, druid = 11) from the AllowableClass bitmask (bit = classID - 1)
 ALL_CLASSES_MASK = 0x5FF
+
+
+def class_bits(*class_ids):
+    mask = 0
+    for class_id in class_ids:
+        mask |= 1 << (class_id - 1)
+    return mask
+
+
+# items with AllowableClass -1: the classes whose primary armor it is (like retail's filter)
+ITEM_CLASS_ARMOR = 4
+ARMOR_CLASSES = {
+    1: class_bits(5, 8, 9),       # cloth: priest, mage, warlock
+    2: class_bits(4, 11),         # leather: rogue, druid
+    3: class_bits(3, 7),          # mail: hunter, shaman
+    4: class_bits(1, 2, 6),       # plate: warrior, paladin, death knight
+}
+
+
+def armor_class_mask(items, cache):
+    """Class mask from the armor type most of the set's armor pieces have (0 = unknown)."""
+    counts = {}
+    for i in items:
+        item = cache[i]
+        if item["class"] == ITEM_CLASS_ARMOR and item["subclass"] in ARMOR_CLASSES:
+            counts[item["subclass"]] = counts.get(item["subclass"], 0) + 1
+    if not counts:
+        return 0
+    return ARMOR_CLASSES[max(counts, key=counts.get)]
 
 
 def lua_string(text):
@@ -310,6 +339,8 @@ def main():
                 mask = ext[i]["allowableclass"]
                 if mask > 0 and (mask & ALL_CLASSES_MASK) != ALL_CLASSES_MASK:
                     class_mask |= mask
+            if class_mask == 0:
+                class_mask = armor_class_mask(level_items, cache)
             sets.append({"id": set_id, "name": name, "items": level_items, "bonuses": bonuses,
                          "quality": max(cache[i]["quality"] for i in level_items),
                          "itemLevel": item_level, "classMask": class_mask,
