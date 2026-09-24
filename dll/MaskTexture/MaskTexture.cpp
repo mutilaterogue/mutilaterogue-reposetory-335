@@ -20,6 +20,8 @@ namespace
     constexpr uint32_t ADDR_TEX_HASTRANSFORM = 0x4B5460;	// int __cdecl (HTEXTURE)
     constexpr uint32_t ADDR_TEX_GETTRANSFORM = 0x4B5490;	// void __cdecl (HTEXTURE, float* offset2, float* scale)
     constexpr uint32_t ADDR_SHADERS = 0xB47934;			// CGxShader* [2]: "UI", "Desaturate"
+    constexpr uint32_t ADDR_UI_SHADERS_CREATE = 0x483060;	// void __cdecl: creates dword_B47934 (UI init / device restore)
+    constexpr uint32_t ADDR_UI_SHADERS_RELEASE = 0x4830A0;	// void __cdecl: releases them
     constexpr uint32_t ADDR_SHADER_VALID = 0x689A50;		// bool __thiscall CGxShader::Valid()
     constexpr uint32_t ADDR_BATCHING = 0xB47948;			// int: merge batch items
     constexpr uint32_t ADDR_DEVICE = 0xC5DF88;			// CGxDevice*
@@ -33,6 +35,7 @@ namespace
 
     // device vtable
     constexpr uint32_t VT_SHADER_CREATE = 272;			// (CGxShader** out, int target, const char* path, const char* name, int permutations)
+    constexpr uint32_t VT_SHADER_RELEASE = 276;			// (CGxShader** shader)
     constexpr uint32_t VT_SHADER_CONSTANTS = 280;			// (int target, int start, const float* data, int count)
 
     // GxRs states (sub_484B00: 21 texture, 78 pixel shader)
@@ -77,6 +80,8 @@ namespace
     using TexGetTransform_t = void(__cdecl*)(uint32_t, float*, float*);
     using ShaderValid_t = bool(__thiscall*)(void*);
     using ShaderCreate_t = void(__thiscall*)(void*, void**, int, const char*, const char*, int);
+    using ShaderRelease_t = void(__thiscall*)(void*, void**);
+    using UiShaders_t = void(__cdecl*)();
     using ShaderConstants_t = void(__thiscall*)(void*, int, int, const float*, int);
     using IsA_t = bool(__thiscall*)(void*, int);
     using LuaType_t = int(__cdecl*)(lua_State*, int);
@@ -95,6 +100,8 @@ namespace
     bool s_testShaderValid = false;
     void* s_maskDesatShader = nullptr;
     bool s_shadersLoaded = false;
+    int s_createHooks = 0;		// the shaders are created with the client's UI shaders (0 = lazily in the render)
+    uint32_t s_createdWithClient = 0;
 
     // the batch being rendered with masks: the item index follows the PixelShader sets (batching off)
     // diagnostics (TextureMaskDebug)
@@ -151,6 +158,35 @@ namespace
             s_debugCShader = nullptr;
         if (s_debugTShader && !valid(s_debugTShader))
             s_debugTShader = nullptr;
+    }
+
+    void ReleaseShaders()
+    {
+        void* device = Device();
+        auto release = reinterpret_cast<ShaderRelease_t>(VFunc(device, VT_SHADER_RELEASE));
+        for (void** shader : { &s_maskShader, &s_maskDesatShader, &s_debugCShader, &s_debugTShader, &s_testShader })
+        {
+            if (*shader)
+                release(device, shader);
+            *shader = nullptr;
+        }
+        s_shadersLoaded = false;
+    }
+
+    // The client creates its UI shaders in sub_483060; a shader created in the middle of a frame is
+    // not drawn (tested: the same Desaturate created by the DLL in the render draws nothing).
+    void __cdecl UiShadersCreateHook()
+    {
+        reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_CREATE)();
+        ReleaseShaders();
+        LoadShaders();
+        s_createdWithClient++;
+    }
+
+    void __cdecl UiShadersReleaseHook()
+    {
+        ReleaseShaders();
+        reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_RELEASE)();
     }
 
     // uv of corner i after the texture's own atlas transform (the UV the shader gets in t0)
@@ -232,6 +268,7 @@ namespace
         if (s_maskOf.empty() || !BatchHasMask(batch))
             return reinterpret_cast<BatchRender_t>(ADDR_BATCH_RENDER)(batch);
 
+        // normally loaded with the client's UI shaders; lazily only if that already happened before the patch
         LoadShaders();
         s_maskedBatches++;
         // one draw per item: every item sets its pixel shader, in item order
@@ -323,16 +360,21 @@ namespace
         return true;
     }
 
-    // every "call CSimpleBatch_Render" in .text
-    int PatchRenderCalls()
+    // every "call target" in .text
+    int PatchAllCalls(uint32_t target, void* hook)
     {
         int patched = 0;
         for (uint32_t site = 0x401000; site < 0x9E0000; site++)
             if (*reinterpret_cast<uint8_t*>(site) == 0xE8
-                && site + 5 + *reinterpret_cast<int32_t*>(site + 1) == ADDR_BATCH_RENDER
-                && PatchCall(site, ADDR_BATCH_RENDER, reinterpret_cast<void*>(&BatchRenderHook)))
+                && site + 5 + *reinterpret_cast<int32_t*>(site + 1) == target
+                && PatchCall(site, target, hook))
                 patched++;
         return patched;
+    }
+
+    int PatchRenderCalls()
+    {
+        return PatchAllCalls(ADDR_BATCH_RENDER, reinterpret_cast<void*>(&BatchRenderHook));
     }
 
     // "push 4Eh; call GxRsSet" inside the render (the per-item pixel shader)
@@ -381,7 +423,12 @@ void MaskTexture::ApplyPatches()
     // the pixel shader hook first: without it the render hook must not run
     s_shaderSetPatched = PatchPixelShaderSet();
     if (s_shaderSetPatched)
+    {
+        // our shaders live and die with the client's UI shaders
+        s_createHooks = PatchAllCalls(ADDR_UI_SHADERS_CREATE, reinterpret_cast<void*>(&UiShadersCreateHook));
+        PatchAllCalls(ADDR_UI_SHADERS_RELEASE, reinterpret_cast<void*>(&UiShadersReleaseHook));
         s_renderCallsPatched = PatchRenderCalls();
+    }
 }
 
 // TextureAddMask(texture, mask): one mask per texture (a new one replaces the old)
@@ -435,9 +482,9 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
 {
     char buffer[1024];
     int n = snprintf(buffer, sizeof(buffer),
-        "flags=%d vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d clientDesaturate=%p debugC=%p debugT=%p | "
+        "flags=%d vtable=%d shaderSet=%d renderCalls=%d createHooks=%d createdWithClient=%u | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d clientDesaturate=%p debugC=%p debugT=%p | "
         "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
-        s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
+        s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched, s_createHooks, s_createdWithClient,
         s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid, reinterpret_cast<void**>(ADDR_SHADERS)[1], s_debugCShader, s_debugTShader,
         s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
         s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
