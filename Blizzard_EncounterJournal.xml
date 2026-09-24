@@ -1037,6 +1037,31 @@
 									</OnClick>
 								</Scripts>
 							</Button>
+							<Button name="$parentMapButton" parentKey="mapButton" hidden="true">
+								<Size x="36" y="36"/>
+								<Anchors>
+									<Anchor point="TOPRIGHT" x="-22" y="-4"/>
+								</Anchors>
+								<NormalTexture file="Interface\EncounterJournal\UI-EncounterJournalTextures">
+									<TexCoords left="0.64062500" right="0.73828125" top="0.15820313" bottom="0.20703125"/>
+								</NormalTexture>
+								<PushedTexture file="Interface\EncounterJournal\UI-EncounterJournalTextures">
+									<TexCoords left="0.64062500" right="0.73828125" top="0.10253906" bottom="0.15136719"/>
+								</PushedTexture>
+								<HighlightTexture file="Interface\EncounterJournal\UI-EncounterJournalTextures" alphaMode="ADD">
+									<TexCoords left="0.74218750" right="0.83984375" top="0.10253906" bottom="0.15136719"/>
+								</HighlightTexture>
+								<Scripts>
+									<OnClick>
+										EncounterJournal_ShowMap();
+									</OnClick>
+									<OnEnter>
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip:SetText((ENCOUNTER_JOURNAL_SHOW_MAP or "Показать карту"):gsub("\n", " "));
+									</OnEnter>
+									<OnLeave function="GameTooltip_Hide"/>
+								</Scripts>
+							</Button>
 							<ScrollFrame name="EncounterJournalBossScrollFrame" parentKey="bossScroll" inherits="FauxScrollFrameTemplate">
 								<Anchors>
 									<Anchor point="TOPLEFT" x="22" y="-46"/>

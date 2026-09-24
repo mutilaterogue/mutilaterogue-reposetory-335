@@ -343,6 +343,7 @@ function EncounterJournal_OnShow(self)
 	end
 
 	EncounterJournal_UpdateTierText();
+	EncounterJournal_CheckCurrentInstance();
 	if UpdateMicroButtons then
 		UpdateMicroButtons();
 	end
@@ -529,6 +530,8 @@ function EncounterJournal_DisplayInstance(instanceID, noButton)
 
 	local encounter = journal.encounter;
 	encounter.leftPage.instanceButton.title:SetText(name);
+	local inst = EJ_DATA.instances[instanceID];
+	SetShown(encounter.leftPage.mapButton, inst and (inst.areaID or 0) > 0 and inst.mapTexture and inst.mapTexture ~= "");
 
 	-- lore
 	local instance = encounter.instance;
@@ -1721,4 +1724,103 @@ if EncounterJournal_AddMapButtons then
 end
 if EncounterJournal_UpdateMapButtonPortraits then
 	hooksecurefunc("EncounterJournal_UpdateMapButtonPortraits", UpdateMapButtonPortraits);
+end
+
+---------------------------------------------------------------------------
+-- open on the instance the player is in (retail does this on open)
+---------------------------------------------------------------------------
+-- 3.3.5 GetInstanceInfo() has no map ID: the instance is found by its name, or by the
+-- dungeon map texture of the current zone. Difficulty index: party 1 / 2, raid 1..4
+-- (10N, 25N, 10H, 25H) = retail difficultyID 3..6.
+local function FindCurrentInstance()
+	local inInstance, instanceType = IsInInstance();
+	if not inInstance or (instanceType ~= "party" and instanceType ~= "raid") then
+		return nil;
+	end
+	local name, _, difficultyIndex = GetInstanceInfo();
+	local isRaid = instanceType == "raid";
+	local difficultyID = isRaid and (difficultyIndex or 1) + 2 or (difficultyIndex or 1);
+
+	local lowerName = strlower(name or "");
+	for _, instanceID in ipairs(EJ_DATA.instanceOrder) do
+		local inst = EJ_DATA.instances[instanceID];
+		if inst and strlower(inst.name or "") == lowerName and (inst.isRaid and true or false) == isRaid then
+			return instanceID, difficultyID, name;
+		end
+	end
+
+	-- names differ between Map.dbc and the journal: try the dungeon map of the zone
+	if not (WorldMapFrame and WorldMapFrame:IsShown()) then
+		SetMapToCurrentZone();
+		local texture = strlower(GetMapInfo() or "");
+		if texture ~= "" then
+			for _, instanceID in ipairs(EJ_DATA.instanceOrder) do
+				local inst = EJ_DATA.instances[instanceID];
+				if inst and inst.mapTexture and strlower(inst.mapTexture) == texture then
+					return instanceID, difficultyID, name;
+				end
+			end
+		end
+	end
+	return nil;
+end
+
+-- once per visit: after that the journal keeps what the player browsed to
+function EncounterJournal_CheckCurrentInstance()
+	local journal = EncounterJournal;
+	local instanceID, difficultyID, name = FindCurrentInstance();
+	if not instanceID then
+		journal.autoOpenedInstance = nil;
+		return;
+	end
+	local key = (name or "") .. "#" .. difficultyID;
+	if journal.autoOpenedInstance == key then
+		return;
+	end
+	journal.autoOpenedInstance = key;
+	EncounterJournal_OpenJournal(difficultyID, instanceID);
+end
+
+---------------------------------------------------------------------------
+-- "Show map": the world map on the instance, on the floor of the selected boss
+---------------------------------------------------------------------------
+-- SetMapByID takes WorldMapArea ID - 1 in this client (see WorldMapFrame_ToggleWindowSize);
+-- the texture check falls back to the plain ID.
+function EncounterJournal_ShowMap()
+	local journal = EncounterJournal;
+	local inst = journal.instanceID and EJ_DATA.instances[journal.instanceID];
+	if not inst or not inst.areaID or inst.areaID == 0 then
+		return;
+	end
+
+	local floor = 0;
+	local encounterID = journal.encounterID;
+	if not encounterID then
+		-- the instance page: the floor of the first boss that has one
+		for _, id in ipairs(EJ_DATA.encountersByInstance[journal.instanceID] or {}) do
+			local enc = EJ_DATA.encounters[id];
+			if enc and (enc.floor or 0) > 0 then
+				encounterID = id;
+				break;
+			end
+		end
+	end
+	local enc = encounterID and EJ_DATA.encounters[encounterID];
+	if enc and (enc.floor or 0) > 0 then
+		floor = enc.floor;
+	end
+
+	WorldMapFrame.blockWorldMapUpdate = true;
+	ShowUIPanel(WorldMapFrame);
+	SetMapByID(inst.areaID - 1);
+	if inst.mapTexture and strlower(GetMapInfo() or "") ~= strlower(inst.mapTexture) then
+		SetMapByID(inst.areaID);
+	end
+	if floor > 0 then
+		SetDungeonMapLevel(floor);
+	end
+	WorldMapFrame.blockWorldMapUpdate = nil;
+	if WorldMapFrame_UpdateMap then
+		WorldMapFrame_UpdateMap();
+	end
 end
