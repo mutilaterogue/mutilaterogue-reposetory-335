@@ -1,7 +1,8 @@
 -- MaskTexture test page (optional, not needed in game): /masktest shows the cases in a row, again hides them.
 --   1 circle   2 desaturated   3 texcoords rotated 45°   4 two masks   5 cropped texcoords   6 <MaskTexture> in XML
 local ICON = "Interface\\Icons\\INV_Misc_QuestionMark";
-local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask";
+-- the retail portrait mask (TempPortraitAlphaMask may be replaced by an opaque one for square portraits)
+local MASK_ATLAS = "UI-HUD-UnitFrame-Player-Portrait-Mask";
 local SIZE, GAP = 64, 24;
 
 local function Cell(parent, index, label)
@@ -17,7 +18,7 @@ end
 
 local function Mask(parent, icon, xOffset)
 	local mask = parent:CreateMaskTexture();
-	mask:SetTexture(CIRCLE);
+	mask:SetAtlas(MASK_ATLAS);
 	mask:SetPoint("TOPLEFT", icon, "TOPLEFT", xOffset or 0, 0);
 	mask:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", xOffset or 0, 0);
 	icon:AddMaskTexture(mask);

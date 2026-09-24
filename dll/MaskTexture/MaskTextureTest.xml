@@ -5,7 +5,7 @@
 		<Layers>
 			<Layer level="ARTWORK">
 				<Texture parentKey="Icon" file="Interface\Icons\INV_Misc_QuestionMark" setAllPoints="true"/>
-				<MaskTexture parentKey="CircleMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" setAllPoints="true">
+				<MaskTexture parentKey="CircleMask" atlas="UI-HUD-UnitFrame-Player-Portrait-Mask" setAllPoints="true">
 					<MaskedTextures>
 						<MaskedTexture childKey="Icon"/>
 					</MaskedTextures>
