@@ -2,13 +2,24 @@
 --   frame:CreateMaskTexture([name, layer, inherits])  a Texture that is not drawn, only masks
 --   texture:AddMaskTexture(mask) / RemoveMaskTexture(mask) / GetNumMaskTextures() / GetMaskTexture(index)
 -- One mask per texture. A mask must stay shown (a hidden region is not laid out), it is not drawn anyway.
-if not TextureAddMask then
-	return;
-end
-
 -- loaded early (FrameXML.toc snippets): no WorldFrame/UIParent yet
 local helper = CreateFrame("Frame");
 helper:Hide();
+
+-- /masktest is registered even without the DLL functions: it says what is missing
+local function MaskTestMissing()
+	print("masktest: TextureAddMask =", TextureAddMask, "- the DLL functions are not registered (CustomLua::RegisterFunctions / OOBLUAFUNCTIONS_PATCH)");
+end
+
+if not TextureAddMask then
+	helper:RegisterEvent("PLAYER_LOGIN");
+	helper:SetScript("OnEvent", function()
+		SLASH_MASKTEST1 = "/masktest";
+		SlashCmdList["MASKTEST"] = MaskTestMissing;
+	end);
+	return;
+end
+
 local textureMethods = getmetatable(helper:CreateTexture()).__index;
 
 function textureMethods:AddMaskTexture(mask)
