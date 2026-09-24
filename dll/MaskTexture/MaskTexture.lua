@@ -99,19 +99,43 @@ local function FindChild(frame, path)
 	return _G[path] or (frameName and _G[frameName .. path]);
 end
 
--- the texture of a <MaskTexture> node: a mask; its masked textures are resolved after the frame's load
-function __XMLExt_Mask(mask, parent, keys)
-	if type(mask) ~= "table" or not TextureSetIsMask then
+-- masks loaded before the DLL functions were registered: applied at login
+local deferredMasks = {};	-- { {mask, frame or nil, "keys" or nil}, ... }
+
+local function ApplyMask(mask, frame, keys)
+	TextureSetIsMask(mask, true);
+	if not (frame and keys) then
 		return;
 	end
-	TextureSetIsMask(mask, true);
-	if keys and type(parent) == "table" then
-		local list = pendingMasks[parent];
-		if not list then
-			list = {};
-			pendingMasks[parent] = list;
+	for key in keys:gmatch("[^,%s]+") do
+		local texture = FindChild(frame, key);
+		if texture and texture.AddMaskTexture then
+			texture:AddMaskTexture(mask);
+		else
+			geterrorhandler()(("MaskTexture: MaskedTexture childKey '%s' not found"):format(key));
 		end
+	end
+end
+
+-- the texture of a <MaskTexture> node: a mask; its masked textures are resolved after the frame's load
+function __XMLExt_Mask(mask, parent, keys)
+	if type(mask) ~= "table" then
+		return;
+	end
+	if type(parent) ~= "table" then
+		parent, keys = nil, nil;
+	end
+	local list = parent and pendingMasks[parent];
+	if parent and not list then
+		list = {};
+		pendingMasks[parent] = list;
+	end
+	if list then
 		list[#list + 1] = { mask, keys };
+	elseif TextureSetIsMask then
+		TextureSetIsMask(mask, true);
+	else
+		deferredMasks[#deferredMasks + 1] = { mask };
 	end
 end
 
@@ -122,14 +146,22 @@ function __XMLExt_ResolveMasks(frame)
 	end
 	pendingMasks[frame] = nil;
 	for _, entry in ipairs(list) do
-		local mask, keys = entry[1], entry[2];
-		for key in keys:gmatch("[^,%s]+") do
-			local texture = FindChild(frame, key);
-			if texture and texture.AddMaskTexture then
-				texture:AddMaskTexture(mask);
-			else
-				geterrorhandler()(("MaskTexture: MaskedTexture childKey '%s' not found"):format(key));
-			end
+		if TextureSetIsMask and TextureAddMask then
+			ApplyMask(entry[1], frame, entry[2]);
+		else
+			deferredMasks[#deferredMasks + 1] = { entry[1], frame, entry[2] };
 		end
 	end
 end
+
+helper:RegisterEvent("PLAYER_LOGIN");
+helper:SetScript("OnEvent", function(self)
+	self:UnregisterAllEvents();
+	if not (TextureSetIsMask and TextureAddMask) then
+		return;
+	end
+	for _, entry in ipairs(deferredMasks) do
+		ApplyMask(entry[1], entry[2], entry[3]);
+	end
+	wipe(deferredMasks);
+end);
