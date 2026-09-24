@@ -70,12 +70,12 @@ local INFO_TABS = {
 	{ key = "overview", button = "overviewTab", tooltip = OVERVIEW or "Обзор",
 	  selected = { 0.90234375, 0.99609375, 0.26953125, 0.31152344 },
 	  unselected = { 0.85546875, 0.94921875, 0.52441406, 0.56640625 } },
-	{ key = "abilities", button = "abilitiesTab", tooltip = ABILITIES or "Способности",
-	  selected = { 0.806640625, 0.8984375, 0.70703125, 0.748046875 },
-	  unselected = { 0.904296875, 0.99609375, 0.70703125, 0.748046875 } },
 	{ key = "loot", button = "lootTab", tooltip = LOOT or "Добыча",
 	  selected = { 0.63281250, 0.72656250, 0.61816406, 0.66015625 },
 	  unselected = { 0.73046875, 0.82421875, 0.61816406, 0.66015625 } },
+	{ key = "abilities", button = "abilitiesTab", tooltip = ABILITIES or "Способности",
+	  selected = { 0.806640625, 0.8984375, 0.70703125, 0.748046875 },
+	  unselected = { 0.904296875, 0.99609375, 0.70703125, 0.748046875 } },
 	{ key = "model", button = "modelTab", tooltip = MODEL or "Модель",
 	  selected = { 0.8046875, 0.900390625, 0.662109375, 0.705078125 },
 	  unselected = { 0.90234375, 1, 0.662109375, 0.705078125 } },
@@ -316,7 +316,7 @@ function EncounterJournal_InitEncounterFrame(self)
 	model.creatureButtons = {};
 	for index = 1, MAX_CREATURES do
 		local button = CreateFrame("Button", "EncounterJournalCreatureButton" .. index, model, "EncounterCreatureButtonTemplate");
-		button:SetPoint("TOPLEFT", model, "TOPLEFT", 4, -4 - (index - 1) * 42);
+		button:SetPoint("TOPLEFT", model, "TOPLEFT", 4, -4 - (index - 1) * 46);
 		button:SetFrameLevel(model.modelFrame:GetFrameLevel() + 2);
 		model.creatureButtons[index] = button;
 	end
@@ -1089,7 +1089,7 @@ function EncounterJournal_UpdateCreatures()
 			button.id = creature.id;
 			button.name = creature.name;
 			button.displayInfo = creature.displayInfo;
-			SetCreatureIcon(button.creature, creature.icon);
+			button.portraitID = nil;
 			button:Show();
 		else
 			button:Hide();
@@ -1110,6 +1110,19 @@ function EncounterJournal_ShowModel()
 		model.dungeonBG:SetTexture(0, 0, 0, 0.6);
 	end
 	model.displayedID = nil;
+	-- round 3D portraits: set while shown, a model set on a hidden frame is not drawn
+	for _, button in ipairs(model.creatureButtons) do
+		if button:IsShown() and button.displayInfo and button.displayInfo > 0 and EncounterJournal_SetModelByDisplayID then
+			if not button.portraitHooked then
+				button.portraitHooked = true;
+				hooksecurefunc(button.portrait, "SetCreature", function(portrait)
+					portrait:SetCamera(0);
+				end);
+			end
+			button.portraitID = button.displayInfo;
+			EncounterJournal_SetModelByDisplayID(button.portrait, button.displayInfo);
+		end
+	end
 	local creature = (journal.creatures or {})[model.shownCreatureIndex or 1] or (journal.creatures or {})[1];
 	if creature then
 		EncounterJournal_DisplayCreatureData(creature, model.shownCreatureIndex or 1);
@@ -1130,9 +1143,9 @@ function EncounterJournal_DisplayCreatureData(creature, index)
 
 	for buttonIndex, button in ipairs(model.creatureButtons) do
 		if buttonIndex == index then
-			button:LockHighlight();
+			button.ring.selected:Show();
 		else
-			button:UnlockHighlight();
+			button.ring.selected:Hide();
 		end
 	end
 end

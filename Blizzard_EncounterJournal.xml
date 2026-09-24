@@ -637,40 +637,60 @@
 		</Scripts>
 	</Button>
 
-	<!-- creature button on the model tab (retail EncounterCreatureButtonTemplate) -->
+	<!--
+		creature button on the model tab (retail EncounterCreatureButtonTemplate): a round portrait.
+		3.3.5 has no texture masks, so the portrait is the creature's model with the portrait
+		camera, between the round background and the ring (the ring is a child frame, above the model).
+	-->
 	<Button name="EncounterCreatureButtonTemplate" virtual="true" hidden="true">
-		<Size x="45" y="44"/>
+		<Size x="50" y="50"/>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture inherits="UI-EJ-CreatureHeaderFrameSm-bg">
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="ARTWORK">
-				<Texture parentKey="creature">
-					<Size x="36" y="36"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="OVERLAY">
-				<Texture inherits="UI-EJ-CreatureHeaderFrameSm">
+					<Size x="50" y="49"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
 					</Anchors>
 				</Texture>
 			</Layer>
 		</Layers>
-		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD">
-			<Size x="34" y="34"/>
+		<Frames>
+			<PlayerModel name="$parentPortrait" parentKey="portrait">
+				<Size x="36" y="36"/>
+				<Anchors>
+					<Anchor point="CENTER"/>
+				</Anchors>
+			</PlayerModel>
+			<Frame name="$parentRing" parentKey="ring" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture inherits="UI-EJ-CreatureHeaderFrameSm">
+							<Size x="50" y="49"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentSelected" parentKey="selected" file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD" hidden="true">
+							<Size x="44" y="44"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<HighlightTexture file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD">
+			<Size x="44" y="44"/>
 			<Anchors>
 				<Anchor point="CENTER"/>
 			</Anchors>
 		</HighlightTexture>
 		<Scripts>
+			<OnLoad>
+				self.portrait:SetFrameLevel(self:GetFrameLevel() + 1);
+				self.ring:SetFrameLevel(self:GetFrameLevel() + 2);
+			</OnLoad>
 			<OnClick>
 				EncounterJournal_DisplayCreature(self);
 				PlaySound("igMainMenuOptionCheckBoxOn");
@@ -1163,25 +1183,25 @@
 				</Frames>
 			</Frame>
 
-			<!-- side tabs of the right page -->
+			<!-- side tabs of the right page (retail order: overview, loot, abilities, model) -->
 			<Button name="$parentOverviewTab" parentKey="overviewTab" inherits="EncounterTabTemplate" hidden="true">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="-6" y="-60"/>
-				</Anchors>
-			</Button>
-			<Button name="$parentAbilitiesTab" parentKey="abilitiesTab" inherits="EncounterTabTemplate" hidden="true">
-				<Anchors>
-					<Anchor point="TOP" relativeTo="$parentOverviewTab" relativePoint="BOTTOM" x="0" y="2"/>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="-14" y="-60"/>
 				</Anchors>
 			</Button>
 			<Button name="$parentLootTab" parentKey="lootTab" inherits="EncounterTabTemplate" hidden="true">
 				<Anchors>
-					<Anchor point="TOP" relativeTo="$parentAbilitiesTab" relativePoint="BOTTOM" x="0" y="2"/>
+					<Anchor point="TOP" relativeTo="$parentOverviewTab" relativePoint="BOTTOM" x="0" y="2"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentAbilitiesTab" parentKey="abilitiesTab" inherits="EncounterTabTemplate" hidden="true">
+				<Anchors>
+					<Anchor point="TOP" relativeTo="$parentLootTab" relativePoint="BOTTOM" x="0" y="2"/>
 				</Anchors>
 			</Button>
 			<Button name="$parentModelTab" parentKey="modelTab" inherits="EncounterTabTemplate" hidden="true">
 				<Anchors>
-					<Anchor point="TOP" relativeTo="$parentLootTab" relativePoint="BOTTOM" x="0" y="2"/>
+					<Anchor point="TOP" relativeTo="$parentAbilitiesTab" relativePoint="BOTTOM" x="0" y="2"/>
 				</Anchors>
 			</Button>
 
