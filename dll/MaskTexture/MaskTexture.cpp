@@ -89,6 +89,8 @@ namespace
     std::unordered_set<void*> s_isMask;					// textures used as masks: not drawn
 
     void* s_maskShader = nullptr;
+    void* s_debugCShader = nullptr;
+    void* s_debugTShader = nullptr;
     void* s_testShader = nullptr;		// the client's Desaturate loaded the same way (path check)
     bool s_testShaderValid = false;
     void* s_maskDesatShader = nullptr;
@@ -103,7 +105,8 @@ namespace
     uint32_t s_maskedItems = 0;			// masked items drawn with the mask
     uint32_t s_failNoTex = 0, s_failNoShader = 0, s_failRect = 0;
     float s_lastC1[4] = {};
-    // TextureMaskDebugFlags: 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader
+    // TextureMaskDebugFlags: 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader,
+    // 8 = UIMaskDebugC (constants as color), 16 = UIMaskDebugT (stage 1 texture)
     int s_debugFlags = 0;
 
     void* s_renderBatch = nullptr;
@@ -135,12 +138,18 @@ namespace
         create(device, &s_maskShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMask", 1);
         create(device, &s_maskDesatShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDesaturate", 1);
         create(device, &s_testShader, GXSH_PIXEL, "Shaders\\Pixel", "Desaturate", 1);
+        create(device, &s_debugCShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDebugC", 1);
+        create(device, &s_debugTShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDebugT", 1);
         auto valid = reinterpret_cast<ShaderValid_t>(ADDR_SHADER_VALID);
         s_testShaderValid = s_testShader && valid(s_testShader);
         if (s_maskShader && !valid(s_maskShader))
             s_maskShader = nullptr;
         if (s_maskDesatShader && !valid(s_maskDesatShader))
             s_maskDesatShader = nullptr;
+        if (s_debugCShader && !valid(s_debugCShader))
+            s_debugCShader = nullptr;
+        if (s_debugTShader && !valid(s_debugTShader))
+            s_debugTShader = nullptr;
     }
 
     // uv of corner i after the texture's own atlas transform (the UV the shader gets in t0)
@@ -281,7 +290,14 @@ namespace
         s_maskedItems++;
         s_lastC1[0] = c1[0]; s_lastC1[1] = c1[1]; s_lastC1[2] = c1[4]; s_lastC1[3] = c1[5];
 
-        gxRsSet(device, state, (s_debugFlags & 4) ? shader : maskShader);
+        void* useShader = maskShader;
+        if ((s_debugFlags & 8) && s_debugCShader)
+            useShader = s_debugCShader;
+        else if ((s_debugFlags & 16) && s_debugTShader)
+            useShader = s_debugTShader;
+        else if (s_debugFlags & 4)
+            useShader = shader;
+        gxRsSet(device, state, useShader);
         if (!(s_debugFlags & 1))
         {
             gxRsSet(device, GXRS_TEXTURE1, maskTex);
@@ -414,10 +430,10 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
 {
     char buffer[1024];
     int n = snprintf(buffer, sizeof(buffer),
-        "flags=%d vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d | "
+        "flags=%d vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d debugC=%p debugT=%p | "
         "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
         s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
-        s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid,
+        s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid, s_debugCShader, s_debugTShader,
         s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
         s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
 

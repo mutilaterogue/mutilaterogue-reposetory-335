@@ -70,6 +70,30 @@ UI_MASK_DESATURATE = [0xFFFF0200,
     0x0000FFFF,
 ]
 
+# Debug shaders (TextureMaskDebugFlags 8 / 16):
+#   UIMaskDebugC = the constants as a color: (c1.x / 8, c1.y / 8, -c2.x, 1) -> white for an 8x8 atlas icon
+#                  and a full mask; black = the constants do not reach the shader
+#   UIMaskDebugT = the stage 1 texture at t0, opaque: the mask image (wrong place) = s1 is bound
+UI_MASK_DEBUG_C = [0xFFFF0200,
+    0x05000051, 0xA00F0003, 0x3E000000, 0x3E000000, 0x00000000, 0x3F800000,	# def c3, 0.125, 0.125, 0, 1
+    0x02000001, 0x800F0001, 0xA0E40001,			# mov r1, c1
+    0x03000005, 0x800F0000, 0x80E40001, 0xA0E40003,	# mul r0, r1, c3
+    0x02000001, 0x80040000, 0xA1000002,			# mov r0.z, -c2.x
+    0x02000001, 0x80080000, 0xA0FF0003,			# mov r0.w, c3.w
+    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
+    0x0000FFFF,
+]
+
+UI_MASK_DEBUG_T = [0xFFFF0200,
+    0x05000051, 0xA00F0003, 0x00000000, 0x00000000, 0x00000000, 0x3F800000,	# def c3, 0, 0, 0, 1
+    0x0200001F, 0x80000000, 0xB0030000,			# dcl t0.xy
+    0x0200001F, 0x90000000, 0xA00F0801,			# dcl_2d s1
+    0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40801,	# texld r0, t0, s1
+    0x02000001, 0x80080000, 0xA0FF0003,			# mov r0.w, c3.w
+    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
+    0x0000FFFF,
+]
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "."
     if len(sys.argv) > 2:
@@ -77,7 +101,8 @@ if __name__ == "__main__":
             assert f.read() == bls(UI), "header/UI mismatch"
         print("UI.bls rebuilt byte for byte")
     os.makedirs(out, exist_ok=True)
-    for name, tokens in (("UIMask", UI_MASK), ("UIMaskDesaturate", UI_MASK_DESATURATE)):
+    for name, tokens in (("UIMask", UI_MASK), ("UIMaskDesaturate", UI_MASK_DESATURATE),
+                         ("UIMaskDebugC", UI_MASK_DEBUG_C), ("UIMaskDebugT", UI_MASK_DEBUG_T)):
         with open(os.path.join(out, name + ".bls"), "wb") as f:
             f.write(bls(tokens))
         print(name + ".bls", len(bls(tokens)))
