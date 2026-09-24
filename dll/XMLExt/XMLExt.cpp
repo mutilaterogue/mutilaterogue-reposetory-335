@@ -5,6 +5,9 @@
 #include <Windows.h>
 #include <cstring>
 #include <string>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 // ---------------- адреса ----------------
 static constexpr uint32_t ADDR_FRAME_LOADXML = 0x4932C0;
@@ -33,6 +36,11 @@ static constexpr int LUA_GLOBALSINDEX = -10002;
 static constexpr char SEP_ENTRY = '\1';
 static constexpr char SEP_FIELD = '\2';
 
+// <MaskTexture>: loaded as a <Texture> (the node name is swapped for the frame's load), then marked
+// as a mask and added to its <MaskedTextures><MaskedTexture childKey="..."/> (Lua, MaskTexture.lua)
+static const char MASK_TEXTURE_TAG[] = "MaskTexture";
+static const char TEXTURE_TAG[] = "Texture";
+
 using LoadXMLFn = int32_t(__thiscall*)(void*, XMLNode*, void*);
 using GetFieldFn = void(__cdecl*)(lua_State*, int, const char*);
 using PCallFn = int(__cdecl*)(lua_State*, int, int, int);
@@ -53,6 +61,11 @@ static XMLNode* NodeNext(XMLNode* n)
 static const char* NodeName(XMLNode* n)
 {
     return *reinterpret_cast<const char**>(reinterpret_cast<uint32_t>(n) + OFF_NODE_NAME);
+}
+
+static void SetNodeName(XMLNode* n, const char* name)
+{
+    *reinterpret_cast<const char**>(reinterpret_cast<uint32_t>(n) + OFF_NODE_NAME) = name;
 }
 
 static XMLNode* FindChild(XMLNode* n, const char* name)
@@ -251,12 +264,121 @@ void XMLExt::Dispatch(void* layout, XMLNode* node, bool pre)
     FrameScript::SetTop(L, top);
 }
 
+// ---------------- <MaskTexture> ----------------
+// mask nodes of the frames being loaded (nested frames load inside their parent's load)
+static std::unordered_set<XMLNode*> s_maskNodes;
+
+using RenamedNodes = std::vector<std::pair<XMLNode*, const char*>>;
+
+// <Layers><Layer><MaskTexture> -> <Texture> for the frame's load; the names are restored after it
+static void BeginMaskTextures(XMLNode* node, RenamedNodes& renamed)
+{
+    XMLNode* layers = FindChild(node, "Layers");
+
+    if (!layers)
+        return;
+
+    for (XMLNode* layer = NodeFirstChild(layers); layer; layer = NodeNext(layer))
+    {
+        for (XMLNode* c = NodeFirstChild(layer); c; c = NodeNext(c))
+        {
+            const char* name = NodeName(c);
+
+            if (name && !_stricmp(name, MASK_TEXTURE_TAG))
+            {
+                renamed.emplace_back(c, name);
+                SetNodeName(c, TEXTURE_TAG);
+                s_maskNodes.insert(c);
+            }
+        }
+    }
+}
+
+static void EndMaskTextures(RenamedNodes& renamed)
+{
+    for (auto& [node, name] : renamed)
+    {
+        SetNodeName(node, name);
+        s_maskNodes.erase(node);
+    }
+}
+
+// the texture loaded from a <MaskTexture> node: __XMLExt_Mask(mask, parent, "key1,key2")
+void XMLExt::DispatchMask(void* layout, XMLNode* node)
+{
+    std::string keys;
+
+    if (XMLNode* masked = FindChild(node, "MaskedTextures"))
+    {
+        for (XMLNode* c = NodeFirstChild(masked); c; c = NodeNext(c))
+        {
+            const char* key = GetAttr(c, "childKey");
+
+            if (!key || !*key)
+                continue;
+
+            if (!keys.empty())
+                keys += ',';
+
+            keys += key;
+        }
+    }
+
+    lua_State* L = reinterpret_cast<GetCtxFn>(ADDR_GET_LUA_CONTEXT)();
+
+    if (!L)
+        return;
+
+    void* obj = reinterpret_cast<void*>(reinterpret_cast<uint32_t>(layout) - LAYOUT_TO_OBJECT);
+    void** vt = *reinterpret_cast<void***>(obj);
+    void* parent = reinterpret_cast<void* (__thiscall*)(void*)>(vt[VT_GET_PARENT / 4])(obj);
+
+    int32_t top = FrameScript::GetTop(L, 0);
+    reinterpret_cast<GetFieldFn>(ADDR_LUA_GETFIELD)(L, LUA_GLOBALSINDEX, "__XMLExt_Mask");
+    PushScriptObject(L, obj);
+    PushScriptObject(L, parent);
+
+    if (!keys.empty())
+        FrameScript::PushString(L, keys.c_str());
+    else
+        FrameScript::PushNil(L);
+
+    reinterpret_cast<PCallFn>(ADDR_LUA_PCALL)(L, 3, 0, 0);
+    FrameScript::SetTop(L, top);
+}
+
+// after the frame's load, all its textures exist: __XMLExt_ResolveMasks(frame)
+void XMLExt::DispatchResolveMasks(void* layout)
+{
+    lua_State* L = reinterpret_cast<GetCtxFn>(ADDR_GET_LUA_CONTEXT)();
+
+    if (!L)
+        return;
+
+    void* obj = reinterpret_cast<void*>(reinterpret_cast<uint32_t>(layout) - LAYOUT_TO_OBJECT);
+    int32_t top = FrameScript::GetTop(L, 0);
+    reinterpret_cast<GetFieldFn>(ADDR_LUA_GETFIELD)(L, LUA_GLOBALSINDEX, "__XMLExt_ResolveMasks");
+    PushScriptObject(L, obj);
+    reinterpret_cast<PCallFn>(ADDR_LUA_PCALL)(L, 1, 0, 0);
+    FrameScript::SetTop(L, top);
+}
+
 // ---------------- хуки ----------------
 int32_t __fastcall XMLExt::FrameLoadXMLEx(void* layout, int32_t, XMLNode* node, void* status)
 {
+    RenamedNodes masks;
+
+    if (node)
+        BeginMaskTextures(node, masks);
+
     Dispatch(layout, node, true);
     int32_t r = reinterpret_cast<LoadXMLFn>(ADDR_FRAME_LOADXML)(layout, node, status);
+    EndMaskTextures(masks);
     Dispatch(layout, node, false);
+
+    if (!masks.empty() && layout)
+        DispatchResolveMasks(layout);
+
     return r;
 }
 
@@ -265,6 +387,10 @@ int32_t __fastcall XMLExt::TextureLoadXMLEx(void* layout, int32_t, XMLNode* node
     Dispatch(layout, node, true);
     int32_t r = reinterpret_cast<LoadXMLFn>(ADDR_TEXTURE_LOADXML)(layout, node, status);
     Dispatch(layout, node, false);
+
+    if (layout && node && s_maskNodes.count(node))
+        DispatchMask(layout, node);
+
     return r;
 }
 

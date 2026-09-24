@@ -1,15 +1,22 @@
-"""Builds the UI mask pixel shaders (.bls) for the 3.3.5 client.
+"""Builds the UI mask pixel shaders (.bls) for the 3.3.5 client (MaskTexture patch).
 
-BLS (GXSH) layout, taken from Shaders\\Pixel\\ps_3_0\\UI.bls and Desaturate.bls:
+BLS (GXSH) layout, taken from the client's Shaders\\Pixel\\<profile>\\UI.bls and Desaturate.bls:
   0x00 'GXSH'  0x04 0x00010003  0x08 1  0x0C 0xA00  0x10 0x200  0x14 1
-  0x18 bytecode size  0x1C D3D9 bytecode (ps_2_0, the client uses ps_2_0 code for every profile)
+  0x18 bytecode size  0x1C D3D9 bytecode
 
-Shaders (all ps_2_0; the mask UV is the texture UV mapped by c1/c2: uv * c1 + c2, c1.zw = c2.zw = 0).
-The D3D9 validator rejects the shader if a register component is read before it is written, and
-ps_2_0 has no arbitrary swizzles (only .xyzw and the replicates .xxxx/.yyyy/.zzzz/.wwww).:
-  UIMask            = UI.bls with the mask alpha
-  UIMaskDesaturate  = Desaturate.bls with the mask alpha
-Inputs: v0 vertex color, t0 texture UV, s0 texture, s1 mask, c1 mask UV scale, c2 mask UV offset.
+The client draws the UI with a vs_3_0 vertex shader on ps_3_0 hardware (gx.log vertexShaderTarget);
+D3D9 does not draw a vs_3_0 + ps_2_0 pair, so the ps_3_0 folder needs ps_3_0 code. Inputs:
+  ps_3_0: v0 = COLOR0, v1 = TEXCOORD0      ps_2_0: v0 = color, t0 = texcoord
+
+Shaders UIMask<n> / UIMaskDesaturate<n>, n = 1..3 masks:
+  color = tex(s0, uv) * vertex color (Desaturate: luminance, like the client's Desaturate)
+  alpha *= mask_k(s_k, uv_k) for k = 1..n, uv_k = uv.x * c[3k-2] + uv.y * c[3k-1] + c[3k] (.xy)
+  (an affine map: texcoord rotation, flips, atlases and crops all stay linear)
+c0 is the luminance constant of the Desaturate variants.
+
+Rules the D3D9 validator enforces (all broke an earlier version): no register component read before
+it is written; ps_2_0 has no arbitrary swizzles (only .xyzw and the replicates); one constant
+register per instruction here to stay safe.
 
 Usage: python tools/blsmask.py Shaders/Pixel [ps_2_0 UI.bls [ps_3_0 UI.bls]] (self-checks)
 """
@@ -18,6 +25,35 @@ import struct
 import sys
 
 HEADER = (0x47585348, 0x00010003, 1, 0xA00, 0x200, 1)
+MAX_MASKS = 3
+
+# register types
+TEMP, INPUT, CONST, TEXTURE, COLOROUT, SAMPLER = 0, 1, 2, 3, 8, 10
+# opcodes
+MOV, ADD, MAD, MUL, DP3, TEXLD, DCL, DEF, END = 1, 2, 4, 5, 8, 0x42, 0x1F, 0x51, 0xFFFF
+# swizzles
+XYZW, XXXX, YYYY, WWWW = 0xE4, 0x00, 0x55, 0xFF
+NEG = 1
+
+
+def reg(rtype, index):
+    return 0x80000000 | ((rtype & 7) << 28) | ((rtype >> 3) << 11) | index
+
+
+def dst(rtype, index, mask=0xF):
+    return reg(rtype, index) | (mask << 16)
+
+
+def src(rtype, index, swizzle=XYZW, modifier=0):
+    return reg(rtype, index) | (swizzle << 16) | (modifier << 24)
+
+
+def ins(opcode, *args):
+    return [(len(args) << 24) | opcode, *args]
+
+
+def fbits(value):
+    return struct.unpack("<I", struct.pack("<f", value))[0]
 
 
 def bls(tokens):
@@ -25,149 +61,89 @@ def bls(tokens):
     return struct.pack("<7I", *HEADER, len(code)) + code
 
 
-DCL = [
-    0x0200001F, 0x80000000, 0x900F0000,	# dcl v0
-    0x0200001F, 0x80000000, 0xB0030000,	# dcl t0.xy
-    0x0200001F, 0x90000000, 0xA00F0800,	# dcl_2d s0
-]
-DCL_MASKED = [
-    0x0200001F, 0x80000000, 0x900F0000,	# dcl v0
-    0x0200001F, 0x80000000, 0xB00F0000,	# dcl t0 (all: mad reads t0.xyzw, zw are 0)
-    0x0200001F, 0x90000000, 0xA00F0800,	# dcl_2d s0
-]
-DCL_MASK = [
-    0x0200001F, 0x90000000, 0xA00F0801,	# dcl_2d s1
-]
-SAMPLE_MASK = [
-    0x03000005, 0x800F0001, 0xB0E40000, 0xA0E40001,	# mul r1, t0, c1 (all of r1: texld reads it whole)
-    0x03000002, 0x800F0001, 0x80E40001, 0xA0E40002,	# add r1, r1, c2 (one constant per instruction)
-    0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40800,			# texld r0, t0, s0
-    0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
-]
+class Profile:
+    def __init__(self, version, color_usage, uv_type, uv_usage):
+        self.version = version
+        self.color_usage = color_usage
+        self.uv_type = uv_type
+        self.uv_usage = uv_usage
 
-UI = [0xFFFF0200] + DCL + [
-    0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40800,	# texld r0, t0, s0
-    0x03000005, 0x800F0000, 0x80E40000, 0x90E40000,	# mul r0, r0, v0
-    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
-    0x0000FFFF,
-]
+    def uv(self, swizzle=XYZW):
+        return src(self.uv_type, 1 if self.uv_type == INPUT else 0, swizzle)
 
-UI_MASK = [0xFFFF0200] + DCL_MASKED + DCL_MASK + SAMPLE_MASK + [
-    0x03000005, 0x800F0000, 0x80E40000, 0x90E40000,	# mul r0, r0, v0
-    0x03000005, 0x80080000, 0x80FF0000, 0x80FF0001,	# mul r0.w, r0.w, r1.w
-    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
-    0x0000FFFF,
-]
+    def declarations(self, samplers, color_mask=0xF):
+        uv_index = 1 if self.uv_type == INPUT else 0
+        tokens = ins(DCL, self.color_usage, dst(INPUT, 0, color_mask))
+        tokens += ins(DCL, self.uv_usage, dst(self.uv_type, uv_index, 0x3))
+        for s in range(samplers):
+            tokens += ins(DCL, 0x90000000, dst(SAMPLER, s))	# dcl_2d
+        return tokens
 
-UI_MASK_DESATURATE = [0xFFFF0200,
-    0x05000051, 0xA00F0000, 0x3E991687, 0x3F1645A2, 0x3DE978D5, 0x00000000,	# def c0, 0.299, 0.587, 0.114, 0
-] + DCL_MASKED + DCL_MASK + SAMPLE_MASK + [
-    0x03000008, 0x80010002, 0x80E40000, 0xA0E40000,	# dp3 r2.x, r0, c0
-    0x03000005, 0x80080002, 0x80FF0000, 0x90FF0000,	# mul r2.w, r0.w, v0.w
-    0x03000005, 0x80080002, 0x80FF0002, 0x80FF0001,	# mul r2.w, r2.w, r1.w
-    0x02000001, 0x80070002, 0x80000002,			# mov r2.xyz, r2.x
-    0x02000001, 0x800F0800, 0x80E40002,			# mov oC0, r2
-    0x0000FFFF,
-]
 
-# Debug shaders (TextureMaskDebugFlags 8 / 16):
-#   UIMaskDebugC = the constants as a color: (c1.x / 8, c1.y / 8, -c2.x, 1) -> white for an 8x8 atlas icon
-#                  and a full mask; black = the constants do not reach the shader
-#   UIMaskDebugT = the stage 1 texture at t0, opaque: the mask image (wrong place) = s1 is bound
-UI_MASK_DEBUG_C = [0xFFFF0200,
-    0x05000051, 0xA00F0003, 0x3E000000, 0x3E000000, 0x00000000, 0x3F800000,	# def c3, 0.125, 0.125, 0, 1
-    0x02000001, 0x800F0001, 0xA0E40001,			# mov r1, c1
-    0x03000005, 0x800F0000, 0x80E40001, 0xA0E40003,	# mul r0, r1, c3
-    0x02000001, 0x80040000, 0xA1000002,			# mov r0.z, -c2.x
-    0x02000001, 0x80080000, 0xA0FF0003,			# mov r0.w, c3.w
-    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
-    0x0000FFFF,
-]
+PS_2_0 = Profile(0xFFFF0200, 0x80000000, TEXTURE, 0x80000000)
+PS_3_0 = Profile(0xFFFF0300, 0x8000000A, INPUT, 0x80000005)	# dcl_color0 / dcl_texcoord0
 
-UI_MASK_DEBUG_T = [0xFFFF0200,
-    0x05000051, 0xA00F0003, 0x00000000, 0x00000000, 0x00000000, 0x3F800000,	# def c3, 0, 0, 0, 1
-    0x0200001F, 0x80000000, 0xB0030000,			# dcl t0.xy
-    0x0200001F, 0x90000000, 0xA00F0801,			# dcl_2d s1
-    0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40801,	# texld r0, t0, s1
-    0x02000001, 0x80080000, 0xA0FF0003,			# mov r0.w, c3.w
-    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
-    0x0000FFFF,
-]
+LUMINANCE = (0.299, 0.587, 0.114, 0.0)
 
-# ---------------- ps_3_0 ----------------
-# The client draws the UI with a vs_3_0 vertex shader on ps_3_0 hardware (gx.log vertexShaderTarget),
-# D3D9 does not draw a vs_3_0 + ps_2_0 pair: Shaders\\Pixel\\ps_3_0 needs ps_3_0 code.
-# Inputs are declared by semantic: v0 = COLOR0, v1 = TEXCOORD0 (the UI vertex shader outputs).
-DCL3 = [
-    0x0200001F, 0x8000000A, 0x900F0000,	# dcl_color0 v0
-    0x0200001F, 0x80000005, 0x90030001,	# dcl_texcoord0 v1.xy
-    0x0200001F, 0x90000000, 0xA00F0800,	# dcl_2d s0
-]
-DCL3_MASK = [
-    0x0200001F, 0x90000000, 0xA00F0801,	# dcl_2d s1
-]
-SAMPLE3_MASK = [
-    0x03000005, 0x800F0001, 0x90440001, 0xA0E40001,	# mul r1, v1.xyxy, c1 (c1.zw = 0)
-    0x03000002, 0x800F0001, 0x80E40001, 0xA0E40002,	# add r1, r1, c2 (c2.zw = 0; one constant per instruction)
-    0x03000042, 0x800F0000, 0x90440001, 0xA0E40800,			# texld r0, v1.xyxy, s0
-    0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
-]
 
-# the client's ps_3_0 UI.bls, rebuilt byte for byte (checks the header and the input declarations)
-UI_3 = [0xFFFF0300] + DCL3 + [
-    0x03000042, 0x800F0000, 0x90E40001, 0xA0E40800,	# texld r0, v1, s0
-    0x03000005, 0x800F0800, 0x80E40000, 0x90E40000,	# mul oC0, r0, v0
-    0x0000FFFF,
-]
+def ui(profile):
+    """The client's UI.bls (self-check)."""
+    tokens = [profile.version] + profile.declarations(1)
+    tokens += ins(TEXLD, dst(TEMP, 0), profile.uv(), src(SAMPLER, 0))
+    if profile is PS_3_0:
+        tokens += ins(MUL, dst(COLOROUT, 0), src(TEMP, 0), src(INPUT, 0))
+    else:
+        tokens += ins(MUL, dst(TEMP, 0), src(TEMP, 0), src(INPUT, 0))
+        tokens += ins(MOV, dst(COLOROUT, 0), src(TEMP, 0))
+    return tokens + [END]
 
-UI_MASK_3 = [0xFFFF0300] + DCL3 + DCL3_MASK + SAMPLE3_MASK + [
-    0x03000005, 0x800F0000, 0x80E40000, 0x90E40000,	# mul r0, r0, v0
-    0x03000005, 0x80080000, 0x80FF0000, 0x80FF0001,	# mul r0.w, r0.w, r1.w
-    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
-    0x0000FFFF,
-]
 
-UI_MASK_DESATURATE_3 = [0xFFFF0300,
-    0x05000051, 0xA00F0000, 0x3E991687, 0x3F1645A2, 0x3DE978D5, 0x00000000,	# def c0, 0.299, 0.587, 0.114, 0
-] + DCL3 + DCL3_MASK + SAMPLE3_MASK + [
-    0x03000008, 0x80010002, 0x80E40000, 0xA0E40000,	# dp3 r2.x, r0, c0
-    0x03000005, 0x80080002, 0x80FF0000, 0x90FF0000,	# mul r2.w, r0.w, v0.w
-    0x03000005, 0x80080002, 0x80FF0002, 0x80FF0001,	# mul r2.w, r2.w, r1.w
-    0x02000001, 0x80070002, 0x80000002,			# mov r2.xyz, r2.x
-    0x02000001, 0x800F0800, 0x80E40002,			# mov oC0, r2
-    0x0000FFFF,
-]
+def ui_mask(profile, masks, desaturate):
+    tokens = [profile.version]
+    if desaturate:
+        tokens += ins(DEF, dst(CONST, 0), *map(fbits, LUMINANCE))
+    tokens += profile.declarations(1 + masks)
+    tokens += ins(TEXLD, dst(TEMP, 0), profile.uv(), src(SAMPLER, 0))
+    for k in range(1, masks + 1):
+        c = 3 * k - 2
+        tokens += ins(MUL, dst(TEMP, 1), profile.uv(XXXX), src(CONST, c))
+        tokens += ins(MAD, dst(TEMP, 1), profile.uv(YYYY), src(CONST, c + 1), src(TEMP, 1))
+        tokens += ins(ADD, dst(TEMP, 1), src(TEMP, 1), src(CONST, c + 2))
+        tokens += ins(TEXLD, dst(TEMP, 1), src(TEMP, 1), src(SAMPLER, k))
+        tokens += ins(MUL, dst(TEMP, 0, 0x8), src(TEMP, 0, WWWW), src(TEMP, 1, WWWW))
+    if desaturate:
+        tokens += ins(DP3, dst(TEMP, 2, 0x1), src(TEMP, 0), src(CONST, 0))
+        tokens += ins(MUL, dst(TEMP, 2, 0x8), src(TEMP, 0, WWWW), src(INPUT, 0, WWWW))
+        tokens += ins(MOV, dst(TEMP, 2, 0x7), src(TEMP, 2, XXXX))
+        tokens += ins(MOV, dst(COLOROUT, 0), src(TEMP, 2))
+    else:
+        tokens += ins(MUL, dst(TEMP, 0), src(TEMP, 0), src(INPUT, 0))
+        tokens += ins(MOV, dst(COLOROUT, 0), src(TEMP, 0))
+    return tokens + [END]
 
-UI_MASK_DEBUG_C_3 = [0xFFFF0300] + UI_MASK_DEBUG_C[1:]
 
-UI_MASK_DEBUG_T_3 = [0xFFFF0300,
-    0x05000051, 0xA00F0003, 0x00000000, 0x00000000, 0x00000000, 0x3F800000,	# def c3, 0, 0, 0, 1
-    0x0200001F, 0x80000005, 0x90030001,			# dcl_texcoord0 v1.xy
-    0x0200001F, 0x90000000, 0xA00F0801,			# dcl_2d s1
-    0x03000042, 0x800F0000, 0x90440001, 0xA0E40801,	# texld r0, v1.xyxy, s1
-    0x02000001, 0x80080000, 0xA0FF0003,			# mov r0.w, c3.w
-    0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
-    0x0000FFFF,
-]
+PROFILES = {"ps_2_0": PS_2_0, "ps_3_0": PS_3_0}
 
-SHADERS = {
-    "ps_2_0": (("UIMask", UI_MASK), ("UIMaskDesaturate", UI_MASK_DESATURATE),
-               ("UIMaskDebugC", UI_MASK_DEBUG_C), ("UIMaskDebugT", UI_MASK_DEBUG_T)),
-    "ps_3_0": (("UIMask", UI_MASK_3), ("UIMaskDesaturate", UI_MASK_DESATURATE_3),
-               ("UIMaskDebugC", UI_MASK_DEBUG_C_3), ("UIMaskDebugT", UI_MASK_DEBUG_T_3)),
-}
+
+def shaders(profile):
+    for masks in range(1, MAX_MASKS + 1):
+        yield "UIMask%d" % masks, ui_mask(profile, masks, False)
+        yield "UIMaskDesaturate%d" % masks, ui_mask(profile, masks, True)
+
 
 if __name__ == "__main__":
-    # usage: blsmask.py <Shaders\\Pixel dir> [ps_2_0 UI.bls [ps_3_0 UI.bls]] (self-checks)
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    for arg, tokens in zip(sys.argv[2:4], (UI, UI_3)):
-        with open(arg, "rb") as f:
-            assert f.read() == bls(tokens), arg + ": header/UI mismatch"
-        print(arg, "rebuilt byte for byte")
-    for profile, shaders in SHADERS.items():
-        out = os.path.join(root, profile)
+    for path, profile in zip(sys.argv[2:4], (PS_2_0, PS_3_0)):
+        with open(path, "rb") as f:
+            assert f.read() == bls(ui(profile)), path + ": header/UI mismatch"
+        print(path, "rebuilt byte for byte")
+    for name, profile in PROFILES.items():
+        out = os.path.join(root, name)
         os.makedirs(out, exist_ok=True)
-        for name, tokens in shaders:
-            with open(os.path.join(out, name + ".bls"), "wb") as f:
+        for old in os.listdir(out):
+            if old.startswith("UIMask") and old.endswith(".bls"):
+                os.remove(os.path.join(out, old))
+        for shader, tokens in shaders(profile):
+            with open(os.path.join(out, shader + ".bls"), "wb") as f:
                 f.write(bls(tokens))
-            print(profile, name + ".bls", len(bls(tokens)))
+            print(name, shader + ".bls", len(bls(tokens)))

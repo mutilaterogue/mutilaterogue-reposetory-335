@@ -1,50 +1,55 @@
--- Retail mask texture methods on top of the WotLKExtensions MaskTexture patch (TextureAddMask & co).
+-- Retail mask texture API on top of the WotLKExtensions MaskTexture patch (TextureAddMask & co).
 --   frame:CreateMaskTexture([name, layer, inherits])  a Texture that is not drawn, only masks
 --   texture:AddMaskTexture(mask) / RemoveMaskTexture(mask) / GetNumMaskTextures() / GetMaskTexture(index)
--- One mask per texture. A mask must stay shown (a hidden region is not laid out), it is not drawn anyway.
--- loaded early (FrameXML.toc snippets): no WorldFrame/UIParent yet
-local helper = CreateFrame("Frame");
-helper:Hide();
-
--- /masktest is registered even without the DLL functions: it says what is missing
-local function MaskTestMissing()
-	print("masktest: TextureAddMask =", TextureAddMask, "- the DLL functions are not registered (CustomLua::RegisterFunctions / OOBLUAFUNCTIONS_PATCH)");
-end
-
+--   XML: <MaskTexture ...><MaskedTextures><MaskedTexture childKey="Icon"/></MaskedTextures></MaskTexture>
+-- Up to 3 masks per texture are drawn. A mask must stay shown (a hidden region is not laid out);
+-- it is never drawn anyway. Outside its rect a mask repeats its edge pixels (keep the edges transparent).
+-- Loaded early (FrameXML.toc snippets, after XMLExt.lua): no WorldFrame/UIParent yet.
 if not TextureAddMask then
-	helper:RegisterEvent("PLAYER_LOGIN");
-	helper:SetScript("OnEvent", function()
-		SLASH_MASKTEST1 = "/masktest";
-		SlashCmdList["MASKTEST"] = MaskTestMissing;
-	end);
 	return;
 end
 
+local helper = CreateFrame("Frame");
+helper:Hide();
 local textureMethods = getmetatable(helper:CreateTexture()).__index;
 
 function textureMethods:AddMaskTexture(mask)
 	TextureAddMask(self, mask);
-	self.maskTexture = mask;
+	local masks = self.maskTextures;
+	if not masks then
+		masks = {};
+		self.maskTextures = masks;
+	end
+	for i = 1, #masks do
+		if masks[i] == mask then
+			return;
+		end
+	end
+	masks[#masks + 1] = mask;
 end
 
 function textureMethods:RemoveMaskTexture(mask)
 	TextureRemoveMask(self, mask);
-	if not mask or self.maskTexture == mask then
-		self.maskTexture = nil;
+	local masks = self.maskTextures;
+	if not masks then
+		return;
+	end
+	for i = #masks, 1, -1 do
+		if not mask or masks[i] == mask then
+			table.remove(masks, i);
+		end
 	end
 end
 
 function textureMethods:GetNumMaskTextures()
-	return self.maskTexture and 1 or 0;
+	return self.maskTextures and #self.maskTextures or 0;
 end
 
 function textureMethods:GetMaskTexture(index)
-	if index == 1 then
-		return self.maskTexture;
-	end
+	return self.maskTextures and self.maskTextures[index];
 end
 
-local function CreateMaskTexture(self, name, layer, inherits, subLevel)
+local function CreateMaskTexture(self, name, layer, inherits)
 	local mask = self:CreateTexture(name, layer or "ARTWORK", inherits);
 	TextureSetIsMask(mask, true);
 	return mask;
@@ -64,38 +69,56 @@ for _, frameType in ipairs(frameTypes) do
 	end
 end
 
--- /masktest: a round question mark icon in the middle of the screen (again to hide it)
--- registered at login: SlashCmdList comes from ChatFrame, later in the toc
-local function MaskTest()
-	local f = MaskTestFrame;
-	if f then
-		-- second /masktest: the report (after at least one frame was drawn)
-		if TextureMaskDebug then
-			print("masktest:", TextureMaskDebug(f.icon));
+---------------------------------------------------------------------------
+-- <MaskTexture> (XMLExt): the DLL loads it as a Texture, then calls these
+---------------------------------------------------------------------------
+local pendingMasks = setmetatable({}, { __mode = "k" });	-- [frame] = { {mask, "key1,key2"}, ... }
+
+local function FindChild(frame, path)
+	local object = frame;
+	for part in path:gmatch("[^%.]+") do
+		if part == "$parent" then
+			object = object.GetParent and object:GetParent();
+		elseif type(object) == "table" then
+			object = object[part];
+		else
+			return nil;
 		end
-		return;
 	end
-	f = CreateFrame("Frame", "MaskTestFrame", UIParent);
-	f:SetSize(128, 128);
-	f:SetPoint("CENTER");
-	local icon = f:CreateTexture(nil, "ARTWORK");
-	icon:SetAllPoints();
-	icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
-	f.icon = icon;
-	local mask = f:CreateMaskTexture();
-	mask:SetAllPoints(icon);
-	mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
-	icon:AddMaskTexture(mask);
-	-- the same icon without a mask on the right, for comparison
-	local plain = f:CreateTexture(nil, "ARTWORK");
-	plain:SetSize(128, 128);
-	plain:SetPoint("LEFT", f, "RIGHT", 16, 0);
-	plain:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
-	print("masktest: TextureGetMask =", TextureGetMask(icon), "- /masktest again for the report");
+	return object;
 end
 
-helper:RegisterEvent("PLAYER_LOGIN");
-helper:SetScript("OnEvent", function()
-	SLASH_MASKTEST1 = "/masktest";
-	SlashCmdList["MASKTEST"] = MaskTest;
-end);
+-- the texture of a <MaskTexture> node: a mask; its masked textures are resolved after the frame's load
+function __XMLExt_Mask(mask, parent, keys)
+	if type(mask) ~= "table" then
+		return;
+	end
+	TextureSetIsMask(mask, true);
+	if keys and type(parent) == "table" then
+		local list = pendingMasks[parent];
+		if not list then
+			list = {};
+			pendingMasks[parent] = list;
+		end
+		list[#list + 1] = { mask, keys };
+	end
+end
+
+function __XMLExt_ResolveMasks(frame)
+	local list = type(frame) == "table" and pendingMasks[frame];
+	if not list then
+		return;
+	end
+	pendingMasks[frame] = nil;
+	for _, entry in ipairs(list) do
+		local mask, keys = entry[1], entry[2];
+		for key in keys:gmatch("[^,%s]+") do
+			local texture = FindChild(frame, key);
+			if texture and texture.AddMaskTexture then
+				texture:AddMaskTexture(mask);
+			else
+				geterrorhandler()(("MaskTexture: MaskedTexture childKey '%s' not found"):format(key));
+			end
+		end
+	end
+end

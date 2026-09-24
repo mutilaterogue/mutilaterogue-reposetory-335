@@ -3,25 +3,26 @@
 #include <Misc/Util.hpp>
 
 #include <Windows.h>
+#include <algorithm>
 #include <cstdio>
-#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
-// All addresses: 3.3.5a (12340), found in IDA (see the comments).
+// All addresses: 3.3.5a (12340).
 namespace
 {
     // ---------------- client functions ----------------
     constexpr uint32_t ADDR_BATCH_RENDER = 0x484B00;		// int __cdecl CSimpleBatch_Render(CSimpleBatch*)
-    constexpr uint32_t ADDR_GXRS_SET = 0x685F50;		// void __thiscall CGxDevice::RsSet(int state, void* value) (ecx = device)
+    constexpr uint32_t ADDR_GXRS_SET = 0x685F50;		// void __thiscall CGxDevice::RsSet(int state, void* value)
     constexpr uint32_t ADDR_TEXTURE_DRAW = 0x485140;		// int __thiscall CSimpleTexture::Draw(CSimpleBatch*)
-    constexpr uint32_t ADDR_TEXTURE_VTABLE_DRAW = 0x9EA1D8 + 23 * 4;	// slot 23 = 0x9EA234
+    constexpr uint32_t ADDR_TEXTURE_VTABLE_DRAW = 0x9EA1D8 + 23 * 4;	// CSimpleTexture vtable slot 23
     constexpr uint32_t ADDR_TEX_GETGX = 0x4B6CB0;		// CGxTex* __cdecl (HTEXTURE, int, int)
-    constexpr uint32_t ADDR_TEX_HASTRANSFORM = 0x4B5460;	// int __cdecl (HTEXTURE)
+    constexpr uint32_t ADDR_TEX_HASTRANSFORM = 0x4B5460;	// int __cdecl (HTEXTURE): texture packed in an atlas
     constexpr uint32_t ADDR_TEX_GETTRANSFORM = 0x4B5490;	// void __cdecl (HTEXTURE, float* offset2, float* scale)
     constexpr uint32_t ADDR_SHADERS = 0xB47934;			// CGxShader* [2]: "UI", "Desaturate"
-    constexpr uint32_t ADDR_UI_SHADERS_CREATE = 0x483060;	// void __cdecl: creates dword_B47934 (UI init / device restore)
-    constexpr uint32_t ADDR_SHADER_VALID = 0x689A50;		// bool __thiscall CGxShader::Valid()
+    constexpr uint32_t ADDR_UI_SHADERS_CREATE = 0x483060;	// void __cdecl: creates them (UI init, device reset)
+    constexpr uint32_t ADDR_SHADER_VALID = 0x689A50;		// bool __thiscall CGxShader::Valid() (reloads if needed)
     constexpr uint32_t ADDR_BATCHING = 0xB47948;			// int: merge batch items
     constexpr uint32_t ADDR_DEVICE = 0xC5DF88;			// CGxDevice*
     constexpr uint32_t ADDR_TEXTURE_CLASSID = 0xB4793C;	// CSimpleTexture script class id (0 until first use)
@@ -34,14 +35,14 @@ namespace
 
     // device vtable
     constexpr uint32_t VT_SHADER_CREATE = 272;			// (CGxShader** out, int target, const char* path, const char* name, int permutations)
-    constexpr uint32_t VT_SHADER_RELEASE = 276;			// (CGxShader** shader)
     constexpr uint32_t VT_SHADER_CONSTANTS = 280;			// (int target, int start, const float* data, int count)
 
-    // GxRs states (sub_484B00: 21 texture, 78 pixel shader)
+    // GxRs states (sub_484B00: 21 texture 0, 78 pixel shader)
     constexpr int GXRS_TEXTURE0 = 21;
-    constexpr int GXRS_TEXTURE1 = 22;
     constexpr int GXRS_PIXELSHADER = 78;
     constexpr int GXSH_PIXEL = 4;
+
+    constexpr size_t MAX_MASKS = 3;			// shaders UIMask1..3 / UIMaskDesaturate1..3 (tools/blsmask.py)
 
     // ---------------- layouts ----------------
     constexpr uint32_t TEX_HANDLE = 0xD4;		// HTEXTURE
@@ -49,7 +50,6 @@ namespace
     constexpr uint32_t TEX_TEXCOORDS = 0x140;	// 4 x {u, v}
     constexpr uint32_t BATCH_COUNT = 0x0C;
     constexpr uint32_t BATCH_ITEMS = 0x10;
-    constexpr uint32_t ITEM_SIZE = 60;
 
     struct BatchItem
     {
@@ -69,7 +69,7 @@ namespace
         float offsetU;			// 13
         float offsetV;			// 14
     };
-    static_assert(sizeof(BatchItem) == ITEM_SIZE);
+    static_assert(sizeof(BatchItem) == 60 || sizeof(void*) != 4);
 
     using BatchRender_t = int(__cdecl*)(void*);
     using GxRsSet_t = void(__thiscall*)(void*, int, void*);
@@ -79,8 +79,8 @@ namespace
     using TexGetTransform_t = void(__cdecl*)(uint32_t, float*, float*);
     using ShaderValid_t = bool(__thiscall*)(void*);
     using ShaderCreate_t = void(__thiscall*)(void*, void**, int, const char*, const char*, int);
-    using UiShaders_t = void(__cdecl*)();
     using ShaderConstants_t = void(__thiscall*)(void*, int, int, const float*, int);
+    using UiShaders_t = void(__cdecl*)();
     using IsA_t = bool(__thiscall*)(void*, int);
     using LuaType_t = int(__cdecl*)(lua_State*, int);
     using LuaRawGetI_t = void(__cdecl*)(lua_State*, int, int);
@@ -88,55 +88,21 @@ namespace
     using LuaSetTop_t = void(__cdecl*)(lua_State*, int);
 
     // ---------------- state ----------------
-    std::unordered_map<const float*, void*> s_maskOf;	// masked texture positions (+0xE0) -> mask texture
-    std::unordered_set<void*> s_isMask;					// textures used as masks: not drawn
+    std::unordered_map<const float*, std::vector<void*>> s_masksOf;	// masked texture positions (+0xE0) -> masks
+    std::unordered_set<void*> s_isMask;									// textures used as masks: not drawn
 
-    void* s_maskShader = nullptr;
-    void* s_debugCShader = nullptr;
-    void* s_debugTShader = nullptr;
-    void* s_testShader = nullptr;		// the client's Desaturate loaded the same way (path check)
-    bool s_testShaderValid = false;
-    void* s_maskDesatShader = nullptr;
+    void* s_maskShaders[MAX_MASKS] = {};
+    void* s_maskDesatShaders[MAX_MASKS] = {};
     bool s_shadersLoaded = false;
-    int s_createHooks = 0;		// the shaders are created with the client's UI shaders (0 = lazily in the render)
-    uint32_t s_createdWithClient = 0;
 
-    // the batch being rendered with masks: the item index follows the PixelShader sets (batching off)
-    // diagnostics (TextureMaskDebug)
-    bool s_vtablePatched = false;
-    bool s_shaderSetPatched = false;
-    int s_renderCallsPatched = 0;
-    uint32_t s_maskedBatches = 0;		// renders of batches with a masked texture
-    uint32_t s_maskedItems = 0;			// masked items drawn with the mask
-    uint32_t s_failNoTex = 0, s_failNoShader = 0, s_failRect = 0;
-    float s_lastC1[4] = {};
-    // TextureMaskDebugFlags: 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader,
-    // 8 = UIMaskDebugC (constants as color), 16 = UIMaskDebugT (stage 1 texture),
-    // 32 = Desaturate created by this DLL, 64 = the client's own Desaturate (dword_B47934[1]),
-    // 128 = the client's Desaturate object carrying our D3D shader (+0x20) for the item
-    int s_debugFlags = 0;
-
+    // the batch being rendered with masks: the item index follows the pixel shader sets (batching off)
     void* s_renderBatch = nullptr;
     uint32_t s_renderItem = 0;
-    bool s_texture1Bound = false;
+    size_t s_boundMasks = 0;
 
     template <typename T> T* At(void* base, uint32_t offset)
     {
         return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(base) + offset);
-    }
-
-    // flag 128: a client shader object lent our D3D shader until the item is drawn
-    constexpr uint32_t SHADER_D3D = 0x20;
-    void* s_swapObject = nullptr;
-    void* s_swapSaved = nullptr;
-
-    void RestoreSwap()
-    {
-        if (s_swapObject)
-        {
-            *At<void*>(s_swapObject, SHADER_D3D) = s_swapSaved;
-            s_swapObject = nullptr;
-        }
     }
 
     void* Device()
@@ -149,55 +115,39 @@ namespace
         return *reinterpret_cast<void**>(*reinterpret_cast<uint8_t**>(object) + offset);
     }
 
+    void GxRsSet(void* device, int state, void* value)
+    {
+        reinterpret_cast<GxRsSet_t>(ADDR_GXRS_SET)(device, state, value);
+    }
+
+    // Shaders are cached by name (sub_6897C0): creating again gives the same object back.
+    // They have to be created with the client's UI shaders: one created in the middle of a frame is not drawn.
     void LoadShaders()
     {
-        if (s_shadersLoaded)
-            return;
         s_shadersLoaded = true;
         void* device = Device();
         auto create = reinterpret_cast<ShaderCreate_t>(VFunc(device, VT_SHADER_CREATE));
-        create(device, &s_maskShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMask", 1);
-        create(device, &s_maskDesatShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDesaturate", 1);
-        create(device, &s_testShader, GXSH_PIXEL, "Shaders\\Pixel", "Desaturate", 1);
-        create(device, &s_debugCShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDebugC", 1);
-        create(device, &s_debugTShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDebugT", 1);
-        auto valid = reinterpret_cast<ShaderValid_t>(ADDR_SHADER_VALID);
-        s_testShaderValid = s_testShader && valid(s_testShader);
-        if (s_maskShader && !valid(s_maskShader))
-            s_maskShader = nullptr;
-        if (s_maskDesatShader && !valid(s_maskDesatShader))
-            s_maskDesatShader = nullptr;
-        if (s_debugCShader && !valid(s_debugCShader))
-            s_debugCShader = nullptr;
-        if (s_debugTShader && !valid(s_debugTShader))
-            s_debugTShader = nullptr;
+        char name[32];
+        for (size_t i = 0; i < MAX_MASKS; i++)
+        {
+            snprintf(name, sizeof(name), "UIMask%u", static_cast<unsigned>(i + 1));
+            create(device, &s_maskShaders[i], GXSH_PIXEL, "Shaders\\Pixel", name, 1);
+            snprintf(name, sizeof(name), "UIMaskDesaturate%u", static_cast<unsigned>(i + 1));
+            create(device, &s_maskDesatShaders[i], GXSH_PIXEL, "Shaders\\Pixel", name, 1);
+        }
     }
 
-    // The client creates its UI shaders in sub_483060 (UI init and again after a device reset).
-    // Ours are created with them; shaders are cached by name (sub_6897C0), creating again gives the
-    // same object back and reloads its D3D shader if the reset dropped it.
-    void __cdecl UiShadersCreateHook()
-    {
-        reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_CREATE)();
-        s_shadersLoaded = false;
-        LoadShaders();
-        s_createdWithClient++;
-    }
-
-    // CGxShader::Valid (sub_689A50) reloads the D3D shader when +0x30 (loaded) was reset,
-    // the client calls it before using its own shaders
+    // CGxShader::Valid reloads the D3D shader when a device reset dropped it
     void* UsableShader(void* shader)
     {
-        if (!shader)
-            return nullptr;
-        return reinterpret_cast<ShaderValid_t>(ADDR_SHADER_VALID)(shader) ? shader : nullptr;
+        return shader && reinterpret_cast<ShaderValid_t>(ADDR_SHADER_VALID)(shader) ? shader : nullptr;
     }
 
-    // uv of corner i after the texture's own atlas transform (the UV the shader gets in t0)
-    void CornerUV(const float* uv, int i, uint32_t handle, float& u, float& v)
+    // the UV the shader gets for corner i of a texture (its own texcoords through its atlas transform)
+    void TextureUV(uint32_t handle, const float* texcoords, int i, float& u, float& v)
     {
-        u = uv[i * 2];
-        v = uv[i * 2 + 1];
+        u = texcoords[i * 2];
+        v = texcoords[i * 2 + 1];
         if (reinterpret_cast<TexHasTransform_t>(ADDR_TEX_HASTRANSFORM)(handle))
         {
             float offset[2] = { 0.f, 0.f };
@@ -208,44 +158,54 @@ namespace
         }
     }
 
-    // c1/c2: maskUV = t0 * c1 + c2 (out[0..3] = c1, out[4..7] = c2; zw = 0).
-    // The texture UV is linear over the quad, so is the mask UV.
-    bool MaskConstants(const BatchItem* item, void* mask, float out[8])
+    // a*u + b*v + c through 3 points (u_i, v_i) -> t_i
+    bool SolveAffine(const float u[3], const float v[3], const float t[3], float out[3])
+    {
+        float det = u[0] * (v[1] - v[2]) - v[0] * (u[1] - u[2]) + (u[1] * v[2] - v[1] * u[2]);
+        if (det > -1e-12f && det < 1e-12f)
+            return false;
+        out[0] = (t[0] * (v[1] - v[2]) - v[0] * (t[1] - t[2]) + (t[1] * v[2] - v[1] * t[2])) / det;
+        out[1] = (u[0] * (t[1] - t[2]) - t[0] * (u[1] - u[2]) + (u[1] * t[2] - t[1] * u[2])) / det;
+        out[2] = (u[0] * (v[1] * t[2] - t[1] * v[2]) - v[0] * (u[1] * t[2] - t[1] * u[2]) + t[0] * (u[1] * v[2] - v[1] * u[2])) / det;
+        return true;
+    }
+
+    // 3 shader constants (12 floats) for one mask: maskUV = uv.x * A + uv.y * B + C.
+    // The texture's UV is affine over its quad (texcoord rotation, flips, atlas, crop), so is the mask UV:
+    // solved through 3 corners, mask UV = the corner's position in the mask rect through the mask's texcoords.
+    bool MaskConstants(const BatchItem* item, void* mask, float out[12])
     {
         const float* p = item->positions;
-        const float* uv = item->texcoords;
-        float tu0 = uv[0], tv0 = uv[1], tu3 = uv[6], tv3 = uv[7];
-        if (item->hasTransform)
-        {
-            tu0 = item->scale * tu0 + item->offsetU; tv0 = item->scale * tv0 + item->offsetV;
-            tu3 = item->scale * tu3 + item->offsetU; tv3 = item->scale * tv3 + item->offsetV;
-        }
-
         const float* m = At<float>(mask, TEX_POSITIONS);
-        uint32_t maskHandle = *At<uint32_t>(mask, TEX_HANDLE);
-        float mu0, mv0, mu3, mv3;
-        CornerUV(At<float>(mask, TEX_TEXCOORDS), 0, maskHandle, mu0, mv0);
-        CornerUV(At<float>(mask, TEX_TEXCOORDS), 3, maskHandle, mu3, mv3);
-
-        float du = tu3 - tu0, dv = tv3 - tv0;
         float mw = m[9] - m[0], mh = m[10] - m[1];
-        if (du == 0.f || dv == 0.f || mw == 0.f || mh == 0.f)
+        if (mw == 0.f || mh == 0.f)
             return false;
 
-        // screen -> mask rect 0..1
-        float ax = (p[9] - p[0]) / (du * mw);
-        float bx = (p[0] - m[0]) / mw - tu0 * ax;
-        float ay = (p[10] - p[1]) / (dv * mh);
-        float by = (p[1] - m[1]) / mh - tv0 * ay;
-        // mask rect 0..1 -> the mask's own texcoords
-        out[0] = ax * (mu3 - mu0);
-        out[1] = ay * (mv3 - mv0);
-        out[2] = 0.f;
-        out[3] = 0.f;
-        out[4] = mu0 + bx * (mu3 - mu0);
-        out[5] = mv0 + by * (mv3 - mv0);
-        out[6] = 0.f;
-        out[7] = 0.f;
+        uint32_t maskHandle = *At<uint32_t>(mask, TEX_HANDLE);
+        float mu0, mv0, mu3, mv3;
+        TextureUV(maskHandle, At<float>(mask, TEX_TEXCOORDS), 0, mu0, mv0);
+        TextureUV(maskHandle, At<float>(mask, TEX_TEXCOORDS), 3, mu3, mv3);
+
+        float u[3], v[3], tu[3], tv[3];
+        for (int i = 0; i < 3; i++)
+        {
+            u[i] = item->texcoords[i * 2];
+            v[i] = item->texcoords[i * 2 + 1];
+            if (item->hasTransform)
+            {
+                u[i] = item->scale * u[i] + item->offsetU;
+                v[i] = item->scale * v[i] + item->offsetV;
+            }
+            const float* corner = p + i * 3;
+            tu[i] = mu0 + (corner[0] - m[0]) / mw * (mu3 - mu0);
+            tv[i] = mv0 + (corner[1] - m[1]) / mh * (mv3 - mv0);
+        }
+
+        float a[3], b[3];
+        if (!SolveAffine(u, v, tu, a) || !SolveAffine(u, v, tv, b))
+            return false;
+        const float constants[12] = { a[0], b[0], 0.f, 0.f,  a[1], b[1], 0.f, 0.f,  a[2], b[2], 0.f, 0.f };
+        std::copy(constants, constants + 12, out);
         return true;
     }
 
@@ -257,24 +217,31 @@ namespace
         return reinterpret_cast<TextureDraw_t>(ADDR_TEXTURE_DRAW)(texture, batch);
     }
 
+    void __cdecl UiShadersCreateHook()
+    {
+        reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_CREATE)();
+        LoadShaders();
+    }
+
     bool BatchHasMask(void* batch)
     {
         uint32_t count = *At<uint32_t>(batch, BATCH_COUNT);
         auto* items = *At<BatchItem*>(batch, BATCH_ITEMS);
         for (uint32_t i = 0; i < count; i++)
-            if (s_maskOf.count(items[i].positions))
+            if (s_masksOf.count(items[i].positions))
                 return true;
         return false;
     }
 
     int __cdecl BatchRenderHook(void* batch)
     {
-        if (s_maskOf.empty() || !BatchHasMask(batch))
+        if (s_masksOf.empty() || !BatchHasMask(batch))
             return reinterpret_cast<BatchRender_t>(ADDR_BATCH_RENDER)(batch);
 
-        // normally loaded with the client's UI shaders; lazily only if that already happened before the patch
-        LoadShaders();
-        s_maskedBatches++;
+        // created with the client's shaders; lazily only if that happened before the patch
+        if (!s_shadersLoaded)
+            LoadShaders();
+
         // one draw per item: every item sets its pixel shader, in item order
         int32_t& batching = *reinterpret_cast<int32_t*>(ADDR_BATCHING);
         int32_t oldBatching = batching;
@@ -283,89 +250,63 @@ namespace
         s_renderItem = 0;
         int result = reinterpret_cast<BatchRender_t>(ADDR_BATCH_RENDER)(batch);
         s_renderBatch = nullptr;
-        RestoreSwap();
         batching = oldBatching;
-        if (s_texture1Bound)
-        {
-            reinterpret_cast<GxRsSet_t>(ADDR_GXRS_SET)(Device(), GXRS_TEXTURE1, nullptr);
-            s_texture1Bound = false;
-        }
+
+        void* device = Device();
+        for (size_t k = 1; k <= s_boundMasks; k++)
+            GxRsSet(device, GXRS_TEXTURE0 + static_cast<int>(k), nullptr);
+        s_boundMasks = 0;
         return result;
     }
 
     // replaces "call CGxDevice::RsSet" (thiscall): fastcall gets the device in ecx and pops the 2 args the same way
     void __fastcall PixelShaderSetHook(void* device, void* /*edx*/, int state, void* shader)
     {
-        auto gxRsSet = reinterpret_cast<GxRsSet_t>(ADDR_GXRS_SET);
         void* batch = s_renderBatch;
         if (!batch || state != GXRS_PIXELSHADER)
         {
-            gxRsSet(device, state, shader);
+            GxRsSet(device, state, shader);
             return;
         }
-
-        // the previous item is drawn by now (the render draws a group before setting the next one)
-        RestoreSwap();
 
         uint32_t count = *At<uint32_t>(batch, BATCH_COUNT);
         auto* items = *At<BatchItem*>(batch, BATCH_ITEMS);
         BatchItem* item = s_renderItem < count ? &items[s_renderItem] : nullptr;
         s_renderItem++;
 
-        auto it = item ? s_maskOf.find(item->positions) : s_maskOf.end();
-        void* mask = it != s_maskOf.end() ? it->second : nullptr;
-        void* maskTex = mask ? reinterpret_cast<TexGetGx_t>(ADDR_TEX_GETGX)(*At<uint32_t>(mask, TEX_HANDLE), 1, 0) : nullptr;
-        float c1[8];
-        bool desat = shader && shader == reinterpret_cast<void**>(ADDR_SHADERS)[1];
-        void* maskShader = UsableShader(desat ? s_maskDesatShader : s_maskShader);
-
-        if (!mask)
+        auto it = item ? s_masksOf.find(item->positions) : s_masksOf.end();
+        if (it == s_masksOf.end())
         {
-            gxRsSet(device, state, shader);
+            GxRsSet(device, state, shader);
             return;
         }
-        bool rectOk = maskTex && maskShader && MaskConstants(item, mask, c1);
-        if (!rectOk)
+
+        void* maskTex[MAX_MASKS];
+        float constants[MAX_MASKS * 12];
+        size_t used = 0;
+        for (void* mask : it->second)
         {
-            if (!maskTex) s_failNoTex++;
-            else if (!maskShader) s_failNoShader++;
-            else s_failRect++;
-            gxRsSet(device, state, shader);
+            if (used == MAX_MASKS)
+                break;
+            maskTex[used] = reinterpret_cast<TexGetGx_t>(ADDR_TEX_GETGX)(*At<uint32_t>(mask, TEX_HANDLE), 1, 0);
+            if (maskTex[used] && MaskConstants(item, mask, constants + used * 12))
+                used++;
+        }
+
+        bool desaturated = shader && shader == reinterpret_cast<void**>(ADDR_SHADERS)[1];
+        void* maskShader = used ? UsableShader((desaturated ? s_maskDesatShaders : s_maskShaders)[used - 1]) : nullptr;
+        if (!maskShader)
+        {
+            GxRsSet(device, state, shader);
             return;
         }
-        s_maskedItems++;
-        s_lastC1[0] = c1[0]; s_lastC1[1] = c1[1]; s_lastC1[2] = c1[4]; s_lastC1[3] = c1[5];
 
-        void* useShader = maskShader;
-        if (s_debugFlags & 64)
-            useShader = reinterpret_cast<void**>(ADDR_SHADERS)[1];
-        else if ((s_debugFlags & 32) && s_testShader)
-            useShader = s_testShader;
-        else if ((s_debugFlags & 8) && UsableShader(s_debugCShader))
-            useShader = s_debugCShader;
-        else if ((s_debugFlags & 16) && UsableShader(s_debugTShader))
-            useShader = s_debugTShader;
-        else if (s_debugFlags & 4)
-            useShader = shader;
-        void* host = reinterpret_cast<void**>(ADDR_SHADERS)[1];
-        if ((s_debugFlags & 128) && host && useShader && useShader != host)
-        {
-            // a different value first: RsSet only marks a changed state
-            gxRsSet(device, state, reinterpret_cast<void**>(ADDR_SHADERS)[0]);
-            gxRsSet(device, state, host);
-            s_swapObject = host;
-            s_swapSaved = *At<void*>(host, SHADER_D3D);
-            *At<void*>(host, SHADER_D3D) = *At<void*>(useShader, SHADER_D3D);
-        }
-        else
-            gxRsSet(device, state, useShader);
-        if (!(s_debugFlags & 1))
-        {
-            gxRsSet(device, GXRS_TEXTURE1, maskTex);
-            s_texture1Bound = true;
-        }
-        if (!(s_debugFlags & 2))
-            reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(device, GXSH_PIXEL, 1, c1, 2);
+        GxRsSet(device, state, maskShader);
+        for (size_t k = 0; k < used; k++)
+            GxRsSet(device, GXRS_TEXTURE0 + 1 + static_cast<int>(k), maskTex[k]);
+        s_boundMasks = std::max(s_boundMasks, used);
+        reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(
+            device, GXSH_PIXEL, 1, constants, static_cast<int>(used * 3));
     }
 
     // ---------------- patching ----------------
@@ -391,18 +332,14 @@ namespace
         return patched;
     }
 
-    int PatchRenderCalls()
-    {
-        return PatchAllCalls(ADDR_BATCH_RENDER, reinterpret_cast<void*>(&BatchRenderHook));
-    }
-
-    // "push 4Eh; call GxRsSet" inside the render (the per-item pixel shader)
+    // "push 4Eh; call CGxDevice::RsSet" inside the render (the per-item pixel shader)
     bool PatchPixelShaderSet()
     {
         for (uint32_t site = ADDR_BATCH_RENDER; site < ADDR_BATCH_RENDER + 0x800; site++)
         {
             auto* code = reinterpret_cast<uint8_t*>(site);
-            if (code[0] == 0x6A && code[1] == GXRS_PIXELSHADER && PatchCall(site + 2, ADDR_GXRS_SET, reinterpret_cast<void*>(&PixelShaderSetHook)))
+            if (code[0] == 0x6A && code[1] == GXRS_PIXELSHADER
+                && PatchCall(site + 2, ADDR_GXRS_SET, reinterpret_cast<void*>(&PixelShaderSetHook)))
                 return true;
         }
         return false;
@@ -425,8 +362,7 @@ namespace
             int32_t& counter = *reinterpret_cast<int32_t*>(ADDR_CLASSID_COUNTER);
             classId = ++counter;
         }
-        auto isA = reinterpret_cast<IsA_t>(VFunc(object, 16));
-        return isA(object, classId) ? object : nullptr;
+        return reinterpret_cast<IsA_t>(VFunc(object, 16))(object, classId) ? object : nullptr;
     }
 }
 
@@ -434,22 +370,17 @@ void MaskTexture::ApplyPatches()
 {
     // masks are not drawn: CSimpleTexture vtable slot 23
     if (*reinterpret_cast<uint32_t*>(ADDR_TEXTURE_VTABLE_DRAW) == ADDR_TEXTURE_DRAW)
-    {
         Util::OverwriteUInt32AtAddress(ADDR_TEXTURE_VTABLE_DRAW, reinterpret_cast<uint32_t>(&TextureDrawHook));
-        s_vtablePatched = true;
-    }
 
     // the pixel shader hook first: without it the render hook must not run
-    s_shaderSetPatched = PatchPixelShaderSet();
-    if (s_shaderSetPatched)
+    if (PatchPixelShaderSet())
     {
-        // our shaders live and die with the client's UI shaders
-        s_createHooks = PatchAllCalls(ADDR_UI_SHADERS_CREATE, reinterpret_cast<void*>(&UiShadersCreateHook));
-        s_renderCallsPatched = PatchRenderCalls();
+        PatchAllCalls(ADDR_UI_SHADERS_CREATE, reinterpret_cast<void*>(&UiShadersCreateHook));
+        PatchAllCalls(ADDR_BATCH_RENDER, reinterpret_cast<void*>(&BatchRenderHook));
     }
 }
 
-// TextureAddMask(texture, mask): one mask per texture (a new one replaces the old)
+// TextureAddMask(texture, mask): up to 3 masks per texture (more are kept but not drawn)
 int32_t MaskTexture::TextureAddMask(lua_State* L)
 {
     void* texture = TextureArg(L, 1);
@@ -457,29 +388,27 @@ int32_t MaskTexture::TextureAddMask(lua_State* L)
     if (!texture || !mask || texture == mask)
         FrameScript::DisplayError(L, "Usage: TextureAddMask(texture, maskTexture)");
     s_isMask.insert(mask);
-    s_maskOf[At<float>(texture, TEX_POSITIONS)] = mask;
+    auto& masks = s_masksOf[At<float>(texture, TEX_POSITIONS)];
+    if (std::find(masks.begin(), masks.end(), mask) == masks.end())
+        masks.push_back(mask);
     return 0;
 }
 
-// TextureRemoveMask(texture [, mask])
+// TextureRemoveMask(texture [, mask]): without a mask, all of them
 int32_t MaskTexture::TextureRemoveMask(lua_State* L)
 {
     void* texture = TextureArg(L, 1);
     if (!texture)
         FrameScript::DisplayError(L, "Usage: TextureRemoveMask(texture [, maskTexture])");
     void* mask = TextureArg(L, 2);
-    auto it = s_maskOf.find(At<float>(texture, TEX_POSITIONS));
-    if (it != s_maskOf.end() && (!mask || it->second == mask))
-        s_maskOf.erase(it);
+    auto it = s_masksOf.find(At<float>(texture, TEX_POSITIONS));
+    if (it == s_masksOf.end())
+        return 0;
+    if (mask)
+        it->second.erase(std::remove(it->second.begin(), it->second.end(), mask), it->second.end());
+    if (!mask || it->second.empty())
+        s_masksOf.erase(it);
     return 0;
-}
-
-// TextureGetMask(texture) -> true if the texture has a mask (the Lua side keeps the mask object)
-int32_t MaskTexture::TextureGetMask(lua_State* L)
-{
-    void* texture = TextureArg(L, 1);
-    FrameScript::PushBoolean(L, texture && s_maskOf.count(At<float>(texture, TEX_POSITIONS)) > 0);
-    return 1;
 }
 
 // TextureSetIsMask(texture, isMask): a mask is not drawn
@@ -493,68 +422,4 @@ int32_t MaskTexture::TextureSetIsMask(lua_State* L)
     else
         s_isMask.erase(texture);
     return 0;
-}
-
-// TextureMaskDebug([texture]) -> a report string: hooks, shaders, counters, the texture/mask rects
-int32_t MaskTexture::TextureMaskDebug(lua_State* L)
-{
-    char buffer[1024];
-    int n = snprintf(buffer, sizeof(buffer),
-        "flags=%d vtable=%d shaderSet=%d renderCalls=%d createHooks=%d createdWithClient=%u | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d clientDesaturate=%p debugC=%p debugT=%p | UIMask d3d=%p valid=%u loaded=%u | "
-        "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
-        s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched, s_createHooks, s_createdWithClient,
-        s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid, reinterpret_cast<void**>(ADDR_SHADERS)[1], s_debugCShader, s_debugTShader,
-        s_maskShader ? *At<void*>(s_maskShader, 0x20) : nullptr,
-        s_maskShader ? *At<uint32_t>(s_maskShader, 0x2C) : 0,
-        s_maskShader ? *At<uint32_t>(s_maskShader, 0x30) : 0,
-        s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
-        s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
-
-    void* texture = TextureArg(L, 1);
-    auto it = texture ? s_maskOf.find(At<float>(texture, TEX_POSITIONS)) : s_maskOf.end();
-    if (it != s_maskOf.end() && n > 0 && n < static_cast<int>(sizeof(buffer)))
-    {
-        const float* p = At<float>(texture, TEX_POSITIONS);
-        const float* m = At<float>(it->second, TEX_POSITIONS);
-        uint32_t maskHandle = *At<uint32_t>(it->second, TEX_HANDLE);
-        void* maskTex = maskHandle ? reinterpret_cast<TexGetGx_t>(ADDR_TEX_GETGX)(maskHandle, 1, 0) : nullptr;
-        snprintf(buffer + n, sizeof(buffer) - n,
-            " | tex %.3f,%.3f..%.3f,%.3f | mask %.3f,%.3f..%.3f,%.3f handle=%X gx=%p",
-            p[0], p[1], p[9], p[10], m[0], m[1], m[9], m[10], maskHandle, maskTex);
-    }
-    FrameScript::PushString(L, buffer);
-    return 1;
-}
-
-// TextureMaskDebugFlags(flags): 1 = no mask on stage 1, 2 = no shader constants, 4 = keep the item's own shader,
-// 8 / 16 = debug shaders, 32 = Desaturate created by this DLL, 64 = the client's Desaturate
-int32_t MaskTexture::TextureMaskDebugFlags(lua_State* L)
-{
-    s_debugFlags = static_cast<int>(FrameScript::GetNumber(L, 1));
-    return 0;
-}
-
-// TextureMaskDumpShaders() -> the device vtable entries used here and the first 0x40 bytes of
-// UIMask (created by the DLL) next to the client's Desaturate (dword_B47934[1]), to compare
-int32_t MaskTexture::TextureMaskDumpShaders(lua_State* L)
-{
-    char buffer[2048];
-    void* device = Device();
-    int n = snprintf(buffer, sizeof(buffer), "device=%p vt272=%p vt276=%p vt280=%p vt288=%p",
-        device, VFunc(device, VT_SHADER_CREATE), VFunc(device, VT_SHADER_RELEASE),
-        VFunc(device, VT_SHADER_CONSTANTS), VFunc(device, 288));
-
-    void* shaders[2] = { s_maskShader, reinterpret_cast<void**>(ADDR_SHADERS)[1] };
-    const char* names[2] = { "UIMask", "Desaturate" };
-    for (int i = 0; i < 2 && n > 0 && n < static_cast<int>(sizeof(buffer)); i++)
-    {
-        n += snprintf(buffer + n, sizeof(buffer) - n, " | %s=%p:", names[i], shaders[i]);
-        if (!shaders[i])
-            continue;
-        const uint32_t* d = reinterpret_cast<const uint32_t*>(shaders[i]);
-        for (int k = 0; k < 32 && n > 0 && n < static_cast<int>(sizeof(buffer)); k++)
-            n += snprintf(buffer + n, sizeof(buffer) - n, " %X", d[k]);
-    }
-    FrameScript::PushString(L, buffer);
-    return 1;
 }
