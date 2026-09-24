@@ -9,7 +9,7 @@ Works with atlases, `SetTexCoord` crops and rotations (8 texcoords), `SetDesatur
 |---|---|
 | `MaskTexture.hpp/.cpp` | `WotLKExtensions/src/Client/` |
 | `../XMLExt/XMLExt.hpp/.cpp` | `WotLKExtensions/src/Client/` (replaces yours: `<MaskTexture>` tag) |
-| `MaskTexture.lua` | `Interface\FrameXML\Utils\`, toc: `Utils\MaskTexture.lua` right after `Utils\TextureUtil.lua` |
+| `../XMLExt/XMLExt.lua` | `Interface\FrameXML\XMLExt.lua` (replaces yours: the mask Lua API is at its end) |
 | `Shaders/Pixel/ps_3_0/UIMask1..3.bls`, `UIMaskDesaturate1..3.bls` | patch MPQ `shaders\Pixel\ps_3_0\` |
 | `Shaders/Pixel/ps_2_0/...` (same names) | patch MPQ `shaders\Pixel\ps_2_0\` (older cards, untested) |
 | `MaskTextureTest.lua/.xml` | optional test page, see below |
