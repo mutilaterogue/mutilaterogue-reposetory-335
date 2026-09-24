@@ -4,7 +4,8 @@ BLS (GXSH) layout, taken from Shaders\\Pixel\\ps_3_0\\UI.bls and Desaturate.bls:
   0x00 'GXSH'  0x04 0x00010003  0x08 1  0x0C 0xA00  0x10 0x200  0x14 1
   0x18 bytecode size  0x1C D3D9 bytecode (ps_2_0, the client uses ps_2_0 code for every profile)
 
-Shaders (all ps_2_0; the mask UV is the texture UV mapped by c1: uv * c1.xy + c1.zw):
+Shaders (all ps_2_0; the mask UV is the texture UV mapped by c1: uv * c1.xy + c1.zw;
+no register component may be read before it is written, the D3D9 validator rejects the shader):
   UIMask            = UI.bls with the mask alpha
   UIMaskDesaturate  = Desaturate.bls with the mask alpha
 Inputs: v0 vertex color, t0 texture UV, s0 texture, s1 mask, c1 mask UV transform.
@@ -32,7 +33,7 @@ DCL_MASK = [
     0x0200001F, 0x90000000, 0xA00F0801,	# dcl_2d s1
 ]
 SAMPLE_MASK = [
-    0x04000004, 0x80030001, 0xB0E40000, 0xA0E40001, 0xA0EE0001,	# mad r1.xy, t0, c1, c1.zwzw
+    0x04000004, 0x800F0001, 0xB0440000, 0xA0440001, 0xA0EE0001,	# mad r1, t0.xyxy, c1.xyxy, c1.zwzw (all of r1: texld reads it whole)
     0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40800,			# texld r0, t0, s0
     0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
 ]

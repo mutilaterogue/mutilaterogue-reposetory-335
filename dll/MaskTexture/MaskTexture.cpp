@@ -89,6 +89,8 @@ namespace
     std::unordered_set<void*> s_isMask;					// textures used as masks: not drawn
 
     void* s_maskShader = nullptr;
+    void* s_testShader = nullptr;		// the client's Desaturate loaded the same way (path check)
+    bool s_testShaderValid = false;
     void* s_maskDesatShader = nullptr;
     bool s_shadersLoaded = false;
 
@@ -130,7 +132,9 @@ namespace
         auto create = reinterpret_cast<ShaderCreate_t>(VFunc(device, VT_SHADER_CREATE));
         create(device, &s_maskShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMask", 1);
         create(device, &s_maskDesatShader, GXSH_PIXEL, "Shaders\\Pixel", "UIMaskDesaturate", 1);
+        create(device, &s_testShader, GXSH_PIXEL, "Shaders\\Pixel", "Desaturate", 1);
         auto valid = reinterpret_cast<ShaderValid_t>(ADDR_SHADER_VALID);
+        s_testShaderValid = s_testShader && valid(s_testShader);
         if (s_maskShader && !valid(s_maskShader))
             s_maskShader = nullptr;
         if (s_maskDesatShader && !valid(s_maskDesatShader))
@@ -399,10 +403,10 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
 {
     char buffer[1024];
     int n = snprintf(buffer, sizeof(buffer),
-        "vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p | "
+        "vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d | "
         "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
         s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
-        s_shadersLoaded, s_maskShader, s_maskDesatShader,
+        s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid,
         s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
         s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
 
