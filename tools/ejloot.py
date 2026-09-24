@@ -21,6 +21,15 @@ convention: "<name> (2)" and "<name> (3)". If the dump gets two more columns
 (entry, difficulty_entry_1, difficulty_entry_2, difficulty_entry_3, modelid1..4,
 name) they are used instead.
 
+Chests (optional, gameobject loot - gunship, Deathbringer, Dreamwalker, Faction
+Champions, Ulduar keepers, ...): each chest spawn is given to the nearest boss of
+its instance, and its spawnMask is the difficulty (same bits as below).
+
+    gameobjects.csv       entry, name, Data1 (loot id), map, position_x, position_y,
+                          position_z, spawnMask
+    gameobject_loot.csv   Entry, Item, Reference, Chance, GroupId
+    spawns.csv            id, map, position_x, position_y, position_z (boss positions)
+
 Difficulty is written as a bitmask, bit = 2^(journal difficulty index - 1):
     dungeons: 1 normal, 2 heroic
     raids:    1 10 normal, 2 25 normal, 4 10 heroic, 8 25 heroic
@@ -40,6 +49,13 @@ MAX_REFERENCE_DEPTH = 6
 
 
 def read_csv(path, ncols):
+    """Tab separated rows, or a quoted CSV export with a header (it fails the int parse)."""
+    import csv
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as fh:
+        first = fh.readline()
+        if "\t" not in first:
+            fh.seek(0)
+            return [row for row in csv.reader(fh) if len(row) >= ncols]
     rows = []
     for encoding in ("utf-8", "cp1251"):
         try:
@@ -169,6 +185,74 @@ def resolve_entry(model, model2entry, heroic):
     return None, None
 
 
+MAX_CHEST_DISTANCE = 150.0
+
+
+def load_chests(csvdir, text, model2entry, reference_loot):
+    """encounterID -> [set per difficulty index 0..3] of chest items; prints unmatched chests."""
+    go_path = os.path.join(csvdir, "gameobjects.csv")
+    loot_path = os.path.join(csvdir, "gameobject_loot.csv")
+    spawn_path = os.path.join(csvdir, "spawns.csv")
+    chests = collections.defaultdict(lambda: [set(), set(), set(), set()])
+    if not (os.path.exists(go_path) and os.path.exists(loot_path) and os.path.exists(spawn_path)):
+        print("chests: gameobjects.csv / gameobject_loot.csv / spawns.csv missing, skipped", file=sys.stderr)
+        return chests
+
+    go_loot = load_loot(loot_path, 5)
+
+    inst_map = {int(i): int(m) for i, m in re.findall(
+        r"EJ_DATA\.instances\[(\d+)\] = \{ mapID = (\d+)", text)}
+    enc_inst = {int(e): int(i) for e, i in re.findall(
+        r"EJ_DATA\.encounters\[(\d+)\] = \{ (?:floor = \d+, )?instanceID = (\d+)", text)}
+    enc_models = collections.defaultdict(list)
+    for e, m in re.findall(r"EJ_DATA\.creatures\[\d+\] = \{ encounterID = (\d+), modelID = (\d+)", text):
+        enc_models[int(e)].append(int(m))
+
+    spawns = collections.defaultdict(list)
+    for p in read_csv(spawn_path, 5):
+        try:
+            spawns[int(p[0])].append((int(p[1]), float(p[2]), float(p[3]), float(p[4])))
+        except ValueError:
+            continue
+
+    # boss position: average spawn of the boss creatures on the instance map
+    boss_pos = collections.defaultdict(list)   # map -> [(encounterID, x, y, z)]
+    for encid, models in enc_models.items():
+        mapID = inst_map.get(enc_inst.get(encid))
+        points = [(x, y, z) for model in models for entry in model2entry.get(model, ())
+                  for smap, x, y, z in spawns.get(entry, ()) if smap == mapID]
+        if points:
+            n = float(len(points))
+            boss_pos[mapID].append((encid, sum(p[0] for p in points) / n,
+                                    sum(p[1] for p in points) / n, sum(p[2] for p in points) / n))
+
+    matched = unmatched = 0
+    for p in read_csv(go_path, 8):
+        try:
+            name = p[1]
+            lootid, mapID = int(p[2]), int(p[3])
+            x, y, z = float(p[4]), float(p[5]), float(p[6])
+            mask = int(p[7]) or 1
+        except ValueError:
+            continue
+        best = None
+        for encid, bx, by, bz in boss_pos.get(mapID, ()):
+            dist = ((x - bx) ** 2 + (y - by) ** 2 + (z - bz) ** 2) ** 0.5
+            if best is None or dist < best[0]:
+                best = (dist, encid)
+        if not best or best[0] > MAX_CHEST_DISTANCE:
+            unmatched += 1
+            print("  chest without a boss nearby: %s (entry %s, map %d)" % (name, p[0], mapID), file=sys.stderr)
+            continue
+        items = expand(lootid, go_loot, reference_loot)
+        for index in range(4):
+            if mask & (1 << index):
+                chests[best[1]][index] |= items
+        matched += 1
+    print("chests given to a boss      %d, without a boss %d" % (matched, unmatched), file=sys.stderr)
+    return chests
+
+
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else "EncounterJournalData.lua"
     csvdir = sys.argv[2] if len(sys.argv) > 2 else "."
@@ -214,6 +298,8 @@ def main():
     for _rid, (encid, itemid) in old_items.items():
         old_by_encounter[encid].add(itemid)
 
+    chests = load_chests(csvdir, text, model2entry, reference_loot)
+
     matched = 0
     unmatched = 0
     raid_fallback = [0, 0]   # raid encounters without a 10 / 25 heroic entry
@@ -221,7 +307,7 @@ def main():
     by_enc_ids = collections.defaultdict(list)
     next_id = 1
 
-    for encid in sorted(set(list(by_encounter) + list(old_by_encounter))):
+    for encid in sorted(set(list(by_encounter) + list(old_by_encounter) + list(chests))):
         is_raid = encid in raid_encounters
         # per difficulty index (0-based): dungeon normal / heroic, raid 10N / 25N / 10H / 25H
         per_diff = [set(), set(), set(), set()]
@@ -240,6 +326,13 @@ def main():
                 if entry:
                     has_entry[index] = True
                     per_diff[index] |= expand(entry, creature_loot, reference_loot)
+
+        # chest loot (spawnMask bits = difficulty index bits)
+        for index, items in enumerate(chests.get(encid, ())):
+            if items:
+                found = True
+                has_entry[index] = True
+                per_diff[index] |= items
 
         if not found or not any(per_diff):
             unmatched += 1
