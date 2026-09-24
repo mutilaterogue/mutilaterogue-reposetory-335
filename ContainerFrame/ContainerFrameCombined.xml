@@ -1,0 +1,86 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\UI.xsd">
+	<!--
+		Retail ContainerFrameCombinedBags for 3.3.5: the backpack and the four bags in one window.
+		Loads after ContainerFrame.xml, ItemSearch.lua, MainMenuBarBagButtons.xml and BankFrame.xml
+		(end of FrameXML.toc). The item buttons are the 3.3.5 ContainerFrameItemButtonTemplate:
+		they read their bag from the parent, so every bag has its own holder frame with the bag ID.
+	-->
+	<Script file="ContainerFrameCombined.lua"/>
+
+	<Frame name="ContainerFrameCombinedBags" inherits="PortraitFrameTemplate" parent="UIParent" frameStrata="MEDIUM" toplevel="true" movable="true" enableMouse="true" hidden="true">
+		<Size x="435" y="300"/>
+		<Anchors>
+			<Anchor point="BOTTOMRIGHT" x="-4" y="85"/>
+		</Anchors>
+		<Frames>
+			<!-- portrait: left click = backpack tooltip, right click = combined / separate bags -->
+			<Button name="$parentPortraitButton" parentKey="PortraitButton">
+				<Size x="50" y="50"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="-6" y="7"/>
+				</Anchors>
+				<HighlightTexture file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight" alphaMode="ADD"/>
+				<Scripts>
+					<OnLoad>
+						self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+					</OnLoad>
+					<OnClick>
+						if button == "RightButton" then
+							ContainerFrameCombinedBags_ToggleMode();
+						end
+					</OnClick>
+					<OnEnter function="ContainerFrameCombinedBags_PortraitOnEnter"/>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Button>
+
+			<!-- sort (retail BagItemAutoSortButton) -->
+			<Button name="$parentSortButton" parentKey="SortButton">
+				<Size x="28" y="26"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-9" y="-28"/>
+				</Anchors>
+				<NormalTexture file="Interface\Icons\INV_Pet_Broom">
+					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92"/>
+				</NormalTexture>
+				<PushedTexture file="Interface\Icons\INV_Pet_Broom">
+					<TexCoords left="0.12" right="0.88" top="0.12" bottom="0.88"/>
+				</PushedTexture>
+				<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+				<Scripts>
+					<OnClick>
+						PlaySound("igMainMenuOptionCheckBoxOn");
+						ContainerFrameCombinedBags_SortBags();
+					</OnClick>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+						GameTooltip:SetText(BAG_CLEANUP_BAGS or "Сортировать сумки", 1, 1, 1);
+						GameTooltip:AddLine(BAG_CLEANUP_BAGS_DESCRIPTION or "Упорядочивает предметы в рюкзаке и сумках.", nil, nil, nil, true);
+						GameTooltip:Show();
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Button>
+
+			<Frame name="$parentMoneyFrame" parentKey="MoneyFrame" inherits="SmallMoneyFrameTemplate">
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" x="4" y="8"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="ContainerFrameCombinedBags_OnLoad"/>
+			<OnEvent function="ContainerFrameCombinedBags_OnEvent"/>
+			<OnShow function="ContainerFrameCombinedBags_OnShow"/>
+			<OnHide function="ContainerFrameCombinedBags_OnHide"/>
+			<OnMouseDown>
+				if button == "LeftButton" then
+					self:StartMoving();
+				end
+			</OnMouseDown>
+			<OnMouseUp>
+				self:StopMovingOrSizing();
+			</OnMouseUp>
+		</Scripts>
+	</Frame>
+</Ui>
