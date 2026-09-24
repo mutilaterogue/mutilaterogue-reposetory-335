@@ -11,7 +11,7 @@ ps_2_0 has no arbitrary swizzles (only .xyzw and the replicates .xxxx/.yyyy/.zzz
   UIMaskDesaturate  = Desaturate.bls with the mask alpha
 Inputs: v0 vertex color, t0 texture UV, s0 texture, s1 mask, c1 mask UV scale, c2 mask UV offset.
 
-Usage: python tools/blsmask.py Shaders/Pixel [ps_2_0 UI.bls to self-check the header]
+Usage: python tools/blsmask.py Shaders/Pixel [ps_2_0 UI.bls [ps_3_0 UI.bls]] (self-checks)
 """
 import os
 import struct
@@ -113,6 +113,13 @@ SAMPLE3_MASK = [
     0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
 ]
 
+# the client's ps_3_0 UI.bls, rebuilt byte for byte (checks the header and the input declarations)
+UI_3 = [0xFFFF0300] + DCL3 + [
+    0x03000042, 0x800F0000, 0x90E40001, 0xA0E40800,	# texld r0, v1, s0
+    0x03000005, 0x800F0800, 0x80E40000, 0x90E40000,	# mul oC0, r0, v0
+    0x0000FFFF,
+]
+
 UI_MASK_3 = [0xFFFF0300] + DCL3 + DCL3_MASK + SAMPLE3_MASK + [
     0x03000005, 0x800F0000, 0x80E40000, 0x90E40000,	# mul r0, r0, v0
     0x03000005, 0x80080000, 0x80FF0000, 0x80FF0001,	# mul r0.w, r0.w, r1.w
@@ -151,12 +158,12 @@ SHADERS = {
 }
 
 if __name__ == "__main__":
-    # usage: blsmask.py <Shaders\\Pixel dir> [ps_2_0 UI.bls to self-check the header]
+    # usage: blsmask.py <Shaders\\Pixel dir> [ps_2_0 UI.bls [ps_3_0 UI.bls]] (self-checks)
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    if len(sys.argv) > 2:
-        with open(sys.argv[2], "rb") as f:
-            assert f.read() == bls(UI), "header/UI mismatch"
-        print("UI.bls rebuilt byte for byte")
+    for arg, tokens in zip(sys.argv[2:4], (UI, UI_3)):
+        with open(arg, "rb") as f:
+            assert f.read() == bls(tokens), arg + ": header/UI mismatch"
+        print(arg, "rebuilt byte for byte")
     for profile, shaders in SHADERS.items():
         out = os.path.join(root, profile)
         os.makedirs(out, exist_ok=True)
