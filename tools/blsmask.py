@@ -4,11 +4,12 @@ BLS (GXSH) layout, taken from Shaders\\Pixel\\ps_3_0\\UI.bls and Desaturate.bls:
   0x00 'GXSH'  0x04 0x00010003  0x08 1  0x0C 0xA00  0x10 0x200  0x14 1
   0x18 bytecode size  0x1C D3D9 bytecode (ps_2_0, the client uses ps_2_0 code for every profile)
 
-Shaders (all ps_2_0; the mask UV is the texture UV mapped by c1: uv * c1.xy + c1.zw;
-no register component may be read before it is written, the D3D9 validator rejects the shader):
+Shaders (all ps_2_0; the mask UV is the texture UV mapped by c1/c2: uv * c1 + c2, c1.zw = c2.zw = 0).
+The D3D9 validator rejects the shader if a register component is read before it is written, and
+ps_2_0 has no arbitrary swizzles (only .xyzw and the replicates .xxxx/.yyyy/.zzzz/.wwww).:
   UIMask            = UI.bls with the mask alpha
   UIMaskDesaturate  = Desaturate.bls with the mask alpha
-Inputs: v0 vertex color, t0 texture UV, s0 texture, s1 mask, c1 mask UV transform.
+Inputs: v0 vertex color, t0 texture UV, s0 texture, s1 mask, c1 mask UV scale, c2 mask UV offset.
 
 Usage: python tools/blsmask.py <out dir> [UI.bls to self-check the header]
 """
@@ -29,11 +30,16 @@ DCL = [
     0x0200001F, 0x80000000, 0xB0030000,	# dcl t0.xy
     0x0200001F, 0x90000000, 0xA00F0800,	# dcl_2d s0
 ]
+DCL_MASKED = [
+    0x0200001F, 0x80000000, 0x900F0000,	# dcl v0
+    0x0200001F, 0x80000000, 0xB00F0000,	# dcl t0 (all: mad reads t0.xyzw, zw are 0)
+    0x0200001F, 0x90000000, 0xA00F0800,	# dcl_2d s0
+]
 DCL_MASK = [
     0x0200001F, 0x90000000, 0xA00F0801,	# dcl_2d s1
 ]
 SAMPLE_MASK = [
-    0x04000004, 0x800F0001, 0xB0440000, 0xA0440001, 0xA0EE0001,	# mad r1, t0.xyxy, c1.xyxy, c1.zwzw (all of r1: texld reads it whole)
+    0x04000004, 0x800F0001, 0xB0E40000, 0xA0E40001, 0xA0E40002,	# mad r1, t0, c1, c2 (all of r1: texld reads it whole)
     0x03000042, 0x800F0000, 0xB0E40000, 0xA0E40800,			# texld r0, t0, s0
     0x03000042, 0x800F0001, 0x80E40001, 0xA0E40801,			# texld r1, r1, s1
 ]
@@ -45,7 +51,7 @@ UI = [0xFFFF0200] + DCL + [
     0x0000FFFF,
 ]
 
-UI_MASK = [0xFFFF0200] + DCL + DCL_MASK + SAMPLE_MASK + [
+UI_MASK = [0xFFFF0200] + DCL_MASKED + DCL_MASK + SAMPLE_MASK + [
     0x03000005, 0x800F0000, 0x80E40000, 0x90E40000,	# mul r0, r0, v0
     0x03000005, 0x80080000, 0x80FF0000, 0x80FF0001,	# mul r0.w, r0.w, r1.w
     0x02000001, 0x800F0800, 0x80E40000,			# mov oC0, r0
@@ -54,7 +60,7 @@ UI_MASK = [0xFFFF0200] + DCL + DCL_MASK + SAMPLE_MASK + [
 
 UI_MASK_DESATURATE = [0xFFFF0200,
     0x05000051, 0xA00F0000, 0x3E991687, 0x3F1645A2, 0x3DE978D5, 0x00000000,	# def c0, 0.299, 0.587, 0.114, 0
-] + DCL + DCL_MASK + SAMPLE_MASK + [
+] + DCL_MASKED + DCL_MASK + SAMPLE_MASK + [
     0x03000008, 0x80010002, 0x80E40000, 0xA0E40000,	# dp3 r2.x, r0, c0
     0x03000005, 0x80080002, 0x80FF0000, 0x90FF0000,	# mul r2.w, r0.w, v0.w
     0x03000005, 0x80080002, 0x80FF0002, 0x80FF0001,	# mul r2.w, r2.w, r1.w

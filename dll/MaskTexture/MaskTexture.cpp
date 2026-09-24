@@ -156,8 +156,9 @@ namespace
         }
     }
 
-    // c1: maskUV = t0 * c1.xy + c1.zw. The texture UV is linear over the quad, so is the mask UV.
-    bool MaskConstants(const BatchItem* item, void* mask, float out[4])
+    // c1/c2: maskUV = t0 * c1 + c2 (out[0..3] = c1, out[4..7] = c2; zw = 0).
+    // The texture UV is linear over the quad, so is the mask UV.
+    bool MaskConstants(const BatchItem* item, void* mask, float out[8])
     {
         const float* p = item->positions;
         const float* uv = item->texcoords;
@@ -187,8 +188,12 @@ namespace
         // mask rect 0..1 -> the mask's own texcoords
         out[0] = ax * (mu3 - mu0);
         out[1] = ay * (mv3 - mv0);
-        out[2] = mu0 + bx * (mu3 - mu0);
-        out[3] = mv0 + by * (mv3 - mv0);
+        out[2] = 0.f;
+        out[3] = 0.f;
+        out[4] = mu0 + bx * (mu3 - mu0);
+        out[5] = mv0 + by * (mv3 - mv0);
+        out[6] = 0.f;
+        out[7] = 0.f;
         return true;
     }
 
@@ -253,7 +258,7 @@ namespace
         auto it = item ? s_maskOf.find(item->positions) : s_maskOf.end();
         void* mask = it != s_maskOf.end() ? it->second : nullptr;
         void* maskTex = mask ? reinterpret_cast<TexGetGx_t>(ADDR_TEX_GETGX)(*At<uint32_t>(mask, TEX_HANDLE), 1, 0) : nullptr;
-        float c1[4];
+        float c1[8];
         bool desat = shader && shader == reinterpret_cast<void**>(ADDR_SHADERS)[1];
         void* maskShader = desat ? s_maskDesatShader : s_maskShader;
 
@@ -272,12 +277,12 @@ namespace
             return;
         }
         s_maskedItems++;
-        memcpy(s_lastC1, c1, sizeof(c1));
+        s_lastC1[0] = c1[0]; s_lastC1[1] = c1[1]; s_lastC1[2] = c1[4]; s_lastC1[3] = c1[5];
 
         gxRsSet(device, state, maskShader);
         gxRsSet(device, GXRS_TEXTURE1, maskTex);
         s_texture1Bound = true;
-        reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(device, GXSH_PIXEL, 1, c1, 1);
+        reinterpret_cast<ShaderConstants_t>(VFunc(device, VT_SHADER_CONSTANTS))(device, GXSH_PIXEL, 1, c1, 2);
     }
 
     // ---------------- patching ----------------
