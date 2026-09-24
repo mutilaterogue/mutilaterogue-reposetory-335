@@ -949,6 +949,11 @@
 								<Anchor point="TOPLEFT" x="20" y="-16"/>
 							</Anchors>
 						</FontString>
+						<FontString parentKey="empty" inherits="GameFontHighlightLarge" text="Нет комплектов" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="-20"/>
+							</Anchors>
+						</FontString>
 					</Layer>
 				</Layers>
 				<Frames>

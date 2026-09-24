@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """
-Builds EncounterJournalItemSets.lua (the journal's "Item sets" tab) from the client DBCs.
+Builds EncounterJournalItemSets.lua (the journal's "Item sets" tab).
 
-Inputs:
-    ItemSet.dbc      set name, items, bonus spells and thresholds (3.3.5 12340)
+    item_template    which items belong to a set (itemset column), item level, class,
+                     required level, bonding, stats - the source of the set contents
+    ItemSet.dbc      only the set name and its bonus spells / thresholds
     Spell.dbc        bonus descriptions ($s1 / ${...} tokens are resolved here)
-    ItemCache.lua    names, quality, icons of the items (sets with unknown items are dropped)
-    items_ext.csv    optional dump of item_template (tab separated or CSV with a header):
-                         SELECT entry, ItemLevel, AllowableClass FROM item_template;
-                     gives the item level line and the class filter
+    ItemCache.lua    quality and icon check (items missing from the client are dropped)
 
-The expansion comes from the set ID: ItemSet.dbc rows were added in patch order
-(classic < 552 <= TBC < 753 <= WotLK); item IDs overlap between expansions.
-Without items_ext.csv there is no item level line and no class filter.
+Only raid and dungeon sets are kept (see the filters below): bind on pickup, no
+resilience (PvP), with stats, item level >= MIN_ITEM_LEVEL, required level >= MIN_REQUIRED_LEVEL.
+A set is split into one row per item level (tier 10 normal / heroic / sanctified share
+one ItemSet), and a row needs at least MIN_PIECES items.
+
+item_template export (CSV with header, as exported, or tab separated with header):
+
+    SELECT entry, Quality, ItemLevel, RequiredLevel, AllowableClass, itemset, bonding, StatsCount,
+           (stat_type1 = 35 OR stat_type2 = 35 OR stat_type3 = 35 OR stat_type4 = 35 OR
+            stat_type5 = 35 OR stat_type6 = 35 OR stat_type7 = 35 OR stat_type8 = 35 OR
+            stat_type9 = 35 OR stat_type10 = 35) AS resilience
+    FROM item_template WHERE itemset > 0;
 
 Usage:
     py ejsets.py [ItemSet.dbc] [Spell.dbc] [ItemCache.lua] [output.lua] [items_ext.csv]
@@ -23,6 +30,11 @@ import struct
 import sys
 
 LOCALE = 8   # ruRU slot of the localized strings
+
+MIN_ITEM_LEVEL = 115
+MIN_REQUIRED_LEVEL = 55
+MIN_PIECES = 4
+BIND_ON_PICKUP = 1
 
 
 def load_dbc(path):
@@ -197,23 +209,30 @@ def load_item_cache(path):
 
 
 def load_items_ext(path):
-    """entry -> (ItemLevel, AllowableClass); tab separated or a quoted CSV export with a header."""
+    """entry -> {column: int} from the item_template export (header row required)."""
     import csv
-    ext = {}
+    items = {}
     if not path or not os.path.exists(path):
-        return ext
+        raise SystemExit("items_ext.csv (item_template export) is required, see the header of this script")
     with open(path, encoding="utf-8-sig", errors="replace", newline="") as fh:
         sample = fh.readline()
         fh.seek(0)
-        delimiter = "\t" if "\t" in sample else ","
-        for parts in csv.reader(fh, delimiter=delimiter):
-            if len(parts) < 3:
+        reader = csv.reader(fh, delimiter="\t" if "\t" in sample else ",")
+        header = [h.strip().lower() for h in next(reader)]
+        for parts in reader:
+            if len(parts) < len(header):
                 continue
-            try:
-                ext[int(parts[0])] = (int(parts[1]), int(parts[2]))
-            except ValueError:
-                continue   # header
-    return ext
+            row = {}
+            for key, value in zip(header, parts):
+                try:
+                    row[key] = int(float(value))
+                except ValueError:
+                    row[key] = 0
+            items[row["entry"]] = row
+    for column in ("itemlevel", "allowableclass", "itemset", "requiredlevel", "bonding", "statscount"):
+        if items and column not in next(iter(items.values())):
+            raise SystemExit("items_ext.csv has no column " + column + ", see the header of this script")
+    return items
 
 
 # classID (EJ class filter, druid = 11) from the AllowableClass bitmask (bit = classID - 1)
@@ -244,16 +263,25 @@ def main():
     cache = load_item_cache(cache_path)
     ext = load_items_ext(ext_path)
 
+    members = {}
+    for entry, item in ext.items():
+        if item["itemset"] > 0:
+            members.setdefault(item["itemset"], []).append(entry)
+
     sets = []
-    dropped = 0
+    stats = {"no items": 0, "not raid/dungeon": 0, "level": 0, "pieces": 0}
     for row in rows:
         set_id = row[0]
         name = string(row[1 + LOCALE])
-        items = [i for i in row[18:35] if i]
-        known = [i for i in items if i in cache]
-        # test and unused sets: items missing from the client
-        if not name or not known or len(known) < len(items):
-            dropped += 1
+        items = [i for i in members.get(set_id, []) if i in cache]
+        if not name or not items:
+            stats["no items"] += 1
+            continue
+
+        # raid / dungeon: bind on pickup, not PvP (resilience), with stats
+        if any(ext[i]["bonding"] != BIND_ON_PICKUP or ext[i].get("resilience", 0) for i in items) \
+                or not any(ext[i]["statscount"] > 0 for i in items):
+            stats["not raid/dungeon"] += 1
             continue
 
         bonuses = []
@@ -265,24 +293,32 @@ def main():
                 bonuses.append((threshold, text))
         bonuses.sort(key=lambda b: b[0])
 
-        quality = max(cache[i]["quality"] for i in items)
-        item_level = 0
-        class_mask = 0
-        if ext:
-            levels = [ext[i][0] for i in items if i in ext]
-            item_level = max(levels) if levels else 0
-            for i in items:
-                mask = ext.get(i, (0, -1))[1]
+        # one row per item level
+        by_level = {}
+        for i in items:
+            by_level.setdefault(ext[i]["itemlevel"], []).append(i)
+        for item_level, level_items in sorted(by_level.items(), reverse=True):
+            if item_level < MIN_ITEM_LEVEL or max(ext[i]["requiredlevel"] for i in level_items) < MIN_REQUIRED_LEVEL:
+                stats["level"] += 1
+                continue
+            if len(level_items) < MIN_PIECES:
+                stats["pieces"] += 1
+                continue
+            level_items.sort(key=lambda i: (cache[i]["invType"], i))
+            class_mask = 0
+            for i in level_items:
+                mask = ext[i]["allowableclass"]
                 if mask > 0 and (mask & ALL_CLASSES_MASK) != ALL_CLASSES_MASK:
                     class_mask |= mask
-        sets.append({"id": set_id, "name": name, "items": items, "bonuses": bonuses,
-                     "quality": quality, "itemLevel": item_level, "classMask": class_mask,
-                     "expansion": set_expansion(set_id)})
+            sets.append({"id": set_id, "name": name, "items": level_items, "bonuses": bonuses,
+                         "quality": max(cache[i]["quality"] for i in level_items),
+                         "itemLevel": item_level, "classMask": class_mask,
+                         "expansion": set_expansion(set_id)})
 
     # newest first inside an expansion: item level, then item IDs
     sets.sort(key=lambda s: (s["expansion"], -s["itemLevel"], -max(s["items"])))
 
-    out = ["-- Generated by tools/ejsets.py from ItemSet.dbc + Spell.dbc. Do not edit by hand.",
+    out = ["-- Generated by tools/ejsets.py from item_template + ItemSet.dbc + Spell.dbc. Do not edit by hand.",
            "-- EJ_ITEMSETS[i] = { id, name, expansion, quality, itemLevel (0 = unknown),",
            "--                    classMask (AllowableClass bits, 0 = every class), items, bonuses = { { count, text } } }",
            "", "EJ_ITEMSETS = {"]
@@ -297,9 +333,9 @@ def main():
     open(out_path, "w", encoding="utf-8").write("\n".join(out))
 
     per_expansion = [sum(1 for s in sets if s["expansion"] == e) for e in range(3)]
-    print("sets written %d (classic %d, tbc %d, wotlk %d), dropped %d"
-          % (len(sets), per_expansion[0], per_expansion[1], per_expansion[2], dropped), file=sys.stderr)
-    print("item level / class filter: %s" % ("items_ext.csv" if ext else "no items_ext.csv"), file=sys.stderr)
+    print("rows written %d (classic %d, tbc %d, wotlk %d)"
+          % (len(sets), per_expansion[0], per_expansion[1], per_expansion[2]), file=sys.stderr)
+    print("dropped: %s" % ", ".join("%s %d" % kv for kv in stats.items()), file=sys.stderr)
 
 
 if __name__ == "__main__":

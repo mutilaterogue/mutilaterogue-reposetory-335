@@ -1603,6 +1603,11 @@ function EncounterJournal_UpdateItemSets(resetScroll)
 		end
 	end
 	lootJournal.sets = list;
+	if #list == 0 then
+		lootJournal.empty:Show();
+	else
+		lootJournal.empty:Hide();
+	end
 	if resetScroll then
 		ResetFauxScroll(lootJournal.ScrollFrame);
 	end
