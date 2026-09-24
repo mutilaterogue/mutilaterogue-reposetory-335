@@ -40,10 +40,10 @@
 				<Anchors>
 					<Anchor point="TOPRIGHT" x="-9" y="-28"/>
 				</Anchors>
-				<NormalTexture file="Interface\Icons\INV_Pet_Broom">
+				<NormalTexture file="Interface\Buttons\UI-Panel-Button-Up">
 					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92"/>
 				</NormalTexture>
-				<PushedTexture file="Interface\Icons\INV_Pet_Broom">
+				<PushedTexture file="Interface\Buttons\UI-Panel-Button-Down">
 					<TexCoords left="0.12" right="0.88" top="0.12" bottom="0.88"/>
 				</PushedTexture>
 				<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
@@ -64,7 +64,7 @@
 
 			<Frame name="$parentMoneyFrame" parentKey="MoneyFrame" inherits="SmallMoneyFrameTemplate">
 				<Anchors>
-					<Anchor point="BOTTOMRIGHT" x="4" y="8"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="9"/>
 				</Anchors>
 			</Frame>
 		</Frames>

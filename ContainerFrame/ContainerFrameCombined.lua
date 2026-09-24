@@ -4,8 +4,8 @@
 -- to the combined window while it is enabled, bank bags and the keyring keep the 3.3.5 frames.
 -- Right click on the portrait switches between the combined window and separate bags.
 --
--- 3.3.5 has no C_Container.SortBags, C_NewItems or bag atlases: sorting moves items one swap at a
--- time, new items are tracked here, textures are 3.3.5 files.
+-- 3.3.5 has no C_Container.SortBags or C_NewItems: sorting moves items one swap at a time, new
+-- items are tracked here. The textures are the retail bag atlases (AtlasInfo.lua / SetAtlas).
 
 local COLUMNS = 10;
 local BUTTON_SIZE = 37;
@@ -20,6 +20,18 @@ local SORT_STEP_DELAY = 0.1;
 local SORT_MAX_STEPS = 400;
 
 local useCombined = true;
+
+-- retail NEW_ITEM_ATLAS_BY_QUALITY
+local NEW_ITEM_ATLAS_BY_QUALITY = {
+	[0] = "bags-glow-white",
+	[1] = "bags-glow-white",
+	[2] = "bags-glow-green",
+	[3] = "bags-glow-blue",
+	[4] = "bags-glow-purple",
+	[5] = "bags-glow-orange",
+	[6] = "bags-glow-artifact",
+	[7] = "bags-glow-heirloom",
+};
 
 -- original 3.3.5 functions: bank bags, keyring and the "separate bags" mode use them
 local orig = {
@@ -109,21 +121,17 @@ end
 -- item buttons
 ---------------------------------------------------------------------------
 local function DecorateButton(button)
-	-- empty slot background (retail "bags-item-slot64")
+	-- empty slot background (retail emptyBackgroundAtlas)
 	local slotBG = button:CreateTexture(nil, "BACKGROUND");
-	slotBG:SetTexture("Interface\\Buttons\\UI-EmptySlot-Disabled");
-	slotBG:SetPoint("CENTER");
-	slotBG:SetWidth(BUTTON_SIZE * 1.7);
-	slotBG:SetHeight(BUTTON_SIZE * 1.7);
+	slotBG:SetAtlas("bags-item-slot64");
+	slotBG:SetAllPoints();
 	button.slotBG = slotBG;
 
-	-- new item glow, pulsing like retail newitemglowAnim
+	-- new item: quality glow pulsing (newitemglowAnim) and a white flash when it arrives
 	local glow = button:CreateTexture(nil, "OVERLAY");
-	glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border");
+	glow:SetAtlas("bags-glow-white", true);
 	glow:SetBlendMode("ADD");
 	glow:SetPoint("CENTER");
-	glow:SetWidth(BUTTON_SIZE * 1.8);
-	glow:SetHeight(BUTTON_SIZE * 1.8);
 	glow:Hide();
 	button.NewItemTexture = glow;
 	local anim = button:CreateAnimationGroup();
@@ -133,20 +141,30 @@ local function DecorateButton(button)
 	alpha:SetDuration(0.5);
 	button.newItemAnim = anim;
 
+	local flash = button:CreateTexture(nil, "OVERLAY");
+	flash:SetAtlas("bags-glow-flash", true);
+	flash:SetBlendMode("ADD");
+	flash:SetPoint("CENTER");
+	flash:Hide();
+	button.flash = flash;
+	local flashAnim = flash:CreateAnimationGroup();
+	local fade = flashAnim:CreateAnimation("Alpha");
+	fade:SetChange(-1);
+	fade:SetDuration(0.6);
+	flashAnim:SetScript("OnFinished", function() flash:Hide(); end);
+	button.flashAnim = flashAnim;
+
 	-- junk coin
 	local junk = button:CreateTexture(nil, "OVERLAY");
-	junk:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon");
-	junk:SetWidth(12);
-	junk:SetHeight(12);
-	junk:SetPoint("TOPLEFT", 2, -2);
+	junk:SetAtlas("bags-junkcoin", true);
+	junk:SetPoint("TOPLEFT", 1, 0);
 	junk:Hide();
 	button.JunkIcon = junk;
 
 	-- bag highlight while the bag button of the main bar is hovered
 	local indicator = button:CreateTexture(nil, "OVERLAY");
-	indicator:SetTexture("Interface\\Buttons\\CheckButtonHilight");
-	indicator:SetBlendMode("ADD");
-	indicator:SetAllPoints();
+	indicator:SetTexture("Interface\\Store\\store-item-highlight");
+	indicator:SetPoint("CENTER");
 	indicator:Hide();
 	button.BagIndicator = indicator;
 
@@ -200,15 +218,12 @@ local function UpdateButton(button, bag, slot, tooltipOwner)
 	local isNew = CheckNewItem(bag, slot, link);
 	button.isNew = isNew or nil;
 	if isNew then
-		local color = quality and ITEM_QUALITY_COLORS[quality];
-		if color and quality >= 2 then
-			button.NewItemTexture:SetVertexColor(color.r, color.g, color.b);
-		else
-			button.NewItemTexture:SetVertexColor(1, 1, 1);
-		end
+		button.NewItemTexture:SetAtlas(NEW_ITEM_ATLAS_BY_QUALITY[quality or 1] or "bags-glow-white", true);
 		button.NewItemTexture:Show();
 		if not button.newItemAnim:IsPlaying() then
 			button.newItemAnim:Play();
+			button.flash:Show();
+			button.flashAnim:Play();
 		end
 	else
 		button.newItemAnim:Stop();
@@ -344,6 +359,30 @@ function ContainerFrameCombinedBags_OnLoad(self)
 	frame = self;
 	self.TitleText:SetText(COMBINED_BAG_TITLE or "Сумки");
 	SetPortraitToTexture(self.portrait, "Interface\\Icons\\INV_Misc_Bag_08");
+
+	-- retail atlases for the sort button, the portrait highlight and the money box
+	local sort = self.SortButton;
+	sort:GetNormalTexture():SetAtlas("bags-button-autosort-up");
+	sort:GetPushedTexture():SetAtlas("bags-button-autosort-down");
+	sort:GetNormalTexture():SetTexCoord(0, 1, 0, 1);
+	sort:GetPushedTexture():SetTexCoord(0, 1, 0, 1);
+	self.PortraitButton:GetHighlightTexture():SetAtlas("bags-roundhighlight");
+
+	local money = self.MoneyFrame;
+	local left = money:CreateTexture(nil, "BACKGROUND");
+	left:SetAtlas("common-coinbox-left");
+	left:SetWidth(8);
+	left:SetHeight(17);
+	left:SetPoint("LEFT", self, "BOTTOMLEFT", 8, 16);
+	local right = money:CreateTexture(nil, "BACKGROUND");
+	right:SetAtlas("common-coinbox-right");
+	right:SetWidth(8);
+	right:SetHeight(17);
+	right:SetPoint("RIGHT", self, "BOTTOMRIGHT", -8, 16);
+	local middle = money:CreateTexture(nil, "BACKGROUND");
+	middle:SetAtlas("_common-coinbox-center");
+	middle:SetPoint("TOPLEFT", left, "TOPRIGHT");
+	middle:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT");
 
 	self.holders = {};
 	for bag = FIRST_BAG, LAST_BAG do
