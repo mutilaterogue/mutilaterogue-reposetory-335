@@ -173,13 +173,24 @@ namespace
             s_debugTShader = nullptr;
     }
 
-    // The client creates its UI shaders in sub_483060. Ours are created with them, once: shaders are
-    // cached by name (sub_6897C0), releasing and creating again may give back a stale object.
+    // The client creates its UI shaders in sub_483060 (UI init and again after a device reset).
+    // Ours are created with them; shaders are cached by name (sub_6897C0), creating again gives the
+    // same object back and reloads its D3D shader if the reset dropped it.
     void __cdecl UiShadersCreateHook()
     {
         reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_CREATE)();
+        s_shadersLoaded = false;
         LoadShaders();
         s_createdWithClient++;
+    }
+
+    // CGxShader::Valid (sub_689A50) reloads the D3D shader when +0x30 (loaded) was reset,
+    // the client calls it before using its own shaders
+    void* UsableShader(void* shader)
+    {
+        if (!shader)
+            return nullptr;
+        return reinterpret_cast<ShaderValid_t>(ADDR_SHADER_VALID)(shader) ? shader : nullptr;
     }
 
     // uv of corner i after the texture's own atlas transform (the UV the shader gets in t0)
@@ -306,7 +317,7 @@ namespace
         void* maskTex = mask ? reinterpret_cast<TexGetGx_t>(ADDR_TEX_GETGX)(*At<uint32_t>(mask, TEX_HANDLE), 1, 0) : nullptr;
         float c1[8];
         bool desat = shader && shader == reinterpret_cast<void**>(ADDR_SHADERS)[1];
-        void* maskShader = desat ? s_maskDesatShader : s_maskShader;
+        void* maskShader = UsableShader(desat ? s_maskDesatShader : s_maskShader);
 
         if (!mask)
         {
@@ -330,9 +341,9 @@ namespace
             useShader = reinterpret_cast<void**>(ADDR_SHADERS)[1];
         else if ((s_debugFlags & 32) && s_testShader)
             useShader = s_testShader;
-        else if ((s_debugFlags & 8) && s_debugCShader)
+        else if ((s_debugFlags & 8) && UsableShader(s_debugCShader))
             useShader = s_debugCShader;
-        else if ((s_debugFlags & 16) && s_debugTShader)
+        else if ((s_debugFlags & 16) && UsableShader(s_debugTShader))
             useShader = s_debugTShader;
         else if (s_debugFlags & 4)
             useShader = shader;
@@ -489,10 +500,13 @@ int32_t MaskTexture::TextureMaskDebug(lua_State* L)
 {
     char buffer[1024];
     int n = snprintf(buffer, sizeof(buffer),
-        "flags=%d vtable=%d shaderSet=%d renderCalls=%d createHooks=%d createdWithClient=%u | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d clientDesaturate=%p debugC=%p debugT=%p | "
+        "flags=%d vtable=%d shaderSet=%d renderCalls=%d createHooks=%d createdWithClient=%u | shaders loaded=%d UIMask=%p Desat=%p testDesaturate=%p/%d clientDesaturate=%p debugC=%p debugT=%p | UIMask d3d=%p valid=%u loaded=%u | "
         "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
         s_debugFlags, s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched, s_createHooks, s_createdWithClient,
         s_shadersLoaded, s_maskShader, s_maskDesatShader, s_testShader, s_testShaderValid, reinterpret_cast<void**>(ADDR_SHADERS)[1], s_debugCShader, s_debugTShader,
+        s_maskShader ? *At<void*>(s_maskShader, 0x20) : nullptr,
+        s_maskShader ? *At<uint32_t>(s_maskShader, 0x2C) : 0,
+        s_maskShader ? *At<uint32_t>(s_maskShader, 0x30) : 0,
         s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
         s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
 
