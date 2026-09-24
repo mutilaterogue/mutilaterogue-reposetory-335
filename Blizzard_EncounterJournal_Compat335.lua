@@ -448,3 +448,75 @@ end
 function EJ_GetContentTuningID()
 	return nil;
 end
+
+---------------------------------------------------------------------------
+-- boss pins on dungeon maps: only the bosses of the shown floor
+---------------------------------------------------------------------------
+-- EncounterJournalAPI.lua returns every boss of the instance on every floor. The data knows
+-- the floor of each boss (tools ejfloors.py: DungeonMap.dbc floorIndex = GetCurrentMapDungeonLevel()).
+-- A boss without a floor in a multi-floor instance is skipped: its x / y are not on any of the
+-- floor maps (gunship battle, bosses whose spawn was not found).
+local mapPins, mapPinsKey = {}, nil;
+
+local function InstanceForMapTexture(texture)
+	texture = strlower(texture);
+	for _, instanceID in ipairs(EJ_DATA.instanceOrder) do
+		local inst = EJ_DATA.instances[instanceID];
+		if inst and inst.mapTexture and inst.mapTexture ~= "" and strlower(inst.mapTexture) == texture then
+			return instanceID;
+		end
+	end
+	return nil;
+end
+
+local function BuildMapPins()
+	local texture = GetMapInfo and GetMapInfo();
+	local level = GetCurrentMapDungeonLevel and GetCurrentMapDungeonLevel() or 0;
+	local key = (texture or "") .. "#" .. level;
+	if key == mapPinsKey then
+		return;
+	end
+	mapPinsKey = key;
+	wipe(mapPins);
+
+	local instanceID = texture and texture ~= "" and InstanceForMapTexture(texture);
+	local list = instanceID and EJ_DATA.encountersByInstance[instanceID];
+	if not list then
+		return;
+	end
+
+	local multiFloor = false;
+	for _, encounterID in ipairs(list) do
+		local enc = EJ_DATA.encounters[encounterID];
+		if enc and (enc.floor or 0) > 0 then
+			multiFloor = true;
+			break;
+		end
+	end
+
+	for _, encounterID in ipairs(list) do
+		local enc = EJ_DATA.encounters[encounterID];
+		local floor = enc and enc.floor or 0;
+		local onFloor;
+		if multiFloor then
+			onFloor = floor > 0 and (floor == level or (level == 0 and floor == 1));
+		else
+			onFloor = true;
+		end
+		if enc and onFloor and enc.x and not (enc.x == 0 and enc.y == 0) then
+			table.insert(mapPins, { id = encounterID, instanceID = instanceID, enc = enc });
+		end
+	end
+end
+
+-- x, y, instanceID, name, description, encounterID, rootSectionID, link
+function EJ_GetMapEncounter(index)
+	BuildMapPins();
+	local pin = mapPins[index];
+	if not pin then
+		return nil;
+	end
+	local enc = pin.enc;
+	return enc.x, enc.y, pin.instanceID, enc.name, enc.desc, pin.id, enc.sectionID,
+		("|cff66bbff|Hjournal:1:%d:%d|h[%s]|h|r"):format(pin.id, EJ_GetDifficulty() or 1, enc.name);
+end

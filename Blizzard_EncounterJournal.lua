@@ -1679,3 +1679,39 @@ function EncounterJournalItemSetItem_OnClick(self)
 		HandleModifiedItemClick(link);
 	end
 end
+
+---------------------------------------------------------------------------
+-- world map boss buttons (EncounterJournal_AddMapButtons in WorldMapFrame.lua)
+---------------------------------------------------------------------------
+-- SetPortraitTexture() takes a unit in 3.3.5, not a display ID, so the buttons stayed empty:
+-- the boss image of the journal goes into the ring instead, cropped to its middle.
+local function UpdateMapButtonPortraits()
+	local index = 1;
+	local button = _G["EJMapButton" .. index];
+	while button do
+		if button:IsShown() and button.encounterID then
+			local _, _, _, _, icon = EJ_GetCreatureInfo(1, button.encounterID);
+			button.bgImage:SetWidth(30);
+			button.bgImage:SetHeight(30);
+			SetCreatureIcon(button.bgImage, icon);
+			if not button.ejClickFixed then
+				button.ejClickFixed = true;
+				button:SetScript("OnClick", function(self)
+					if WORLDMAP_SETTINGS and WORLDMAP_SETTINGS.size ~= WORLDMAP_WINDOWED_SIZE then
+						ToggleFrame(WorldMapFrame);
+					end
+					EncounterJournal_OpenJournal(nil, self.instanceID, self.encounterID);
+				end);
+			end
+		end
+		index = index + 1;
+		button = _G["EJMapButton" .. index];
+	end
+end
+
+if EncounterJournal_AddMapButtons then
+	hooksecurefunc("EncounterJournal_AddMapButtons", UpdateMapButtonPortraits);
+end
+if EncounterJournal_UpdateMapButtonPortraits then
+	hooksecurefunc("EncounterJournal_UpdateMapButtonPortraits", UpdateMapButtonPortraits);
+end
