@@ -85,7 +85,12 @@ local function FindChild(frame, path)
 			return nil;
 		end
 	end
-	return object;
+	if object then
+		return object;
+	end
+	-- 3.3.5 ignores parentKey next to name="...": the global name, also as $parent<key>
+	local frameName = frame.GetName and frame:GetName();
+	return _G[path] or (frameName and _G[frameName .. path]);
 end
 
 -- the texture of a <MaskTexture> node: a mask; its masked textures are resolved after the frame's load
