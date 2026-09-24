@@ -22,6 +22,7 @@ public:
     static int32_t TextureRemoveMask(lua_State* L);
     static int32_t TextureGetMask(lua_State* L);
     static int32_t TextureSetIsMask(lua_State* L);
+    static int32_t TextureMaskDebug(lua_State* L);
 
 private:
     MaskTexture() = delete;

@@ -23,6 +23,7 @@ Retail-like `MaskTexture` for 3.3.5a (12340): a texture drawn through the alpha 
        AddToFunctionMap("TextureRemoveMask", &MaskTexture::TextureRemoveMask);
        AddToFunctionMap("TextureGetMask", &MaskTexture::TextureGetMask);
        AddToFunctionMap("TextureSetIsMask", &MaskTexture::TextureSetIsMask);
+       AddToFunctionMap("TextureMaskDebug", &MaskTexture::TextureMaskDebug);
    #endif
    ```
    (`OOBLUAFUNCTIONS_PATCH` must be on.)

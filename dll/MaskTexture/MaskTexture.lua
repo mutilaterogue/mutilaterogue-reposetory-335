@@ -69,7 +69,10 @@ end
 local function MaskTest()
 	local f = MaskTestFrame;
 	if f then
-		if f:IsShown() then f:Hide(); else f:Show(); end
+		-- second /masktest: the report (after at least one frame was drawn)
+		if TextureMaskDebug then
+			print("masktest:", TextureMaskDebug(f.icon));
+		end
 		return;
 	end
 	f = CreateFrame("Frame", "MaskTestFrame", UIParent);
@@ -78,6 +81,7 @@ local function MaskTest()
 	local icon = f:CreateTexture(nil, "ARTWORK");
 	icon:SetAllPoints();
 	icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
+	f.icon = icon;
 	local mask = f:CreateMaskTexture();
 	mask:SetAllPoints(icon);
 	mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
@@ -87,7 +91,7 @@ local function MaskTest()
 	plain:SetSize(128, 128);
 	plain:SetPoint("LEFT", f, "RIGHT", 16, 0);
 	plain:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark");
-	print("masktest: TextureGetMask =", TextureGetMask(icon));
+	print("masktest: TextureGetMask =", TextureGetMask(icon), "- /masktest again for the report");
 end
 
 helper:RegisterEvent("PLAYER_LOGIN");

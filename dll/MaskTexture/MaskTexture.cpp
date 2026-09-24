@@ -3,6 +3,8 @@
 #include <Misc/Util.hpp>
 
 #include <Windows.h>
+#include <cstdio>
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -91,6 +93,15 @@ namespace
     bool s_shadersLoaded = false;
 
     // the batch being rendered with masks: the item index follows the PixelShader sets (batching off)
+    // diagnostics (TextureMaskDebug)
+    bool s_vtablePatched = false;
+    bool s_shaderSetPatched = false;
+    int s_renderCallsPatched = 0;
+    uint32_t s_maskedBatches = 0;		// renders of batches with a masked texture
+    uint32_t s_maskedItems = 0;			// masked items drawn with the mask
+    uint32_t s_failNoTex = 0, s_failNoShader = 0, s_failRect = 0;
+    float s_lastC1[4] = {};
+
     void* s_renderBatch = nullptr;
     uint32_t s_renderItem = 0;
     bool s_texture1Bound = false;
@@ -201,6 +212,7 @@ namespace
             return reinterpret_cast<BatchRender_t>(ADDR_BATCH_RENDER)(batch);
 
         LoadShaders();
+        s_maskedBatches++;
         // one draw per item: every item sets its pixel shader, in item order
         int32_t& batching = *reinterpret_cast<int32_t*>(ADDR_BATCHING);
         int32_t oldBatching = batching;
@@ -241,11 +253,22 @@ namespace
         bool desat = shader && shader == reinterpret_cast<void**>(ADDR_SHADERS)[1];
         void* maskShader = desat ? s_maskDesatShader : s_maskShader;
 
-        if (!maskTex || !maskShader || !MaskConstants(item, mask, c1))
+        if (!mask)
         {
             gxRsSet(device, state, shader);
             return;
         }
+        bool rectOk = maskTex && maskShader && MaskConstants(item, mask, c1);
+        if (!rectOk)
+        {
+            if (!maskTex) s_failNoTex++;
+            else if (!maskShader) s_failNoShader++;
+            else s_failRect++;
+            gxRsSet(device, state, shader);
+            return;
+        }
+        s_maskedItems++;
+        memcpy(s_lastC1, c1, sizeof(c1));
 
         gxRsSet(device, state, maskShader);
         gxRsSet(device, GXRS_TEXTURE1, maskTex);
@@ -314,11 +337,15 @@ void MaskTexture::ApplyPatches()
 {
     // masks are not drawn: CSimpleTexture vtable slot 23
     if (*reinterpret_cast<uint32_t*>(ADDR_TEXTURE_VTABLE_DRAW) == ADDR_TEXTURE_DRAW)
+    {
         Util::OverwriteUInt32AtAddress(ADDR_TEXTURE_VTABLE_DRAW, reinterpret_cast<uint32_t>(&TextureDrawHook));
+        s_vtablePatched = true;
+    }
 
     // the pixel shader hook first: without it the render hook must not run
-    if (PatchPixelShaderSet())
-        PatchRenderCalls();
+    s_shaderSetPatched = PatchPixelShaderSet();
+    if (s_shaderSetPatched)
+        s_renderCallsPatched = PatchRenderCalls();
 }
 
 // TextureAddMask(texture, mask): one mask per texture (a new one replaces the old)
@@ -365,4 +392,32 @@ int32_t MaskTexture::TextureSetIsMask(lua_State* L)
     else
         s_isMask.erase(texture);
     return 0;
+}
+
+// TextureMaskDebug([texture]) -> a report string: hooks, shaders, counters, the texture/mask rects
+int32_t MaskTexture::TextureMaskDebug(lua_State* L)
+{
+    char buffer[1024];
+    int n = snprintf(buffer, sizeof(buffer),
+        "vtable=%d shaderSet=%d renderCalls=%d | shaders loaded=%d UIMask=%p Desat=%p | "
+        "batches=%u items=%u failTex=%u failShader=%u failRect=%u | c1=%.3f %.3f %.3f %.3f",
+        s_vtablePatched, s_shaderSetPatched, s_renderCallsPatched,
+        s_shadersLoaded, s_maskShader, s_maskDesatShader,
+        s_maskedBatches, s_maskedItems, s_failNoTex, s_failNoShader, s_failRect,
+        s_lastC1[0], s_lastC1[1], s_lastC1[2], s_lastC1[3]);
+
+    void* texture = TextureArg(L, 1);
+    auto it = texture ? s_maskOf.find(At<float>(texture, TEX_POSITIONS)) : s_maskOf.end();
+    if (it != s_maskOf.end() && n > 0 && n < static_cast<int>(sizeof(buffer)))
+    {
+        const float* p = At<float>(texture, TEX_POSITIONS);
+        const float* m = At<float>(it->second, TEX_POSITIONS);
+        uint32_t maskHandle = *At<uint32_t>(it->second, TEX_HANDLE);
+        void* maskTex = maskHandle ? reinterpret_cast<TexGetGx_t>(ADDR_TEX_GETGX)(maskHandle, 1, 0) : nullptr;
+        snprintf(buffer + n, sizeof(buffer) - n,
+            " | tex %.3f,%.3f..%.3f,%.3f | mask %.3f,%.3f..%.3f,%.3f handle=%X gx=%p",
+            p[0], p[1], p[9], p[10], m[0], m[1], m[9], m[10], maskHandle, maskTex);
+    }
+    FrameScript::PushString(L, buffer);
+    return 1;
 }
