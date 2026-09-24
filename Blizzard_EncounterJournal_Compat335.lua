@@ -149,17 +149,9 @@ local function ToIndex(difficultyID)
 	return DUNGEON_TO_INDEX[difficultyID];
 end
 
--- Raid loot in the data is flagged only by raid size (bit 1 = 10, bit 2 = 25), there is no
--- heroic bit: heroic raid difficulties filter the loot by their size.
-local RAID_LOOT_INDEX = { [3] = 1, [4] = 2, [5] = 1, [6] = 2 };
+-- The difficulty is kept as the retail ID: EJ_GetDifficulty() must not guess it back from the
+-- data index after switching between a raid and a dungeon.
 local selectedDifficultyID;
-
-local function LootIndex(difficultyID)
-	if EJ_InstanceIsRaid() then
-		return RAID_LOOT_INDEX[difficultyID];
-	end
-	return DUNGEON_TO_INDEX[difficultyID];
-end
 
 function EJ_GetDifficulty()
 	if selectedDifficultyID and ToIndex(selectedDifficultyID) then
@@ -173,21 +165,12 @@ function EJ_GetDifficulty()
 end
 
 function EJ_SetDifficulty(difficultyID)
-	local index = LootIndex(difficultyID);
+	local index = ToIndex(difficultyID);
 	if not index then
 		return;
 	end
-	local changed = selectedDifficultyID ~= difficultyID;
-	local indexChanged = orig.GetDifficulty() ~= index;
 	selectedDifficultyID = difficultyID;
 	orig.SetDifficulty(index);
-	-- same loot index (10N -> 10H): EncounterJournalAPI.lua sends no update, send it here
-	if changed and not indexChanged and EncounterJournal and EncounterJournal:IsShown() then
-		local onEvent = EncounterJournal:GetScript("OnEvent");
-		if onEvent then
-			onEvent(EncounterJournal, "EJ_DIFFICULTY_UPDATE", difficultyID);
-		end
-	end
 end
 
 function EJ_IsValidInstanceDifficulty(difficultyID)
