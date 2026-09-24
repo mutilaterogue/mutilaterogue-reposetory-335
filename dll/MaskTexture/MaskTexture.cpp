@@ -517,7 +517,7 @@ int32_t MaskTexture::TextureMaskDebugFlags(lua_State* L)
 // UIMask (created by the DLL) next to the client's Desaturate (dword_B47934[1]), to compare
 int32_t MaskTexture::TextureMaskDumpShaders(lua_State* L)
 {
-    char buffer[1024];
+    char buffer[2048];
     void* device = Device();
     int n = snprintf(buffer, sizeof(buffer), "device=%p vt272=%p vt276=%p vt280=%p vt288=%p",
         device, VFunc(device, VT_SHADER_CREATE), VFunc(device, VT_SHADER_RELEASE),
@@ -531,7 +531,7 @@ int32_t MaskTexture::TextureMaskDumpShaders(lua_State* L)
         if (!shaders[i])
             continue;
         const uint32_t* d = reinterpret_cast<const uint32_t*>(shaders[i]);
-        for (int k = 0; k < 16 && n > 0 && n < static_cast<int>(sizeof(buffer)); k++)
+        for (int k = 0; k < 32 && n > 0 && n < static_cast<int>(sizeof(buffer)); k++)
             n += snprintf(buffer + n, sizeof(buffer) - n, " %X", d[k]);
     }
     FrameScript::PushString(L, buffer);
