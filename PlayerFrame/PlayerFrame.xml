@@ -13,18 +13,22 @@
 			<Frame name="PlayerFrameContainer" setAllPoints="true">
 				<Layers>
 					<Layer level="BACKGROUND" textureSubLevel="1">
-						<Texture name="PlayerPortrait">
+						<Texture name="PlayerPortrait" parentKey="PlayerPortrait">
 							<Size x="60" y="60"/>
 							<Anchors>
 								<Anchor point="TOPLEFT" x="24" y="-19"/>
 							</Anchors>
 						</Texture>
-						<Texture parentKey="PlayerPortraitMask" atlas="UI-HUD-UnitFrame-Player-Portrait-Mask">
+						<!-- retail: the portrait masked to the frame's round hole (MaskTexture, WotLKExtensions) -->
+						<MaskTexture parentKey="PlayerPortraitMask" atlas="UI-HUD-UnitFrame-Player-Portrait-Mask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
 							<Size x="60" y="60"/>
 							<Anchors>
 								<Anchor point="TOPLEFT" x="24" y="-19"/>
 							</Anchors>
-						</Texture>
+							<MaskedTextures>
+								<MaskedTexture childKey="PlayerPortrait"/>
+							</MaskedTextures>
+						</MaskTexture>
 					</Layer>
 					<Layer level="ARTWORK" textureSubLevel="2">
 						<Texture name="PlayerFrameBackground">
