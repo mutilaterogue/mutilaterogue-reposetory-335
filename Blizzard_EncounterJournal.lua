@@ -862,10 +862,16 @@ function EncounterJournal_UpdateAbilities()
 
 				local height = HEADER_HEIGHT;
 				if sectionOpen[sectionID] and description and description ~= "" then
-					header.description:SetWidth(width - indent - 20);
-					header.description:SetText(description);
-					header.description:Show();
-					height = height + 6 + header.description:GetStringHeight() + 6;
+					-- explicit anchor + height: with only the XML anchor the text was drawn over the header
+					local text = header.description;
+					text:ClearAllPoints();
+					text:SetPoint("TOPLEFT", header, "TOPLEFT", 12, -(HEADER_HEIGHT + 6));
+					text:SetWidth(width - indent - 24);
+					text:SetText(description);
+					local textHeight = text:GetStringHeight();
+					text:SetHeight(textHeight);
+					text:Show();
+					height = height + 6 + textHeight + 8;
 				else
 					header.description:Hide();
 				end

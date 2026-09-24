@@ -488,17 +488,20 @@
 								<Anchor point="LEFT"/>
 							</Anchors>
 						</Texture>
-						<Texture name="$parentRight" parentKey="right" inherits="UI-EJ-PaperHeader-UnSelectUp-Right">
+						<!-- right end = the left end mirrored; the middle = the last column of the left end stretched -->
+						<Texture name="$parentRight" parentKey="right" file="Interface\EncounterJournal\UI-EncounterJournalTextures">
+							<Size x="64" y="29"/>
 							<Anchors>
 								<Anchor point="RIGHT"/>
 							</Anchors>
+							<TexCoords left="0.97460938" right="0.84960938" top="0.49023438" bottom="0.51855469"/>
 						</Texture>
-						<Texture parentKey="mid" file="Interface\EncounterJournal\UI-EncounterJournalTextures_Tile">
+						<Texture name="$parentMid" parentKey="mid" file="Interface\EncounterJournal\UI-EncounterJournalTextures">
 							<Anchors>
 								<Anchor point="TOPLEFT" relativeTo="$parentLeft" relativePoint="TOPRIGHT"/>
 								<Anchor point="BOTTOMRIGHT" relativeTo="$parentRight" relativePoint="BOTTOMLEFT"/>
 							</Anchors>
-							<TexCoords left="0" right="1" top="0.34375000" bottom="0.40039063"/>
+							<TexCoords left="0.96" right="0.97" top="0.49023438" bottom="0.51855469"/>
 						</Texture>
 					</Layer>
 					<Layer level="ARTWORK">
