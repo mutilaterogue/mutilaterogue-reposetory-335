@@ -2,8 +2,10 @@
 ..\UI.xsd">
 	<!--
 		Blizzard_EncounterJournal (retail) for 3.3.5 on the 3.3.5 data.
-		Stage 1: journal frame, Dungeons / Raids tabs, tier (expansion) dropdown, instance grid,
-		navigation bar, instance lore page. Encounter pages (overview / abilities / loot / model) - stage 2.
+		Stage 1: journal frame, Dungeons / Raids tabs, tier (expansion) dropdown, instance grid, navigation bar.
+		Stage 2: instance / encounter book (boss list, lore, overview / abilities / loot / model tabs,
+		difficulty, loot filters) and search.
+		3.3.5 has no relativeKey: anchors between regions use $parent names.
 	-->
 	<Script file="Blizzard_EncounterJournal.lua"/>
 
@@ -372,6 +374,393 @@
 		</Scripts>
 	</Button>
 
+
+	<!-- boss button of the left page (retail EncounterBossButtonTemplate) -->
+	<Button name="EncounterBossButtonTemplate" virtual="true" hidden="true">
+		<Size x="325" y="55"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentCreature" parentKey="creature">
+					<Size x="128" y="64"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-12" y="7"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentText" parentKey="text" inherits="GameFontNormalMed3" justifyH="LEFT">
+					<Size x="200" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="110" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<NormalTexture inherits="UI-EJ-BossButton-Up"/>
+		<PushedTexture inherits="UI-EJ-BossButton-Down"/>
+		<HighlightTexture inherits="UI-EJ-BossButton-Highlight" alphaMode="ADD"/>
+		<Scripts>
+			<OnClick function="EncounterJournalBossButton_OnClick"/>
+		</Scripts>
+	</Button>
+
+	<!-- side tab on the right edge of the book (overview / abilities / loot / model) -->
+	<Button name="EncounterTabTemplate" virtual="true">
+		<Size x="63" y="57"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="unselected" inherits="UI-EJ-Tab-UnSelected">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="selected" inherits="UI-EJ-Tab-Selected" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="icon">
+					<Size x="48" y="43"/>
+					<Anchors>
+						<Anchor point="CENTER" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<HighlightTexture inherits="UI-EJ-Tab-Highlight" alphaMode="ADD"/>
+		<Scripts>
+			<OnClick>
+				EncounterJournal_SetInfoTab(self.tabKey);
+				PlaySound("igAbiliityPageTurn");
+			</OnClick>
+			<OnEnter>
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				GameTooltip:SetText(self.tooltip);
+			</OnEnter>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<!-- flag icon of an ability header (tank / healer / heroic / magic ...) -->
+	<Frame name="EncounterFlagIconTemplate" virtual="true" enableMouse="true" hidden="true">
+		<Size x="20" y="20"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="icon" file="Interface\EncounterJournal\UI-EJ-Icons">
+					<Size x="32" y="32"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnEnter>
+				if self.tooltipTitle then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+					GameTooltip:SetText(self.tooltipTitle, 1, 1, 1);
+					if self.tooltipText and self.tooltipText ~= "" then
+						GameTooltip:AddLine(self.tooltipText, nil, nil, nil, true);
+					end
+					GameTooltip:Show();
+				end
+			</OnEnter>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Frame>
+
+	<!-- ability section: header button + description (retail EncounterInfoTemplate) -->
+	<Frame name="EncounterInfoTemplate" virtual="true" hidden="true">
+		<Size x="340" y="29"/>
+		<Frames>
+			<Button name="$parentButton" parentKey="button">
+				<Size x="340" y="29"/>
+				<Anchors>
+					<Anchor point="TOPLEFT"/>
+					<Anchor point="TOPRIGHT"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture name="$parentLeft" parentKey="left" inherits="UI-EJ-PaperHeader-UnSelectUp-Left">
+							<Anchors>
+								<Anchor point="LEFT"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentRight" parentKey="right" inherits="UI-EJ-PaperHeader-UnSelectUp-Right">
+							<Anchors>
+								<Anchor point="RIGHT"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="mid" file="Interface\EncounterJournal\UI-EncounterJournalTextures_Tile">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentLeft" relativePoint="TOPRIGHT"/>
+								<Anchor point="BOTTOMRIGHT" relativeTo="$parentRight" relativePoint="BOTTOMLEFT"/>
+							</Anchors>
+							<TexCoords left="0" right="1" top="0.34375000" bottom="0.40039063"/>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString name="$parentExpandedIcon" parentKey="expandedIcon" inherits="GameFontNormal" text="+">
+							<Size x="14" y="14"/>
+							<Anchors>
+								<Anchor point="LEFT" x="10" y="0"/>
+							</Anchors>
+						</FontString>
+						<Texture name="$parentAbilityIcon" parentKey="abilityIcon">
+							<Size x="20" y="20"/>
+							<Anchors>
+								<Anchor point="LEFT" relativeTo="$parentExpandedIcon" relativePoint="RIGHT" x="4" y="0"/>
+							</Anchors>
+							<TexCoords left="0.07" right="0.93" top="0.07" bottom="0.93"/>
+						</Texture>
+						<FontString parentKey="title" inherits="GameFontNormal" justifyH="LEFT">
+							<Size x="0" y="14"/>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="abilityIconBorder" inherits="UI-EJ-AbilityIconBorder">
+							<Anchors>
+								<Anchor point="CENTER" relativeTo="$parentAbilityIcon"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame name="$parentIcon4" parentKey="icon4" inherits="EncounterFlagIconTemplate">
+						<Anchors>
+							<Anchor point="RIGHT" x="-8" y="0"/>
+						</Anchors>
+					</Frame>
+					<Frame name="$parentIcon3" parentKey="icon3" inherits="EncounterFlagIconTemplate">
+						<Anchors>
+							<Anchor point="RIGHT" relativeTo="$parentIcon4" relativePoint="LEFT" x="-1" y="0"/>
+						</Anchors>
+					</Frame>
+					<Frame name="$parentIcon2" parentKey="icon2" inherits="EncounterFlagIconTemplate">
+						<Anchors>
+							<Anchor point="RIGHT" relativeTo="$parentIcon3" relativePoint="LEFT" x="-1" y="0"/>
+						</Anchors>
+					</Frame>
+					<Frame name="$parentIcon1" parentKey="icon1" inherits="EncounterFlagIconTemplate">
+						<Anchors>
+							<Anchor point="RIGHT" relativeTo="$parentIcon2" relativePoint="LEFT" x="-1" y="0"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+				<HighlightTexture file="Interface\EncounterJournal\UI-EncounterJournalTextures_Tile" alphaMode="ADD">
+					<TexCoords left="0" right="1" top="0.46484375" bottom="0.52148438"/>
+				</HighlightTexture>
+				<Scripts>
+					<OnClick function="EncounterJournalSectionButton_OnClick"/>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="description" inherits="GameFontBlack" justifyH="LEFT" justifyV="TOP" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentButton" relativePoint="BOTTOMLEFT" x="10" y="-6"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- loot row (retail EncounterItemTemplate) -->
+	<Button name="EncounterItemTemplate" virtual="true" hidden="true">
+		<Size x="321" y="45"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="bg" inherits="UI-EJ-LootFrame">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="icon">
+					<Size x="36" y="36"/>
+					<Anchors>
+						<Anchor point="LEFT" x="5" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentName" parentKey="name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="265" y="12"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIcon" relativePoint="TOPRIGHT" x="7" y="-1"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSlot" parentKey="slot" inherits="GameFontBlackSmall" justifyH="LEFT">
+					<Size x="130" y="10"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT" x="0" y="-3"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="armorType" inherits="GameFontBlackSmall" justifyH="RIGHT">
+					<Size x="130" y="10"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeTo="$parentName" relativePoint="BOTTOMRIGHT" x="0" y="-3"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="boss" inherits="GameFontBlackSmall" justifyH="LEFT">
+					<Size x="265" y="10"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentSlot" relativePoint="BOTTOMLEFT" x="0" y="-2"/>
+					</Anchors>
+					<Color r="0.3" g="0.2" b="0.1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" x="2" y="-2"/>
+				<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+			</Anchors>
+		</HighlightTexture>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+			</OnLoad>
+			<OnClick function="EncounterJournalLootButton_OnClick"/>
+			<OnEnter function="EncounterJournalLootButton_OnEnter"/>
+			<OnLeave>
+				GameTooltip:Hide();
+				ResetCursor();
+			</OnLeave>
+			<OnUpdate function="EncounterJournalLootButton_OnUpdate"/>
+		</Scripts>
+	</Button>
+
+	<!-- creature button on the model tab (retail EncounterCreatureButtonTemplate) -->
+	<Button name="EncounterCreatureButtonTemplate" virtual="true" hidden="true">
+		<Size x="45" y="44"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture inherits="UI-EJ-CreatureHeaderFrameSm-bg">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="creature">
+					<Size x="36" y="36"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture inherits="UI-EJ-CreatureHeaderFrameSm">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD">
+			<Size x="34" y="34"/>
+			<Anchors>
+				<Anchor point="CENTER"/>
+			</Anchors>
+		</HighlightTexture>
+		<Scripts>
+			<OnClick>
+				EncounterJournal_DisplayCreature(self);
+				PlaySound("igMainMenuOptionCheckBoxOn");
+			</OnClick>
+			<OnEnter>
+				if self.name then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+					GameTooltip:SetText(self.name);
+				end
+			</OnEnter>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<!-- search: small preview row under the search box -->
+	<Button name="EncounterSearchSMTemplate" virtual="true" hidden="true">
+		<Size x="220" y="27"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="icon">
+					<Size x="21" y="21"/>
+					<Anchors>
+						<Anchor point="LEFT" x="5" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentName" parentKey="name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="185" y="12"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentIcon" relativePoint="RIGHT" x="6" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD"/>
+		<Scripts>
+			<OnClick>
+				EncounterJournal_SelectSearch(self.index);
+			</OnClick>
+			<OnEnter function="EncounterJournalSearchButton_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<!-- search: row of the full results list -->
+	<Button name="EncounterSearchLGTemplate" virtual="true" hidden="true">
+		<Size x="560" y="46"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="bg">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.35"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="icon">
+					<Size x="38" y="38"/>
+					<Anchors>
+						<Anchor point="LEFT" x="5" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentName" parentKey="name" inherits="GameFontNormalLarge" justifyH="LEFT">
+					<Size x="340" y="16"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIcon" relativePoint="TOPRIGHT" x="10" y="-2"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="path" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Size x="340" y="12"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT" x="0" y="-5"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="resultType" inherits="GameFontDisable" justifyH="RIGHT">
+					<Size x="150" y="12"/>
+					<Anchors>
+						<Anchor point="RIGHT" x="-10" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD"/>
+		<Scripts>
+			<OnClick>
+				EncounterJournal_SelectSearch(self.index);
+			</OnClick>
+			<OnEnter function="EncounterJournalSearchButton_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
 	<!-- The journal -->
 	<Frame name="EncounterJournal" inherits="ButtonFrameTemplate" toplevel="true" enableMouse="true" parent="UIParent" hidden="true">
 		<Size x="800" y="496"/>
@@ -384,6 +773,51 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" x="61" y="-22"/>
 				</Anchors>
+			</Frame>
+
+			<!-- search box (retail EncounterJournal.searchBox) -->
+			<EditBox name="$parentSearchBox" parentKey="searchBox" inherits="SearchBoxTemplate" letters="40">
+				<Size x="160" y="20"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-16" y="-30"/>
+				</Anchors>
+				<Scripts>
+					<OnTextChanged function="EncounterJournal_OnSearchTextChanged"/>
+					<OnEnterPressed function="EncounterJournal_ShowFullSearch"/>
+				</Scripts>
+			</EditBox>
+
+			<!-- search preview: first results under the search box -->
+			<Frame name="$parentSearchPreview" parentKey="searchPreview" hidden="true" frameStrata="DIALOG">
+				<Size x="230" y="10"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentSearchBox" relativePoint="BOTTOMRIGHT" x="5" y="-2"/>
+				</Anchors>
+				<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+					<EdgeSize val="16"/>
+					<TileSize val="16"/>
+					<BackgroundInsets left="4" right="4" top="4" bottom="4"/>
+				</Backdrop>
+				<Frames>
+					<Button parentKey="showAll">
+						<Size x="220" y="22"/>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString parentKey="text" inherits="GameFontHighlightSmall">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<HighlightTexture file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD"/>
+						<Scripts>
+							<OnClick>
+								EncounterJournal_ShowFullSearch();
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
 			</Frame>
 
 			<!-- instance select: background, expansion dropdown, instance grid -->
@@ -425,8 +859,12 @@
 				</Frames>
 			</Frame>
 
-			<!-- instance page (retail encounter.instance): lore background, title, description -->
-			<Frame name="$parentInstanceFrame" parentKey="instanceFrame" hidden="true">
+			<!--
+				instance / encounter page (retail EncounterJournal.encounter): an open book.
+				left page  - instance title and the list of bosses
+				right page - instance lore (instance) or the boss tabs (info): overview, abilities, loot, model
+			-->
+			<Frame name="$parentEncounter" parentKey="encounter" hidden="true">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="0" y="0"/>
 					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-3" y="0"/>
@@ -441,37 +879,354 @@
 							<TexCoords left="0" right="0.76953125" top="0" bottom="0.830078125"/>
 						</Texture>
 					</Layer>
+				</Layers>
+				<Frames>
+					<!-- left page -->
+					<Frame name="$parentLeftPage" parentKey="leftPage">
+						<Size x="385" y="10"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="5" y="-5"/>
+							<Anchor point="BOTTOMLEFT" x="5" y="5"/>
+						</Anchors>
+						<Frames>
+							<Button name="$parentInstanceButton" parentKey="instanceButton">
+								<Size x="330" y="30"/>
+								<Anchors>
+									<Anchor point="TOPLEFT" x="25" y="-8"/>
+								</Anchors>
+								<Layers>
+									<Layer level="ARTWORK">
+										<FontString parentKey="title" inherits="QuestFont_Large" justifyH="LEFT">
+											<Size x="330" y="30"/>
+											<Anchors>
+												<Anchor point="LEFT"/>
+											</Anchors>
+											<Color r="0.25" g="0.1484375" b="0.02"/>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Scripts>
+									<OnClick>
+										EncounterJournal_DisplayInstance(EncounterJournal.instanceID, true);
+										PlaySound("igAbiliityPageTurn");
+									</OnClick>
+								</Scripts>
+							</Button>
+							<ScrollFrame name="EncounterJournalBossScrollFrame" parentKey="bossScroll" inherits="FauxScrollFrameTemplate">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="22" y="-46"/>
+									<Anchor point="BOTTOMRIGHT" x="-28" y="8"/>
+								</Anchors>
+							</ScrollFrame>
+							<Frame parentKey="bossList" enableMouseWheel="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="EncounterJournalBossScrollFrame"/>
+									<Anchor point="BOTTOMRIGHT" relativeTo="EncounterJournalBossScrollFrame"/>
+								</Anchors>
+							</Frame>
+						</Frames>
+					</Frame>
+
+					<!-- right page: instance lore -->
+					<Frame name="$parentInstance" parentKey="instance" hidden="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="396" y="-1"/>
+							<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture name="$parentLoreBG" parentKey="loreBG" file="Interface\EncounterJournal\UI-EJ-LOREBG-Default">
+									<Size x="390" y="300"/>
+									<Anchors>
+										<Anchor point="TOPRIGHT" x="-3" y="-8"/>
+									</Anchors>
+									<TexCoords left="0" right="0.76171875" top="0" bottom="0.5859375"/>
+								</Texture>
+							</Layer>
+							<Layer level="OVERLAY">
+								<FontString parentKey="title" inherits="QuestFont_Super_Huge" justifyH="CENTER" justifyV="BOTTOM">
+									<Size x="320" y="35"/>
+									<Anchors>
+										<Anchor point="TOP" relativeTo="$parentLoreBG" x="0" y="-20"/>
+									</Anchors>
+									<Color r="1" g="0.82" b="0"/>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<ScrollFrame name="EncounterJournalInstanceLoreScroll" parentKey="loreScroll" inherits="UIPanelScrollFrameTemplate">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="$parentLoreBG" relativePoint="BOTTOMLEFT" x="22" y="-6"/>
+									<Anchor point="BOTTOMRIGHT" x="-32" y="10"/>
+								</Anchors>
+								<ScrollChild>
+									<Frame parentKey="child">
+										<Size x="330" y="10"/>
+										<Layers>
+											<Layer level="ARTWORK">
+												<FontString parentKey="lore" inherits="GameFontBlack" justifyH="LEFT" justifyV="TOP">
+													<Size x="330" y="0"/>
+													<Anchors>
+														<Anchor point="TOPLEFT"/>
+													</Anchors>
+												</FontString>
+											</Layer>
+										</Layers>
+									</Frame>
+								</ScrollChild>
+							</ScrollFrame>
+						</Frames>
+					</Frame>
+
+					<!-- right page: boss info (title, difficulty, tab contents) -->
+					<Frame name="$parentInfo" parentKey="info" hidden="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="398" y="-1"/>
+							<Anchor point="BOTTOMRIGHT" x="-3" y="0"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString parentKey="encounterTitle" inherits="QuestFont_Large" justifyH="LEFT">
+									<Size x="220" y="30"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" x="18" y="-8"/>
+									</Anchors>
+									<Color r="0.25" g="0.1484375" b="0.02"/>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<Button name="$parentDifficulty" parentKey="difficulty" inherits="WowStyle1DropdownTemplate">
+								<Size x="140" y="25"/>
+								<Anchors>
+									<Anchor point="TOPRIGHT" x="-12" y="-10"/>
+								</Anchors>
+							</Button>
+
+							<!-- overview -->
+							<ScrollFrame name="EncounterJournalOverviewScroll" parentKey="overviewScroll" inherits="UIPanelScrollFrameTemplate" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="18" y="-48"/>
+									<Anchor point="BOTTOMRIGHT" x="-30" y="10"/>
+								</Anchors>
+								<ScrollChild>
+									<Frame name="EncounterJournalOverviewChild" parentKey="child">
+										<Size x="335" y="10"/>
+										<Layers>
+											<Layer level="ARTWORK">
+												<Texture name="$parentHeader" parentKey="header" inherits="UI-EJ-Header-Overview">
+													<Size x="335" y="30"/>
+													<Anchors>
+														<Anchor point="TOPLEFT"/>
+													</Anchors>
+												</Texture>
+												<FontString parentKey="headerText" inherits="GameFontNormalMed3" justifyH="LEFT">
+													<Anchors>
+														<Anchor point="LEFT" relativeTo="$parentHeader" x="15" y="0"/>
+													</Anchors>
+												</FontString>
+												<FontString name="$parentDescription" parentKey="description" inherits="GameFontBlack" justifyH="LEFT" justifyV="TOP">
+													<Size x="325" y="0"/>
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeTo="$parentHeader" relativePoint="BOTTOMLEFT" x="5" y="-10"/>
+													</Anchors>
+												</FontString>
+												<FontString parentKey="creatures" inherits="GameFontBlack" justifyH="LEFT" justifyV="TOP">
+													<Size x="325" y="0"/>
+													<Anchors>
+														<Anchor point="TOPLEFT" relativeTo="$parentDescription" relativePoint="BOTTOMLEFT" x="0" y="-14"/>
+													</Anchors>
+												</FontString>
+											</Layer>
+										</Layers>
+									</Frame>
+								</ScrollChild>
+							</ScrollFrame>
+
+							<!-- abilities -->
+							<ScrollFrame name="EncounterJournalDetailsScroll" parentKey="detailsScroll" inherits="UIPanelScrollFrameTemplate" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="12" y="-48"/>
+									<Anchor point="BOTTOMRIGHT" x="-30" y="10"/>
+								</Anchors>
+								<ScrollChild>
+									<Frame parentKey="child">
+										<Size x="340" y="10"/>
+									</Frame>
+								</ScrollChild>
+							</ScrollFrame>
+
+							<!-- loot -->
+							<Frame name="$parentLoot" parentKey="loot" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="10" y="-40"/>
+									<Anchor point="BOTTOMRIGHT" x="-5" y="5"/>
+								</Anchors>
+								<Frames>
+									<Button name="EncounterJournalLootClassFilter" parentKey="classFilter" inherits="WowStyle1DropdownTemplate">
+										<Size x="165" y="25"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" x="8" y="-2"/>
+										</Anchors>
+									</Button>
+									<Button name="EncounterJournalLootSlotFilter" parentKey="slotFilter" inherits="WowStyle1DropdownTemplate">
+										<Size x="165" y="25"/>
+										<Anchors>
+											<Anchor point="LEFT" relativeTo="EncounterJournalLootClassFilter" relativePoint="RIGHT" x="6" y="0"/>
+										</Anchors>
+									</Button>
+									<ScrollFrame name="EncounterJournalLootScroll" parentKey="scroll" inherits="FauxScrollFrameTemplate">
+										<Anchors>
+											<Anchor point="TOPLEFT" x="8" y="-34"/>
+											<Anchor point="BOTTOMRIGHT" x="-26" y="2"/>
+										</Anchors>
+									</ScrollFrame>
+									<Frame parentKey="list" enableMouseWheel="true">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeTo="EncounterJournalLootScroll"/>
+											<Anchor point="BOTTOMRIGHT" relativeTo="EncounterJournalLootScroll"/>
+										</Anchors>
+									</Frame>
+									<Frame parentKey="empty">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeTo="EncounterJournalLootScroll"/>
+											<Anchor point="BOTTOMRIGHT" relativeTo="EncounterJournalLootScroll"/>
+										</Anchors>
+										<Layers>
+											<Layer level="ARTWORK">
+												<FontString parentKey="text" inherits="GameFontBlack">
+													<Anchors>
+														<Anchor point="CENTER"/>
+													</Anchors>
+												</FontString>
+											</Layer>
+										</Layers>
+									</Frame>
+								</Frames>
+							</Frame>
+
+							<!-- model -->
+							<Frame name="$parentModel" parentKey="model" hidden="true">
+								<Anchors>
+									<Anchor point="TOPLEFT" x="6" y="-44"/>
+									<Anchor point="BOTTOMRIGHT" x="-6" y="8"/>
+								</Anchors>
+								<Layers>
+									<Layer level="BACKGROUND">
+										<Texture parentKey="dungeonBG">
+											<Anchors>
+												<Anchor point="TOPLEFT"/>
+												<Anchor point="BOTTOMRIGHT"/>
+											</Anchors>
+										</Texture>
+									</Layer>
+									<Layer level="OVERLAY">
+										<Texture parentKey="titleBG" inherits="UI-EJ-BossNameShadow">
+											<Size x="360" y="50"/>
+											<Anchors>
+												<Anchor point="BOTTOM" x="0" y="0"/>
+											</Anchors>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Frames>
+									<PlayerModel name="EncounterJournalBossModel" parentKey="modelFrame" inherits="ModelTemplate" enableMouse="true">
+										<Anchors>
+											<Anchor point="TOPLEFT"/>
+											<Anchor point="BOTTOMRIGHT"/>
+										</Anchors>
+									</PlayerModel>
+									<Frame parentKey="titleFrame">
+										<Anchors>
+											<Anchor point="BOTTOMLEFT"/>
+											<Anchor point="BOTTOMRIGHT"/>
+										</Anchors>
+										<Size x="10" y="40"/>
+										<Layers>
+											<Layer level="OVERLAY">
+												<FontString parentKey="imageTitle" inherits="QuestFont_Large">
+													<Anchors>
+														<Anchor point="BOTTOM" x="0" y="12"/>
+													</Anchors>
+													<Color r="1" g="0.82" b="0"/>
+												</FontString>
+											</Layer>
+										</Layers>
+									</Frame>
+								</Frames>
+							</Frame>
+						</Frames>
+					</Frame>
+				</Frames>
+			</Frame>
+
+			<!-- side tabs of the right page -->
+			<Button name="$parentOverviewTab" parentKey="overviewTab" inherits="EncounterTabTemplate" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="-6" y="-60"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentAbilitiesTab" parentKey="abilitiesTab" inherits="EncounterTabTemplate" hidden="true">
+				<Anchors>
+					<Anchor point="TOP" relativeTo="$parentOverviewTab" relativePoint="BOTTOM" x="0" y="2"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentLootTab" parentKey="lootTab" inherits="EncounterTabTemplate" hidden="true">
+				<Anchors>
+					<Anchor point="TOP" relativeTo="$parentAbilitiesTab" relativePoint="BOTTOM" x="0" y="2"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentModelTab" parentKey="modelTab" inherits="EncounterTabTemplate" hidden="true">
+				<Anchors>
+					<Anchor point="TOP" relativeTo="$parentLootTab" relativePoint="BOTTOM" x="0" y="2"/>
+				</Anchors>
+			</Button>
+
+			<!-- full search results over the page -->
+			<Frame name="$parentSearchResults" parentKey="searchResults" hidden="true" enableMouse="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="80" y="-20"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-80" y="20"/>
+				</Anchors>
+				<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+					<EdgeSize val="16"/>
+					<TileSize val="32"/>
+					<BackgroundInsets left="4" right="4" top="4" bottom="4"/>
+				</Backdrop>
+				<Layers>
 					<Layer level="ARTWORK">
-						<Texture name="$parentLoreBG" parentKey="loreBG" file="Interface\EncounterJournal\UI-EJ-LOREBG-Default">
-							<Size x="390" y="330"/>
+						<FontString parentKey="TitleText" inherits="GameFontNormal" justifyH="LEFT">
+							<Size x="520" y="14"/>
 							<Anchors>
-								<Anchor point="TOPRIGHT" x="-3" y="-9"/>
-							</Anchors>
-							<TexCoords left="0" right="0.76171875" top="0" bottom="0.64453125"/>
-						</Texture>
-					</Layer>
-					<Layer level="OVERLAY">
-						<FontString name="$parentTitle" parentKey="title" inherits="QuestFont_Super_Huge" justifyH="CENTER" justifyV="BOTTOM">
-							<Size x="320" y="35"/>
-							<Anchors>
-								<Anchor point="TOP" relativeTo="$parentLoreBG" x="0" y="-20"/>
-							</Anchors>
-							<Color r="1" g="0.82" b="0"/>
-						</FontString>
-						<FontString name="$parentDescription" parentKey="description" inherits="GameFontBlack" justifyH="LEFT" justifyV="TOP">
-							<Size x="340" y="0"/>
-							<Anchors>
-								<Anchor point="TOPLEFT" x="30" y="-40"/>
-							</Anchors>
-						</FontString>
-						<FontString name="$parentEncounterHint" parentKey="encounterHint" inherits="GameFontDisable" justifyH="LEFT">
-							<Size x="340" y="0"/>
-							<Anchors>
-								<Anchor point="BOTTOMLEFT" x="30" y="20"/>
+								<Anchor point="TOPLEFT" x="14" y="-12"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
+				<Frames>
+					<Button parentKey="closeButton" inherits="UIPanelCloseButton">
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="0" y="0"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								self:GetParent():Hide();
+							</OnClick>
+						</Scripts>
+					</Button>
+					<ScrollFrame name="EncounterJournalSearchResultsScroll" parentKey="scroll" inherits="FauxScrollFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="12" y="-34"/>
+							<Anchor point="BOTTOMRIGHT" x="-32" y="10"/>
+						</Anchors>
+					</ScrollFrame>
+					<Frame parentKey="list" enableMouseWheel="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="EncounterJournalSearchResultsScroll"/>
+							<Anchor point="BOTTOMRIGHT" relativeTo="EncounterJournalSearchResultsScroll"/>
+						</Anchors>
+					</Frame>
+				</Frames>
 			</Frame>
 
 			<Frame name="$parentTabSystem" parentKey="TabSystem" inherits="TabSystemTemplate">
