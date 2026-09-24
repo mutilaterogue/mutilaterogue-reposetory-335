@@ -7,7 +7,7 @@
 local INSTANCE_BUTTON_WIDTH, INSTANCE_BUTTON_HEIGHT = 174, 96;
 local INSTANCE_PADDING_X, INSTANCE_PADDING_Y = 15, 15;
 local INSTANCE_COLUMNS = 4;
-local INSTANCE_ROWS = 4;
+local INSTANCE_ROWS = 3;	-- visible rows: 3*96 + 2*15 = 318 fits the grid (~367), 4 rows (429) overflow the frame
 
 -- retail tier backgrounds (EJ_TIER_DATA)
 local TIER_BACKGROUNDS = {
