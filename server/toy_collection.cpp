@@ -9,12 +9,12 @@
  * The item itself stays in the bags. From the journal a learned toy is used without the item:
  * the server casts the item's "on use" spell and keeps the cooldown (per character).
  *
- * AddonComm opcodes (AddonComm.h):
- *   CMSG_CIRCLE_REQUEST_TOYS = 6       -> SMSG_CIRCLE_TOY_LIST
- *   CMSG_CIRCLE_USE_TOY      = 7 : itemId
- *   SMSG_CIRCLE_TOY_LIST     = 6 : "itemId,itemId,..." : "ownedId/remainingMs/durationMs,..."
- *   SMSG_CIRCLE_TOY_ADDED    = 7 : itemId
- *   SMSG_CIRCLE_TOY_COOLDOWN = 8 : itemId : remainingMs : durationMs
+ * AddonComm opcodes - names, nothing to add to AddonComm.h / Server.lua:
+ *   "TOYS_REQUEST"       -> "TOYS_LIST"
+ *   "TOYS_USE" : itemId
+ *   "TOYS_LIST" : "itemId,itemId,..." : "ownedId/remainingMs/durationMs,..."
+ *   "TOYS_ADDED" : itemId
+ *   "TOYS_COOLDOWN" : itemId : remainingMs : durationMs
  *
  * Setup: both SQL files, register AddSC_toy_collection() in custom_script_loader.cpp.
  */
@@ -202,7 +202,7 @@ namespace
             owned << itemId << '/' << remaining << '/' << duration;
         }
 
-        sAddonComm->Send(player, SMSG_CIRCLE_TOY_LIST, toyListText, owned.str());
+        sAddonComm->Send(player, "TOYS_LIST", toyListText, owned.str());
     }
 
     void LearnToy(Player* player, uint32 itemId)
@@ -216,7 +216,7 @@ namespace
         CharacterDatabase.PExecute("INSERT IGNORE INTO account_toys (accountId, itemId) VALUES ({}, {})",
             player->GetSession()->GetAccountId(), itemId);
 
-        sAddonComm->Send(player, SMSG_CIRCLE_TOY_ADDED, itemId);
+        sAddonComm->Send(player, "TOYS_ADDED", itemId);
     }
 
     // Learns every toy the character currently has (bags, equipment, bank).
@@ -247,7 +247,7 @@ namespace
         if (uint32 remaining = GetRemaining(player, itemId, duration))
         {
             // the client shows "not ready yet" itself
-            sAddonComm->Send(player, SMSG_CIRCLE_TOY_COOLDOWN, itemId, remaining, duration);
+            sAddonComm->Send(player, "TOYS_COOLDOWN", itemId, remaining, duration);
             return;
         }
 
@@ -272,7 +272,7 @@ namespace
         Cooldown& cd = toyCooldowns[player->GetGUID()][itemId];
         cd.start = getMSTime();
         cd.duration = infoItr->second.cooldownMs;
-        sAddonComm->Send(player, SMSG_CIRCLE_TOY_COOLDOWN, itemId, cd.duration, cd.duration);
+        sAddonComm->Send(player, "TOYS_COOLDOWN", itemId, cd.duration, cd.duration);
     }
 }
 
@@ -292,8 +292,8 @@ class toy_collection_player : public PlayerScript
 public:
     toy_collection_player() : PlayerScript("toy_collection_player")
     {
-        sAddonComm->Register(CMSG_CIRCLE_REQUEST_TOYS, &HandleRequestToys);
-        sAddonComm->Register(CMSG_CIRCLE_USE_TOY, &HandleUseToy);
+        sAddonComm->Register("TOYS_REQUEST", &HandleRequestToys);
+        sAddonComm->Register("TOYS_USE", &HandleUseToy);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override

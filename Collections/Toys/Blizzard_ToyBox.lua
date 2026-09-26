@@ -1,10 +1,10 @@
 -- Toys tab (ToyBox) for 3.3.5.
 -- The list of all toys and the learned ones come from the server
 -- (server\toy_collection.cpp) through AddonComm:
---   CMSG.REQUEST_TOYS      -> SMSG.TOY_LIST "ids" : "ownedId/remainingMs/durationMs,..."
---   CMSG.USE_TOY id        -> the server casts the toy's spell, answers SMSG.TOY_COOLDOWN
---   SMSG.TOY_ADDED id      (learned a new toy)
---   SMSG.TOY_COOLDOWN id : remainingMs : durationMs
+--   OP_REQUEST      -> OP_LIST "ids" : "ownedId/remainingMs/durationMs,..."
+--   OP_USE id        -> the server casts the toy's spell, answers OP_COOLDOWN
+--   OP_ADDED id      (learned a new toy)
+--   OP_COOLDOWN id : remainingMs : durationMs
 -- Names and icons: GetItemInfo; unknown items are requested through a hidden tooltip.
 
 local COLUMNS, ROWS = 3, 6;
@@ -12,14 +12,9 @@ local PER_PAGE = COLUMNS * ROWS;
 local BUTTON_WIDTH, BUTTON_HEIGHT = 208, 50;
 local BUTTON_PADDING_Y = 16;
 
--- opcodes come from Server.lua (CMSG / SMSG); they must match AddonComm.h on the server
-CMSG = CMSG or {};
-SMSG = SMSG or {};
-CMSG.REQUEST_TOYS = CMSG.REQUEST_TOYS or 6;
-CMSG.USE_TOY = CMSG.USE_TOY or 7;
-SMSG.TOY_LIST = SMSG.TOY_LIST or 6;
-SMSG.TOY_ADDED = SMSG.TOY_ADDED or 7;
-SMSG.TOY_COOLDOWN = SMSG.TOY_COOLDOWN or 8;
+-- опкоды - имена: их не нужно добавлять ни в Server.lua, ни в AddonComm.h
+local OP_REQUEST, OP_USE = "TOYS_REQUEST", "TOYS_USE";
+local OP_LIST, OP_ADDED, OP_COOLDOWN = "TOYS_LIST", "TOYS_ADDED", "TOYS_COOLDOWN";
 
 local allToys = {};         -- item ids
 local toySet = {};          -- [itemId] = true
@@ -132,7 +127,11 @@ local function UpdateButtons(self)
 		self.EmptyText:SetPoint("CENTER", self.Inset, "CENTER", 0, 20);
 	end
 	if #allToys == 0 then
-		self.EmptyText:SetText(self.requested and "Сервер не прислал список игрушек" or "Загрузка...");
+		if self.listReceived then
+			self.EmptyText:SetText("Сервер прислал пустой список игрушек\n(таблица custom_toys и лог worldserver)");
+		else
+			self.EmptyText:SetText(self.requested and "Сервер не ответил на запрос игрушек" or "Загрузка...");
+		end
 		self.EmptyText:Show();
 	else
 		self.EmptyText:Hide();
@@ -252,7 +251,7 @@ end
 
 function ToyBox_OnShow(self)
 	if Comm_Send then
-		Comm_Send(CMSG.REQUEST_TOYS);
+		Comm_Send(OP_REQUEST);
 		self.requested = nil;
 		self.requestElapsed = 0;
 	end
@@ -272,7 +271,7 @@ function ToyBox_UseToy(itemId)
 		return;
 	end
 	if Comm_Send then
-		Comm_Send(CMSG.USE_TOY, itemId);
+		Comm_Send(OP_USE, itemId);
 	end
 end
 
@@ -330,8 +329,9 @@ local function RefreshIfShown()
 end
 
 if Comm_Register then
-	Comm_Register(SMSG.TOY_LIST, function(allText, ownedText)
+	Comm_Register(OP_LIST, function(allText, ownedText)
 		ToyBox.requestElapsed = nil;
+		ToyBox.listReceived = true;
 		local newList, newSet = {}, {};
 		for id in (allText or ""):gmatch("(%d+)") do
 			id = tonumber(id);
@@ -348,7 +348,7 @@ if Comm_Register then
 		RefreshIfShown();
 	end);
 
-	Comm_Register(SMSG.TOY_ADDED, function(itemId)
+	Comm_Register(OP_ADDED, function(itemId)
 		itemId = tonumber(itemId);
 		if itemId then
 			owned[itemId] = true;
@@ -362,7 +362,7 @@ if Comm_Register then
 		end
 	end);
 
-	Comm_Register(SMSG.TOY_COOLDOWN, function(itemId, remaining, duration)
+	Comm_Register(OP_COOLDOWN, function(itemId, remaining, duration)
 		itemId = tonumber(itemId);
 		if itemId then
 			SetCooldown(itemId, remaining, duration);
@@ -383,6 +383,6 @@ loginFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 loginFrame:SetScript("OnEvent", function(self)
 	self:UnregisterAllEvents();
 	if Comm_Send then
-		Comm_Send(CMSG.REQUEST_TOYS);
+		Comm_Send(OP_REQUEST);
 	end
 end);

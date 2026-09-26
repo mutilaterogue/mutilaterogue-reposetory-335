@@ -31,11 +31,11 @@ bool AddonComm::HandleIncoming(Player* player, std::string const& prefix, std::s
         if (parts.size() < 5)
             return true;
 
-        uint32 opcode = CommToUInt32(parts[1]);
+        std::string const& opcode = parts[1];
         uint32 idx = CommToUInt32(parts[2]);
         uint32 total = CommToUInt32(parts[3]);
 
-        if (!opcode || !total || !idx || idx > total || total > CIRCLE_MAXCHUNKS)
+        if (opcode.empty() || !total || !idx || idx > total || total > CIRCLE_MAXCHUNKS)
             return true;
 
         ChunkBuffer& buf = _chunks[player->GetGUID()][opcode];
@@ -66,7 +66,7 @@ bool AddonComm::HandleIncoming(Player* player, std::string const& prefix, std::s
         return true;
     }
 
-    uint32 opcode = CommToUInt32(parts[0]);
+    std::string const& opcode = parts[0];
 
     auto itr = _handlers.find(opcode);
     if (itr == _handlers.end())
@@ -77,7 +77,7 @@ bool AddonComm::HandleIncoming(Player* player, std::string const& prefix, std::s
     return true;
 }
 
-void AddonComm::SendRaw(Player* player, uint32 opcode, std::string const& payload)
+void AddonComm::SendRaw(Player* player, std::string const& opcode, std::string const& payload)
 {
     if (!player || !player->GetSession())
         return;
@@ -89,7 +89,7 @@ void AddonComm::SendRaw(Player* player, uint32 opcode, std::string const& payloa
     }
 
     // Strip "opcode:" - the body is sent in chunks
-    std::string head = std::to_string(opcode) + CIRCLE_SEP;
+    std::string head = opcode + CIRCLE_SEP;
     std::string body = payload.substr(head.size());
 
     size_t chunkSize = CIRCLE_MAXBYTES - 24;
@@ -97,7 +97,7 @@ void AddonComm::SendRaw(Player* player, uint32 opcode, std::string const& payloa
 
     if (total > CIRCLE_MAXCHUNKS)
     {
-        TC_LOG_ERROR("server", "AddonComm: payload too large for opcode %u", opcode);
+        TC_LOG_ERROR("server", "AddonComm: payload too large for opcode %s", opcode.c_str());
         return;
     }
 

@@ -20,6 +20,9 @@
 #define CIRCLE_MAXBYTES  240
 #define CIRCLE_MAXCHUNKS 64
 
+// Опкод - это строка. Старые числовые опкоды ниже работают как раньше ("3" == 3),
+// а новые модули используют имена ("TOYS_REQUEST") и ничего не добавляют сюда
+// и в Server.lua: имя пишется только в самом модуле на сервере и в его Lua-файле.
 enum CircleCMSG : uint32
 {
     CMSG_CIRCLE_REQUEST_TALENT_TREE         = 1,
@@ -27,8 +30,6 @@ enum CircleCMSG : uint32
     CMSG_CIRCLE_REQUEST_HEIRLOOMS           = 3,
     CMSG_CIRCLE_CREATE_HEIRLOOM             = 4,
     CMSG_CIRCLE_REQUEST_CREATURE_BY_DISPLAY = 5,
-    CMSG_CIRCLE_REQUEST_TOYS                = 6,
-    CMSG_CIRCLE_USE_TOY                     = 7,
 };
 
 enum CircleSMSG : uint32
@@ -38,9 +39,6 @@ enum CircleSMSG : uint32
     SMSG_CIRCLE_HEIRLOOM_ADDED              = 3,
     SMSG_CIRCLE_HEIRLOOM_LIST               = 4,
     SMSG_CIRCLE_CREATURE_BY_DISPLAY         = 5,
-    SMSG_CIRCLE_TOY_LIST                    = 6,
-    SMSG_CIRCLE_TOY_ADDED                   = 7,
-    SMSG_CIRCLE_TOY_COOLDOWN                = 8,
 };
 
 // Safe uint32 parse from string (replacement for atoul)
@@ -68,7 +66,8 @@ public:
         return &inst;
     }
 
-    void Register(uint32 opcode, Handler handler) { _handlers[opcode] = handler; }
+    void Register(std::string const& opcode, Handler handler) { _handlers[opcode] = handler; }
+    void Register(uint32 opcode, Handler handler) { _handlers[std::to_string(opcode)] = handler; }
 
     // Parse an incoming addon whisper. Returns true if the packet was ours.
     bool HandleIncoming(Player* player, std::string const& prefix, std::string const& body);
@@ -76,19 +75,22 @@ public:
     void OnPlayerLogout(ObjectGuid guid) { _chunks.erase(guid); }
 
     // Usage: Send(player, SMSG_CIRCLE_TALENT_TREE, spec, tree, active);
-    template<typename... Args>
-    void Send(Player* player, uint32 opcode, Args&&... args)
+    // opcode: число (SMSG_CIRCLE_*) или имя ("TOYS_LIST")
+    template<typename Op, typename... Args>
+    void Send(Player* player, Op const& opcode, Args&&... args)
     {
+        std::ostringstream key;
+        key << opcode;
         std::ostringstream ss;
-        ss << opcode;
+        ss << key.str();
         AppendAll(ss, std::forward<Args>(args)...);
-        SendRaw(player, opcode, ss.str());
+        SendRaw(player, key.str(), ss.str());
     }
 
 private:
     AddonComm() {}
 
-    void SendRaw(Player* player, uint32 opcode, std::string const& payload);
+    void SendRaw(Player* player, std::string const& opcode, std::string const& payload);
     void SendPacket(Player* player, std::string const& payload);
 
     static void AppendAll(std::ostringstream&) {}
@@ -102,7 +104,7 @@ private:
 
     static std::vector<std::string> Split(std::string const& str, char sep);
 
-    std::unordered_map<uint32, Handler> _handlers;
+    std::unordered_map<std::string, Handler> _handlers;
 
     // Chunk reassembly for packets coming from the client
     struct ChunkBuffer
@@ -114,7 +116,7 @@ private:
 
     // std::map because ObjectGuid has operator< in every 3.3.5 fork,
     // while ObjectGuid::Hash is not always present
-    std::map<ObjectGuid, std::unordered_map<uint32, ChunkBuffer>> _chunks;
+    std::map<ObjectGuid, std::unordered_map<std::string, ChunkBuffer>> _chunks;
 };
 
 #define sAddonComm AddonComm::instance()
