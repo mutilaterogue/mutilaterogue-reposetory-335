@@ -27,8 +27,6 @@ function TransmogUI.UpdateOutfits(self)
 			button:Hide();
 		end
 	end
-	self.OutfitScrollUp:SetEnabled(offset > 0);
-	self.OutfitScrollDown:SetEnabled(offset + NUM_OUTFIT_BUTTONS < #TransmogOutfits);
 end
 
 function TransmogUI.CurrentOutfitSlots(self)

@@ -3,7 +3,7 @@
 --   "TMOG_GET_STATE" -> "TMOG_STATE" : "slot/itemId,..."        текущие трансмоги
 --   "TMOG_APPLY" : "slot/itemId,..." (0 = вернуть облик) -> "TMOG_RESULT" : ok(1/0) : message
 --   "TMOG_OPEN" / "TMOG_CLOSE"  окно у NPC открывает/закрывает сервер
---   "APPEAR_GET_PAGE" ... : "T" : 24 -> "APPEAR_PAGE" ... : "T"   облики (appearance_collection.cpp)
+--   "APPEAR_GET_PAGE" ... : "T" : 20 -> "APPEAR_PAGE" ... : "T"   облики (appearance_collection.cpp)
 
 TransmogUI = TransmogUI or {};
 
@@ -12,8 +12,8 @@ TransmogUI.OP_APPLY, TransmogUI.OP_RESULT = "TMOG_APPLY", "TMOG_RESULT";
 TransmogUI.OP_OPEN, TransmogUI.OP_CLOSE = "TMOG_OPEN", "TMOG_CLOSE";
 TransmogUI.OP_GET_PAGE, TransmogUI.OP_PAGE = "APPEAR_GET_PAGE", "APPEAR_PAGE";
 
-TransmogUI.GRID_COLUMNS, TransmogUI.GRID_ROWS = 6, 4;
-TransmogUI.MODEL_WIDTH, TransmogUI.MODEL_HEIGHT, TransmogUI.MODEL_SPACE_X, TransmogUI.MODEL_SPACE_Y = 68, 86, 9, 12;
+TransmogUI.GRID_COLUMNS, TransmogUI.GRID_ROWS = 5, 4;   -- ретейл: 5x4 карточек 100x132, отступы 20
+TransmogUI.MODEL_WIDTH, TransmogUI.MODEL_HEIGHT, TransmogUI.MODEL_SPACE_X, TransmogUI.MODEL_SPACE_Y = 100, 132, 20, 20;
 
 -- раскладка как в ретейле: образы | персонаж | коллекция
 TransmogUI.LEFT_X1, TransmogUI.LEFT_X2 = 4, 264;
@@ -21,7 +21,7 @@ TransmogUI.CENTER_X1, TransmogUI.CENTER_X2 = 266, 726;
 TransmogUI.RIGHT_X1, TransmogUI.RIGHT_X2 = 728, 1196;
 TransmogUI.PANEL_TOP, TransmogUI.PANEL_BOTTOM = -22, -716;
 
-TransmogUI.NUM_OUTFIT_BUTTONS = 14;
+TransmogUI.NUM_OUTFIT_BUTTONS = 13;   -- OutfitList 650 / запись 48
 TransmogUI.MAX_OUTFITS = 30;
 
 -- slot id, category (appearance_collection.cpp), side on the character

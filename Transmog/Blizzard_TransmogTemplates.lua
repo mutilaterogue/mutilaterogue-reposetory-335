@@ -28,16 +28,16 @@ function TransmogUI.DressGridModel(model)
 end
 
 function TransmogItemModel_OnLoad(self)
+	-- рамка-карточка (ретейл: Border atlas transmog-itemcard-default, useAtlasSize, по центру)
 	local border = CreateFrame("Frame", nil, self:GetParent());
-	border:SetPoint("TOPLEFT", self, "TOPLEFT", -5, 5);
-	border:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 5, -5);
+	border:SetAllPoints(self);
 	border:SetFrameLevel(self:GetFrameLevel() + 2);
 	border.Card = border:CreateTexture(nil, "OVERLAY");
-	border.Card:SetAllPoints();
-	border.Card:SetAtlas("transmog-itemCard-default");
+	border.Card:SetAtlas("transmog-itemCard-default", true);
+	border.Card:SetPoint("CENTER");
 	border.Hover = border:CreateTexture(nil, "OVERLAY", nil, 1);
-	border.Hover:SetAllPoints();
-	border.Hover:SetAtlas("transmog-itemCard-hover");
+	border.Hover:SetAtlas("transmog-itemCard-hover", true);
+	border.Hover:SetPoint("CENTER");
 	border.Hover:Hide();
 	border:Hide();
 	self.Border = border;

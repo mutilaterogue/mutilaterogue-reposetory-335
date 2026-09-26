@@ -9,7 +9,7 @@
 	<Script file="Blizzard_Transmog.lua"/>
 
 	<Frame name="TransmogFrame" inherits="RetailPortraitFrameTemplate" parent="UIParent" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="HIGH">
-		<Size x="1200" y="720"/>
+		<Size x="1618" y="883"/>
 		<Anchors>
 			<Anchor point="CENTER"/>
 		</Anchors>
