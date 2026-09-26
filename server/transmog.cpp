@@ -28,6 +28,7 @@
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "Item.h"
+#include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
@@ -403,6 +404,7 @@ struct npc_transmogrifier : public ScriptedAI
 
     bool OnGossipHello(Player* player) override
     {
+        TC_LOG_INFO("scripts", "npc_transmogrifier: {} opens transmogrification", player->GetName());
         CloseGossipMenuFor(player);
         openedAt[player->GetGUID()] = me->GetGUID();
         sAddonComm->Send(player, "TMOG_OPEN");
@@ -412,6 +414,7 @@ struct npc_transmogrifier : public ScriptedAI
 
 void AddSC_transmog()
 {
+    TC_LOG_INFO("server.loading", ">> Loaded transmog scripts (npc_transmogrifier)");
     new transmog_world();
     new transmog_player();
     RegisterCreatureAI(npc_transmogrifier);
