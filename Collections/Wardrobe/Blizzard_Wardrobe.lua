@@ -93,6 +93,11 @@ local CATEGORY_INVTYPE = {
 
 -- камера WCollections (WardrobeCameras.lua) по расе/полу/типу предмета; /wardcam может её переопределить
 local function GetCamera(category, itemId)
+	return WardrobeGetCamera(category, itemId);
+end
+
+-- общая функция камеры (её использует и окно трансмогрификации)
+function WardrobeGetCamera(category, itemId)
 	local custom = WARDROBE_CAMERAS[category];
 	if custom and custom.user then
 		return custom;
@@ -337,7 +342,7 @@ function WardrobeCollectionFrame_Request(self)
 	local search = (self.searchText or ""):gsub(":", " ");
 	self.waiting = true;
 	self.requestElapsed = 0;
-	Comm_Send(OP_GET_PAGE, self.category, self.classId or 0, flags, self.page or 1, search);
+	Comm_Send(OP_GET_PAGE, self.category, self.classId or 0, flags, self.page or 1, search, "W");
 end
 
 local function UpdatePage(self)
@@ -548,7 +553,10 @@ end
 -- server messages
 ---------------------------------------------------------------------------
 if Comm_Register then
-	Comm_Register(OP_PAGE, function(category, page, numPages, collected, total, entriesText)
+	Comm_Register(OP_PAGE, function(category, page, numPages, collected, total, entriesText, tag)
+		if tag and tag ~= "" and tag ~= "W" then
+			return;   -- ответ для окна трансмогрификации
+		end
 		local frame = WardrobeCollectionFrame;
 		if WARDROBE_DEBUG then
 			DEFAULT_CHAT_FRAME:AddMessage(("APPEAR_PAGE cat=%s page=%s/%s collected=%s total=%s entries=%d"):format(

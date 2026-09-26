@@ -15,8 +15,8 @@
  * Client and server names must differ: the client also receives its own addon whisper.
  *   "APPEAR_GET_PAGE" -> "APPEAR_PAGE"
  *   "APPEAR_GET_SOURCES" -> "APPEAR_SOURCES"
- *   "APPEAR_PAGE"    C: category : classId(0 = all) : flags(1 collected, 2 not collected) : page : search
- *                    S: category : page : numPages : collectedCount : totalCount : "displayId/itemId/c,..."
+ *   "APPEAR_PAGE"    C: category : classId(0 = all) : flags(1 collected, 2 not collected) : page : search : tag
+ *                    S: category : page : numPages : collectedCount : totalCount : "displayId/itemId/c,..." : tag
  *   "APPEAR_SOURCES" C: category : displayId
  *                    S: category : displayId : "itemId/c,..."
  *   "APPEAR_ADDED"   S: itemId   (a new appearance was collected)
@@ -390,6 +390,8 @@ namespace
         std::wstring search;
         if (args.size() > 4 && !args[4].empty() && Utf8toWStr(args[4], search))
             wstrToLower(search);
+        // tag of the requesting window ("W" wardrobe, "T" transmog) - echoed back
+        std::string tag = args.size() > 5 ? args[5] : std::string();
 
         ScanIfNeeded(player);
 
@@ -442,7 +444,7 @@ namespace
             entries << appearance->displayId << '/' << itemId << '/' << (visible[i].second ? 1 : 0);
         }
 
-        sAddonComm->Send(player, "APPEAR_PAGE", category, page, numPages, collectedCount, total, entries.str());
+        sAddonComm->Send(player, "APPEAR_PAGE", category, page, numPages, collectedCount, total, entries.str(), tag);
     }
 
     // C: category : displayId
