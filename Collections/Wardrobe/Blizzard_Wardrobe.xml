@@ -44,29 +44,6 @@
 		</Scripts>
 	</DressUpModel>
 
-	<Button name="WardrobeSlotButtonTemplate" virtual="true">
-		<Size x="31" y="31"/>
-		<Layers>
-			<Layer level="ARTWORK">
-				<Texture name="$parentIcon" parentKey="Icon" setAllPoints="true"/>
-			</Layer>
-			<Layer level="OVERLAY">
-				<Texture name="$parentSelectedTexture" parentKey="SelectedTexture" hidden="true">
-					<Size x="40" y="40"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-		</Layers>
-		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
-		<Scripts>
-			<OnClick function="WardrobeSlotButton_OnClick"/>
-			<OnEnter function="WardrobeSlotButton_OnEnter"/>
-			<OnLeave function="GameTooltip_Hide"/>
-		</Scripts>
-	</Button>
-
 	<Frame name="WardrobeCollectionFrame" parent="CollectionsJournal" setAllPoints="true" hidden="true">
 		<Frames>
 			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">

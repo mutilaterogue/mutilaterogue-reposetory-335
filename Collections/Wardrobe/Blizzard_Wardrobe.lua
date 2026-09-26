@@ -80,6 +80,12 @@ end
 ---------------------------------------------------------------------------
 -- models
 ---------------------------------------------------------------------------
+local function ApplyCamera(model)
+	local cam = GetCamera(WardrobeCollectionFrame.category);
+	model:SetPosition(cam[1], cam[2], cam[3]);
+	model:SetFacing(cam[4] or 0);
+end
+
 local function DressModel(model)
 	local entry = model.entry;
 	if not entry then
@@ -88,9 +94,9 @@ local function DressModel(model)
 	model:SetUnit("player");
 	model:Undress();
 	model:TryOn("item:" .. entry.itemId);
-	local cam = GetCamera(WardrobeCollectionFrame.category);
-	model:SetPosition(cam[1], cam[2], cam[3]);
-	model:SetFacing(cam[4] or 0);
+	ApplyCamera(model);
+	-- 3.3.5 сбрасывает позицию, когда модель персонажа догружается: держим камеру ещё полсекунды
+	model.cameraTime = 0.5;
 end
 
 local function UpdateModel(model)
@@ -116,6 +122,13 @@ function WardrobeItemsModel_OnLoad(self)
 	SetAtlasSafe(self.Highlight, "transmog-wardrobe-border-highlighted", true);
 	SetAtlasSafe(self.Selected, "transmog-wardrobe-border-selected", true);
 	self:SetScript("OnUpdate", function(model, elapsed)
+		if model.cameraTime then
+			model.cameraTime = model.cameraTime - elapsed;
+			ApplyCamera(model);
+			if model.cameraTime <= 0 then
+				model.cameraTime = nil;
+			end
+		end
 		if model.redressTime then
 			model.redressTime = model.redressTime - elapsed;
 			if model.redressTime <= 0 then
@@ -217,17 +230,6 @@ end
 ---------------------------------------------------------------------------
 -- slots / weapons
 ---------------------------------------------------------------------------
-local function UpdateSlotButtons(self)
-	for _, button in ipairs(self.slotButtons) do
-		local selected;
-		if button.info.categories then
-			selected = self.weaponKey == button.info.key;
-		else
-			selected = self.category == button.info.category and not self.weaponKey;
-		end
-		button.SelectedTexture:SetShown(selected);
-	end
-end
 
 local function GetWeaponInfo(key)
 	for _, info in ipairs(WEAPON_SLOTS) do
@@ -253,40 +255,12 @@ local function GetCategoryName(category)
 	return "";
 end
 
-function WardrobeCollectionFrame_SetCategory(self, category, weaponKey)
+function WardrobeCollectionFrame_SetCategory(self, category)
 	self.category = category;
-	self.weaponKey = weaponKey;
 	self.page = 1;
-	UpdateSlotButtons(self);
-
-	local dropdown = self.ItemsCollectionFrame.WeaponDropdown;
-	if weaponKey then
-		dropdown:Show();
-		if dropdown.SetText then
-			dropdown:SetText(GetCategoryName(category));
-		end
-	else
-		dropdown:Hide();
-	end
+	self.CategoryText:SetText(GetCategoryName(category));
+	self.FilterDropdown:ValidateResetState();
 	WardrobeCollectionFrame_Request(self);
-end
-
-function WardrobeSlotButton_OnClick(self)
-	local frame = WardrobeCollectionFrame;
-	local info = self.info;
-	PlaySound("igMainMenuOptionCheckBoxOn");
-	if info.categories then
-		local category = frame.lastWeaponCategory[info.key] or info.categories[1][1];
-		WardrobeCollectionFrame_SetCategory(frame, category, info.key);
-	else
-		WardrobeCollectionFrame_SetCategory(frame, info.category, nil);
-	end
-end
-
-function WardrobeSlotButton_OnEnter(self)
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	GameTooltip:SetText(self.info.name);
-	GameTooltip:Show();
 end
 
 ---------------------------------------------------------------------------
@@ -356,46 +330,12 @@ function WardrobeCollectionFrame_OnLoad(self)
 		end
 	end
 
-	-- slot buttons: armor, gap, weapons (like retail)
-	self.slotButtons = {};
-	local slotsFrame = self.ItemsCollectionFrame.SlotsFrame;
-	local x = 0;
-	local function AddButton(info)
-		local button = CreateFrame("Button", nil, slotsFrame, "WardrobeSlotButtonTemplate");
-		button.info = info;
-		button:SetPoint("TOPLEFT", slotsFrame, "TOPLEFT", x, 0);
-		-- иконки слотов 3.3.5 (атласы transmog-nav-slot-* в клиенте без текстур - были пустыми)
-		local _, texture = GetInventorySlotInfo(info.slot);
-		button.Icon:SetTexture(texture);
-		if not SetAtlasSafe(button.SelectedTexture, "transmog-nav-slot-selected", false) then
-			button.SelectedTexture:SetTexture("Interface\\Buttons\\CheckButtonHilight");
-			button.SelectedTexture:SetBlendMode("ADD");
-		end
-		table.insert(self.slotButtons, button);
-		x = x + 36;
-	end
-	for _, info in ipairs(ARMOR_SLOTS) do
-		AddButton(info);
-	end
-	x = x + 20;
-	for _, info in ipairs(WEAPON_SLOTS) do
-		AddButton(info);
-	end
-
-	-- weapon type dropdown
-	local weaponDropdown = self.ItemsCollectionFrame.WeaponDropdown;
-	weaponDropdown:SetupMenu(function(dropdown, rootDescription)
-		local info = GetWeaponInfo(self.weaponKey);
-		if not info then
-			return;
-		end
-		for _, cat in ipairs(info.categories) do
-			rootDescription:CreateRadio(cat[2], function() return self.category == cat[1]; end, function()
-				self.lastWeaponCategory[info.key] = cat[1];
-				WardrobeCollectionFrame_SetCategory(self, cat[1], info.key);
-			end);
-		end
-	end);
+	-- название выбранного слота над сеткой (слот выбирается в «Фильтре»)
+	self.CategoryText = self.ItemsCollectionFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+	self.CategoryText:SetPoint("TOP", self.ItemsCollectionFrame, "TOP", 0, -40);
+	self.CategoryText:SetText(GetCategoryName(self.category));
+	self.ItemsCollectionFrame.SlotsFrame:Hide();
+	self.ItemsCollectionFrame.WeaponDropdown:Hide();
 
 	-- class dropdown
 	local classOrder = CLASS_SORT_ORDER or { "WARRIOR", "DEATHKNIGHT", "PALADIN", "PRIEST", "SHAMAN", "DRUID", "ROGUE", "MAGE", "WARLOCK", "HUNTER" };
@@ -431,10 +371,12 @@ function WardrobeCollectionFrame_OnLoad(self)
 	-- filter
 	local filter = self.FilterDropdown;
 	filter:SetIsDefaultCallback(function()
-		return self.filters.collected and self.filters.notCollected;
+		return self.filters.collected and self.filters.notCollected and self.category == 1;
 	end);
 	filter:SetDefaultCallback(function()
 		self.filters.collected, self.filters.notCollected = true, true;
+		self.category = 1;
+		self.CategoryText:SetText(GetCategoryName(1));
 	end);
 	filter:SetUpdateCallback(function() self.page = 1; WardrobeCollectionFrame_Request(self); end);
 	filter:SetupMenu(function(dropdown, rootDescription)
@@ -448,6 +390,25 @@ function WardrobeCollectionFrame_OnLoad(self)
 				self.page = 1;
 				WardrobeCollectionFrame_Request(self);
 			end);
+		end
+
+		local function IsCategory(category)
+			return self.category == category;
+		end
+		local function SetCategory(category)
+			WardrobeCollectionFrame_SetCategory(self, category);
+		end
+		rootDescription:CreateDivider();
+		rootDescription:CreateTitle("Броня");
+		for _, info in ipairs(ARMOR_SLOTS) do
+			rootDescription:CreateRadio(info.name, IsCategory, SetCategory, info.category);
+		end
+		for _, info in ipairs(WEAPON_SLOTS) do
+			rootDescription:CreateDivider();
+			rootDescription:CreateTitle(info.name);
+			for _, cat in ipairs(info.categories) do
+				rootDescription:CreateRadio(cat[2], IsCategory, SetCategory, cat[1]);
+			end
 		end
 	end);
 
@@ -509,7 +470,6 @@ function WardrobeCollectionFrame_OnLoad(self)
 		end
 	end);
 
-	UpdateSlotButtons(self);
 end
 
 function WardrobeCollectionFrame_OnShow(self)
@@ -528,6 +488,10 @@ end
 if Comm_Register then
 	Comm_Register(OP_PAGE, function(category, page, numPages, collected, total, entriesText)
 		local frame = WardrobeCollectionFrame;
+		if WARDROBE_DEBUG then
+			DEFAULT_CHAT_FRAME:AddMessage(("APPEAR_PAGE cat=%s page=%s/%s collected=%s total=%s entries=%d"):format(
+				tostring(category), tostring(page), tostring(numPages), tostring(collected), tostring(total), select(2, (entriesText or ""):gsub("%d+/%d+/%d", "")) ));
+		end
 		category = tonumber(category);
 		if category ~= frame.category then
 			return;   -- answer for an old request
@@ -599,4 +563,11 @@ SlashCmdList["WARDCAM"] = function(msg)
 		end
 	end
 	DEFAULT_CHAT_FRAME:AddMessage(("WARDROBE_CAMERAS[%s] = { %.2f, %.2f, %.2f, %.2f }"):format(tostring(key), cam[1], cam[2], cam[3], cam[4] or 0));
+end
+
+-- /wardebug - печатать ответы сервера (проверка, что страница пришла целиком)
+SLASH_WARDEBUG1 = "/wardebug";
+SlashCmdList["WARDEBUG"] = function()
+	WARDROBE_DEBUG = not WARDROBE_DEBUG;
+	DEFAULT_CHAT_FRAME:AddMessage("Wardrobe debug: " .. (WARDROBE_DEBUG and "on" or "off"));
 end
