@@ -149,65 +149,110 @@ function TransmogSlotButton_OnEnter(self)
 	GameTooltip:Show();
 end
 
-function TransmogUI.CreatePanel(parent, x1, x2, atlas)
-	local panel = CreateFrame("Frame", nil, parent);
-	panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x1, PANEL_TOP);
-	panel:SetPoint("BOTTOMRIGHT", parent, "TOPLEFT", x2, PANEL_BOTTOM);
-	local bg = panel:CreateTexture(nil, "BACKGROUND");
-	bg:SetAllPoints();
-	bg:SetAtlas(atlas);
-	panel.Bg = bg;
-	return panel;
+-- зеркально по горизонтали (ретейл: rotation="180"/flip) - по координатам атласа
+function TransmogUI.FlipAtlasHorizontal(texture, atlas)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if info then
+		local left = info.leftTexCoord or info.left;
+		local right = info.rightTexCoord or info.right;
+		local top = info.topTexCoord or info.top;
+		local bottom = info.bottomTexCoord or info.bottom;
+		if left and right and top and bottom then
+			texture:SetTexCoord(right, left, top, bottom);
+		end
+	end
 end
 
-function TransmogUI.CreateIconButton(parent, texture, size, tooltip, onClick)
-	local button = CreateFrame("Button", nil, parent);
-	button:SetSize(size, size);
-	local normal = button:CreateTexture(nil, "ARTWORK");
-	normal:SetAllPoints();
-	if texture:find("\\") then
-		normal:SetTexture(texture);
-	else
-		normal:SetAtlas(texture);   -- атлас ретейла
-	end
-	button.Icon = normal;
-	local highlight = button:CreateTexture(nil, "HIGHLIGHT");
-	highlight:SetAllPoints();
-	if texture:find("\\") then
-		highlight:SetTexture(texture);
-	else
-		highlight:SetAtlas(texture);
-	end
-	highlight:SetBlendMode("ADD");
-	highlight:SetAlpha(0.5);
-	button:SetScript("OnClick", onClick);
-	button:SetScript("OnEnter", function(btn)
-		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT");
-		GameTooltip:SetText(tooltip);
+function TransmogTooltipButton_OnEnter(self)
+	if self.tooltipText then
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetText(self.tooltipText);
 		GameTooltip:Show();
-	end);
-	button:SetScript("OnLeave", GameTooltip_Hide);
-	return button;
+	end
 end
 
-function TransmogUI.CreateBorder(frame, r, g, b)
-	local border = CreateFrame("Frame", nil, frame);
-	border:SetPoint("TOPLEFT", -3, 3);
-	border:SetPoint("BOTTOMRIGHT", 3, -3);
-	border:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12 });
-	border:SetBackdropBorderColor(r, g, b, 1);
-	return border;
+---------------------------------------------------------------------------
+-- tertiary / square buttons
+---------------------------------------------------------------------------
+function TransmogTertiaryButton_OnMouseDown(self)
+	if self:IsEnabled() == 1 then
+		self.NormalTex:SetAtlas(self.pushedAtlas or "common-button-tertiary-pressed");
+	end
 end
 
--- вкладки коллекции: «Предметы» работает, остальные - заглушки до серверной части
-function TransmogUI.CreateStubTab(parent, text)
-	local frame = CreateFrame("Frame", nil, parent);
-	frame:SetAllPoints();
-	local label = TransmogUI.CreateLabel(frame, "GameFontNormalHuge", "В скором времени");
-	label:SetPoint("CENTER", 0, 20);
-	local desc = TransmogUI.CreateLabel(frame, "GameFontHighlight", text);
-	desc:SetPoint("TOP", label, "BOTTOM", 0, -10);
-	desc:SetWidth(380);
-	frame:Hide();
-	return frame;
+function TransmogTertiaryButton_OnMouseUp(self)
+	self.NormalTex:SetAtlas(self.normalAtlas or "common-button-tertiary-normal");
+end
+
+function TransmogTertiaryButton_OnDisable(self)
+	self.NormalTex:SetAtlas(self.disabledAtlas or "common-button-tertiary-disabled");
+end
+
+---------------------------------------------------------------------------
+-- model control buttons
+---------------------------------------------------------------------------
+function TransmogControlButton_OnLoad(self)
+	local atlas = self.iconAtlas;
+	if not atlas then
+		return;
+	end
+	self.Icon:SetAtlas(atlas);
+	self.Highlight:SetAtlas(atlas);
+	if self.mirror then
+		TransmogUI.FlipAtlasHorizontal(self.Icon, atlas);
+		TransmogUI.FlipAtlasHorizontal(self.Highlight, atlas);
+	end
+end
+
+function TransmogControlButton_OnMouseDown(self)
+	if self.spin then
+		TransmogFramePreview.spin = self.spin;
+	end
+end
+
+function TransmogControlButton_OnMouseUp(self)
+	if self.spin then
+		TransmogFramePreview.spin = nil;
+	end
+end
+
+---------------------------------------------------------------------------
+-- outfit entries
+---------------------------------------------------------------------------
+function TransmogOutfitEntry_OnClick(self, mouseButton)
+	local frame = TransmogFrame;
+	if not self.outfit then
+		return;
+	end
+	if mouseButton == "RightButton" then
+		for i, outfit in ipairs(TransmogOutfits) do
+			if outfit == self.outfit then
+				table.remove(TransmogOutfits, i);
+				break;
+			end
+		end
+		if frame.selectedOutfit == self.outfit then
+			frame.selectedOutfit = nil;
+		end
+		TransmogUI.UpdateOutfits(frame);
+	else
+		PlaySound("igMainMenuOptionCheckBoxOn");
+		frame.OutfitCollection.ShowEquippedGear.Active:Hide();
+		TransmogUI.LoadOutfit(frame, self.outfit);
+		TransmogUI.UpdateOutfits(frame);
+	end
+end
+
+function TransmogOutfitEntry_OnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:SetText(self.outfit and self.outfit.name or "");
+	GameTooltip:AddLine("ЛКМ - примерить образ, ПКМ - удалить.", 0.5, 0.5, 0.5, true);
+	GameTooltip:Show();
+end
+
+function TransmogOutfitList_OnMouseWheel(self, delta)
+	local frame = TransmogFrame;
+	local maxOffset = math.max(0, #TransmogOutfits - NUM_OUTFIT_BUTTONS);
+	frame.outfitOffset = math.max(0, math.min(maxOffset, (frame.outfitOffset or 0) - delta));
+	TransmogUI.UpdateOutfits(frame);
 end
