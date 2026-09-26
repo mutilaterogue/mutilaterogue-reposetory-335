@@ -117,3 +117,34 @@ function TransmogUI.CreateLabel(parent, font, text)
 end
 
 TransmogOutfits = TransmogOutfits or {};   -- { name, icon, slots = { [slotId] = itemId } } - на сервере позже
+
+-- камера моделей в сетке - та же, что во «Внешнем виде» (WCollections по расе/полу/типу предмета)
+local CATEGORY_INVTYPE = {
+	[1] = "INVTYPE_HEAD", [2] = "INVTYPE_SHOULDER", [3] = "INVTYPE_CLOAK", [4] = "INVTYPE_CHEST", [5] = "INVTYPE_BODY",
+	[6] = "INVTYPE_TABARD", [7] = "INVTYPE_WRIST", [8] = "INVTYPE_HAND", [9] = "INVTYPE_WAIST", [10] = "INVTYPE_LEGS",
+	[11] = "INVTYPE_FEET",
+};
+local DEFAULT_WEAPON_CAMERA = { 0.6, 0, -0.05, 0.6 };
+local DEFAULT_CAMERA = { 0, 0, 0, 0 };
+
+function TransmogUI.GetCamera(category, itemId)
+	if WardrobeGetCamera then
+		return WardrobeGetCamera(category, itemId);
+	end
+	if category and category >= 20 then
+		return (WARDROBE_WEAPON_CAMERAS and (WARDROBE_WEAPON_CAMERAS[category] or WARDROBE_WEAPON_CAMERAS.default)) or DEFAULT_WEAPON_CAMERA;
+	end
+	if WCollections and WCollections.Cameras and WCollections.GetCharacterCameraID then
+		local invType = itemId and select(9, GetItemInfo(itemId));
+		if not invType or invType == "" then
+			invType = CATEGORY_INVTYPE[category];
+		end
+		if invType then
+			local cam = WCollections.Cameras[WCollections:GetCharacterCameraID(invType)];
+			if cam then
+				return cam;
+			end
+		end
+	end
+	return DEFAULT_CAMERA;
+end

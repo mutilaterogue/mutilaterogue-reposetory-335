@@ -8,6 +8,9 @@
 --   "APPEAR_GET_PAGE" ... : "T" -> "APPEAR_PAGE" ... : "T"   appearances (appearance_collection.cpp)
 -- Without the server: /transmog opens the window, "Apply" says the server does not answer.
 
+-- масштаб окна (ретейловское окно 1618x883)
+local TRANSMOG_FRAME_SCALE = 0.75
+
 local OP_GET_STATE, OP_STATE, OP_APPLY, OP_RESULT, OP_OPEN, OP_CLOSE, OP_GET_PAGE, OP_PAGE, GRID_COLUMNS, GRID_ROWS, MODEL_WIDTH, MODEL_HEIGHT, MODEL_SPACE_X, MODEL_SPACE_Y, LEFT_X1, LEFT_X2, CENTER_X1, CENTER_X2, RIGHT_X1, RIGHT_X2, PANEL_TOP, PANEL_BOTTOM, SLOTS, SLOT_UNASSIGNED_ATLAS, SLOT_BY_ID, CLASS_IDS, NUM_OUTFIT_BUTTONS, MAX_OUTFITS =
 	TransmogUI.OP_GET_STATE, TransmogUI.OP_STATE, TransmogUI.OP_APPLY, TransmogUI.OP_RESULT, TransmogUI.OP_OPEN, TransmogUI.OP_CLOSE, TransmogUI.OP_GET_PAGE, TransmogUI.OP_PAGE, TransmogUI.GRID_COLUMNS, TransmogUI.GRID_ROWS, TransmogUI.MODEL_WIDTH, TransmogUI.MODEL_HEIGHT, TransmogUI.MODEL_SPACE_X, TransmogUI.MODEL_SPACE_Y, TransmogUI.LEFT_X1, TransmogUI.LEFT_X2, TransmogUI.CENTER_X1, TransmogUI.CENTER_X2, TransmogUI.RIGHT_X1, TransmogUI.RIGHT_X2, TransmogUI.PANEL_TOP, TransmogUI.PANEL_BOTTOM, TransmogUI.SLOTS, TransmogUI.SLOT_UNASSIGNED_ATLAS, TransmogUI.SLOT_BY_ID, TransmogUI.CLASS_IDS, TransmogUI.NUM_OUTFIT_BUTTONS, TransmogUI.MAX_OUTFITS;
 
@@ -195,6 +198,20 @@ local function AtlasButton(parent, width, height, normal, pushed, disabled)
 	return button;
 end
 
+-- зеркально по горизонтали (ретейл: rotation="180"/flip) - по координатам атласа, не GetTexCoord
+local function FlipAtlasHorizontal(texture, atlas)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if info then
+		local left = info.leftTexCoord or info.left;
+		local right = info.rightTexCoord or info.right;
+		local top = info.topTexCoord or info.top;
+		local bottom = info.bottomTexCoord or info.bottom;
+		if left and right and top and bottom then
+			texture:SetTexCoord(right, left, top, bottom);
+		end
+	end
+end
+
 local function Tooltip(frame, text)
 	frame:SetScript("OnEnter", function(owner)
 		GameTooltip:SetOwner(owner, "ANCHOR_RIGHT");
@@ -211,7 +228,7 @@ function TransmogFrame_OnLoad(self)
 	tinsert(UISpecialFrames, self:GetName());
 	self:RegisterForDrag("LeftButton");
 	-- ретейловское окно 1618x883: масштаб как у PlayerSpellsFrame
-	self:SetScale(TRANSMOG_FRAME_SCALE or 0.62);
+	self:SetScale(TRANSMOG_FRAME_SCALE);
 
 	if self.TitleContainer and self.TitleContainer.TitleText then
 		self.TitleContainer.TitleText:SetText("Трансмогрификация");
@@ -373,8 +390,7 @@ function TransmogFrame_OnLoad(self)
 	local gradientRight = Tex(preview, "BACKGROUND", "transmog-outfit-darkBG-gradient", false, 2);
 	gradientRight:SetSize(123, 860);
 	gradientRight:SetPoint("RIGHT");
-	local l, r, t, b = gradientRight:GetTexCoord();
-	gradientRight:SetTexCoord(r, l, t, b);   -- rotation="180" в ретейле
+	FlipAtlasHorizontal(gradientRight, "transmog-outfit-darkBG-gradient");   -- rotation="180" в ретейле
 
 	local model = CreateFrame("DressUpModel", "TransmogFramePreview", preview);
 	model:SetAllPoints();
@@ -412,14 +428,19 @@ function TransmogFrame_OnLoad(self)
 	controls:SetSize(5 * 30, 26);
 	controls:SetPoint("TOP", 0, -18);
 	controls:SetFrameLevel(model:GetFrameLevel() + 5);
-	local function Control(index, atlas, tooltip, onClick, spin)
+	local function Control(index, atlas, tooltip, onClick, spin, mirror)
 		local button = CreateFrame("Button", nil, controls);
 		button:SetSize(26, 26);
 		button:SetPoint("LEFT", (index - 1) * 30, 0);
-		Tex(button, "ARTWORK", atlas):SetAllPoints();
+		local icon = Tex(button, "ARTWORK", atlas);
+		icon:SetAllPoints();
 		local hl = Tex(button, "HIGHLIGHT", atlas);
 		hl:SetAllPoints();
 		hl:SetBlendMode("ADD");
+		if mirror then
+			FlipAtlasHorizontal(icon, atlas);
+			FlipAtlasHorizontal(hl, atlas);
+		end
 		if spin then
 			button:SetScript("OnMouseDown", function() model.spin = spin; end);
 			button:SetScript("OnMouseUp", function() model.spin = nil; end);
@@ -431,7 +452,7 @@ function TransmogFrame_OnLoad(self)
 	Control(1, "common-icon-zoomin", "Приблизить", function() Zoom(1); end);
 	Control(2, "common-icon-zoomout", "Отдалить", function() Zoom(-1); end);
 	Control(3, "common-icon-rotateleft", "Повернуть влево", nil, -1);
-	Control(4, "common-icon-rotateright", "Повернуть вправо", nil, 1);
+	Control(4, "common-icon-rotateleft", "Повернуть вправо", nil, 1, true);
 	Control(5, "common-icon-undo", "Сбросить вид", function()
 		model.zoom, model.facing = 0, 0;
 		model:SetPosition(0, 0, 0);
@@ -592,9 +613,10 @@ function TransmogFrame_OnLoad(self)
 			self.page = 1;
 			TransmogUI.RequestPage(self);
 		end);
-		local sources = rootDescription:CreateSubmenu("Источники");
+		rootDescription:CreateDivider();
+		rootDescription:CreateTitle("Источники");
 		for i, name in ipairs(SOURCES) do
-			sources:CreateCheckbox(name, function() return self.sourceFilters[i]; end, function()
+			rootDescription:CreateCheckbox(name, function() return self.sourceFilters[i]; end, function()
 				self.sourceFilters[i] = not self.sourceFilters[i];
 				filter:ValidateResetState();
 			end);

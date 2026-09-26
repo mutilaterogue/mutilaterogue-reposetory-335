@@ -5,10 +5,10 @@ local OP_GET_STATE, OP_STATE, OP_APPLY, OP_RESULT, OP_OPEN, OP_CLOSE, OP_GET_PAG
 
 function TransmogUI.ApplyCamera(model)
 	local entry = model.entry;
-	if not entry or not WardrobeGetCamera then
+	if not entry then
 		return;
 	end
-	local cam = WardrobeGetCamera(TransmogFrame.category, entry.itemId);
+	local cam = TransmogUI.GetCamera(TransmogFrame.category, entry.itemId);
 	model:SetPosition(cam[1], cam[2], cam[3]);
 	model:SetFacing(cam[4] or 0);
 end
