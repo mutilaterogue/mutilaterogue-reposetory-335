@@ -153,6 +153,9 @@ local function UpdateModel(model)
 	end
 	DressModel(model);
 	-- 3.3.5: the unit model is sometimes not ready on the same frame - dress again a bit later
+	-- модель персонажа и предмет в 3.3.5 догружаются не сразу (оружие - особенно):
+	-- переодеваем ещё несколько раз, пока всё не подгрузится
+	model.redressIndex = 1;
 	model.redressTime = 0.1;
 end
 
@@ -176,8 +179,10 @@ function WardrobeItemsModel_OnLoad(self)
 		if model.redressTime then
 			model.redressTime = model.redressTime - elapsed;
 			if model.redressTime <= 0 then
-				model.redressTime = nil;
 				DressModel(model);
+				local delays = { 0.3, 0.6, 1.0, 2.0 };
+				model.redressIndex = (model.redressIndex or 1) + 1;
+				model.redressTime = delays[model.redressIndex - 1];
 			end
 		end
 	end);
