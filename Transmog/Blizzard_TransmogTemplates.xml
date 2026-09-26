@@ -69,21 +69,54 @@
 			<OnLeave function="GameTooltip_Hide"/>
 		</Scripts>
 	</Button>
-	<!-- кнопка common-button-tertiary (ретейл: PurchaseOutfitButton, DisplayTypes) -->
+	<!-- кнопка common-button-tertiary (ретейл: PurchaseOutfitButton, DisplayTypes).
+	     В ретейле атлас режется слайсами, 3.3.5 так не умеет - режем на 3 части сами (TransmogUI.SetSlicedAtlas) -->
 	<Button name="TransmogTertiaryButtonTemplate" virtual="true">
+		<KeyValues>
+			<KeyValue key="normalAtlas" value="common-button-tertiary-normal-small" type="string"/>
+			<KeyValue key="pushedAtlas" value="common-button-tertiary-pressed-small" type="string"/>
+			<KeyValue key="disabledAtlas" value="common-button-tertiary-disabled-small" type="string"/>
+			<KeyValue key="hoverAtlas" value="common-button-tertiary-hover-small" type="string"/>
+		</KeyValues>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture parentKey="NormalTex" atlas="common-button-tertiary-normal" setAllPoints="true"/>
+				<Texture parentKey="Left">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Right">
+					<Anchors>
+						<Anchor point="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Center"/>
 			</Layer>
 			<Layer level="HIGHLIGHT">
-				<Texture parentKey="HighlightTex" atlas="common-button-tertiary-normal" alphaMode="ADD" setAllPoints="true"/>
+				<Texture parentKey="HighlightLeft" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="HighlightRight" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="HighlightCenter" alphaMode="ADD"/>
 			</Layer>
 		</Layers>
 		<Scripts>
+			<OnShow function="TransmogTertiaryButton_Update"/>
+			<OnSizeChanged function="TransmogTertiaryButton_Update"/>
 			<OnMouseDown function="TransmogTertiaryButton_OnMouseDown"/>
-			<OnMouseUp function="TransmogTertiaryButton_OnMouseUp"/>
-			<OnEnable function="TransmogTertiaryButton_OnMouseUp"/>
-			<OnDisable function="TransmogTertiaryButton_OnDisable"/>
+			<OnMouseUp function="TransmogTertiaryButton_Update"/>
+			<OnEnable function="TransmogTertiaryButton_Update"/>
+			<OnDisable function="TransmogTertiaryButton_Update"/>
 		</Scripts>
 	</Button>
 
@@ -115,9 +148,9 @@
 			</Layer>
 		</Layers>
 		<Scripts>
-			<OnMouseDown function="TransmogTertiaryButton_OnMouseDown"/>
-			<OnMouseUp function="TransmogTertiaryButton_OnMouseUp"/>
-			<OnEnable function="TransmogTertiaryButton_OnMouseUp"/>
+			<OnMouseDown function="TransmogSquareButton_OnMouseDown"/>
+			<OnMouseUp function="TransmogSquareButton_OnMouseUp"/>
+			<OnEnable function="TransmogSquareButton_OnMouseUp"/>
 			<OnEnter function="TransmogTooltipButton_OnEnter"/>
 			<OnLeave function="GameTooltip_Hide"/>
 		</Scripts>

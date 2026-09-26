@@ -174,18 +174,68 @@ end
 ---------------------------------------------------------------------------
 -- tertiary / square buttons
 ---------------------------------------------------------------------------
-function TransmogTertiaryButton_OnMouseDown(self)
-	if self:IsEnabled() == 1 then
-		self.NormalTex:SetAtlas(self.pushedAtlas or "common-button-tertiary-pressed");
+-- атлас на 3 части: края по SLICE_EDGE высоты атласа сохраняют пропорции, центр тянется
+local SLICE_EDGE = 0.5;
+
+local function SetSliced(left, center, right, atlas, height)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if not info then
+		return false;
+	end
+	local l = info.leftTexCoord or info.left;
+	local r = info.rightTexCoord or info.right;
+	local t = info.topTexCoord or info.top;
+	local b = info.bottomTexCoord or info.bottom;
+	local w, h = info.width, info.height;
+	if not (l and r and t and b and w and h) or h == 0 then
+		return false;
+	end
+	local edge = math.min(h * SLICE_EDGE, w / 2);   -- ширина края в пикселях атласа
+	local u = (r - l) * edge / w;                     -- та же ширина в координатах файла
+	local edgeWidth = edge * height / h;              -- на кнопке
+	for _, tex in ipairs({ left, center, right }) do
+		tex:SetAtlas(atlas);
+	end
+	left:SetTexCoord(l, l + u, t, b);
+	left:SetWidth(edgeWidth);
+	right:SetTexCoord(r - u, r, t, b);
+	right:SetWidth(edgeWidth);
+	center:SetTexCoord(l + u, r - u, t, b);
+	center:ClearAllPoints();
+	center:SetPoint("TOPLEFT", left, "TOPRIGHT");
+	center:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT");
+	return true;
+end
+
+function TransmogUI.SetSlicedAtlas(button, atlas)
+	local height = button:GetHeight();
+	if not SetSliced(button.Left, button.Center, button.Right, atlas, height) and atlas ~= button.normalAtlas then
+		SetSliced(button.Left, button.Center, button.Right, button.normalAtlas, height);   -- нет такого атласа - обычный
 	end
 end
 
-function TransmogTertiaryButton_OnMouseUp(self)
-	self.NormalTex:SetAtlas(self.normalAtlas or "common-button-tertiary-normal");
+function TransmogTertiaryButton_Update(self)
+	local height = self:GetHeight();
+	TransmogUI.SetSlicedAtlas(self, self:IsEnabled() == 1 and self.normalAtlas or self.disabledAtlas);
+	if not SetSliced(self.HighlightLeft, self.HighlightCenter, self.HighlightRight, self.hoverAtlas, height) then
+		SetSliced(self.HighlightLeft, self.HighlightCenter, self.HighlightRight, self.normalAtlas, height);
+	end
 end
 
-function TransmogTertiaryButton_OnDisable(self)
-	self.NormalTex:SetAtlas(self.disabledAtlas or "common-button-tertiary-disabled");
+function TransmogTertiaryButton_OnMouseDown(self)
+	if self:IsEnabled() == 1 then
+		TransmogUI.SetSlicedAtlas(self, self.pushedAtlas);
+	end
+end
+
+function TransmogSquareButton_OnMouseDown(self)
+	if self:IsEnabled() == 1 then
+		self.NormalTex:SetAtlas(self.pushedAtlas);
+	end
+end
+
+function TransmogSquareButton_OnMouseUp(self)
+	self.NormalTex:SetAtlas(self.normalAtlas);
 end
 
 ---------------------------------------------------------------------------
