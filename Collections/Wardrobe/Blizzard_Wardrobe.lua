@@ -95,22 +95,22 @@ local function DressModel(model)
 	model:Undress();
 	model:TryOn("item:" .. entry.itemId);
 	ApplyCamera(model);
-	-- 3.3.5 сбрасывает позицию, когда модель персонажа догружается: держим камеру ещё полсекунды
-	model.cameraTime = 0.5;
 end
 
 local function UpdateModel(model)
 	local entry = model.entry;
 	if not entry then
 		model:Hide();
+		model.BorderFrame:Hide();
 		return;
 	end
 	model:Show();
+	model.BorderFrame:Show();
 	if entry.collected then
-		SetAtlasSafe(model.Border, "transmog-wardrobe-border-collected", true);
+		model.BorderFrame:SetBackdropBorderColor(1, 0.82, 0, 1);
 		model:SetAlpha(1);
 	else
-		SetAtlasSafe(model.Border, "transmog-wardrobe-border-uncollected", true);
+		model.BorderFrame:SetBackdropBorderColor(0.45, 0.45, 0.45, 1);
 		model:SetAlpha(0.8);
 	end
 	DressModel(model);
@@ -119,15 +119,21 @@ local function UpdateModel(model)
 end
 
 function WardrobeItemsModel_OnLoad(self)
+	-- рамка: атласы transmog-wardrobe-border-* в клиенте без текстур, поэтому обычная рамка поверх модели
+	local border = CreateFrame("Frame", nil, self:GetParent());
+	border:SetPoint("TOPLEFT", self, "TOPLEFT", -5, 5);
+	border:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 5, -5);
+	border:SetFrameLevel(self:GetFrameLevel() + 2);
+	border:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
+		insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+	border:Hide();
+	self.BorderFrame = border;
 	SetAtlasSafe(self.Highlight, "transmog-wardrobe-border-highlighted", true);
 	SetAtlasSafe(self.Selected, "transmog-wardrobe-border-selected", true);
 	self:SetScript("OnUpdate", function(model, elapsed)
-		if model.cameraTime then
-			model.cameraTime = model.cameraTime - elapsed;
+		-- 3.3.5 сбрасывает позицию, пока догружаются модель и предмет: ставим камеру каждый кадр
+		if model.entry then
 			ApplyCamera(model);
-			if model.cameraTime <= 0 then
-				model.cameraTime = nil;
-			end
 		end
 		if model.redressTime then
 			model.redressTime = model.redressTime - elapsed;
