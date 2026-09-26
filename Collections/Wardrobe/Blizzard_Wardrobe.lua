@@ -73,6 +73,15 @@ local function RequestItem(itemId)
 	itemQueryTooltip:Hide();
 end
 
+-- оружие на персонаже: { приближение, x, высота, поворот }; подгонка - /wardcam в игре
+WARDROBE_WEAPON_CAMERAS = WARDROBE_WEAPON_CAMERAS or {
+	default = { 0.6, 0, -0.05, 0.6 },
+	[21] = { 0.3, 0, 0, 0.6 }, [25] = { 0.3, 0, 0, 0.6 }, [28] = { 0.3, 0, 0, 0.6 },   -- двуручные
+	[26] = { 0.2, 0, 0, 0.6 }, [30] = { 0.2, 0, 0, 0.6 },                            -- древковое, посохи
+	[22] = { 0.4, 0, 0, 0.6 }, [23] = { 0.4, 0, 0, 0.6 }, [38] = { 0.4, 0, 0, 0.6 },   -- луки, ружья, арбалеты
+	[40] = { 0.6, 0, -0.05, -0.6 }, [41] = { 0.6, 0, -0.05, -0.6 },                  -- щит, левая рука
+};
+
 -- тип слота по категории - если GetItemInfo ещё не знает предмет
 local CATEGORY_INVTYPE = {
 	[1] = "INVTYPE_HEAD", [2] = "INVTYPE_SHOULDER", [3] = "INVTYPE_CLOAK", [4] = "INVTYPE_CHEST", [5] = "INVTYPE_BODY",
@@ -87,6 +96,10 @@ local function GetCamera(category, itemId)
 	local custom = WARDROBE_CAMERAS[category];
 	if custom and custom.user then
 		return custom;
+	end
+	-- оружие: камеры WCollections рассчитаны на модель одного предмета, а у нас персонаж с оружием в руке
+	if category >= 20 then
+		return WARDROBE_WEAPON_CAMERAS[category] or WARDROBE_WEAPON_CAMERAS.default;
 	end
 	if WCollections and WCollections.Cameras then
 		local invType = itemId and select(9, GetItemInfo(itemId));
