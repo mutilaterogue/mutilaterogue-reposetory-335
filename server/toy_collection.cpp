@@ -62,23 +62,30 @@ namespace
 
     constexpr uint32 MIN_COOLDOWN_MS = 1500;   // like a global cooldown, anti-spam
 
-    bool GetUseSpell(ItemTemplate const& proto, ToyInfo& info)
+    constexpr uint32 ITEM_SPELLS = 5;            // spellid_1..5 in item_template
+    constexpr uint32 SPELLTRIGGER_ON_USE = 0;    // ITEM_SPELLTRIGGER_ON_USE
+
+    // fields: [base] spellid, spelltrigger, spellcooldown, spellcategorycooldown for 1..5
+    bool GetUseSpell(Field* fields, uint32 base, ToyInfo& info)
     {
-        for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+        for (uint32 i = 0; i < ITEM_SPELLS; ++i)
         {
-            auto const& spell = proto.Spells[i];
-            if (spell.SpellId <= 0 || spell.SpellTrigger != ITEM_SPELLTRIGGER_ON_USE)
+            int32 spellId = fields[base + i * 4 + 0].GetInt32();
+            uint32 trigger = fields[base + i * 4 + 1].GetUInt32();
+            int32 itemCooldown = fields[base + i * 4 + 2].GetInt32();
+            int32 categoryCooldown = fields[base + i * 4 + 3].GetInt32();
+            if (spellId <= 0 || trigger != SPELLTRIGGER_ON_USE)
                 continue;
 
-            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(uint32(spell.SpellId));
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(uint32(spellId));
             if (!spellInfo)
                 continue;
 
-            int32 cooldown = spell.SpellCooldown > 0 ? spell.SpellCooldown : spell.SpellCategoryCooldown;
+            int32 cooldown = itemCooldown > 0 ? itemCooldown : categoryCooldown;
             if (cooldown <= 0)
                 cooldown = int32(std::max(spellInfo->RecoveryTime, spellInfo->CategoryRecoveryTime));
 
-            info.spellId = uint32(spell.SpellId);
+            info.spellId = uint32(spellId);
             info.cooldownMs = std::max(uint32(cooldown > 0 ? cooldown : 0), MIN_COOLDOWN_MS);
             return true;
         }
@@ -91,7 +98,13 @@ namespace
         toyInfo.clear();
 
         std::ostringstream list;
-        QueryResult result = WorldDatabase.Query("SELECT itemId FROM custom_toys ORDER BY itemId");
+        // заклинания берём прямо из item_template: поля ItemTemplate в разных форках называются по-разному
+        std::ostringstream query;
+        query << "SELECT t.itemId, i.entry";
+        for (uint32 n = 1; n <= ITEM_SPELLS; ++n)
+            query << ", i.spellid_" << n << ", i.spelltrigger_" << n << ", i.spellcooldown_" << n << ", i.spellcategorycooldown_" << n;
+        query << " FROM custom_toys t LEFT JOIN item_template i ON i.entry = t.itemId ORDER BY t.itemId";
+        QueryResult result = WorldDatabase.Query(query.str().c_str());
         if (!result)
         {
             TC_LOG_ERROR("server.loading", "toy_collection: world table custom_toys is empty or missing");
@@ -101,16 +114,16 @@ namespace
 
         do
         {
-            uint32 itemId = result->Fetch()[0].GetUInt32();
-            ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId);
-            if (!proto)
+            Field* fields = result->Fetch();
+            uint32 itemId = fields[0].GetUInt32();
+            if (fields[1].IsNull() || !sObjectMgr->GetItemTemplate(itemId))
             {
                 TC_LOG_ERROR("server.loading", "toy_collection: item %u from custom_toys does not exist, skipped", itemId);
                 continue;
             }
 
             ToyInfo info;
-            if (!GetUseSpell(*proto, info))
+            if (!GetUseSpell(fields, 2, info))
             {
                 TC_LOG_ERROR("server.loading", "toy_collection: item %u has no \"on use\" spell, skipped", itemId);
                 continue;
