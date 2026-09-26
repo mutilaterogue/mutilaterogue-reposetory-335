@@ -2176,7 +2176,16 @@ end
 
 function MovementSpeed_OnUpdate(statFrame, elapsedTime)
 	local unit = statFrame.unit;
-	local _, runSpeed, flightSpeed, swimSpeed = GetUnitSpeed(unit);
+	local currentSpeed, runSpeed, flightSpeed, swimSpeed = GetUnitSpeed(unit);
+	if (not runSpeed) then
+		-- 3.3.5: GetUnitSpeed отдаёт только текущую скорость; стоя - 0, тогда базовая/последняя
+		currentSpeed = currentSpeed or 0;
+		if (currentSpeed > 0) then
+			statFrame.lastSpeed = currentSpeed;
+		end
+		local speed = statFrame.lastSpeed or BASE_MOVEMENT_SPEED;
+		runSpeed, flightSpeed, swimSpeed = speed, speed, speed;
+	end
 	runSpeed = runSpeed/BASE_MOVEMENT_SPEED*100;
 	flightSpeed = flightSpeed/BASE_MOVEMENT_SPEED*100;
 	swimSpeed = swimSpeed/BASE_MOVEMENT_SPEED*100;
