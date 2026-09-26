@@ -1,6 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\..\UI.xsd">
 	<!-- Вкладка «Внешний вид» (ретейл WardrobeCollectionFrame, вкладка «Предметы») для 3.3.5.
 	     Данные - сервер (server\appearance_collection.cpp), опкоды APPEAR_*. -->
+	<Script file="WardrobeCameras.lua"/>
 	<Script file="Blizzard_Wardrobe.lua"/>
 
 	<DressUpModel name="WardrobeItemsModelTemplate" virtual="true" enableMouse="true">

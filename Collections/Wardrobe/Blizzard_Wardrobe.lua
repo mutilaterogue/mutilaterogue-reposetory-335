@@ -73,15 +73,48 @@ local function RequestItem(itemId)
 	itemQueryTooltip:Hide();
 end
 
-local function GetCamera(category)
-	return WARDROBE_CAMERAS[category] or WARDROBE_CAMERAS.weapon;
+-- тип слота по категории - если GetItemInfo ещё не знает предмет
+local CATEGORY_INVTYPE = {
+	[1] = "INVTYPE_HEAD", [2] = "INVTYPE_SHOULDER", [3] = "INVTYPE_CLOAK", [4] = "INVTYPE_CHEST", [5] = "INVTYPE_BODY",
+	[6] = "INVTYPE_TABARD", [7] = "INVTYPE_WRIST", [8] = "INVTYPE_HAND", [9] = "INVTYPE_WAIST", [10] = "INVTYPE_LEGS",
+	[11] = "INVTYPE_FEET", [40] = "INVTYPE_SHIELD", [41] = "INVTYPE_HOLDABLE",
+	[21] = "INVTYPE_2HWEAPON", [25] = "INVTYPE_2HWEAPON", [28] = "INVTYPE_2HWEAPON", [26] = "INVTYPE_2HWEAPON", [30] = "INVTYPE_2HWEAPON",
+	[22] = "INVTYPE_RANGED", [23] = "INVTYPE_RANGED", [38] = "INVTYPE_RANGED", [39] = "INVTYPE_RANGEDRIGHT", [36] = "INVTYPE_THROWN",
+};
+
+-- камера WCollections (WardrobeCameras.lua) по расе/полу/типу предмета; /wardcam может её переопределить
+local function GetCamera(category, itemId)
+	local custom = WARDROBE_CAMERAS[category];
+	if custom and custom.user then
+		return custom;
+	end
+	if WCollections and WCollections.Cameras then
+		local invType = itemId and select(9, GetItemInfo(itemId));
+		if not invType or invType == "" then
+			invType = CATEGORY_INVTYPE[category] or "INVTYPE_WEAPON";
+		end
+		local id;
+		if category >= 20 and category < 40 then
+			id = WCollections:GetWeaponCameraID(invType, category - 20);
+		elseif category >= 40 then
+			id = WCollections:GetWeaponCameraID(invType);
+		else
+			id = WCollections:GetCharacterCameraID(invType);
+		end
+		local cam = id and WCollections.Cameras[id];
+		if cam then
+			return cam;
+		end
+	end
+	return custom or WARDROBE_CAMERAS.weapon;
 end
 
 ---------------------------------------------------------------------------
 -- models
 ---------------------------------------------------------------------------
 local function ApplyCamera(model)
-	local cam = GetCamera(WardrobeCollectionFrame.category);
+	local cam = GetCamera(WardrobeCollectionFrame.category, model.entry and model.entry.itemId);
+	model.camera = cam;
 	model:SetPosition(cam[1], cam[2], cam[3]);
 	model:SetFacing(cam[4] or 0);
 end
@@ -557,18 +590,16 @@ SlashCmdList["WARDCAM"] = function(msg)
 	local frame = WardrobeCollectionFrame;
 	local zoom, x, z, facing = strsplit(" ", msg or "");
 	zoom, x, z, facing = tonumber(zoom), tonumber(x), tonumber(z), tonumber(facing);
-	local key = WARDROBE_CAMERAS[frame.category] and frame.category or "weapon";
-	local cam = WARDROBE_CAMERAS[key];
+	local base = frame.models[1] and frame.models[1].camera or GetCamera(frame.category);
+	local cam = { base[1], base[2], base[3], base[4] or 0, user = true };
 	if zoom then
 		cam[1], cam[2], cam[3] = zoom, x or cam[2], z or cam[3];
 		if facing then
 			cam[4] = facing;
 		end
-		for _, model in ipairs(frame.models) do
-			DressModel(model);
-		end
+		WARDROBE_CAMERAS[frame.category] = cam;
 	end
-	DEFAULT_CHAT_FRAME:AddMessage(("WARDROBE_CAMERAS[%s] = { %.2f, %.2f, %.2f, %.2f }"):format(tostring(key), cam[1], cam[2], cam[3], cam[4] or 0));
+	DEFAULT_CHAT_FRAME:AddMessage(("category %d: { %.2f, %.2f, %.2f, %.2f }"):format(frame.category, cam[1], cam[2], cam[3], cam[4] or 0));
 end
 
 -- /wardebug - печатать ответы сервера (проверка, что страница пришла целиком)
