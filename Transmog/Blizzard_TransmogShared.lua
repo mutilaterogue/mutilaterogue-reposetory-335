@@ -1,7 +1,7 @@
 -- Трансмогрификация: общие данные (ретейл: Blizzard_TransmogShared).
 -- Опкоды (имена; запрос и ответ называются по-разному - клиент получает и свой аддон-шёпот):
 --   "TMOG_GET_STATE" -> "TMOG_STATE" : "slot/itemId,..."        текущие трансмоги
---   "TMOG_APPLY" : "slot/itemId,..." (0 = вернуть облик) -> "TMOG_RESULT" : ok(1/0) : message
+--   "TMOG_APPLY" : "slot/itemId,..." (0 = вернуть облик) -> "TMOG_RESULT" : ok(1/0) : имя строки ошибки : itemId
 --   "TMOG_OPEN" / "TMOG_CLOSE"  окно у NPC открывает/закрывает сервер
 --   "APPEAR_GET_PAGE" ... : "T" : 20 -> "APPEAR_PAGE" ... : "T"   облики (appearance_collection.cpp)
 
@@ -11,6 +11,14 @@ TransmogUI.OP_GET_STATE, TransmogUI.OP_STATE = "TMOG_GET_STATE", "TMOG_STATE";
 TransmogUI.OP_APPLY, TransmogUI.OP_RESULT = "TMOG_APPLY", "TMOG_RESULT";
 TransmogUI.OP_OPEN, TransmogUI.OP_CLOSE = "TMOG_OPEN", "TMOG_CLOSE";
 TransmogUI.OP_GET_PAGE, TransmogUI.OP_PAGE = "APPEAR_GET_PAGE", "APPEAR_PAGE";
+-- наряды, ситуации, свои комплекты (server/transmog_outfits.cpp), наборы (server/transmog_sets.cpp)
+TransmogUI.OP_OUTFITS_GET, TransmogUI.OP_OUTFIT, TransmogUI.OP_OUTFITS_END = "TMOG_OUTFITS_GET", "TMOG_OUTFIT", "TMOG_OUTFITS_END";
+TransmogUI.OP_OUTFIT_SAVE, TransmogUI.OP_OUTFIT_EQUIP, TransmogUI.OP_OUTFIT_RENAME = "TMOG_OUTFIT_SAVE", "TMOG_OUTFIT_EQUIP", "TMOG_OUTFIT_RENAME";
+TransmogUI.OP_OUTFIT_DEL, TransmogUI.OP_OUTFIT_BUY, TransmogUI.OP_OUTFIT_SIT = "TMOG_OUTFIT_DEL", "TMOG_OUTFIT_BUY", "TMOG_OUTFIT_SIT";
+TransmogUI.OP_OUTFIT_ACTIVE = "TMOG_OUTFIT_ACTIVE";
+TransmogUI.OP_CSETS_GET, TransmogUI.OP_CSET, TransmogUI.OP_CSETS_END = "TMOG_CSETS_GET", "TMOG_CSET", "TMOG_CSETS_END";
+TransmogUI.OP_CSET_SAVE, TransmogUI.OP_CSET_DEL = "TMOG_CSET_SAVE", "TMOG_CSET_DEL";
+TransmogUI.OP_SETS_GET, TransmogUI.OP_SET, TransmogUI.OP_SETS_END = "TMOG_SETS_GET", "TMOG_SET", "TMOG_SETS_END";
 
 TransmogUI.GRID_COLUMNS, TransmogUI.GRID_ROWS = 5, 4;   -- ретейл: 5x4 карточек 100x132, отступы 20
 TransmogUI.MODEL_WIDTH, TransmogUI.MODEL_HEIGHT, TransmogUI.MODEL_SPACE_X, TransmogUI.MODEL_SPACE_Y = 100, 132, 20, 20;
@@ -116,7 +124,126 @@ function TransmogUI.CreateLabel(parent, font, text)
 	return label;
 end
 
-TransmogOutfits = TransmogOutfits or {};   -- { name, icon, slots = { [slotId] = itemId } } - на сервере позже
+-- текст ошибки сервера: имя глобальной строки ретейла (Blizzard_TransmogStrings.lua), "%s" - ссылка на предмет
+function TransmogUI.GetErrorText(errorName, errorItem)
+	if not errorName or errorName == "" then
+		return nil;
+	end
+	local text = _G[errorName] or errorName;
+	if text:find("%%s") then
+		local itemId = tonumber(errorItem);
+		local name = itemId and itemId > 0 and (select(2, GetItemInfo(itemId)) or ("item:" .. itemId)) or "";
+		text = text:format(name);
+	elseif text:find("%%d") then
+		text = text:format(tonumber(errorItem) or 0);
+	end
+	return text;
+end
+
+-- ячейка экипировки для облика предмета (наборы, свои комплекты)
+TransmogUI.SLOT_BY_EQUIPLOC = {
+	INVTYPE_HEAD = 1, INVTYPE_SHOULDER = 3, INVTYPE_CLOAK = 15, INVTYPE_CHEST = 5, INVTYPE_ROBE = 5, INVTYPE_BODY = 4,
+	INVTYPE_TABARD = 19, INVTYPE_WRIST = 9, INVTYPE_HAND = 10, INVTYPE_WAIST = 6, INVTYPE_LEGS = 7, INVTYPE_FEET = 8,
+	INVTYPE_WEAPON = 16, INVTYPE_2HWEAPON = 16, INVTYPE_WEAPONMAINHAND = 16, INVTYPE_WEAPONOFFHAND = 17,
+	INVTYPE_SHIELD = 17, INVTYPE_HOLDABLE = 17, INVTYPE_RANGED = 18, INVTYPE_RANGEDRIGHT = 18, INVTYPE_THROWN = 18,
+};
+
+function TransmogUI.GetItemSlot(itemId)
+	local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(itemId);
+	if not equipLoc then
+		TransmogUI.RequestItem(itemId);
+		return nil;
+	end
+	return TransmogUI.SLOT_BY_EQUIPLOC[equipLoc];
+end
+
+-- "slot/itemId,..." <-> { [slot] = itemId }
+function TransmogUI.FormatSlots(slots)
+	local list = {};
+	for _, info in ipairs(TransmogUI.SLOTS) do
+		if slots[info.id] then
+			table.insert(list, info.id .. "/" .. slots[info.id]);
+		end
+	end
+	return table.concat(list, ",");
+end
+
+-- облик, который сейчас показан на персонаже: изменения > трансмогрификация > надетый предмет
+function TransmogUI.DisplayedLooks(frame, includeEquipped)
+	local looks = {};
+	for _, info in ipairs(TransmogUI.SLOTS) do
+		local pending = frame.pending[info.id];
+		local itemId;
+		if pending ~= nil then
+			itemId = pending ~= 0 and pending or (includeEquipped and GetInventoryItemID("player", info.id)) or nil;
+		elseif frame.applied[info.id] then
+			itemId = frame.applied[info.id];
+		elseif includeEquipped then
+			itemId = GetInventoryItemID("player", info.id);
+		end
+		if itemId then
+			looks[info.id] = itemId;
+		end
+	end
+	return looks;
+end
+
+-- примерить облики на надетые предметы (в очередь изменений); replaceAll: остальные ячейки вернуть к предмету
+function TransmogUI.LoadLooks(frame, looks, replaceAll)
+	if replaceAll then
+		wipe(frame.pending);
+	end
+	for _, info in ipairs(TransmogUI.SLOTS) do
+		local slotId = info.id;
+		local equipped = GetInventoryItemID("player", slotId);
+		local itemId = looks[slotId];
+		if equipped then
+			if itemId then
+				if itemId == equipped then
+					frame.pending[slotId] = frame.applied[slotId] and 0 or nil;
+				elseif itemId == frame.applied[slotId] then
+					frame.pending[slotId] = nil;
+				else
+					frame.pending[slotId] = itemId;
+				end
+			elseif replaceAll and frame.applied[slotId] then
+				frame.pending[slotId] = 0;
+			end
+		end
+	end
+	TransmogUI.UpdateSlots(frame);
+	TransmogUI.UpdatePreview(frame);
+	TransmogUI.UpdateGrid(frame);
+end
+
+-- название комплекта (ItemSet.dbc) из подсказки предмета: строка "Название (0/5)"
+TransmogUI.setNames = {};
+function TransmogUI.GetSetName(setId, itemId)
+	if TransmogUI.setNames[setId] then
+		return TransmogUI.setNames[setId];
+	end
+	local tooltip = TransmogUI.itemQueryTooltip;
+	tooltip:SetOwner(UIParent, "ANCHOR_NONE");
+	tooltip:SetHyperlink("item:" .. itemId);
+	local name;
+	for i = 2, tooltip:NumLines() do
+		local line = _G["TransmogQueryTooltipTextLeft" .. i];
+		local text = line and line:GetText();
+		local found = text and text:match("^(.-) %(%d+/%d+%)$");
+		if found and found ~= "" then
+			name = found;
+			break;
+		end
+	end
+	tooltip:Hide();
+	if name then
+		TransmogUI.setNames[setId] = name;
+	end
+	return name;
+end
+
+-- модели карточек: облик ставится после загрузки модели, поэтому одевание повторяется
+TransmogUI.REDRESS_DELAYS = { 0.1, 0.3, 0.6, 1.0, 2.0 };
 
 -- камера моделей в сетке - та же, что во «Внешнем виде» (WCollections по расе/полу/типу предмета)
 local CATEGORY_INVTYPE = {

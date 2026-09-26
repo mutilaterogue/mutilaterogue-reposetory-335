@@ -9,20 +9,22 @@
  * Validation order is the retail one (HandleTransmogrifyItems): everything is checked first,
  * then money is taken, then all slots are applied - on any error nothing changes.
  *   - slot is a visible equipment slot and holds an item
- *   - appearance collected on the account (account_appearances, same displayid + compatible type)
- *   - player->CanUseItem(appearance)                                 (retail: CanUseItem)
+ *   - no legendary items (retail ERR_TRANSMOGRIFY_LEGENDARY)
  *   - CanTransmogrifyItemWithItem: same class, armor subclass, weapon type, slot group
+ *   - player->CanUseItem(appearance)                                 (retail: CanUseItem)
+ *   - appearance collected on the account (account_appearances, same displayid + compatible type)
  *   - cost = sell price of the transmogrified item (min 1 silver), reset is free
  *
  * AddonComm opcodes (client: Transmog\Blizzard_Transmog.lua):
  *   "TMOG_GET_STATE"                         -> "TMOG_STATE"  : "slot/itemId,..."
- *   "TMOG_APPLY" : "slot/itemId,..." (0 = restore) -> "TMOG_RESULT" : ok(1/0) : message, then "TMOG_STATE"
+ *   "TMOG_APPLY" : "slot/itemId,..." (0 = restore) -> "TMOG_RESULT" : ok(1/0) : error : errorItem, then "TMOG_STATE"
  *   "TMOG_OPEN" / "TMOG_CLOSE"               server opens / closes the window (npc_transmogrifier)
  *
  * Setup: sql/characters_transmog.sql, core/Player_transmog.patch, register AddSC_transmog().
  * NPC: creature_template.ScriptName = 'npc_transmogrifier', npcflag 1 (gossip).
  */
 
+#include "transmog.h"
 #include "ScriptMgr.h"
 #include "AddonComm\AddonComm.h"
 #include "Creature.h"
@@ -48,15 +50,6 @@ namespace
     constexpr bool REQUIRE_NPC = false;
     constexpr uint32 MIN_COST = 100;   // 1 silver
 
-    struct ItemData
-    {
-        uint8 Class = 0;
-        uint8 SubClass = 0;
-        uint8 InventoryType = 0;
-        uint32 DisplayId = 0;
-        uint32 SellPrice = 0;
-    };
-
     struct TransmogData
     {
         ObjectGuid::LowType Owner = 0;
@@ -64,30 +57,9 @@ namespace
         uint32 Illusion = 0;   // SpellItemEnchantment id (PLAYER_VISIBLE_ITEM_n_ENCHANTMENT), 0 = none
     };
 
-    std::unordered_map<uint32, ItemData> items;                            // item_template
+    std::unordered_map<uint32, Transmog::ItemData> items;                  // item_template (armor, weapons)
     std::unordered_map<ObjectGuid::LowType, TransmogData> transmogs;      // item guid -> transmog
     std::unordered_map<ObjectGuid, ObjectGuid> openedAt;                  // player -> transmogrifier npc
-
-    // visible equipment slots (neck, rings, trinkets have no look)
-    bool IsTransmogSlot(uint8 slot)
-    {
-        switch (slot)
-        {
-            case EQUIPMENT_SLOT_HEAD: case EQUIPMENT_SLOT_SHOULDERS: case EQUIPMENT_SLOT_BODY: case EQUIPMENT_SLOT_CHEST:
-            case EQUIPMENT_SLOT_WAIST: case EQUIPMENT_SLOT_LEGS: case EQUIPMENT_SLOT_FEET: case EQUIPMENT_SLOT_WRISTS:
-            case EQUIPMENT_SLOT_HANDS: case EQUIPMENT_SLOT_BACK: case EQUIPMENT_SLOT_MAINHAND: case EQUIPMENT_SLOT_OFFHAND:
-            case EQUIPMENT_SLOT_RANGED: case EQUIPMENT_SLOT_TABARD:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    ItemData const* GetItemData(uint32 entry)
-    {
-        auto itr = items.find(entry);
-        return itr != items.end() ? &itr->second : nullptr;
-    }
 
     // retail IsValidTransmogOutfitSlotForItem: inventory types that share a slot
     uint8 SlotGroup(uint8 inventoryType)
@@ -110,47 +82,6 @@ namespace
     bool IsBowGunCrossbow(uint8 subClass)
     {
         return subClass == ITEM_SUBCLASS_WEAPON_BOW || subClass == ITEM_SUBCLASS_WEAPON_GUN || subClass == ITEM_SUBCLASS_WEAPON_CROSSBOW;
-    }
-
-    // retail Item::CanTransmogrifyItemWithItem, rules of 3.3.5 item types
-    bool CanTransmogrifyItemWithItem(ItemData const& target, ItemData const& source)
-    {
-        if (target.Class != source.Class || SlotGroup(target.InventoryType) != SlotGroup(source.InventoryType))
-            return false;
-
-        if (target.Class == ITEM_CLASS_ARMOR)
-        {
-            switch (target.InventoryType)
-            {
-                case INVTYPE_CLOAK: case INVTYPE_BODY: case INVTYPE_TABARD:
-                    return true;   // no armor type
-                default:
-                    return target.SubClass == source.SubClass;
-            }
-        }
-
-        if (target.Class == ITEM_CLASS_WEAPON)
-            return target.SubClass == source.SubClass || (IsBowGunCrossbow(target.SubClass) && IsBowGunCrossbow(source.SubClass));
-
-        return false;
-    }
-
-    void LoadItems()
-    {
-        items.clear();
-        QueryResult result = WorldDatabase.Query("SELECT entry, class, subclass, InventoryType, displayid, SellPrice FROM item_template WHERE class IN (2, 4)");
-        if (!result)
-            return;
-        do
-        {
-            Field* fields = result->Fetch();
-            ItemData& data = items[fields[0].GetUInt32()];
-            data.Class = fields[1].GetUInt8();
-            data.SubClass = fields[2].GetUInt8();
-            data.InventoryType = fields[3].GetUInt8();
-            data.DisplayId = fields[4].GetUInt32();
-            data.SellPrice = fields[5].GetUInt32();
-        } while (result->NextRow());
     }
 
     // the transmogrified look of an equipped item (Player::s_visibleItemHook)
@@ -202,31 +133,6 @@ namespace
         openedAt.erase(player->GetGUID());
     }
 
-    void SendState(Player* player)
-    {
-        std::ostringstream list;
-        bool first = true;
-        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
-        {
-            Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
-            if (!item)
-                continue;
-            auto itr = transmogs.find(item->GetGUID().GetCounter());
-            if (itr == transmogs.end() || itr->second.Owner != player->GetGUID().GetCounter() || !itr->second.FakeEntry)
-                continue;
-            if (!first)
-                list << ',';
-            list << uint32(slot) << '/' << itr->second.FakeEntry;
-            first = false;
-        }
-        sAddonComm->Send(player, "TMOG_STATE", list.str());
-    }
-
-    void SendResult(Player* player, bool ok, std::string const& message)
-    {
-        sAddonComm->Send(player, "TMOG_RESULT", ok ? 1 : 0, message);
-    }
-
     bool CanInteract(Player* player)
     {
         if (!REQUIRE_NPC)
@@ -235,46 +141,146 @@ namespace
         return itr != openedAt.end() && player->GetNPCIfCanInteractWith(itr->second, UNIT_NPC_FLAG_GOSSIP);
     }
 
-    // appearance collected: any collected item with the same look and a compatible type
-    bool HasAppearance(Player* player, ItemData const& target, ItemData const& source)
+    Transmog::ApplyResult Fail(char const* error, uint32 item = 0)
     {
-        QueryResult result = CharacterDatabase.PQuery("SELECT itemId FROM account_appearances WHERE accountId = {}", player->GetSession()->GetAccountId());
-        if (!result)
-            return false;
-        do
-        {
-            ItemData const* collected = GetItemData(result->Fetch()[0].GetUInt32());
-            if (collected && collected->DisplayId == source.DisplayId && CanTransmogrifyItemWithItem(target, *collected))
-                return true;
-        } while (result->NextRow());
-        return false;
+        Transmog::ApplyResult result;
+        result.Error = error;
+        result.ErrorItem = item;
+        return result;
     }
 
     void HandleGetState(Player* player, std::vector<std::string> const& /*args*/)
     {
-        SendState(player);
+        Transmog::SendState(player);
     }
 
     void HandleApply(Player* player, std::vector<std::string> const& args)
     {
         if (!CanInteract(player))
         {
-            SendResult(player, false, "Подойдите к трансмогрификатору.");
+            Transmog::SendResult(player, Fail("TRANSMOG_ERR_NEED_NPC"));
             sAddonComm->Send(player, "TMOG_CLOSE");
             return;
         }
 
-        struct Change
-        {
-            uint8 Slot;
-            Item* Target;
-            uint32 FakeEntry;   // 0 = restore
-        };
-        std::vector<Change> changes;
-        std::unordered_set<uint8> seen;
-        uint64 cost = 0;
+        Transmog::ApplyResult result = Transmog::ApplyLooks(player, Transmog::ParseSlots(args.empty() ? std::string() : args[0]), true, false);
+        Transmog::SendResult(player, result);
+        if (result.Ok)
+            Transmog::SendState(player);
+    }
+}
 
-        std::string const text = args.empty() ? std::string() : args[0];
+namespace Transmog
+{
+    void Load()
+    {
+        items.clear();
+        QueryResult result = WorldDatabase.Query("SELECT entry, class, subclass, InventoryType, displayid, SellPrice, Quality, AllowableClass, itemset FROM item_template WHERE class IN (2, 4)");
+        if (!result)
+            return;
+        do
+        {
+            Field* fields = result->Fetch();
+            ItemData& data = items[fields[0].GetUInt32()];
+            data.Class = fields[1].GetUInt8();
+            data.SubClass = fields[2].GetUInt8();
+            data.InventoryType = fields[3].GetUInt8();
+            data.DisplayId = fields[4].GetUInt32();
+            data.SellPrice = fields[5].GetUInt32();
+            data.Quality = fields[6].GetUInt8();
+            data.AllowableClass = fields[7].GetInt32();
+            data.ItemSet = fields[8].GetUInt32();
+        } while (result->NextRow());
+        TC_LOG_INFO("server.loading", ">> transmog: {} items", uint32(items.size()));
+    }
+
+    ItemData const* GetItemData(uint32 entry)
+    {
+        auto itr = items.find(entry);
+        return itr != items.end() ? &itr->second : nullptr;
+    }
+
+    std::unordered_map<uint32, ItemData> const& GetAllItems()
+    {
+        return items;
+    }
+
+    // visible equipment slots (neck, rings, trinkets have no look)
+    bool IsTransmogSlot(uint8 slot)
+    {
+        switch (slot)
+        {
+            case EQUIPMENT_SLOT_HEAD: case EQUIPMENT_SLOT_SHOULDERS: case EQUIPMENT_SLOT_BODY: case EQUIPMENT_SLOT_CHEST:
+            case EQUIPMENT_SLOT_WAIST: case EQUIPMENT_SLOT_LEGS: case EQUIPMENT_SLOT_FEET: case EQUIPMENT_SLOT_WRISTS:
+            case EQUIPMENT_SLOT_HANDS: case EQUIPMENT_SLOT_BACK: case EQUIPMENT_SLOT_MAINHAND: case EQUIPMENT_SLOT_OFFHAND:
+            case EQUIPMENT_SLOT_RANGED: case EQUIPMENT_SLOT_TABARD:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // retail Item::CanTransmogrifyItemWithItem, rules of 3.3.5 item types
+    bool CanTransmogrifyItemWithItem(ItemData const& target, ItemData const& source)
+    {
+        if (target.Class != source.Class || SlotGroup(target.InventoryType) != SlotGroup(source.InventoryType))
+            return false;
+
+        if (target.Class == ITEM_CLASS_ARMOR)
+        {
+            switch (target.InventoryType)
+            {
+                case INVTYPE_CLOAK: case INVTYPE_BODY: case INVTYPE_TABARD:
+                    return true;   // no armor type
+                default:
+                    return target.SubClass == source.SubClass;
+            }
+        }
+
+        if (target.Class == ITEM_CLASS_WEAPON)
+            return target.SubClass == source.SubClass || (IsBowGunCrossbow(target.SubClass) && IsBowGunCrossbow(source.SubClass));
+
+        return false;
+    }
+
+    std::unordered_set<uint32> LoadCollected(Player* player)
+    {
+        std::unordered_set<uint32> collected;
+        if (QueryResult result = CharacterDatabase.PQuery("SELECT itemId FROM account_appearances WHERE accountId = {}", player->GetSession()->GetAccountId()))
+        {
+            do
+            {
+                collected.insert(result->Fetch()[0].GetUInt32());
+            } while (result->NextRow());
+        }
+        return collected;
+    }
+
+    bool IsAppearanceCollected(std::unordered_set<uint32> const& collected, ItemData const& target, uint32 itemId)
+    {
+        ItemData const* source = GetItemData(itemId);
+        if (!source)
+            return false;
+        if (collected.count(itemId))
+            return true;
+        for (uint32 collectedId : collected)
+        {
+            ItemData const* other = GetItemData(collectedId);
+            if (other && other->DisplayId == source->DisplayId && CanTransmogrifyItemWithItem(target, *other))
+                return true;
+        }
+        return false;
+    }
+
+    bool IsAppearanceCollected(std::unordered_set<uint32> const& collected, uint32 itemId)
+    {
+        ItemData const* source = GetItemData(itemId);
+        return source && IsAppearanceCollected(collected, *source, itemId);
+    }
+
+    SlotList ParseSlots(std::string const& text)
+    {
+        SlotList slots;
         std::istringstream stream(text);
         std::string token;
         while (std::getline(stream, token, ','))
@@ -283,50 +289,134 @@ namespace
             if (sep == std::string::npos)
                 continue;
             uint32 slot = CommToUInt32(token.substr(0, sep), EQUIPMENT_SLOT_END);
-            uint32 fakeEntry = CommToUInt32(token.substr(sep + 1), 0);
+            uint32 itemId = CommToUInt32(token.substr(sep + 1), 0);
+            if (slot < EQUIPMENT_SLOT_END)
+                slots.emplace_back(uint8(slot), itemId);
+        }
+        return slots;
+    }
 
-            // slot of the transmogrified item
-            if (slot >= EQUIPMENT_SLOT_END || !IsTransmogSlot(uint8(slot)) || !seen.insert(uint8(slot)).second)
-                return SendResult(player, false, "Неверный слот.");
+    std::string FormatSlots(SlotList const& slots)
+    {
+        std::ostringstream text;
+        bool first = true;
+        for (auto const& [slot, itemId] : slots)
+        {
+            if (!first)
+                text << ',';
+            text << uint32(slot) << '/' << itemId;
+            first = false;
+        }
+        return text.str();
+    }
 
-            // transmogrified item
-            Item* target = player->GetItemByPos(INVENTORY_SLOT_BAG_0, uint8(slot));
-            if (!target)
-                return SendResult(player, false, "В слоте нет предмета.");
-
-            if (!fakeEntry || fakeEntry == target->GetEntry())
-            {
-                changes.push_back({ uint8(slot), target, 0 });   // 0 cost if reverting look
+    uint64 GetCost(Player* player, SlotList const& looks)
+    {
+        uint64 cost = 0;
+        for (auto const& [slot, itemId] : looks)
+        {
+            Item* target = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+            if (!target || !itemId || itemId == target->GetEntry())
                 continue;
+            auto itr = transmogs.find(target->GetGUID().GetCounter());
+            if (itr != transmogs.end() && itr->second.Owner == player->GetGUID().GetCounter() && itr->second.FakeEntry == itemId)
+                continue;   // already this look
+            ItemData const* data = GetItemData(target->GetEntry());
+            cost += std::max(data ? data->SellPrice : 0u, MIN_COST);
+        }
+        return cost;
+    }
+
+    ApplyResult ApplyLooks(Player* player, SlotList const& looks, bool charge, bool skipInvalid)
+    {
+        struct Change
+        {
+            uint8 Slot;
+            Item* Target;
+            uint32 FakeEntry;   // 0 = restore
+        };
+        std::vector<Change> changes;
+        std::unordered_set<uint8> seen;
+        std::unordered_set<uint32> collected;
+        bool collectedLoaded = false;
+
+        for (auto const& [slot, lookEntry] : looks)
+        {
+            // slot of the transmogrified item
+            if (!IsTransmogSlot(slot) || !seen.insert(slot).second)
+            {
+                if (skipInvalid)
+                    continue;
+                return Fail("TRANSMOGRIFY_INVALID_DESTINATION");
             }
 
-            ItemData const* targetData = GetItemData(target->GetEntry());
-            ItemData const* sourceData = GetItemData(fakeEntry);
-            ItemTemplate const* sourceTemplate = sObjectMgr->GetItemTemplate(fakeEntry);
-            if (!targetData || !sourceData || !sourceTemplate)
-                return SendResult(player, false, "Этот предмет нельзя трансмогрифицировать.");
+            // transmogrified item
+            Item* target = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+            if (!target)
+            {
+                if (skipInvalid)
+                    continue;
+                return Fail("TRANSMOGRIFY_INVALID_NO_ITEM");
+            }
 
-            if (!CanTransmogrifyItemWithItem(*targetData, *sourceData))
-                return SendResult(player, false, "Этот облик не подходит к предмету.");
+            uint32 fakeEntry = lookEntry;
+            if (fakeEntry == target->GetEntry())
+                fakeEntry = 0;   // 0 cost if reverting look
 
-            if (player->CanUseItem(sourceTemplate) != EQUIP_ERR_OK)
-                return SendResult(player, false, "Вы не можете использовать этот облик.");
+            if (fakeEntry)
+            {
+                ItemData const* targetData = GetItemData(target->GetEntry());
+                ItemData const* sourceData = GetItemData(fakeEntry);
+                ItemTemplate const* sourceTemplate = sObjectMgr->GetItemTemplate(fakeEntry);
+                char const* error = nullptr;
+                uint32 errorItem = 0;
 
-            if (!HasAppearance(player, *targetData, *sourceData))
-                return SendResult(player, false, "Этот облик ещё не собран.");
+                if (!targetData)
+                    error = "ERR_TRANSMOGRIFY_INVALID_DESTINATION", errorItem = target->GetEntry();
+                else if (!sourceData || !sourceTemplate)
+                    error = "ERR_TRANSMOGRIFY_INVALID_SOURCE";
+                else if (targetData->Quality == ITEM_QUALITY_LEGENDARY || sourceData->Quality == ITEM_QUALITY_LEGENDARY)
+                    error = "ERR_TRANSMOGRIFY_LEGENDARY";
+                else if (!CanTransmogrifyItemWithItem(*targetData, *sourceData))
+                    error = "ERR_TRANSMOGRIFY_MISMATCH";
+                else if (player->CanUseItem(sourceTemplate) != EQUIP_ERR_OK)
+                    error = "ERR_TRANSMOGRIFY_CANT_EQUIP";
+                else
+                {
+                    if (!collectedLoaded)
+                    {
+                        collected = LoadCollected(player);
+                        collectedLoaded = true;
+                    }
+                    if (!IsAppearanceCollected(collected, *targetData, fakeEntry))
+                        error = "TRANSMOGRIFY_STYLE_UNCOLLECTED";
+                }
 
-            changes.push_back({ uint8(slot), target, fakeEntry });
-            cost += std::max(targetData->SellPrice, MIN_COST);
+                if (error)
+                {
+                    if (skipInvalid)
+                        continue;
+                    return Fail(error, errorItem);
+                }
+            }
+
+            changes.push_back({ slot, target, fakeEntry });
         }
 
         if (changes.empty())
-            return SendResult(player, false, "");
+            return skipInvalid ? ApplyResult{ true } : Fail("TRANSMOG_NO_VALID_ITEMS_EQUIPPED");
 
-        if (cost)
+        if (charge)
         {
-            if (!player->HasEnoughMoney(cost))
-                return SendResult(player, false, "Недостаточно денег.");
-            player->ModifyMoney(-int64(cost));
+            SlotList paid;
+            for (Change const& change : changes)
+                paid.emplace_back(change.Slot, change.FakeEntry);
+            if (uint64 cost = GetCost(player, paid))
+            {
+                if (!player->HasEnoughMoney(cost))
+                    return Fail("ERR_TRANSMOG_OUTFIT_SLOT_CANNOT_AFFORD");
+                player->ModifyMoney(-int64(cost));
+            }
         }
 
         // Everything is fine, proceed
@@ -358,8 +448,48 @@ namespace
         }
         CharacterDatabase.CommitTransaction(trans);
 
-        SendResult(player, true, "");
-        SendState(player);
+        return ApplyResult{ true };
+    }
+
+    SlotList GetCurrentLooks(Player* player)
+    {
+        SlotList looks;
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+        {
+            Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+            if (!item)
+                continue;
+            auto itr = transmogs.find(item->GetGUID().GetCounter());
+            if (itr == transmogs.end() || itr->second.Owner != player->GetGUID().GetCounter() || !itr->second.FakeEntry)
+                continue;
+            looks.emplace_back(slot, itr->second.FakeEntry);
+        }
+        return looks;
+    }
+
+    void SendState(Player* player)
+    {
+        sAddonComm->Send(player, "TMOG_STATE", FormatSlots(GetCurrentLooks(player)));
+    }
+
+    void SendResult(Player* player, ApplyResult const& result)
+    {
+        sAddonComm->Send(player, "TMOG_RESULT", result.Ok ? 1 : 0, result.Error, result.ErrorItem);
+    }
+
+    // names go through AddonComm (':' separates arguments) and chat links ('|')
+    std::string SanitizeName(std::string name, size_t maxBytes)
+    {
+        name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return c == ':' || c == '|' || c == ',' || c == '/' || c == '\\' || c == '\'' || c == '"' || c == '\n' || c == '\r'; }), name.end());
+        if (name.size() > maxBytes)
+        {
+            name.resize(maxBytes);
+            while (!name.empty() && (uint8(name.back()) & 0xC0) == 0x80)   // cut UTF-8 continuation bytes
+                name.pop_back();
+            if (!name.empty() && (uint8(name.back()) & 0x80))
+                name.pop_back();
+        }
+        return name;
     }
 }
 
@@ -370,7 +500,7 @@ public:
 
     void OnStartup() override
     {
-        LoadItems();
+        Transmog::Load();
         // looks of deleted items
         CharacterDatabase.Execute("DELETE FROM character_transmog WHERE item_guid NOT IN (SELECT guid FROM item_instance)");
         Player::s_visibleItemHook = &VisibleItemHook;

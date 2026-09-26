@@ -3,7 +3,7 @@
 -- The interface works on its own; the server part comes later. Opcodes (names; requests differ
 -- from answers, the client also receives its own addon whisper):
 --   "TMOG_GET_STATE"            -> "TMOG_STATE" : "slot/itemId,..."        current transmogs
---   "TMOG_APPLY" : "slot/itemId,..." (itemId 0 = restore) -> "TMOG_RESULT" : ok(1/0) : message
+--   "TMOG_APPLY" : "slot/itemId,..." (itemId 0 = restore) -> "TMOG_RESULT" : ok(1/0) : error string name : itemId
 --   "TMOG_OPEN" / "TMOG_CLOSE"  server opens/closes the window (NPC transmogrifier)
 --   "APPEAR_GET_PAGE" ... : "T" -> "APPEAR_PAGE" ... : "T"   appearances (appearance_collection.cpp)
 -- Without the server: /transmog opens the window, "Apply" says the server does not answer.
@@ -53,9 +53,6 @@ function TransmogUI.UpdatePreview(self)
 	model:SetUnit("player");
 	model:SetPosition(model.zoom or 0, 0, 0);
 	model:SetFacing(model.facing or 0);
-	if self.showEquipped then
-		return;   -- «Показать надетую экипировку»: только то, что надето сейчас
-	end
 	for _, info in ipairs(SLOTS) do
 		local itemId, changed = TransmogUI.GetDisplayedItem(self, info.id);
 		if itemId and (changed or self.applied[info.id]) then
@@ -126,7 +123,7 @@ function TransmogUI.UpdateGrid(self)
 	end
 
 	local paging = self.Paging;
-	paging.Text:SetFormattedText("Стр. %d/%d", self.page or 1, self.numPages or 1);
+	paging.Text:SetFormattedText(PAGE_NUMBER_WITH_MAX or "Стр. %d/%d", self.page or 1, self.numPages or 1);
 	paging.Prev:SetEnabled((self.page or 1) > 1);
 	paging.Next:SetEnabled((self.page or 1) < (self.numPages or 1));
 
@@ -134,10 +131,10 @@ function TransmogUI.UpdateGrid(self)
 		self.GridMessage:SetText("Выберите слот на персонаже");
 		self.GridMessage:Show();
 	elseif not self.category then
-		self.GridMessage:SetText("Этот предмет нельзя трансмогрифицировать");
+		self.GridMessage:SetText(TRANSMOG_SLOT_WARNING_INVALID_EQUIPPED_DESTINATION_ITEM);
 		self.GridMessage:Show();
 	elseif #self.entries == 0 then
-		self.GridMessage:SetText(self.waiting and (self.noAnswer and "Сервер не ответил" or "Загрузка...") or "Нет обликов");
+		self.GridMessage:SetText(self.waiting and (self.noAnswer and "Сервер не ответил" or SEARCH_LOADING_TEXT or "Загрузка...") or TRANSMOGRIFY_STYLE_UNCOLLECTED);
 		self.GridMessage:Show();
 	else
 		self.GridMessage:Hide();
@@ -215,14 +212,19 @@ function TransmogPreview_OnUpdate(self, elapsed)
 	end
 end
 
+-- ретейл: ShowEquippedGearSpellFrame - убрать все трансмогрификации (в очередь изменений)
 function TransmogFrame_ToggleShowEquipped()
 	local frame = TransmogFrame;
-	frame.showEquipped = not frame.showEquipped;
+	wipe(frame.pending);
+	for slotId in pairs(frame.applied) do
+		frame.pending[slotId] = 0;
+	end
 	frame.selectedOutfit = nil;
-	frame.EquippedActive:SetShown(frame.showEquipped);
 	PlaySound("igMainMenuOptionCheckBoxOn");
 	TransmogUI.UpdateOutfits(frame);
+	TransmogUI.UpdateSlots(frame);
 	TransmogUI.UpdatePreview(frame);
+	TransmogUI.UpdateGrid(frame);
 end
 
 function TransmogFrame_ToggleWeapons()
@@ -278,7 +280,7 @@ function TransmogFrame_SetPage(self, page)
 end
 
 -- FilterButton - как во «Внешнем виде»; источники пока без функций
-local SOURCES = { "Добыча с боссов", "Задание", "Торговец", "Мировая добыча", "Достижение", "Профессия" };
+local SOURCES = { TRANSMOG_SOURCE_1, TRANSMOG_SOURCE_2, TRANSMOG_SOURCE_3, TRANSMOG_SOURCE_4, TRANSMOG_SOURCE_5, TRANSMOG_SOURCE_6 };
 
 local function SetupFilter(self, filter)
 	self.sourceFilters = {};
@@ -305,15 +307,15 @@ local function SetupFilter(self, filter)
 		TransmogUI.RequestPage(self);
 	end);
 	filter:SetupMenu(function(dropdown, rootDescription)
-		rootDescription:CreateCheckbox("Собранные", function() return true; end, function() end);
-		rootDescription:CreateCheckbox("Не собранные", function() return self.showUncollected; end, function()
+		rootDescription:CreateCheckbox(TRANSMOG_COLLECTED, function() return true; end, function() end);
+		rootDescription:CreateCheckbox(TRANSMOG_NOT_COLLECTED, function() return self.showUncollected; end, function()
 			self.showUncollected = not self.showUncollected;
 			filter:ValidateResetState();
 			self.page = 1;
 			TransmogUI.RequestPage(self);
 		end);
 		rootDescription:CreateDivider();
-		rootDescription:CreateTitle("Источники");
+		rootDescription:CreateTitle(SOURCES_LABEL or "Источники");
 		for i, name in ipairs(SOURCES) do
 			rootDescription:CreateCheckbox(name, function() return self.sourceFilters[i]; end, function()
 				self.sourceFilters[i] = not self.sourceFilters[i];
@@ -332,10 +334,10 @@ local function SetupTabs(wardrobe)
 	TabSystemOwnerMixin.OnLoad(wardrobe);
 	wardrobe:SetTabSystem(tabs);
 	tabs:SetFrameLevel(content:GetFrameLevel() + 5);
-	local itemsTab = wardrobe:AddNamedTab("Предметы", content.ItemsFrame);
-	wardrobe:AddNamedTab("Наборы", content.SetsFrame);
-	wardrobe:AddNamedTab("Свои наборы", content.CustomSetsFrame);
-	wardrobe:AddNamedTab("Ситуации", content.SituationsFrame);
+	local itemsTab = wardrobe:AddNamedTab(TRANSMOG_TAB_ITEMS, content.ItemsFrame);
+	wardrobe:AddNamedTab(TRANSMOG_TAB_SETS, content.SetsFrame);
+	wardrobe:AddNamedTab(TRANSMOG_TAB_CUSTOM_SETS, content.CustomSetsFrame);
+	wardrobe:AddNamedTab(TRANSMOG_TAB_SITUATIONS, content.SituationsFrame);
 	wardrobe:SetTab(itemsTab);
 end
 
@@ -349,7 +351,7 @@ function TransmogFrame_OnLoad(self)
 	self:SetScale(TRANSMOG_FRAME_SCALE);
 
 	if self.TitleContainer and self.TitleContainer.TitleText then
-		self.TitleContainer.TitleText:SetText("Трансмогрификация");
+		self.TitleContainer.TitleText:SetText(TRANSMOGRIFY);
 	end
 	if self.PortraitContainer and self.PortraitContainer.portrait then
 		SetPortraitToTexture(self.PortraitContainer.portrait, "Interface\\Icons\\INV_Arcane_Orb");
@@ -366,7 +368,12 @@ function TransmogFrame_OnLoad(self)
 	for index = 1, NUM_OUTFIT_BUTTONS do
 		self.outfitButtons[index] = _G[outfits.OutfitList:GetName() .. "Entry" .. index];
 	end
-	outfits.PurchaseOutfitButton:Disable();
+	outfits.PurchaseOutfitButton:SetScript("OnClick", TransmogFrame_PurchaseOutfitSlot);
+	outfits.PurchaseOutfitButton:SetScript("OnEnter", TransmogFrame_PurchaseOutfitSlot_OnEnter);
+	outfits.PurchaseOutfitButton:SetScript("OnLeave", GameTooltip_Hide);
+	outfits.PurchaseOutfitButton:SetMotionScriptsWhileDisabled(true);
+	outfits.SaveOutfitButton:SetScript("OnEnter", TransmogFrame_SaveOutfit_OnEnter);
+	outfits.SaveOutfitButton:SetScript("OnLeave", GameTooltip_Hide);
 
 	-- CharacterPreview
 	local preview = self.CharacterPreview;
@@ -442,7 +449,7 @@ function TransmogFrame_OnUpdate(self, elapsed)
 		self.applyElapsed = self.applyElapsed + elapsed;
 		if self.applyElapsed > 3 then
 			self.applyElapsed = nil;
-			UIErrorsFrame:AddMessage("Сервер пока не поддерживает трансмогрификацию.", 1.0, 0.1, 0.1, 1.0);
+			UIErrorsFrame:AddMessage("Сервер не ответил.", 1.0, 0.1, 0.1, 1.0);
 		end
 	end
 end
@@ -452,7 +459,9 @@ function TransmogFrame_OnShow(self)
 	wipe(self.pending);
 	if Comm_Send then
 		Comm_Send(OP_GET_STATE);
+		Comm_Send(TransmogUI.OP_OUTFITS_GET);
 	end
+	TransmogUI.setsStale = true;
 	TransmogUI.UpdateOutfits(self);
 	TransmogUI.UpdateSlots(self);
 	TransmogUI.UpdatePreview(self);
@@ -471,6 +480,10 @@ end
 function TransmogFrame_OnHide(self)
 	PlaySound("igCharacterInfoClose");
 	StaticPopup_Hide("TRANSMOG_OUTFIT_NAME");
+	StaticPopup_Hide("TRANSMOG_OUTFIT_DELETE");
+	StaticPopup_Hide("TRANSMOG_OUTFIT_BUY");
+	StaticPopup_Hide("TRANSMOG_CUSTOM_SET_NAME");
+	StaticPopup_Hide("TRANSMOG_CUSTOM_SET_DELETE");
 end
 
 function TransmogFrame_OnEvent(self, event, unit)
@@ -486,7 +499,7 @@ function TransmogFrame_Apply(self)
 	end
 	local cost = TransmogUI.GetCost(self);
 	if cost > GetMoney() then
-		UIErrorsFrame:AddMessage(ERR_NOT_ENOUGH_MONEY or "Недостаточно денег.", 1.0, 0.1, 0.1, 1.0);
+		UIErrorsFrame:AddMessage(ERR_TRANSMOG_OUTFIT_SLOT_CANNOT_AFFORD, 1.0, 0.1, 0.1, 1.0);
 		return;
 	end
 	local list = {};
@@ -519,10 +532,12 @@ if Comm_Register then
 		if TransmogFrame:IsShown() then
 			TransmogUI.UpdateSlots(TransmogFrame);
 			TransmogUI.UpdatePreview(TransmogFrame);
+			TransmogUI.UpdateOutfits(TransmogFrame);
 		end
 	end);
 
-	Comm_Register(OP_RESULT, function(ok, message)
+	-- ok : имя строки ошибки (ERR_TRANSMOGRIFY_* ...) : itemId для "%s"
+	Comm_Register(OP_RESULT, function(ok, errorName, errorItem)
 		local frame = TransmogFrame;
 		frame.applyElapsed = nil;
 		if ok == "1" then
@@ -531,8 +546,14 @@ if Comm_Register then
 			end
 			wipe(frame.pending);
 			PlaySound("igQuestListComplete");
-		elseif message and message ~= "" then
-			UIErrorsFrame:AddMessage(message, 1.0, 0.1, 0.1, 1.0);
+		end
+		local message = TransmogUI.GetErrorText(errorName, errorItem);
+		if message then
+			if ok == "1" then
+				UIErrorsFrame:AddMessage(message, 1.0, 0.82, 0.0, 1.0);   -- сохранено, но с предупреждением
+			else
+				UIErrorsFrame:AddMessage(message, 1.0, 0.1, 0.1, 1.0);
+			end
 		end
 		if frame:IsShown() then
 			TransmogUI.UpdateSlots(frame);

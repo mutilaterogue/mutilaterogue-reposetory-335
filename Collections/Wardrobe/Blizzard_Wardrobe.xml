@@ -3,6 +3,7 @@
 	     Данные - сервер (server\appearance_collection.cpp), опкоды APPEAR_*. -->
 	<Script file="WardrobeCameras.lua"/>
 	<Script file="Blizzard_Wardrobe.lua"/>
+	<Script file="Blizzard_WardrobeSets.lua"/>
 
 	<DressUpModel name="WardrobeItemsModelTemplate" virtual="true" enableMouse="true">
 		<Size x="78" y="104"/>
@@ -236,6 +237,72 @@
 						</Frames>
 					</Frame>
 				</Frames>
+			</Frame>
+
+			<!-- ретейл: SetsCollectionFrame - комплекты (карточки создаются в Lua из TransmogSetModelTemplate) -->
+			<Frame name="$parentSetsCollectionFrame" parentKey="SetsCollectionFrame" inherits="CollectionsBackgroundTemplate" enableMouseWheel="true" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="3" y="-3"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-3" y="3"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString parentKey="NoEntriesText" inherits="GameFontNormalLarge" hidden="true">
+							<Size x="500" y="0"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="20"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame name="$parentPagingFrame" parentKey="PagingFrame">
+						<Size x="140" y="30"/>
+						<Anchors>
+							<Anchor point="BOTTOM" x="22" y="6"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString parentKey="PageText" inherits="GameFontHighlight" justifyH="RIGHT">
+									<Anchors>
+										<Anchor point="RIGHT" x="-70" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Frames>
+							<Button parentKey="PrevPageButton">
+								<Size x="32" y="32"/>
+								<Anchors>
+									<Anchor point="RIGHT" x="-34" y="0"/>
+								</Anchors>
+								<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Up"/>
+								<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Down"/>
+								<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Disabled"/>
+								<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+								<Scripts>
+									<OnClick>WardrobeSets_ChangePage(-1);</OnClick>
+								</Scripts>
+							</Button>
+							<Button parentKey="NextPageButton">
+								<Size x="32" y="32"/>
+								<Anchors>
+									<Anchor point="RIGHT" x="0" y="0"/>
+								</Anchors>
+								<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Up"/>
+								<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Down"/>
+								<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Disabled"/>
+								<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+								<Scripts>
+									<OnClick>WardrobeSets_ChangePage(1);</OnClick>
+								</Scripts>
+							</Button>
+						</Frames>
+					</Frame>
+				</Frames>
+				<Scripts>
+					<OnMouseWheel>WardrobeSets_ChangePage(-delta);</OnMouseWheel>
+				</Scripts>
 			</Frame>
 		</Frames>
 		<Scripts>

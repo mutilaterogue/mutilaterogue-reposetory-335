@@ -436,6 +436,7 @@ function WardrobeCollectionFrame_OnLoad(self)
 	if classDropdown.SetText then
 		classDropdown:SetText(ClassLabel(playerClass));
 	end
+	classDropdown:Hide();
 
 	-- filter
 	local filter = self.FilterDropdown;
@@ -467,6 +468,24 @@ function WardrobeCollectionFrame_OnLoad(self)
 		local function SetCategory(category)
 			WardrobeCollectionFrame_SetCategory(self, category);
 		end
+		-- класс (место выпадающего списка заняли вкладки «Предметы» / «Наборы»)
+		rootDescription:CreateDivider();
+		local classMenu = rootDescription:CreateSubmenu(CLASS or "Класс");
+		local function IsClass(classFile)
+			return (classFile and CLASS_IDS[classFile] or nil) == self.classId;
+		end
+		local function SetClassFilter(classFile)
+			self.classId = classFile and CLASS_IDS[classFile] or nil;
+			self.page = 1;
+			WardrobeCollectionFrame_Request(self);
+		end
+		classMenu:CreateRadio(ClassLabel(nil), function() return self.classId == nil; end, function() SetClassFilter(nil); end);
+		for _, classFile in ipairs(classOrder) do
+			if CLASS_IDS[classFile] then
+				classMenu:CreateRadio(ClassLabel(classFile), IsClass, SetClassFilter, classFile);
+			end
+		end
+
 		-- категории - подменю: раскрываются по одной при наведении
 		rootDescription:CreateDivider();
 		local armor = rootDescription:CreateSubmenu("Броня");
@@ -486,6 +505,10 @@ function WardrobeCollectionFrame_OnLoad(self)
 		local text = searchBox:GetText() or "";
 		if text == (SEARCH or "") then
 			text = "";
+		end
+		if self.setsMode then
+			WardrobeSets_SetSearch(text);
+			return;
 		end
 		if text ~= (self.searchText or "") then
 			self.searchText = text;
@@ -542,6 +565,11 @@ function WardrobeCollectionFrame_OnLoad(self)
 end
 
 function WardrobeCollectionFrame_OnShow(self)
+	WardrobeSets_Init(self);
+	if self.setsMode then
+		WardrobeSets_Show(self);
+		return;
+	end
 	self.noAnswer = nil;
 	WardrobeCollectionFrame_Request(self);
 	UpdatePage(self);
@@ -609,6 +637,9 @@ if Comm_Register then
 			return;
 		end
 		sourcesCache = {};
+		if TransmogUI then
+			TransmogUI.setsStale = true;   -- прогресс комплектов
+		end
 		local _, link = GetItemInfo(itemId);
 		-- ретейл: ERR_LEARN_TRANSMOG_S системным сообщением
 		local info = ChatTypeInfo["SYSTEM"];

@@ -71,7 +71,7 @@ function TransmogItemModel_OnMouseDown(self, button)
 		return;
 	end
 	if not entry.collected then
-		UIErrorsFrame:AddMessage("Этот облик ещё не собран.", 1.0, 0.1, 0.1, 1.0);
+		UIErrorsFrame:AddMessage(TRANSMOGRIFY_STYLE_UNCOLLECTED, 1.0, 0.1, 0.1, 1.0);
 		return;
 	end
 	local slotId = frame.selectedSlot;
@@ -99,7 +99,7 @@ function TransmogItemModel_OnEnter(self)
 	if entry.collected then
 		GameTooltip:AddLine("Щелчок - применить этот облик к слоту.", 0.1, 1, 0.1, true);
 	else
-		GameTooltip:AddLine("Облик не собран.", 1, 0.1, 0.1, true);
+		GameTooltip:AddLine(TRANSMOGRIFY_TOOLTIP_APPEARANCE_UNKNOWN, 1, 0.1, 0.1, true);
 	end
 	GameTooltip:Show();
 end
@@ -133,7 +133,7 @@ function TransmogSlotButton_OnEnter(self)
 	local link = GetInventoryItemLink("player", slotId);
 	if not link then
 		GameTooltip:SetText(self.info.name);
-		GameTooltip:AddLine("Нет надетого предмета.", 0.6, 0.6, 0.6);
+		GameTooltip:AddLine(TRANSMOG_SLOT_WARNING_NOTHING_EQUIPPED, 0.6, 0.6, 0.6, true);
 		GameTooltip:Show();
 		return;
 	end
@@ -141,9 +141,9 @@ function TransmogSlotButton_OnEnter(self)
 	local itemId, changed = TransmogUI.GetDisplayedItem(frame, slotId);
 	local shown = itemId and GetItemInfo(itemId);
 	if frame.pending[slotId] == 0 then
-		GameTooltip:AddLine("Будет возвращён исходный облик.", 1, 0.82, 0);
+		GameTooltip:AddLine(TRANSMOGRIFY_TOOLTIP_REVERT, 1, 0.82, 0);
 	elseif shown and (changed or frame.applied[slotId]) then
-		GameTooltip:AddLine((changed and "Новый облик: " or "Облик: ") .. shown, 1, 0.5, 1);
+		GameTooltip:AddLine(TRANSMOGRIFIED:format(shown), 1, 0.5, 1, true);
 	end
 	GameTooltip:AddLine("ЛКМ - выбрать слот, ПКМ - отменить изменение / вернуть облик.", 0.5, 0.5, 0.5, true);
 	GameTooltip:Show();
@@ -166,7 +166,7 @@ end
 function TransmogTooltipButton_OnEnter(self)
 	if self.tooltipText then
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip:SetText(self.tooltipText);
+		GameTooltip:SetText(_G[self.tooltipText] or self.tooltipText);
 		GameTooltip:Show();
 	end
 end
@@ -269,45 +269,4 @@ function TransmogControlButton_OnMouseUp(self)
 	if self.spin then
 		TransmogFramePreview.spin = nil;
 	end
-end
-
----------------------------------------------------------------------------
--- outfit entries
----------------------------------------------------------------------------
-function TransmogOutfitEntry_OnClick(self, mouseButton)
-	local frame = TransmogFrame;
-	if not self.outfit then
-		return;
-	end
-	if mouseButton == "RightButton" then
-		for i, outfit in ipairs(TransmogOutfits) do
-			if outfit == self.outfit then
-				table.remove(TransmogOutfits, i);
-				break;
-			end
-		end
-		if frame.selectedOutfit == self.outfit then
-			frame.selectedOutfit = nil;
-		end
-		TransmogUI.UpdateOutfits(frame);
-	else
-		PlaySound("igMainMenuOptionCheckBoxOn");
-		frame.OutfitCollection.ShowEquippedGear.Active:Hide();
-		TransmogUI.LoadOutfit(frame, self.outfit);
-		TransmogUI.UpdateOutfits(frame);
-	end
-end
-
-function TransmogOutfitEntry_OnEnter(self)
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	GameTooltip:SetText(self.outfit and self.outfit.name or "");
-	GameTooltip:AddLine("ЛКМ - примерить образ, ПКМ - удалить.", 0.5, 0.5, 0.5, true);
-	GameTooltip:Show();
-end
-
-function TransmogOutfitList_OnMouseWheel(self, delta)
-	local frame = TransmogFrame;
-	local maxOffset = math.max(0, #TransmogOutfits - NUM_OUTFIT_BUTTONS);
-	frame.outfitOffset = math.max(0, math.min(maxOffset, (frame.outfitOffset or 0) - delta));
-	TransmogUI.UpdateOutfits(frame);
 end

@@ -269,27 +269,104 @@
 		</Scripts>
 	</Button>
 
-	<!-- вкладки коллекции, которые появятся с серверной частью; текст - KeyValue descText -->
-	<Frame name="TransmogStubTabTemplate" setAllPoints="true" hidden="true" virtual="true">
+	<!-- ретейл: TransmogSetBaseModelTemplate - карточка комплекта 178x218 (наборы и свои комплекты).
+	     Рамка и подпись - в дочернем Overlay: области самой модели рисуются под ней -->
+	<DressUpModel name="TransmogSetBaseModelTemplate" enableMouse="true" virtual="true">
+		<Size x="178" y="218"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" setAllPoints="true">
+					<Color r="0" g="0" b="0"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="Overlay" setAllPoints="true">
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="IncompleteOverlay" setAllPoints="true" alpha="0.5" hidden="true">
+							<Color r="0" g="0" b="0"/>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Border" atlas="transmog-setcard-default">
+							<Size x="194" y="234"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+						<FontString parentKey="Name" inherits="GameFontNormal" justifyH="CENTER" justifyV="BOTTOM">
+							<Size x="166" y="0"/>
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="24"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Progress" inherits="GameFontHighlightSmall" justifyH="CENTER">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="9"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture parentKey="TransmogStateTexture" atlas="transmog-setcard-transmogrified" hidden="true">
+							<Size x="194" y="234"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Highlight" atlas="transmog-itemcard-default" alphaMode="ADD" hidden="true">
+							<Size x="194" y="234"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="TransmogSetModel_OnLoad"/>
+			<OnUpdate function="TransmogSetModel_OnUpdate"/>
+			<OnEnter function="TransmogSetModel_OnEnter"/>
+			<OnLeave function="TransmogSetModel_OnLeave"/>
+		</Scripts>
+	</DressUpModel>
+
+	<DressUpModel name="TransmogSetModelTemplate" inherits="TransmogSetBaseModelTemplate" virtual="true">
+		<Scripts>
+			<OnMouseUp function="TransmogSetModel_OnMouseUp"/>
+		</Scripts>
+	</DressUpModel>
+
+	<DressUpModel name="TransmogCustomSetModelTemplate" inherits="TransmogSetBaseModelTemplate" virtual="true">
+		<Scripts>
+			<OnMouseUp function="TransmogCustomSetModel_OnMouseUp"/>
+		</Scripts>
+	</DressUpModel>
+
+	<!-- ретейл: TransmogSituationTemplate - строка условия с выпадающим списком; id: 1 местность, 2 передвижение, 3 бой -->
+	<Frame name="TransmogSituationTemplate" virtual="true">
+		<Size x="554" y="50"/>
 		<Layers>
 			<Layer level="OVERLAY">
-				<FontString parentKey="Title" inherits="GameFontNormalHuge" text="В скором времени">
+				<FontString parentKey="Title" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="170" y="0"/>
 					<Anchors>
-						<Anchor point="CENTER" x="0" y="20"/>
-					</Anchors>
-				</FontString>
-				<FontString parentKey="Desc" inherits="GameFontHighlight">
-					<Size x="380" y="0"/>
-					<Anchors>
-						<Anchor point="TOP" relativePoint="CENTER" x="0" y="0"/>
+						<Anchor point="LEFT" x="35" y="0"/>
 					</Anchors>
 				</FontString>
 			</Layer>
 		</Layers>
+		<Frames>
+			<Button parentKey="Dropdown" inherits="WowStyle1DropdownTemplate">
+				<Size x="260" y="26"/>
+				<Anchors>
+					<Anchor point="RIGHT" x="-35" y="-2"/>
+				</Anchors>
+			</Button>
+		</Frames>
 		<Scripts>
-			<OnShow>
-				self.Desc:SetText(self.descText or "");
-			</OnShow>
+			<OnLoad function="TransmogSituation_OnLoad"/>
 		</Scripts>
 	</Frame>
 </Ui>

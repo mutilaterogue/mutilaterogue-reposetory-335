@@ -25,6 +25,8 @@ void AddSC_heirloom_collection();
 void AddSC_toy_collection();
 void AddSC_appearance_collection();
 void AddSC_transmog();
+void AddSC_transmog_outfits();
+void AddSC_transmog_sets();
 
 void AddCustomScripts()
 {
@@ -34,4 +36,6 @@ void AddCustomScripts()
     AddSC_toy_collection();
     AddSC_appearance_collection();
     AddSC_transmog();
+    AddSC_transmog_outfits();
+    AddSC_transmog_sets();
 }
