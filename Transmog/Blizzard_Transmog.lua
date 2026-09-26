@@ -13,8 +13,14 @@ local OP_APPLY, OP_RESULT = "TMOG_APPLY", "TMOG_RESULT";
 local OP_OPEN, OP_CLOSE = "TMOG_OPEN", "TMOG_CLOSE";
 local OP_GET_PAGE, OP_PAGE = "APPEAR_GET_PAGE", "APPEAR_PAGE";
 
-local GRID_COLUMNS, GRID_ROWS = 6, 3;
-local MODEL_WIDTH, MODEL_HEIGHT, MODEL_SPACE_X, MODEL_SPACE_Y = 66, 88, 7, 16;
+local GRID_COLUMNS, GRID_ROWS = 6, 4;
+local MODEL_WIDTH, MODEL_HEIGHT, MODEL_SPACE_X, MODEL_SPACE_Y = 68, 86, 9, 12;
+
+-- раскладка как в ретейле: образы | персонаж | коллекция
+local LEFT_X1, LEFT_X2 = 4, 264;
+local CENTER_X1, CENTER_X2 = 266, 726;
+local RIGHT_X1, RIGHT_X2 = 728, 1196;
+local PANEL_TOP, PANEL_BOTTOM = -22, -716;
 
 -- slot id, category (appearance_collection.cpp), side on the character
 local SLOTS = {
@@ -145,6 +151,11 @@ end
 local function UpdatePreview(self)
 	local model = self.Preview;
 	model:SetUnit("player");
+	model:SetPosition(model.zoom or 0, 0, 0);
+	model:SetFacing(model.facing or 0);
+	if self.showEquipped then
+		return;   -- «Показать надетую экипировку»: только то, что надето сейчас
+	end
 	for _, info in ipairs(SLOTS) do
 		local itemId, changed = GetDisplayedItem(self, info.id);
 		if itemId and (changed or self.applied[info.id]) then
@@ -221,7 +232,7 @@ local function UpdateGrid(self)
 			model:Show();
 			model.Border:Show();
 			if entry.itemId == selectedItem then
-				model.Border:SetBackdropBorderColor(0.2, 1, 0.2, 1);
+				model.Border:SetBackdropBorderColor(0.8, 0.3, 1, 1);   -- выбранный облик - фиолетовая рамка, как в ретейле
 			elseif entry.collected then
 				model.Border:SetBackdropBorderColor(1, 0.82, 0, 1);
 			else
@@ -265,7 +276,7 @@ local function RequestPage(self)
 	local flags = self.showUncollected and 3 or 1;
 	local search = (self.searchText or ""):gsub(":", " ");
 	self.waiting, self.noAnswer, self.requestElapsed = true, nil, 0;
-	Comm_Send(OP_GET_PAGE, self.category, CLASS_IDS[playerClass] or 0, flags, self.page or 1, search, "T");
+	Comm_Send(OP_GET_PAGE, self.category, CLASS_IDS[playerClass] or 0, flags, self.page or 1, search, "T", GRID_COLUMNS * GRID_ROWS);
 	UpdateGrid(self);
 end
 
@@ -402,20 +413,34 @@ end
 ---------------------------------------------------------------------------
 -- outfits (left)
 ---------------------------------------------------------------------------
-local NUM_OUTFIT_BUTTONS = 12;
+local NUM_OUTFIT_BUTTONS = 14;
+local MAX_OUTFITS = 30;
+
+local function CountSlots(outfit)
+	local n = 0;
+	for _ in pairs(outfit.slots) do
+		n = n + 1;
+	end
+	return n;
+end
 
 local function UpdateOutfits(self)
+	local offset = self.outfitOffset or 0;
 	for index, button in ipairs(self.outfitButtons) do
-		local outfit = TransmogOutfits[index];
+		local outfit = TransmogOutfits[index + offset];
 		button.outfit = outfit;
 		if outfit then
 			button.Icon:SetTexture(outfit.icon or "Interface\\Icons\\INV_Chest_Cloth_17");
 			button.Name:SetText(outfit.name);
+			button.Sub:SetText(("Слотов: %d"):format(CountSlots(outfit)));
+			button.Selected:SetShown(self.selectedOutfit == outfit);
 			button:Show();
 		else
 			button:Hide();
 		end
 	end
+	self.OutfitScrollUp:SetEnabled(offset > 0);
+	self.OutfitScrollDown:SetEnabled(offset + NUM_OUTFIT_BUTTONS < #TransmogOutfits);
 end
 
 local function CurrentOutfitSlots(self)
@@ -478,7 +503,7 @@ function TransmogFrame_SaveOutfit(name)
 			return;
 		end
 	end
-	if #TransmogOutfits >= NUM_OUTFIT_BUTTONS then
+	if #TransmogOutfits >= MAX_OUTFITS then
 		UIErrorsFrame:AddMessage("Слишком много образов.", 1.0, 0.1, 0.1, 1.0);
 		return;
 	end
@@ -487,6 +512,8 @@ function TransmogFrame_SaveOutfit(name)
 end
 
 local function LoadOutfit(self, outfit)
+	self.selectedOutfit = outfit;
+	self.showEquipped = false;
 	wipe(self.pending);
 	for _, info in ipairs(SLOTS) do
 		local itemId = outfit.slots[info.id];
@@ -506,6 +533,54 @@ end
 ---------------------------------------------------------------------------
 -- frame
 ---------------------------------------------------------------------------
+local function CreatePanel(parent, x1, x2, r, g, b, a)
+	local panel = CreateFrame("Frame", nil, parent);
+	panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x1, PANEL_TOP);
+	panel:SetPoint("BOTTOMRIGHT", parent, "TOPLEFT", x2, PANEL_BOTTOM);
+	local bg = panel:CreateTexture(nil, "BACKGROUND");
+	bg:SetAllPoints();
+	bg:SetTexture(r, g, b, a);
+	panel.Bg = bg;
+	return panel;
+end
+
+local function CreateIconButton(parent, texture, size, tooltip, onClick)
+	local button = CreateFrame("Button", nil, parent);
+	button:SetSize(size, size);
+	button:SetNormalTexture(texture);
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
+	button:SetScript("OnClick", onClick);
+	button:SetScript("OnEnter", function(btn)
+		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT");
+		GameTooltip:SetText(tooltip);
+		GameTooltip:Show();
+	end);
+	button:SetScript("OnLeave", GameTooltip_Hide);
+	return button;
+end
+
+local function CreateBorder(frame, r, g, b)
+	local border = CreateFrame("Frame", nil, frame);
+	border:SetPoint("TOPLEFT", -3, 3);
+	border:SetPoint("BOTTOMRIGHT", 3, -3);
+	border:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12 });
+	border:SetBackdropBorderColor(r, g, b, 1);
+	return border;
+end
+
+-- вкладки коллекции: «Предметы» работает, остальные - заглушки до серверной части
+local function CreateStubTab(parent, text)
+	local frame = CreateFrame("Frame", nil, parent);
+	frame:SetAllPoints();
+	local label = CreateLabel(frame, "GameFontNormalHuge", "В скором времени");
+	label:SetPoint("CENTER", 0, 20);
+	local desc = CreateLabel(frame, "GameFontHighlight", text);
+	desc:SetPoint("TOP", label, "BOTTOM", 0, -10);
+	desc:SetWidth(380);
+	frame:Hide();
+	return frame;
+end
+
 function TransmogFrame_OnLoad(self)
 	self.pending = {};
 	self.applied = {};
@@ -523,22 +598,54 @@ function TransmogFrame_OnLoad(self)
 		self:SetFrameLevelsFromBaseLevel(self:GetFrameLevel());
 	end
 
+	-------------------------------------------------------------------
 	-- left: outfits
-	local left = CreateInset(self, 6, -60, 236, -694 + 36);
-	CreateLabel(left, "GameFontNormalLarge", "Образы"):SetPoint("TOP", 0, -10);
+	-------------------------------------------------------------------
+	local left = CreatePanel(self, LEFT_X1, LEFT_X2, 0.05, 0.05, 0.06, 0.95);
+
+	-- «Показать надетую экипировку» (ретейл: ShowEquippedGearSpellFrame)
+	local equipped = CreateFrame("Button", nil, left);
+	equipped:SetSize(244, 40);
+	equipped:SetPoint("TOPLEFT", 8, -34);
+	equipped.Icon = equipped:CreateTexture(nil, "ARTWORK");
+	equipped.Icon:SetSize(34, 34);
+	equipped.Icon:SetPoint("LEFT", 2, 0);
+	equipped.Icon:SetTexture("Interface\\Icons\\INV_Chest_Chain_15");
+	CreateBorder(equipped, 0.8, 0.65, 0.3);
+	local equippedText = CreateLabel(equipped, "GameFontNormal", "Показать надетую экипировку");
+	equippedText:SetPoint("LEFT", equipped.Icon, "RIGHT", 8, 0);
+	equipped:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar-Blue", "ADD");
+	equipped:SetScript("OnClick", function()
+		self.showEquipped = not self.showEquipped;
+		self.selectedOutfit = nil;
+		PlaySound("igMainMenuOptionCheckBoxOn");
+		UpdateOutfits(self);
+		UpdatePreview(self);
+	end);
+
 	self.outfitButtons = {};
 	for index = 1, NUM_OUTFIT_BUTTONS do
 		local button = CreateFrame("Button", nil, left);
-		button:SetSize(214, 38);
-		button:SetPoint("TOPLEFT", left, "TOPLEFT", 8, -34 - (index - 1) * 42);
+		button:SetSize(226, 36);
+		button:SetPoint("TOPLEFT", left, "TOPLEFT", 8, -84 - (index - 1) * 38);
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+		local bg = button:CreateTexture(nil, "BACKGROUND");
+		bg:SetAllPoints();
+		bg:SetTexture(0.15, 0.13, 0.1, 0.8);
 		button.Icon = button:CreateTexture(nil, "ARTWORK");
-		button.Icon:SetSize(34, 34);
+		button.Icon:SetSize(32, 32);
 		button.Icon:SetPoint("LEFT", 2, 0);
 		button.Name = CreateLabel(button, "GameFontNormal", "");
-		button.Name:SetPoint("LEFT", button.Icon, "RIGHT", 8, 0);
+		button.Name:SetPoint("TOPLEFT", button.Icon, "TOPRIGHT", 8, -2);
 		button.Name:SetPoint("RIGHT", -4, 0);
 		button.Name:SetJustifyH("LEFT");
+		button.Sub = CreateLabel(button, "GameFontDisableSmall", "");
+		button.Sub:SetPoint("BOTTOMLEFT", button.Icon, "BOTTOMRIGHT", 8, 2);
+		button.Selected = button:CreateTexture(nil, "OVERLAY");
+		button.Selected:SetAllPoints();
+		button.Selected:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar");
+		button.Selected:SetBlendMode("ADD");
+		button.Selected:Hide();
 		button:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar-Blue", "ADD");
 		button:SetScript("OnClick", function(btn, mouseButton)
 			if not btn.outfit then
@@ -551,10 +658,14 @@ function TransmogFrame_OnLoad(self)
 						break;
 					end
 				end
+				if self.selectedOutfit == btn.outfit then
+					self.selectedOutfit = nil;
+				end
 				UpdateOutfits(self);
 			else
 				PlaySound("igMainMenuOptionCheckBoxOn");
 				LoadOutfit(self, btn.outfit);
+				UpdateOutfits(self);
 			end
 		end);
 		button:SetScript("OnEnter", function(btn)
@@ -566,19 +677,56 @@ function TransmogFrame_OnLoad(self)
 		button:SetScript("OnLeave", GameTooltip_Hide);
 		self.outfitButtons[index] = button;
 	end
+
+	-- прокрутка списка образов
+	local function ScrollOutfits(delta)
+		local maxOffset = math.max(0, #TransmogOutfits - NUM_OUTFIT_BUTTONS);
+		self.outfitOffset = math.max(0, math.min(maxOffset, (self.outfitOffset or 0) - delta));
+		UpdateOutfits(self);
+	end
+	left:EnableMouseWheel(true);
+	left:SetScript("OnMouseWheel", function(_, delta) ScrollOutfits(delta); end);
+	self.OutfitScrollUp = CreateIconButton(left, "Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up", 20, "Вверх", function() ScrollOutfits(1); end);
+	self.OutfitScrollUp:SetPoint("TOPRIGHT", left, "TOPRIGHT", -2, -84);
+	self.OutfitScrollDown = CreateIconButton(left, "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up", 20, "Вниз", function() ScrollOutfits(-1); end);
+	self.OutfitScrollDown:SetPoint("TOPRIGHT", left, "TOPRIGHT", -2, -84 - NUM_OUTFIT_BUTTONS * 38 + 22);
+
+	-- «Купить ячейку образа» (ретейл) - пока недоступно
+	local purchase = CreateFrame("Button", nil, left, "UIPanelButtonTemplate");
+	purchase:SetSize(244, 24);
+	purchase:SetPoint("BOTTOMLEFT", 8, 44);
+	purchase:SetText("|cff20ff20+|r Купить ячейку образа");
+	purchase:Disable();
+
 	local saveOutfit = CreateFrame("Button", nil, left, "UIPanelButtonTemplate");
-	saveOutfit:SetSize(200, 24);
-	saveOutfit:SetPoint("BOTTOM", 0, 12);
-	saveOutfit:SetText("Сохранить образ");
+	saveOutfit:SetSize(110, 24);
+	saveOutfit:SetPoint("BOTTOMLEFT", 8, 12);
+	saveOutfit:SetText("|cffff5050Сохранить образ|r");
 	saveOutfit:SetScript("OnClick", function()
 		StaticPopup_Show("TRANSMOG_OUTFIT_NAME");
 	end);
 
-	-- center: character with slots
-	local center = CreateInset(self, 240, -60, 700, -694 + 36);
+	local money = CreateFrame("Frame", "TransmogFrameMoneyFrame", left, "SmallMoneyFrameTemplate");
+	money:SetPoint("LEFT", saveOutfit, "RIGHT", 10, 0);
+	self.MoneyFrame = money;
+
+	-------------------------------------------------------------------
+	-- center: character
+	-------------------------------------------------------------------
+	local center = CreatePanel(self, CENTER_X1, CENTER_X2, 0.1, 0.07, 0.05, 1);
+	local rock = center:CreateTexture(nil, "BACKGROUND", nil, 1);
+	rock:SetAllPoints();
+	rock:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock", true, true);
+	rock:SetVertexColor(0.45, 0.35, 0.3);
+	local shadow = center:CreateTexture(nil, "BACKGROUND", nil, 2);
+	shadow:SetPoint("TOPLEFT", 60, -60);
+	shadow:SetPoint("BOTTOMRIGHT", -60, 60);
+	shadow:SetTexture("Interface\\Common\\ShadowOverlay-Corner");
+	shadow:SetAlpha(0);
+
 	local preview = CreateFrame("DressUpModel", "TransmogFramePreview", center);
-	preview:SetPoint("TOPLEFT", 60, -10);
-	preview:SetPoint("BOTTOMRIGHT", -60, 70);
+	preview:SetPoint("TOPLEFT", 70, -50);
+	preview:SetPoint("BOTTOMRIGHT", -70, 90);
 	preview:EnableMouse(true);
 	preview:EnableMouseWheel(true);
 	preview:SetScript("OnMouseDown", function(model, button)
@@ -590,71 +738,142 @@ function TransmogFrame_OnLoad(self)
 	preview:SetScript("OnMouseUp", function(model)
 		model.rotating = nil;
 	end);
-	preview:SetScript("OnUpdate", function(model)
+	preview:SetScript("OnUpdate", function(model, elapsed)
 		if model.rotating then
 			local x = GetCursorPosition();
 			model.facing = (model.facing or 0) + (x - model.rotateX) * 0.02;
 			model.rotateX = x;
 			model:SetFacing(model.facing);
+		elseif model.spin then
+			model.facing = (model.facing or 0) + model.spin * elapsed * 2;
+			model:SetFacing(model.facing);
 		end
 	end);
-	preview:SetScript("OnMouseWheel", function(model, delta)
-		model.zoom = math.max(0, math.min(2.5, (model.zoom or 0) + delta * 0.3));
-		model:SetPosition(model.zoom, 0, 0);
-	end);
+	local function Zoom(delta)
+		preview.zoom = math.max(0, math.min(2.5, (preview.zoom or 0) + delta * 0.3));
+		preview:SetPosition(preview.zoom, 0, 0);
+	end
+	preview:SetScript("OnMouseWheel", function(_, delta) Zoom(delta); end);
 	self.Preview = preview;
 
-	self.slotButtons = {};
-	local leftIndex, rightIndex, bottomIndex = 0, 0, 0;
-	for _, info in ipairs(SLOTS) do
-		local button = CreateFrame("Button", nil, center, "TransmogSlotButtonTemplate");
-		button.info = info;
-		if info.side == "LEFT" then
-			button:SetPoint("TOPLEFT", center, "TOPLEFT", 12, -14 - leftIndex * 48);
-			leftIndex = leftIndex + 1;
-		elseif info.side == "RIGHT" then
-			button:SetPoint("TOPRIGHT", center, "TOPRIGHT", -12, -14 - rightIndex * 48);
-			rightIndex = rightIndex + 1;
-		else
-			button:SetPoint("BOTTOM", center, "BOTTOM", (bottomIndex - 1) * 48, 70);
-			bottomIndex = bottomIndex + 1;
+	-- панель управления моделью (ретейл: ModelSceneControlFrame)
+	local controls = CreateFrame("Frame", nil, center);
+	controls:SetSize(5 * 26, 24);
+	controls:SetPoint("TOP", center, "TOP", 0, -14);
+	local function Control(index, texture, tooltip, onClick, onDown, onUp)
+		local button = CreateIconButton(controls, texture, 22, tooltip, onClick);
+		button:SetPoint("LEFT", controls, "LEFT", (index - 1) * 26, 0);
+		if onDown then
+			button:SetScript("OnMouseDown", onDown);
+			button:SetScript("OnMouseUp", onUp);
 		end
-		table.insert(self.slotButtons, button);
 	end
+	Control(1, "Interface\\Buttons\\UI-PlusButton-Up", "Приблизить", function() Zoom(1); end);
+	Control(2, "Interface\\Buttons\\UI-MinusButton-Up", "Отдалить", function() Zoom(-1); end);
+	Control(3, "Interface\\Buttons\\UI-RotationLeft-Button-Up", "Повернуть влево", nil,
+		function() preview.spin = -1; end, function() preview.spin = nil; end);
+	Control(4, "Interface\\Buttons\\UI-RotationRight-Button-Up", "Повернуть вправо", nil,
+		function() preview.spin = 1; end, function() preview.spin = nil; end);
+	Control(5, "Interface\\Buttons\\UI-RefreshButton", "Сбросить вид", function()
+		preview.zoom, preview.facing = 0, 0;
+		preview:SetPosition(0, 0, 0);
+		preview:SetFacing(0);
+	end);
 
-	local money = CreateFrame("Frame", "TransmogFrameMoneyFrame", center, "SmallMoneyFrameTemplate");
-	money:SetPoint("BOTTOMLEFT", center, "BOTTOMLEFT", 14, 20);
-	self.MoneyFrame = money;
-	CreateLabel(center, "GameFontNormal", "Стоимость:"):SetPoint("BOTTOMLEFT", money, "TOPLEFT", 0, 4);
-
-	local apply = CreateFrame("Button", nil, center, "UIPanelButtonTemplate");
-	apply:SetSize(140, 26);
-	apply:SetPoint("BOTTOMRIGHT", center, "BOTTOMRIGHT", -12, 14);
-	apply:SetText("Применить");
-	apply:SetScript("OnClick", function() TransmogFrame_Apply(self); end);
-	self.ApplyButton = apply;
-
-	local clear = CreateFrame("Button", nil, center, "UIPanelButtonTemplate");
-	clear:SetSize(110, 26);
-	clear:SetPoint("RIGHT", apply, "LEFT", -6, 0);
-	clear:SetText("Отменить всё");
-	clear:SetScript("OnClick", function()
+	-- справа сверху: убрать оружие в ножны / отменить все изменения
+	local sheathe = CreateIconButton(center, "Interface\\Icons\\INV_Sword_04", 26, "Показать/убрать оружие", function()
+		self.hideWeapons = not self.hideWeapons;
+		if self.hideWeapons and preview.UndressSlot then
+			preview:UndressSlot(16);
+			preview:UndressSlot(17);
+			preview:UndressSlot(18);
+		else
+			UpdatePreview(self);
+		end
+	end);
+	sheathe:SetPoint("TOPRIGHT", center, "TOPRIGHT", -46, -50);
+	local undoAll = CreateIconButton(center, "Interface\\Buttons\\UI-RefreshButton", 26, "Отменить все изменения", function()
 		wipe(self.pending);
 		PlaySound("igMainMenuOptionCheckBoxOff");
 		UpdateSlots(self);
 		UpdatePreview(self);
 		UpdateGrid(self);
 	end);
-	self.ClearButton = clear;
+	undoAll:SetPoint("LEFT", sheathe, "RIGHT", 6, 0);
+	self.ClearButton = undoAll;
 
-	-- right: appearances of the selected slot
-	local right = CreateInset(self, 704, -60, 1154, -694 + 36);
-	self.SlotTitle = CreateLabel(right, "GameFontNormalLarge", "");
-	self.SlotTitle:SetPoint("TOPLEFT", 14, -12);
+	-- слоты вокруг персонажа
+	self.slotButtons = {};
+	local leftIndex, rightIndex, bottomIndex = 0, 0, 0;
+	for _, info in ipairs(SLOTS) do
+		local button = CreateFrame("Button", nil, center, "TransmogSlotButtonTemplate");
+		button.info = info;
+		if info.side == "LEFT" then
+			button:SetPoint("TOPLEFT", center, "TOPLEFT", 30, -100 - leftIndex * 52);
+			leftIndex = leftIndex + 1;
+		elseif info.side == "RIGHT" then
+			button:SetPoint("TOPRIGHT", center, "TOPRIGHT", -30, -230 - rightIndex * 52);
+			rightIndex = rightIndex + 1;
+		else
+			button:SetPoint("BOTTOM", center, "BOTTOM", (bottomIndex - 1) * 56, 70);
+			bottomIndex = bottomIndex + 1;
+		end
+		table.insert(self.slotButtons, button);
+	end
 
-	local searchBox = CreateFrame("EditBox", "TransmogFrameSearchBox", right, "SearchBoxTemplate");
-	searchBox:SetSize(130, 20);
-	searchBox:SetPoint("TOPRIGHT", right, "TOPRIGHT", -14, -10);
+	-- иллюзии оружия (в 3.3.5 нет) - как в ретейле, перечёркнутые ячейки под оружием
+	for index = 1, 2 do
+		local illusion = CreateFrame("Frame", nil, center);
+		illusion:SetSize(22, 22);
+		illusion:SetPoint("BOTTOM", center, "BOTTOM", (index - 2) * 56, 40);
+		local icon = illusion:CreateTexture(nil, "ARTWORK");
+		icon:SetAllPoints();
+		icon:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up");
+		icon:SetAlpha(0.6);
+	end
+
+	local apply = CreateFrame("Button", nil, center, "UIPanelButtonTemplate");
+	apply:SetSize(150, 26);
+	apply:SetPoint("BOTTOMRIGHT", center, "BOTTOMRIGHT", -12, 12);
+	apply:SetText("Применить");
+	apply:SetScript("OnClick", function() TransmogFrame_Apply(self); end);
+	self.ApplyButton = apply;
+
+	-------------------------------------------------------------------
+	-- right: wardrobe collection with tabs
+	-------------------------------------------------------------------
+	local right = CreatePanel(self, RIGHT_X1, RIGHT_X2, 0.05, 0.05, 0.06, 0.95);
+	self.Wardrobe = right;
+
+	local content = CreateFrame("Frame", "TransmogFrameWardrobeContent", right, "CollectionsBackgroundTemplate");
+	content:SetPoint("TOPLEFT", right, "TOPLEFT", 6, -40);
+	content:SetPoint("BOTTOMRIGHT", right, "BOTTOMRIGHT", -6, 6);
+	CreateBorder(content, 0.7, 0.55, 0.25);
+
+	-- TabSystem сверху (TabSystemTopButtonTemplate)
+	Mixin(right, TabSystemOwnerMixin);
+	TabSystemOwnerMixin.OnLoad(right);
+	local tabs = CreateFrame("Frame", nil, right, "TabSystemTemplate");
+	tabs.tabTemplate = "TabSystemTopButtonTemplate";
+	tabs.tabPool = CreateFramePool("BUTTON", tabs, "TabSystemTopButtonTemplate");
+	tabs.minTabWidth, tabs.maxTabWidth = 90, 150;
+	tabs:SetPoint("BOTTOMLEFT", content, "TOPLEFT", 16, -2);
+	right:SetTabSystem(tabs);
+
+	local items = CreateFrame("Frame", nil, content);
+	items:SetAllPoints();
+	local itemsTab = right:AddNamedTab("Предметы", items);
+	right:AddNamedTab("Наборы", CreateStubTab(content, "Комплекты для трансмогрификации появятся вместе с серверной частью."));
+	right:AddNamedTab("Свои наборы", CreateStubTab(content, "Свои наборы появятся вместе с серверной частью."));
+	right:AddNamedTab("Ситуации", CreateStubTab(content, "Смена образа по ситуациям (бой, верховая езда...) появится позже."));
+	right:SetTab(itemsTab);
+
+	self.SlotTitle = CreateLabel(items, "GameFontNormalHuge", "");
+	self.SlotTitle:SetPoint("TOPLEFT", 16, -14);
+
+	local searchBox = CreateFrame("EditBox", "TransmogFrameSearchBox", items, "SearchBoxTemplate");
+	searchBox:SetSize(140, 20);
+	searchBox:SetPoint("TOPRIGHT", items, "TOPRIGHT", -110, -14);
 	searchBox:HookScript("OnTextChanged", function(box)
 		local text = box:GetText() or "";
 		if text == (SEARCH or "") then
@@ -666,34 +885,82 @@ function TransmogFrame_OnLoad(self)
 		end
 	end);
 
-	local uncollected = CreateFrame("CheckButton", "TransmogFrameShowUncollected", right, "UICheckButtonTemplate");
-	uncollected:SetSize(24, 24);
-	uncollected:SetPoint("TOPRIGHT", searchBox, "BOTTOMRIGHT", -110, -4);
-	_G[uncollected:GetName() .. "Text"]:SetText("Показывать несобранные");
-	uncollected:SetScript("OnClick", function(check)
-		self.showUncollected = check:GetChecked() and true or false;
+	-- «Источники» (ретейл: фильтр) - показать несобранные
+	local filter = CreateFrame("Button", nil, items, "UIPanelButtonTemplate");
+	filter:SetSize(96, 22);
+	filter:SetPoint("LEFT", searchBox, "RIGHT", 8, 0);
+	filter:SetText("Источники");
+	filter:SetScript("OnClick", function()
+		self.showUncollected = not self.showUncollected;
+		filter:SetText(self.showUncollected and "Все" or "Источники");
 		self.page = 1;
 		RequestPage(self);
 	end);
+	filter:SetScript("OnEnter", function(btn)
+		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT");
+		GameTooltip:SetText(self.showUncollected and "Показаны и несобранные облики" or "Показаны только собранные облики");
+		GameTooltip:AddLine("Щелчок - переключить.", 0.5, 0.5, 0.5);
+		GameTooltip:Show();
+	end);
+	filter:SetScript("OnLeave", GameTooltip_Hide);
 
+	-- «Не назначено» / «Показать надетую экипировку» для выбранного слота
+	local function DisplayTypeButton(text, icon, onClick)
+		local button = CreateFrame("Button", nil, items);
+		button:SetSize(170, 28);
+		local bg = button:CreateTexture(nil, "BACKGROUND");
+		bg:SetAllPoints();
+		bg:SetTexture(0.1, 0.08, 0.06, 0.9);
+		CreateBorder(button, 0.7, 0.55, 0.25);
+		local tex = button:CreateTexture(nil, "ARTWORK");
+		tex:SetSize(22, 22);
+		tex:SetPoint("LEFT", 4, 0);
+		tex:SetTexture(icon);
+		local label = CreateLabel(button, "GameFontNormal", text);
+		label:SetPoint("LEFT", tex, "RIGHT", 6, 0);
+		button:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD");
+		button:SetScript("OnClick", onClick);
+		return button;
+	end
+	local unassigned = DisplayTypeButton("Не назначено", "Interface\\Buttons\\UI-GroupLoot-Pass-Up", function()
+		if self.selectedSlot then
+			self.pending[self.selectedSlot] = nil;     -- слот не меняется
+			UpdateSlots(self);
+			UpdatePreview(self);
+			UpdateGrid(self);
+		end
+	end);
+	unassigned:SetPoint("TOPLEFT", items, "TOPLEFT", 16, -52);
+	local showEquipped = DisplayTypeButton("Надетая экипировка", "Interface\\Icons\\INV_Chest_Chain_15", function()
+		local slotId = self.selectedSlot;
+		if slotId then
+			self.pending[slotId] = self.applied[slotId] and 0 or nil;   -- собственный облик предмета
+			UpdateSlots(self);
+			UpdatePreview(self);
+			UpdateGrid(self);
+		end
+	end);
+	showEquipped:SetPoint("LEFT", unassigned, "RIGHT", 12, 0);
+
+	-- сетка обликов 6x4
 	self.gridModels = {};
 	local gridWidth = GRID_COLUMNS * MODEL_WIDTH + (GRID_COLUMNS - 1) * MODEL_SPACE_X;
-	local startX = (450 - gridWidth) / 2;
+	local startX = ((RIGHT_X2 - RIGHT_X1 - 12) - gridWidth) / 2;
 	for row = 1, GRID_ROWS do
 		for column = 1, GRID_COLUMNS do
-			local model = CreateFrame("DressUpModel", nil, right, "TransmogItemModelTemplate");
-			model:SetPoint("TOPLEFT", right, "TOPLEFT", startX + (column - 1) * (MODEL_WIDTH + MODEL_SPACE_X), -80 - (row - 1) * (MODEL_HEIGHT + MODEL_SPACE_Y));
+			local model = CreateFrame("DressUpModel", nil, items, "TransmogItemModelTemplate");
+			model:SetPoint("TOPLEFT", items, "TOPLEFT", startX + (column - 1) * (MODEL_WIDTH + MODEL_SPACE_X), -96 - (row - 1) * (MODEL_HEIGHT + MODEL_SPACE_Y));
 			model:Hide();
 			table.insert(self.gridModels, model);
 		end
 	end
 
-	self.GridMessage = CreateLabel(right, "GameFontHighlightLarge", "");
-	self.GridMessage:SetPoint("CENTER", right, "CENTER", 0, 40);
+	self.GridMessage = CreateLabel(items, "GameFontHighlightLarge", "");
+	self.GridMessage:SetPoint("CENTER", items, "CENTER", 0, 20);
 
-	local paging = CreateFrame("Frame", nil, right);
+	local paging = CreateFrame("Frame", nil, items);
 	paging:SetSize(160, 32);
-	paging:SetPoint("BOTTOM", right, "BOTTOM", 20, 60);
+	paging:SetPoint("BOTTOM", items, "BOTTOM", 20, 14);
 	paging.Text = CreateLabel(paging, "GameFontHighlight", "");
 	paging.Text:SetPoint("RIGHT", paging, "RIGHT", -72, 0);
 	local function PageButton(prev)
@@ -720,24 +987,9 @@ function TransmogFrame_OnLoad(self)
 	end
 	paging.Prev:SetScript("OnClick", function() SetPage((self.page or 1) - 1); end);
 	paging.Next:SetScript("OnClick", function() SetPage((self.page or 1) + 1); end);
-	right:EnableMouseWheel(true);
-	right:SetScript("OnMouseWheel", function(_, delta) SetPage((self.page or 1) - delta); end);
+	items:EnableMouseWheel(true);
+	items:SetScript("OnMouseWheel", function(_, delta) SetPage((self.page or 1) - delta); end);
 	self.Paging = paging;
-
-	local restore = CreateFrame("Button", nil, right, "UIPanelButtonTemplate");
-	restore:SetSize(220, 24);
-	restore:SetPoint("BOTTOM", right, "BOTTOM", 0, 20);
-	restore:SetText("Вернуть исходный облик");
-	restore:SetScript("OnClick", function()
-		local slotId = self.selectedSlot;
-		if not slotId then
-			return;
-		end
-		self.pending[slotId] = self.applied[slotId] and 0 or nil;
-		UpdateSlots(self);
-		UpdatePreview(self);
-		UpdateGrid(self);
-	end);
 
 	self:SetScript("OnUpdate", function(frame, elapsed)
 		if frame.searchDelay then

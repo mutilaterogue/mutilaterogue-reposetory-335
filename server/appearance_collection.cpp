@@ -15,7 +15,7 @@
  * Client and server names must differ: the client also receives its own addon whisper.
  *   "APPEAR_GET_PAGE" -> "APPEAR_PAGE"
  *   "APPEAR_GET_SOURCES" -> "APPEAR_SOURCES"
- *   "APPEAR_PAGE"    C: category : classId(0 = all) : flags(1 collected, 2 not collected) : page : search : tag
+ *   "APPEAR_PAGE"    C: category : classId(0 = all) : flags(1 collected, 2 not collected) : page : search : tag : pageSize
  *                    S: category : page : numPages : collectedCount : totalCount : "displayId/itemId/c,..." : tag
  *   "APPEAR_SOURCES" C: category : displayId
  *                    S: category : displayId : "itemId/c,..."
@@ -392,6 +392,9 @@ namespace
             wstrToLower(search);
         // tag of the requesting window ("W" wardrobe, "T" transmog) - echoed back
         std::string tag = args.size() > 5 ? args[5] : std::string();
+        // page size (transmog window shows 24), default 18
+        uint32 pageSize = args.size() > 6 ? CommToUInt32(args[6], PAGE_SIZE) : PAGE_SIZE;
+        pageSize = std::max<uint32>(1, std::min<uint32>(pageSize, 30));
 
         ScanIfNeeded(player);
 
@@ -431,15 +434,15 @@ namespace
             return a.first->itemLevel < b.first->itemLevel;
         });
 
-        uint32 numPages = std::max<uint32>(1, uint32((visible.size() + PAGE_SIZE - 1) / PAGE_SIZE));
+        uint32 numPages = std::max<uint32>(1, uint32((visible.size() + pageSize - 1) / pageSize));
         page = std::min(page, numPages);
 
         std::ostringstream entries;
-        for (size_t i = (page - 1) * PAGE_SIZE; i < visible.size() && i < page * PAGE_SIZE; ++i)
+        for (size_t i = (page - 1) * pageSize; i < visible.size() && i < page * pageSize; ++i)
         {
             Appearance const* appearance = visible[i].first;
             uint32 itemId = visible[i].second ? visible[i].second : appearance->items.front();
-            if (i != (page - 1) * PAGE_SIZE)
+            if (i != (page - 1) * pageSize)
                 entries << ',';
             entries << appearance->displayId << '/' << itemId << '/' << (visible[i].second ? 1 : 0);
         }
