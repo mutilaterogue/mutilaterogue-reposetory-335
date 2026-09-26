@@ -364,10 +364,9 @@ function WardrobeCollectionFrame_OnLoad(self)
 		local button = CreateFrame("Button", nil, slotsFrame, "WardrobeSlotButtonTemplate");
 		button.info = info;
 		button:SetPoint("TOPLEFT", slotsFrame, "TOPLEFT", x, 0);
-		if not SetAtlasSafe(button.Icon, info.atlas, false) then
-			local _, texture = GetInventorySlotInfo(info.slot);
-			button.Icon:SetTexture(texture);
-		end
+		-- иконки слотов 3.3.5 (атласы transmog-nav-slot-* в клиенте без текстур - были пустыми)
+		local _, texture = GetInventorySlotInfo(info.slot);
+		button.Icon:SetTexture(texture);
 		if not SetAtlasSafe(button.SelectedTexture, "transmog-nav-slot-selected", false) then
 			button.SelectedTexture:SetTexture("Interface\\Buttons\\CheckButtonHilight");
 			button.SelectedTexture:SetBlendMode("ADD");
