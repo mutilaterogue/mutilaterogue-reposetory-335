@@ -2,75 +2,11 @@
 	<!-- Окно трансмогрификации (ретейл 12.x TransmogFrame, упрощено для 3.3.5):
 	     слева образы, по центру персонаж со слотами, справа коллекция обликов выбранного слота.
 	     В FrameXML.toc - после Collections\Collections.xml: Transmog\Blizzard_Transmog.xml -->
+	<!-- порядок как в ретейле: общие данные, шаблоны, образы, само окно -->
+	<Script file="Blizzard_TransmogShared.lua"/>
+	<Include file="Blizzard_TransmogTemplates.xml"/>
+	<Script file="Blizzard_TransmogOutfits.lua"/>
 	<Script file="Blizzard_Transmog.lua"/>
-
-	<DressUpModel name="TransmogItemModelTemplate" virtual="true" enableMouse="true">
-		<Size x="68" y="86"/>
-		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture setAllPoints="true">
-					<Color r="0" g="0" b="0"/>
-				</Texture>
-			</Layer>
-		</Layers>
-		<Scripts>
-			<OnLoad function="TransmogItemModel_OnLoad"/>
-			<OnMouseDown function="TransmogItemModel_OnMouseDown"/>
-			<OnEnter function="TransmogItemModel_OnEnter"/>
-			<OnLeave function="GameTooltip_Hide"/>
-		</Scripts>
-	</DressUpModel>
-
-	<Button name="TransmogSlotButtonTemplate" virtual="true">
-		<Size x="42" y="42"/>
-		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture name="$parentBackground" parentKey="Background" atlas="transmog-gearSlot-default">
-					<Size x="59" y="59"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="ARTWORK">
-				<Texture name="$parentIcon" parentKey="Icon">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="2" y="-2"/>
-						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="OVERLAY">
-				<Texture name="$parentPending" parentKey="Pending" atlas="transmog-gearSlot-pending" hidden="true">
-					<Size x="59" y="59"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-				<Texture name="$parentSelected" parentKey="Selected" atlas="transmog-gearSlot-selected" hidden="true">
-					<Size x="59" y="59"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-				<Texture name="$parentTransmogged" parentKey="Transmogged" atlas="transmog-icon-checkmark" hidden="true">
-					<Size x="20" y="20"/>
-					<Anchors>
-						<Anchor point="BOTTOMRIGHT" x="8" y="-6"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-		</Layers>
-		<HighlightTexture atlas="transmog-gearSlot-selected" alphaMode="ADD"/>
-		<Scripts>
-			<OnLoad>
-				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-			</OnLoad>
-			<OnClick function="TransmogSlotButton_OnClick"/>
-			<OnEnter function="TransmogSlotButton_OnEnter"/>
-			<OnLeave function="GameTooltip_Hide"/>
-		</Scripts>
-	</Button>
 
 	<Frame name="TransmogFrame" inherits="RetailPortraitFrameTemplate" parent="UIParent" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="HIGH">
 		<Size x="1200" y="720"/>

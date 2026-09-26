@@ -8,118 +8,10 @@
 --   "APPEAR_GET_PAGE" ... : "T" -> "APPEAR_PAGE" ... : "T"   appearances (appearance_collection.cpp)
 -- Without the server: /transmog opens the window, "Apply" says the server does not answer.
 
-local OP_GET_STATE, OP_STATE = "TMOG_GET_STATE", "TMOG_STATE";
-local OP_APPLY, OP_RESULT = "TMOG_APPLY", "TMOG_RESULT";
-local OP_OPEN, OP_CLOSE = "TMOG_OPEN", "TMOG_CLOSE";
-local OP_GET_PAGE, OP_PAGE = "APPEAR_GET_PAGE", "APPEAR_PAGE";
+local OP_GET_STATE, OP_STATE, OP_APPLY, OP_RESULT, OP_OPEN, OP_CLOSE, OP_GET_PAGE, OP_PAGE, GRID_COLUMNS, GRID_ROWS, MODEL_WIDTH, MODEL_HEIGHT, MODEL_SPACE_X, MODEL_SPACE_Y, LEFT_X1, LEFT_X2, CENTER_X1, CENTER_X2, RIGHT_X1, RIGHT_X2, PANEL_TOP, PANEL_BOTTOM, SLOTS, SLOT_UNASSIGNED_ATLAS, SLOT_BY_ID, CLASS_IDS, NUM_OUTFIT_BUTTONS, MAX_OUTFITS =
+	TransmogUI.OP_GET_STATE, TransmogUI.OP_STATE, TransmogUI.OP_APPLY, TransmogUI.OP_RESULT, TransmogUI.OP_OPEN, TransmogUI.OP_CLOSE, TransmogUI.OP_GET_PAGE, TransmogUI.OP_PAGE, TransmogUI.GRID_COLUMNS, TransmogUI.GRID_ROWS, TransmogUI.MODEL_WIDTH, TransmogUI.MODEL_HEIGHT, TransmogUI.MODEL_SPACE_X, TransmogUI.MODEL_SPACE_Y, TransmogUI.LEFT_X1, TransmogUI.LEFT_X2, TransmogUI.CENTER_X1, TransmogUI.CENTER_X2, TransmogUI.RIGHT_X1, TransmogUI.RIGHT_X2, TransmogUI.PANEL_TOP, TransmogUI.PANEL_BOTTOM, TransmogUI.SLOTS, TransmogUI.SLOT_UNASSIGNED_ATLAS, TransmogUI.SLOT_BY_ID, TransmogUI.CLASS_IDS, TransmogUI.NUM_OUTFIT_BUTTONS, TransmogUI.MAX_OUTFITS;
 
-local GRID_COLUMNS, GRID_ROWS = 6, 4;
-local MODEL_WIDTH, MODEL_HEIGHT, MODEL_SPACE_X, MODEL_SPACE_Y = 68, 86, 9, 12;
-
--- раскладка как в ретейле: образы | персонаж | коллекция
-local LEFT_X1, LEFT_X2 = 4, 264;
-local CENTER_X1, CENTER_X2 = 266, 726;
-local RIGHT_X1, RIGHT_X2 = 728, 1196;
-local PANEL_TOP, PANEL_BOTTOM = -22, -716;
-
--- slot id, category (appearance_collection.cpp), side on the character
-local SLOTS = {
-	{ id = 1,  slot = "HeadSlot",          category = 1,  side = "LEFT",   name = "Голова" },
-	{ id = 3,  slot = "ShoulderSlot",      category = 2,  side = "LEFT",   name = "Плечи" },
-	{ id = 15, slot = "BackSlot",          category = 3,  side = "LEFT",   name = "Спина" },
-	{ id = 5,  slot = "ChestSlot",         category = 4,  side = "LEFT",   name = "Грудь" },
-	{ id = 4,  slot = "ShirtSlot",         category = 5,  side = "LEFT",   name = "Рубашка" },
-	{ id = 19, slot = "TabardSlot",        category = 6,  side = "LEFT",   name = "Гербовая накидка" },
-	{ id = 9,  slot = "WristSlot",         category = 7,  side = "LEFT",   name = "Запястья" },
-	{ id = 10, slot = "HandsSlot",         category = 8,  side = "RIGHT",  name = "Кисти рук" },
-	{ id = 6,  slot = "WaistSlot",         category = 9,  side = "RIGHT",  name = "Пояс" },
-	{ id = 7,  slot = "LegsSlot",          category = 10, side = "RIGHT",  name = "Ноги" },
-	{ id = 8,  slot = "FeetSlot",          category = 11, side = "RIGHT",  name = "Ступни" },
-	{ id = 16, slot = "MainHandSlot",      weapon = true, side = "BOTTOM", name = "Правая рука" },
-	{ id = 17, slot = "SecondaryHandSlot", weapon = true, side = "BOTTOM", name = "Левая рука" },
-	{ id = 18, slot = "RangedSlot",        weapon = true, side = "BOTTOM", name = "Дальний бой" },
-};
--- ретейловские атласы пустых слотов (Interface/Transmogrify)
-local SLOT_UNASSIGNED_ATLAS = {
-	[1] = "head", [3] = "shoulders", [15] = "back", [5] = "chest", [4] = "shirt", [19] = "tabard", [9] = "wrist",
-	[10] = "hands", [6] = "waist", [7] = "legs", [8] = "feet", [16] = "mainHand", [17] = "offHand", [18] = "mainHand",
-};
-local SLOT_BY_ID = {};
-for _, info in ipairs(SLOTS) do
-	SLOT_BY_ID[info.id] = info;
-end
-
-local CLASS_IDS = {
-	WARRIOR = 1, PALADIN = 2, HUNTER = 3, ROGUE = 4, PRIEST = 5, DEATHKNIGHT = 6,
-	SHAMAN = 7, MAGE = 8, WARLOCK = 9, DRUID = 11,
-};
-
--- 3.3.5: GetItemInfo gives the weapon type as text - map it to the item subclass id through the auction list
-local WEAPON_SUBCLASS_ORDER = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 14, 15, 16, 18, 19, 20 };
-local weaponSubclassByName;
-local function GetWeaponSubclass(subTypeName)
-	if not weaponSubclassByName then
-		weaponSubclassByName = {};
-		local names = { GetAuctionItemSubClasses(1) };
-		for index, name in ipairs(names) do
-			weaponSubclassByName[name] = WEAPON_SUBCLASS_ORDER[index];
-		end
-	end
-	return weaponSubclassByName[subTypeName];
-end
-
--- category of the appearance list for an equipped item
-local function GetItemCategory(slotInfo, itemLink)
-	if not slotInfo.weapon then
-		return slotInfo.category;
-	end
-	if not itemLink then
-		return nil;
-	end
-	local _, _, _, _, _, _, subType, _, equipLoc = GetItemInfo(itemLink);
-	if equipLoc == "INVTYPE_SHIELD" then
-		return 40;
-	elseif equipLoc == "INVTYPE_HOLDABLE" then
-		return 41;
-	end
-	local subclass = GetWeaponSubclass(subType);
-	return subclass and (20 + subclass) or nil;
-end
-
-local itemQueryTooltip = CreateFrame("GameTooltip", "TransmogQueryTooltip", UIParent, "GameTooltipTemplate");
-local function RequestItem(itemId)
-	itemQueryTooltip:SetOwner(UIParent, "ANCHOR_NONE");
-	itemQueryTooltip:SetHyperlink("item:" .. itemId);
-	itemQueryTooltip:Hide();
-end
-
-local function GetItemIcon(itemId)
-	local _, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemId);
-	if not icon then
-		RequestItem(itemId);
-	end
-	return icon or "Interface\\Icons\\INV_Misc_QuestionMark";
-end
-
-local function CreateInset(parent, x1, y1, x2, y2)
-	local inset = CreateFrame("Frame", nil, parent, "InsetFrameTemplate");
-	inset:SetPoint("TOPLEFT", parent, "TOPLEFT", x1, y1);
-	inset:SetPoint("BOTTOMRIGHT", parent, "TOPLEFT", x2, y2);
-	return inset;
-end
-
-local function CreateLabel(parent, font, text)
-	local label = parent:CreateFontString(nil, "OVERLAY", font);
-	label:SetText(text);
-	return label;
-end
-
----------------------------------------------------------------------------
--- state
----------------------------------------------------------------------------
-TransmogOutfits = TransmogOutfits or {};   -- { name, icon, slots = { [slotId] = itemId } } - на сервере позже
-
-local function GetDisplayedItem(self, slotId)
+function TransmogUI.GetDisplayedItem(self, slotId)
 	-- what the slot shows: pending change > current transmog > equipped item
 	local pending = self.pending[slotId];
 	if pending ~= nil then
@@ -134,11 +26,11 @@ local function GetDisplayedItem(self, slotId)
 	return GetInventoryItemID and GetInventoryItemID("player", slotId), false;
 end
 
-local function HasPending(self)
+function TransmogUI.HasPending(self)
 	return next(self.pending) ~= nil;
 end
 
-local function GetCost(self)
+function TransmogUI.GetCost(self)
 	local cost = 0;
 	for slotId in pairs(self.pending) do
 		local link = GetInventoryItemLink("player", slotId);
@@ -153,7 +45,7 @@ end
 ---------------------------------------------------------------------------
 -- character preview
 ---------------------------------------------------------------------------
-local function UpdatePreview(self)
+function TransmogUI.UpdatePreview(self)
 	local model = self.Preview;
 	model:SetUnit("player");
 	model:SetPosition(model.zoom or 0, 0, 0);
@@ -162,21 +54,21 @@ local function UpdatePreview(self)
 		return;   -- «Показать надетую экипировку»: только то, что надето сейчас
 	end
 	for _, info in ipairs(SLOTS) do
-		local itemId, changed = GetDisplayedItem(self, info.id);
+		local itemId, changed = TransmogUI.GetDisplayedItem(self, info.id);
 		if itemId and (changed or self.applied[info.id]) then
 			model:TryOn("item:" .. itemId);
 		end
 	end
 end
 
-local function UpdateSlotButton(self, button)
+function TransmogUI.UpdateSlotButton(self, button)
 	local info = button.info;
 	local slotId = info.id;
 	local equipped = GetInventoryItemLink("player", slotId);
-	local itemId, changed = GetDisplayedItem(self, slotId);
+	local itemId, changed = TransmogUI.GetDisplayedItem(self, slotId);
 
 	if equipped and itemId then
-		button.Icon:SetTexture(GetItemIcon(itemId));
+		button.Icon:SetTexture(TransmogUI.GetItemIcon(itemId));
 		button.Icon:SetDesaturated(false);
 		button.Background:SetAtlas("transmog-gearSlot-default");
 		button:Enable();
@@ -191,46 +83,22 @@ local function UpdateSlotButton(self, button)
 	button.Transmogged:SetShown(self.applied[slotId] ~= nil and self.pending[slotId] ~= 0);
 end
 
-local function UpdateSlots(self)
+function TransmogUI.UpdateSlots(self)
 	for _, button in ipairs(self.slotButtons) do
-		UpdateSlotButton(self, button);
+		TransmogUI.UpdateSlotButton(self, button);
 	end
 
-	local cost = GetCost(self);
+	local cost = TransmogUI.GetCost(self);
 	MoneyFrame_Update(self.MoneyFrame:GetName(), cost);
-	self.ApplyButton:SetEnabled(HasPending(self));
-	self.ClearButton:SetEnabled(HasPending(self));
+	self.ApplyButton:SetEnabled(TransmogUI.HasPending(self));
+	self.ClearButton:SetEnabled(TransmogUI.HasPending(self));
 end
 
 ---------------------------------------------------------------------------
 -- appearance grid (right)
 ---------------------------------------------------------------------------
-local function ApplyCamera(model)
-	local entry = model.entry;
-	if not entry or not WardrobeGetCamera then
-		return;
-	end
-	local cam = WardrobeGetCamera(TransmogFrame.category, entry.itemId);
-	model:SetPosition(cam[1], cam[2], cam[3]);
-	model:SetFacing(cam[4] or 0);
-end
-
-local function DressGridModel(model)
-	local entry = model.entry;
-	if not entry then
-		return;
-	end
-	if not model.unitSet then
-		model:SetUnit("player");
-		model.unitSet = true;
-	end
-	model:Undress();
-	model:TryOn("item:" .. entry.itemId);
-	ApplyCamera(model);
-end
-
-local function UpdateGrid(self)
-	local selectedItem = self.selectedSlot and GetDisplayedItem(self, self.selectedSlot);
+function TransmogUI.UpdateGrid(self)
+	local selectedItem = self.selectedSlot and TransmogUI.GetDisplayedItem(self, self.selectedSlot);
 	for index, model in ipairs(self.gridModels) do
 		local entry = self.entries[index];
 		model.entry = entry;
@@ -246,7 +114,7 @@ local function UpdateGrid(self)
 			end
 			model.Border.Card:SetDesaturated(not entry.collected);
 			model:SetAlpha(entry.collected and 1 or 0.6);
-			DressGridModel(model);
+			TransmogUI.DressGridModel(model);
 			model.redressIndex, model.redressTime = 1, 0.1;
 		else
 			model:Hide();
@@ -273,10 +141,10 @@ local function UpdateGrid(self)
 	end
 end
 
-local function RequestPage(self)
+function TransmogUI.RequestPage(self)
 	self.entries = {};
 	if not self.selectedSlot or not self.category or not Comm_Send then
-		UpdateGrid(self);
+		TransmogUI.UpdateGrid(self);
 		return;
 	end
 	local _, playerClass = UnitClass("player");
@@ -284,7 +152,7 @@ local function RequestPage(self)
 	local search = (self.searchText or ""):gsub(":", " ");
 	self.waiting, self.noAnswer, self.requestElapsed = true, nil, 0;
 	Comm_Send(OP_GET_PAGE, self.category, CLASS_IDS[playerClass] or 0, flags, self.page or 1, search, "T", GRID_COLUMNS * GRID_ROWS);
-	UpdateGrid(self);
+	TransmogUI.UpdateGrid(self);
 end
 
 function TransmogFrame_SelectSlot(self, slotId)
@@ -294,319 +162,11 @@ function TransmogFrame_SelectSlot(self, slotId)
 		return;
 	end
 	self.selectedSlot = slotId;
-	self.category = GetItemCategory(info, link);
+	self.category = TransmogUI.GetItemCategory(info, link);
 	self.page = 1;
 	self.SlotTitle:SetText(info.name);
-	UpdateSlots(self);
-	RequestPage(self);
-end
-
-function TransmogItemModel_OnLoad(self)
-	local border = CreateFrame("Frame", nil, self:GetParent());
-	border:SetPoint("TOPLEFT", self, "TOPLEFT", -5, 5);
-	border:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 5, -5);
-	border:SetFrameLevel(self:GetFrameLevel() + 2);
-	border.Card = border:CreateTexture(nil, "OVERLAY");
-	border.Card:SetAllPoints();
-	border.Card:SetAtlas("transmog-itemCard-default");
-	border.Hover = border:CreateTexture(nil, "OVERLAY", nil, 1);
-	border.Hover:SetAllPoints();
-	border.Hover:SetAtlas("transmog-itemCard-hover");
-	border.Hover:Hide();
-	border:Hide();
-	self.Border = border;
-
-	self:SetScript("OnUpdate", function(model, elapsed)
-		model.Border.Hover:SetShown(model:IsMouseOver());
-		if model.entry then
-			ApplyCamera(model);
-		end
-		if model.redressTime then
-			model.redressTime = model.redressTime - elapsed;
-			if model.redressTime <= 0 then
-				DressGridModel(model);
-				local delays = { 0.3, 0.6, 1.0, 2.0 };
-				model.redressIndex = (model.redressIndex or 1) + 1;
-				model.redressTime = delays[model.redressIndex - 1];
-			end
-		end
-	end);
-end
-
-function TransmogItemModel_OnMouseDown(self, button)
-	local frame = TransmogFrame;
-	local entry = self.entry;
-	if not entry or not frame.selectedSlot then
-		return;
-	end
-	local _, link = GetItemInfo(entry.itemId);
-	if IsModifiedClick("CHATLINK") and link then
-		ChatEdit_InsertLink(link);
-		return;
-	end
-	if not entry.collected then
-		UIErrorsFrame:AddMessage("Этот облик ещё не собран.", 1.0, 0.1, 0.1, 1.0);
-		return;
-	end
-	local slotId = frame.selectedSlot;
-	if entry.itemId == GetInventoryItemID("player", slotId) and not frame.applied[slotId] then
-		frame.pending[slotId] = nil;   -- выбран собственный облик предмета
-	elseif entry.itemId == frame.applied[slotId] then
-		frame.pending[slotId] = nil;
-	else
-		frame.pending[slotId] = entry.itemId;
-	end
-	PlaySound("igMainMenuOptionCheckBoxOn");
-	UpdateSlots(frame);
-	UpdatePreview(frame);
-	UpdateGrid(frame);
-end
-
-function TransmogItemModel_OnEnter(self)
-	local entry = self.entry;
-	if not entry then
-		return;
-	end
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	GameTooltip:SetHyperlink("item:" .. entry.itemId);
-	GameTooltip:AddLine(" ");
-	if entry.collected then
-		GameTooltip:AddLine("Щелчок - применить этот облик к слоту.", 0.1, 1, 0.1, true);
-	else
-		GameTooltip:AddLine("Облик не собран.", 1, 0.1, 0.1, true);
-	end
-	GameTooltip:Show();
-end
-
----------------------------------------------------------------------------
--- slot buttons
----------------------------------------------------------------------------
-function TransmogSlotButton_OnClick(self, button)
-	local frame = TransmogFrame;
-	local slotId = self.info.id;
-	if button == "RightButton" then
-		if frame.pending[slotId] ~= nil then
-			frame.pending[slotId] = nil;        -- отменить изменение
-		elseif frame.applied[slotId] then
-			frame.pending[slotId] = 0;          -- вернуть исходный облик предмета
-		end
-		PlaySound("igMainMenuOptionCheckBoxOff");
-		UpdateSlots(frame);
-		UpdatePreview(frame);
-		UpdateGrid(frame);
-		return;
-	end
-	PlaySound("igMainMenuOptionCheckBoxOn");
-	TransmogFrame_SelectSlot(frame, slotId);
-end
-
-function TransmogSlotButton_OnEnter(self)
-	local frame = TransmogFrame;
-	local slotId = self.info.id;
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	local link = GetInventoryItemLink("player", slotId);
-	if not link then
-		GameTooltip:SetText(self.info.name);
-		GameTooltip:AddLine("Нет надетого предмета.", 0.6, 0.6, 0.6);
-		GameTooltip:Show();
-		return;
-	end
-	GameTooltip:SetInventoryItem("player", slotId);
-	local itemId, changed = GetDisplayedItem(frame, slotId);
-	local shown = itemId and GetItemInfo(itemId);
-	if frame.pending[slotId] == 0 then
-		GameTooltip:AddLine("Будет возвращён исходный облик.", 1, 0.82, 0);
-	elseif shown and (changed or frame.applied[slotId]) then
-		GameTooltip:AddLine((changed and "Новый облик: " or "Облик: ") .. shown, 1, 0.5, 1);
-	end
-	GameTooltip:AddLine("ЛКМ - выбрать слот, ПКМ - отменить изменение / вернуть облик.", 0.5, 0.5, 0.5, true);
-	GameTooltip:Show();
-end
-
----------------------------------------------------------------------------
--- outfits (left)
----------------------------------------------------------------------------
-local NUM_OUTFIT_BUTTONS = 14;
-local MAX_OUTFITS = 30;
-
-local function CountSlots(outfit)
-	local n = 0;
-	for _ in pairs(outfit.slots) do
-		n = n + 1;
-	end
-	return n;
-end
-
-local function UpdateOutfits(self)
-	local offset = self.outfitOffset or 0;
-	for index, button in ipairs(self.outfitButtons) do
-		local outfit = TransmogOutfits[index + offset];
-		button.outfit = outfit;
-		if outfit then
-			button.Icon:SetTexture(outfit.icon or "Interface\\Icons\\INV_Chest_Cloth_17");
-			button.Name:SetText(outfit.name);
-			button.Sub:SetText(("Слотов: %d"):format(CountSlots(outfit)));
-			button.Selected:SetShown(self.selectedOutfit == outfit);
-			button:Show();
-		else
-			button:Hide();
-		end
-	end
-	self.OutfitScrollUp:SetEnabled(offset > 0);
-	self.OutfitScrollDown:SetEnabled(offset + NUM_OUTFIT_BUTTONS < #TransmogOutfits);
-end
-
-local function CurrentOutfitSlots(self)
-	local slots = {};
-	for _, info in ipairs(SLOTS) do
-		local itemId, changed = GetDisplayedItem(self, info.id);
-		if itemId and (changed or self.applied[info.id]) and self.pending[info.id] ~= 0 then
-			slots[info.id] = itemId;
-		end
-	end
-	return slots;
-end
-
-StaticPopupDialogs["TRANSMOG_OUTFIT_NAME"] = {
-	text = "Название образа:",
-	button1 = SAVE or "Сохранить",
-	button2 = CANCEL,
-	hasEditBox = 1,
-	maxLetters = 31,
-	OnAccept = function(self)
-		local name = self.editBox:GetText();
-		if name and name ~= "" then
-			TransmogFrame_SaveOutfit(name);
-		end
-	end,
-	EditBoxOnEnterPressed = function(self)
-		local parent = self:GetParent();
-		local name = self:GetText();
-		if name and name ~= "" then
-			TransmogFrame_SaveOutfit(name);
-		end
-		parent:Hide();
-	end,
-	OnShow = function(self)
-		self.editBox:SetFocus();
-	end,
-	timeout = 0,
-	whileDead = 1,
-	hideOnEscape = 1,
-};
-
-function TransmogFrame_SaveOutfit(name)
-	local frame = TransmogFrame;
-	local slots = CurrentOutfitSlots(frame);
-	if not next(slots) then
-		UIErrorsFrame:AddMessage("Нет изменённых слотов для образа.", 1.0, 0.1, 0.1, 1.0);
-		return;
-	end
-	local icon;
-	for _, info in ipairs(SLOTS) do
-		if slots[info.id] then
-			icon = GetItemIcon(slots[info.id]);
-			break;
-		end
-	end
-	for _, outfit in ipairs(TransmogOutfits) do
-		if outfit.name == name then
-			outfit.slots, outfit.icon = slots, icon;
-			UpdateOutfits(frame);
-			return;
-		end
-	end
-	if #TransmogOutfits >= MAX_OUTFITS then
-		UIErrorsFrame:AddMessage("Слишком много образов.", 1.0, 0.1, 0.1, 1.0);
-		return;
-	end
-	table.insert(TransmogOutfits, { name = name, icon = icon, slots = slots });
-	UpdateOutfits(frame);
-end
-
-local function LoadOutfit(self, outfit)
-	self.selectedOutfit = outfit;
-	self.showEquipped = false;
-	wipe(self.pending);
-	for _, info in ipairs(SLOTS) do
-		local itemId = outfit.slots[info.id];
-		if GetInventoryItemLink("player", info.id) then
-			if itemId and itemId ~= self.applied[info.id] then
-				self.pending[info.id] = itemId;
-			elseif not itemId and self.applied[info.id] then
-				self.pending[info.id] = 0;
-			end
-		end
-	end
-	UpdateSlots(self);
-	UpdatePreview(self);
-	UpdateGrid(self);
-end
-
----------------------------------------------------------------------------
--- frame
----------------------------------------------------------------------------
-local function CreatePanel(parent, x1, x2, atlas)
-	local panel = CreateFrame("Frame", nil, parent);
-	panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x1, PANEL_TOP);
-	panel:SetPoint("BOTTOMRIGHT", parent, "TOPLEFT", x2, PANEL_BOTTOM);
-	local bg = panel:CreateTexture(nil, "BACKGROUND");
-	bg:SetAllPoints();
-	bg:SetAtlas(atlas);
-	panel.Bg = bg;
-	return panel;
-end
-
-local function CreateIconButton(parent, texture, size, tooltip, onClick)
-	local button = CreateFrame("Button", nil, parent);
-	button:SetSize(size, size);
-	local normal = button:CreateTexture(nil, "ARTWORK");
-	normal:SetAllPoints();
-	if texture:find("\\") then
-		normal:SetTexture(texture);
-	else
-		normal:SetAtlas(texture);   -- атлас ретейла
-	end
-	button.Icon = normal;
-	local highlight = button:CreateTexture(nil, "HIGHLIGHT");
-	highlight:SetAllPoints();
-	if texture:find("\\") then
-		highlight:SetTexture(texture);
-	else
-		highlight:SetAtlas(texture);
-	end
-	highlight:SetBlendMode("ADD");
-	highlight:SetAlpha(0.5);
-	button:SetScript("OnClick", onClick);
-	button:SetScript("OnEnter", function(btn)
-		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT");
-		GameTooltip:SetText(tooltip);
-		GameTooltip:Show();
-	end);
-	button:SetScript("OnLeave", GameTooltip_Hide);
-	return button;
-end
-
-local function CreateBorder(frame, r, g, b)
-	local border = CreateFrame("Frame", nil, frame);
-	border:SetPoint("TOPLEFT", -3, 3);
-	border:SetPoint("BOTTOMRIGHT", 3, -3);
-	border:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12 });
-	border:SetBackdropBorderColor(r, g, b, 1);
-	return border;
-end
-
--- вкладки коллекции: «Предметы» работает, остальные - заглушки до серверной части
-local function CreateStubTab(parent, text)
-	local frame = CreateFrame("Frame", nil, parent);
-	frame:SetAllPoints();
-	local label = CreateLabel(frame, "GameFontNormalHuge", "В скором времени");
-	label:SetPoint("CENTER", 0, 20);
-	local desc = CreateLabel(frame, "GameFontHighlight", text);
-	desc:SetPoint("TOP", label, "BOTTOM", 0, -10);
-	desc:SetWidth(380);
-	frame:Hide();
-	return frame;
+	TransmogUI.UpdateSlots(self);
+	TransmogUI.RequestPage(self);
 end
 
 function TransmogFrame_OnLoad(self)
@@ -614,6 +174,8 @@ function TransmogFrame_OnLoad(self)
 	self.applied = {};
 	self.entries = {};
 	tinsert(UISpecialFrames, self:GetName());
+	-- окно 1200x720 не влезает на экран при обычном масштабе интерфейса - уменьшаем, как PlayerSpellsFrame
+	self:SetScale(TRANSMOG_FRAME_SCALE or 0.8);
 	self:RegisterForDrag("LeftButton");
 
 	if self.TitleContainer and self.TitleContainer.TitleText then
@@ -629,7 +191,7 @@ function TransmogFrame_OnLoad(self)
 	-------------------------------------------------------------------
 	-- left: outfits
 	-------------------------------------------------------------------
-	local left = CreatePanel(self, LEFT_X1, LEFT_X2, "transmog-outfit-darkBG");
+	local left = TransmogUI.CreatePanel(self, LEFT_X1, LEFT_X2, "transmog-outfit-darkBG");
 	local gradientTop = left:CreateTexture(nil, "BACKGROUND", nil, 1);
 	gradientTop:SetAtlas("transmog-outfit-toptexture", true);
 	gradientTop:SetPoint("TOP");
@@ -654,15 +216,15 @@ function TransmogFrame_OnLoad(self)
 	spellFrame:SetAtlas("transmog-outfit-spellFrame");
 	spellFrame:SetPoint("TOPLEFT", equipped.Icon, "TOPLEFT", -4, 4);
 	spellFrame:SetPoint("BOTTOMRIGHT", equipped.Icon, "BOTTOMRIGHT", 4, -4);
-	local equippedText = CreateLabel(equipped, "GameFontNormal", "Показать надетую экипировку");
+	local equippedText = TransmogUI.CreateLabel(equipped, "GameFontNormal", "Показать надетую экипировку");
 	equippedText:SetPoint("LEFT", equipped.Icon, "RIGHT", 8, 0);
 	equipped:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar-Blue", "ADD");
 	equipped:SetScript("OnClick", function()
 		self.showEquipped = not self.showEquipped;
 		self.selectedOutfit = nil;
 		PlaySound("igMainMenuOptionCheckBoxOn");
-		UpdateOutfits(self);
-		UpdatePreview(self);
+		TransmogUI.UpdateOutfits(self);
+		TransmogUI.UpdatePreview(self);
 	end);
 
 	self.outfitButtons = {};
@@ -677,11 +239,11 @@ function TransmogFrame_OnLoad(self)
 		button.Icon = button:CreateTexture(nil, "ARTWORK");
 		button.Icon:SetSize(32, 32);
 		button.Icon:SetPoint("LEFT", 2, 0);
-		button.Name = CreateLabel(button, "GameFontNormal", "");
+		button.Name = TransmogUI.CreateLabel(button, "GameFontNormal", "");
 		button.Name:SetPoint("TOPLEFT", button.Icon, "TOPRIGHT", 8, -2);
 		button.Name:SetPoint("RIGHT", -4, 0);
 		button.Name:SetJustifyH("LEFT");
-		button.Sub = CreateLabel(button, "GameFontDisableSmall", "");
+		button.Sub = TransmogUI.CreateLabel(button, "GameFontDisableSmall", "");
 		button.Sub:SetPoint("BOTTOMLEFT", button.Icon, "BOTTOMRIGHT", 8, 2);
 		button.Selected = button:CreateTexture(nil, "OVERLAY");
 		button.Selected:SetAllPoints();
@@ -702,11 +264,11 @@ function TransmogFrame_OnLoad(self)
 				if self.selectedOutfit == btn.outfit then
 					self.selectedOutfit = nil;
 				end
-				UpdateOutfits(self);
+				TransmogUI.UpdateOutfits(self);
 			else
 				PlaySound("igMainMenuOptionCheckBoxOn");
-				LoadOutfit(self, btn.outfit);
-				UpdateOutfits(self);
+				TransmogUI.LoadOutfit(self, btn.outfit);
+				TransmogUI.UpdateOutfits(self);
 			end
 		end);
 		button:SetScript("OnEnter", function(btn)
@@ -723,13 +285,13 @@ function TransmogFrame_OnLoad(self)
 	local function ScrollOutfits(delta)
 		local maxOffset = math.max(0, #TransmogOutfits - NUM_OUTFIT_BUTTONS);
 		self.outfitOffset = math.max(0, math.min(maxOffset, (self.outfitOffset or 0) - delta));
-		UpdateOutfits(self);
+		TransmogUI.UpdateOutfits(self);
 	end
 	left:EnableMouseWheel(true);
 	left:SetScript("OnMouseWheel", function(_, delta) ScrollOutfits(delta); end);
-	self.OutfitScrollUp = CreateIconButton(left, "Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up", 20, "Вверх", function() ScrollOutfits(1); end);
+	self.OutfitScrollUp = TransmogUI.CreateIconButton(left, "Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up", 20, "Вверх", function() ScrollOutfits(1); end);
 	self.OutfitScrollUp:SetPoint("TOPRIGHT", left, "TOPRIGHT", -2, -84);
-	self.OutfitScrollDown = CreateIconButton(left, "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up", 20, "Вниз", function() ScrollOutfits(-1); end);
+	self.OutfitScrollDown = TransmogUI.CreateIconButton(left, "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up", 20, "Вниз", function() ScrollOutfits(-1); end);
 	self.OutfitScrollDown:SetPoint("TOPRIGHT", left, "TOPRIGHT", -2, -84 - NUM_OUTFIT_BUTTONS * 38 + 22);
 
 	-- «Купить ячейку образа» (ретейл) - пока недоступно
@@ -754,7 +316,7 @@ function TransmogFrame_OnLoad(self)
 	-------------------------------------------------------------------
 	-- center: character
 	-------------------------------------------------------------------
-	local center = CreatePanel(self, CENTER_X1, CENTER_X2, "transmog-locationBG");
+	local center = TransmogUI.CreatePanel(self, CENTER_X1, CENTER_X2, "transmog-locationBG");
 	-- фон по расе, как в ретейле (transmog-background-race-*)
 	local _, raceFile = UnitRace("player");
 	local raceBg = center:CreateTexture(nil, "BACKGROUND", nil, 1);
@@ -801,7 +363,7 @@ function TransmogFrame_OnLoad(self)
 	controls:SetSize(5 * 26, 24);
 	controls:SetPoint("TOP", center, "TOP", 0, -14);
 	local function Control(index, texture, tooltip, onClick, onDown, onUp)
-		local button = CreateIconButton(controls, texture, 22, tooltip, onClick);
+		local button = TransmogUI.CreateIconButton(controls, texture, 22, tooltip, onClick);
 		button:SetPoint("LEFT", controls, "LEFT", (index - 1) * 26, 0);
 		if onDown then
 			button:SetScript("OnMouseDown", onDown);
@@ -821,23 +383,23 @@ function TransmogFrame_OnLoad(self)
 	end);
 
 	-- справа сверху: убрать оружие в ножны / отменить все изменения
-	local sheathe = CreateIconButton(center, "Interface\\Icons\\INV_Sword_04", 26, "Показать/убрать оружие", function()
+	local sheathe = TransmogUI.CreateIconButton(center, "Interface\\Icons\\INV_Sword_04", 26, "Показать/убрать оружие", function()
 		self.hideWeapons = not self.hideWeapons;
 		if self.hideWeapons and preview.UndressSlot then
 			preview:UndressSlot(16);
 			preview:UndressSlot(17);
 			preview:UndressSlot(18);
 		else
-			UpdatePreview(self);
+			TransmogUI.UpdatePreview(self);
 		end
 	end);
 	sheathe:SetPoint("TOPRIGHT", center, "TOPRIGHT", -46, -50);
-	local undoAll = CreateIconButton(center, "transmog-icon-revert", 26, "Отменить все изменения", function()
+	local undoAll = TransmogUI.CreateIconButton(center, "transmog-icon-revert", 26, "Отменить все изменения", function()
 		wipe(self.pending);
 		PlaySound("igMainMenuOptionCheckBoxOff");
-		UpdateSlots(self);
-		UpdatePreview(self);
-		UpdateGrid(self);
+		TransmogUI.UpdateSlots(self);
+		TransmogUI.UpdatePreview(self);
+		TransmogUI.UpdateGrid(self);
 	end);
 	undoAll:SetPoint("LEFT", sheathe, "RIGHT", 6, 0);
 	self.ClearButton = undoAll;
@@ -885,7 +447,7 @@ function TransmogFrame_OnLoad(self)
 	-------------------------------------------------------------------
 	-- right: wardrobe collection with tabs
 	-------------------------------------------------------------------
-	local right = CreatePanel(self, RIGHT_X1, RIGHT_X2, "transmog-outfit-darkBG");
+	local right = TransmogUI.CreatePanel(self, RIGHT_X1, RIGHT_X2, "transmog-outfit-darkBG");
 	self.Wardrobe = right;
 
 	local content = CreateFrame("Frame", "TransmogFrameWardrobeContent", right, "CollectionsBackgroundTemplate");
@@ -896,8 +458,7 @@ function TransmogFrame_OnLoad(self)
 	tabsBg:SetAllPoints();
 	tabsBg:SetAtlas("transmog-tabs-frame-BG");
 	local tabsFrame = content:CreateTexture(nil, "BORDER");
-	tabsFrame:SetPoint("TOPLEFT", -11, 12);
-	tabsFrame:SetPoint("BOTTOMRIGHT", 6, -6);
+	tabsFrame:SetAllPoints();   -- рамка внутри панели, не вылезает за окно
 	tabsFrame:SetAtlas("transmog-tabs-frame");
 
 	-- TabSystem сверху (TabSystemTopButtonTemplate)
@@ -913,12 +474,12 @@ function TransmogFrame_OnLoad(self)
 	local items = CreateFrame("Frame", nil, content);
 	items:SetAllPoints();
 	local itemsTab = right:AddNamedTab("Предметы", items);
-	right:AddNamedTab("Наборы", CreateStubTab(content, "Комплекты для трансмогрификации появятся вместе с серверной частью."));
-	right:AddNamedTab("Свои наборы", CreateStubTab(content, "Свои наборы появятся вместе с серверной частью."));
-	right:AddNamedTab("Ситуации", CreateStubTab(content, "Смена образа по ситуациям (бой, верховая езда...) появится позже."));
+	right:AddNamedTab("Наборы", TransmogUI.CreateStubTab(content, "Комплекты для трансмогрификации появятся вместе с серверной частью."));
+	right:AddNamedTab("Свои наборы", TransmogUI.CreateStubTab(content, "Свои наборы появятся вместе с серверной частью."));
+	right:AddNamedTab("Ситуации", TransmogUI.CreateStubTab(content, "Смена образа по ситуациям (бой, верховая езда...) появится позже."));
 	right:SetTab(itemsTab);
 
-	self.SlotTitle = CreateLabel(items, "GameFontNormalHuge", "");
+	self.SlotTitle = TransmogUI.CreateLabel(items, "GameFontNormalHuge", "");
 	self.SlotTitle:SetPoint("TOPLEFT", 16, -14);
 
 	local searchBox = CreateFrame("EditBox", "TransmogFrameSearchBox", items, "SearchBoxTemplate");
@@ -960,7 +521,7 @@ function TransmogFrame_OnLoad(self)
 			self.sourceFilters[index] = true;
 		end
 		self.page = 1;
-		RequestPage(self);
+		TransmogUI.RequestPage(self);
 	end);
 	filter:SetupMenu(function(dropdown, rootDescription)
 		rootDescription:CreateCheckbox("Собранные", function() return true; end, function() end);
@@ -968,7 +529,7 @@ function TransmogFrame_OnLoad(self)
 			self.showUncollected = not self.showUncollected;
 			filter:ValidateResetState();
 			self.page = 1;
-			RequestPage(self);
+			TransmogUI.RequestPage(self);
 		end);
 		local sources = rootDescription:CreateSubmenu("Источники");
 		for index, name in ipairs(SOURCES) do
@@ -994,7 +555,7 @@ function TransmogFrame_OnLoad(self)
 		else
 			tex:SetAtlas(icon);
 		end
-		local label = CreateLabel(button, "GameFontNormal", text);
+		local label = TransmogUI.CreateLabel(button, "GameFontNormal", text);
 		label:SetPoint("LEFT", tex, "RIGHT", 6, 0);
 		button:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD");
 		button:SetScript("OnClick", onClick);
@@ -1003,9 +564,9 @@ function TransmogFrame_OnLoad(self)
 	local unassigned = DisplayTypeButton("Не назначено", "transmog-icon-disabled", function()
 		if self.selectedSlot then
 			self.pending[self.selectedSlot] = nil;     -- слот не меняется
-			UpdateSlots(self);
-			UpdatePreview(self);
-			UpdateGrid(self);
+			TransmogUI.UpdateSlots(self);
+			TransmogUI.UpdatePreview(self);
+			TransmogUI.UpdateGrid(self);
 		end
 	end);
 	unassigned:SetPoint("TOPLEFT", items, "TOPLEFT", 16, -52);
@@ -1013,9 +574,9 @@ function TransmogFrame_OnLoad(self)
 		local slotId = self.selectedSlot;
 		if slotId then
 			self.pending[slotId] = self.applied[slotId] and 0 or nil;   -- собственный облик предмета
-			UpdateSlots(self);
-			UpdatePreview(self);
-			UpdateGrid(self);
+			TransmogUI.UpdateSlots(self);
+			TransmogUI.UpdatePreview(self);
+			TransmogUI.UpdateGrid(self);
 		end
 	end);
 	showEquipped:SetPoint("LEFT", unassigned, "RIGHT", 12, 0);
@@ -1033,13 +594,13 @@ function TransmogFrame_OnLoad(self)
 		end
 	end
 
-	self.GridMessage = CreateLabel(items, "GameFontHighlightLarge", "");
+	self.GridMessage = TransmogUI.CreateLabel(items, "GameFontHighlightLarge", "");
 	self.GridMessage:SetPoint("CENTER", items, "CENTER", 0, 20);
 
 	local paging = CreateFrame("Frame", nil, items);
 	paging:SetSize(160, 32);
 	paging:SetPoint("BOTTOM", items, "BOTTOM", 20, 14);
-	paging.Text = CreateLabel(paging, "GameFontHighlight", "");
+	paging.Text = TransmogUI.CreateLabel(paging, "GameFontHighlight", "");
 	paging.Text:SetPoint("RIGHT", paging, "RIGHT", -72, 0);
 	local function PageButton(prev)
 		local button = CreateFrame("Button", nil, paging);
@@ -1061,7 +622,7 @@ function TransmogFrame_OnLoad(self)
 		end
 		self.page = page;
 		PlaySound("igAbiliityPageTurn");
-		RequestPage(self);
+		TransmogUI.RequestPage(self);
 	end
 	paging.Prev:SetScript("OnClick", function() SetPage((self.page or 1) - 1); end);
 	paging.Next:SetScript("OnClick", function() SetPage((self.page or 1) + 1); end);
@@ -1075,7 +636,7 @@ function TransmogFrame_OnLoad(self)
 			if frame.searchDelay <= 0 then
 				frame.searchDelay = nil;
 				frame.page = 1;
-				RequestPage(frame);
+				TransmogUI.RequestPage(frame);
 			end
 		end
 		if frame.requestElapsed then
@@ -1084,7 +645,7 @@ function TransmogFrame_OnLoad(self)
 				frame.requestElapsed = nil;
 				if frame.waiting then
 					frame.noAnswer = true;
-					UpdateGrid(frame);
+					TransmogUI.UpdateGrid(frame);
 				end
 			end
 		end
@@ -1106,9 +667,9 @@ function TransmogFrame_OnShow(self)
 	if Comm_Send then
 		Comm_Send(OP_GET_STATE);
 	end
-	UpdateOutfits(self);
-	UpdateSlots(self);
-	UpdatePreview(self);
+	TransmogUI.UpdateOutfits(self);
+	TransmogUI.UpdateSlots(self);
+	TransmogUI.UpdatePreview(self);
 	if not self.selectedSlot then
 		for _, info in ipairs(SLOTS) do
 			if GetInventoryItemLink("player", info.id) then
@@ -1117,7 +678,7 @@ function TransmogFrame_OnShow(self)
 			end
 		end
 	else
-		RequestPage(self);
+		TransmogUI.RequestPage(self);
 	end
 end
 
@@ -1128,16 +689,16 @@ end
 
 function TransmogFrame_OnEvent(self, event, unit)
 	if event == "UNIT_INVENTORY_CHANGED" and unit == "player" and self:IsShown() then
-		UpdateSlots(self);
-		UpdatePreview(self);
+		TransmogUI.UpdateSlots(self);
+		TransmogUI.UpdatePreview(self);
 	end
 end
 
 function TransmogFrame_Apply(self)
-	if not HasPending(self) then
+	if not TransmogUI.HasPending(self) then
 		return;
 	end
-	local cost = GetCost(self);
+	local cost = TransmogUI.GetCost(self);
 	if cost > GetMoney() then
 		UIErrorsFrame:AddMessage(ERR_NOT_ENOUGH_MONEY or "Недостаточно денег.", 1.0, 0.1, 0.1, 1.0);
 		return;
@@ -1155,7 +716,7 @@ end
 ---------------------------------------------------------------------------
 -- server messages
 ---------------------------------------------------------------------------
-local function ParseSlots(text)
+function TransmogUI.ParseSlots(text)
 	local slots = {};
 	for slotId, itemId in (text or ""):gmatch("(%d+)/(%d+)") do
 		itemId = tonumber(itemId);
@@ -1168,10 +729,10 @@ end
 
 if Comm_Register then
 	Comm_Register(OP_STATE, function(text)
-		TransmogFrame.applied = ParseSlots(text);
+		TransmogFrame.applied = TransmogUI.ParseSlots(text);
 		if TransmogFrame:IsShown() then
-			UpdateSlots(TransmogFrame);
-			UpdatePreview(TransmogFrame);
+			TransmogUI.UpdateSlots(TransmogFrame);
+			TransmogUI.UpdatePreview(TransmogFrame);
 		end
 	end);
 
@@ -1188,9 +749,9 @@ if Comm_Register then
 			UIErrorsFrame:AddMessage(message, 1.0, 0.1, 0.1, 1.0);
 		end
 		if frame:IsShown() then
-			UpdateSlots(frame);
-			UpdatePreview(frame);
-			UpdateGrid(frame);
+			TransmogUI.UpdateSlots(frame);
+			TransmogUI.UpdatePreview(frame);
+			TransmogUI.UpdateGrid(frame);
 		end
 	end);
 
@@ -1218,7 +779,7 @@ if Comm_Register then
 			table.insert(frame.entries, { displayId = tonumber(displayId), itemId = tonumber(itemId), collected = isCollected == "1" });
 		end
 		if frame:IsShown() then
-			UpdateGrid(frame);
+			TransmogUI.UpdateGrid(frame);
 		end
 	end);
 end
