@@ -138,7 +138,7 @@ namespace
             data.Active = result->Fetch()[1].GetUInt32();
         }
 
-        if (QueryResult result = CharacterDatabase.PQuery("SELECT id, name, icon, slots, sit_enabled, sit_location, sit_movement, sit_combat FROM character_transmog_outfits WHERE guid = {}", guid))
+        if (QueryResult result = CharacterDatabase.PQuery("SELECT id, name, icon, slots, CAST(sit_enabled AS SIGNED), CAST(sit_location AS SIGNED), CAST(sit_movement AS SIGNED), CAST(sit_combat AS SIGNED) FROM character_transmog_outfits WHERE guid = {}", guid))
         {
             do
             {
@@ -148,10 +148,10 @@ namespace
                 outfit.Name = fields[1].GetString();
                 outfit.Icon = fields[2].GetUInt32();
                 outfit.Slots = Transmog::ParseSlots(fields[3].GetString());
-                outfit.SituationsEnabled = fields[4].GetUInt8() != 0;
-                outfit.Location = std::min<uint8>(fields[5].GetUInt8(), LOC_MAX - 1);
-                outfit.Movement = std::min<uint8>(fields[6].GetUInt8(), MOVE_MAX - 1);
-                outfit.Combat = std::min<uint8>(fields[7].GetUInt8(), COMBAT_MAX - 1);
+                outfit.SituationsEnabled = fields[4].GetInt64() != 0;
+                outfit.Location = uint8(std::min<int64>(fields[5].GetInt64(), LOC_MAX - 1));
+                outfit.Movement = uint8(std::min<int64>(fields[6].GetInt64(), MOVE_MAX - 1));
+                outfit.Combat = uint8(std::min<int64>(fields[7].GetInt64(), COMBAT_MAX - 1));
             } while (result->NextRow());
         }
     }

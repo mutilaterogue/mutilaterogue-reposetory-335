@@ -175,21 +175,24 @@ namespace Transmog
     void Load()
     {
         items.clear();
-        QueryResult result = WorldDatabase.Query("SELECT entry, class, subclass, InventoryType, displayid, SellPrice, Quality, AllowableClass, itemset FROM item_template WHERE class IN (2, 4)");
+        // CAST: every column comes as BIGINT, so the reading does not depend on the column types of the fork
+        QueryResult result = WorldDatabase.Query("SELECT CAST(entry AS SIGNED), CAST(class AS SIGNED), CAST(subclass AS SIGNED), CAST(InventoryType AS SIGNED), "
+            "CAST(displayid AS SIGNED), CAST(SellPrice AS SIGNED), CAST(Quality AS SIGNED), CAST(AllowableClass AS SIGNED), CAST(itemset AS SIGNED) "
+            "FROM item_template WHERE class IN (2, 4)");
         if (!result)
             return;
         do
         {
             Field* fields = result->Fetch();
-            ItemData& data = items[fields[0].GetUInt32()];
-            data.Class = fields[1].GetUInt8();
-            data.SubClass = fields[2].GetUInt8();
-            data.InventoryType = fields[3].GetUInt8();
-            data.DisplayId = fields[4].GetUInt32();
-            data.SellPrice = fields[5].GetUInt32();
-            data.Quality = fields[6].GetUInt8();
-            data.AllowableClass = fields[7].GetInt32();
-            data.ItemSet = fields[8].GetUInt32();
+            ItemData& data = items[uint32(fields[0].GetInt64())];
+            data.Class = uint8(fields[1].GetInt64());
+            data.SubClass = uint8(fields[2].GetInt64());
+            data.InventoryType = uint8(fields[3].GetInt64());
+            data.DisplayId = uint32(fields[4].GetInt64());
+            data.SellPrice = uint32(std::max<int64>(0, fields[5].GetInt64()));
+            data.Quality = uint8(fields[6].GetInt64());
+            data.AllowableClass = int32(fields[7].GetInt64());
+            data.ItemSet = uint32(fields[8].GetInt64());
         } while (result->NextRow());
         TC_LOG_INFO("server.loading", ">> transmog: {} items", uint32(items.size()));
     }
