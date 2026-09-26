@@ -53,6 +53,16 @@ function TransmogUI.UpdatePreview(self)
 	model:SetUnit("player");
 	model:SetPosition(model.zoom or 0, 0, 0);
 	model:SetFacing(model.facing or 0);
+	if self.hideWeapons then
+		-- «Убрать оружие»: в 3.3.5 у модели нет UndressSlot - одеваем заново без оружия
+		model:Undress();
+		for slotId, itemId in pairs(TransmogUI.DisplayedLooks(self, true)) do
+			if slotId ~= 16 and slotId ~= 17 and slotId ~= 18 then
+				model:TryOn("item:" .. itemId);
+			end
+		end
+		return;
+	end
 	for _, info in ipairs(SLOTS) do
 		local itemId, changed = TransmogUI.GetDisplayedItem(self, info.id);
 		if itemId and (changed or self.applied[info.id]) then
@@ -231,13 +241,8 @@ function TransmogFrame_ToggleWeapons()
 	local frame = TransmogFrame;
 	local model = frame.Preview;
 	frame.hideWeapons = not frame.hideWeapons;
-	if frame.hideWeapons and model.UndressSlot then
-		model:UndressSlot(16);
-		model:UndressSlot(17);
-		model:UndressSlot(18);
-	else
-		TransmogUI.UpdatePreview(frame);
-	end
+	PlaySound("igMainMenuOptionCheckBoxOn");
+	TransmogUI.UpdatePreview(frame);
 end
 
 local function RefreshAll(frame)

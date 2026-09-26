@@ -26,7 +26,7 @@
 
 #include "transmog.h"
 #include "ScriptMgr.h"
-#include "AddonComm\AddonComm.h"
+#include "Custom\AddonComm\AddonComm.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "Item.h"
@@ -195,6 +195,9 @@ namespace Transmog
             data.ItemSet = uint32(fields[8].GetInt64());
         } while (result->NextRow());
         TC_LOG_INFO("server.loading", ">> transmog: {} items", uint32(items.size()));
+        if (ItemData const* sample = GetItemData(2105))   // пример: Thug Shirt, должен быть class 4 inv 4
+            TC_LOG_INFO("server.loading", ">> transmog: item 2105 class {} sub {} inv {} display {}",
+                uint32(sample->Class), uint32(sample->SubClass), uint32(sample->InventoryType), sample->DisplayId);
     }
 
     ItemData const* GetItemData(uint32 entry)
@@ -397,6 +400,11 @@ namespace Transmog
 
                 if (error)
                 {
+                    TC_LOG_INFO("scripts", "transmog: {} slot {} item {} (class {} sub {} inv {}) <- look {} (class {} sub {} inv {}): {}",
+                        player->GetName(), uint32(slot), target->GetEntry(),
+                        targetData ? uint32(targetData->Class) : 999, targetData ? uint32(targetData->SubClass) : 999, targetData ? uint32(targetData->InventoryType) : 999,
+                        fakeEntry, sourceData ? uint32(sourceData->Class) : 999, sourceData ? uint32(sourceData->SubClass) : 999, sourceData ? uint32(sourceData->InventoryType) : 999,
+                        error);
                     if (skipInvalid)
                         continue;
                     return Fail(error, errorItem);

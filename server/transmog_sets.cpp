@@ -13,7 +13,7 @@
 
 #include "transmog.h"
 #include "ScriptMgr.h"
-#include "AddonComm\AddonComm.h"
+#include "Custom\AddonComm\AddonComm.h"
 #include "Player.h"
 #include "SharedDefines.h"
 

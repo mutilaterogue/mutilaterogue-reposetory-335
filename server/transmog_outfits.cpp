@@ -30,7 +30,7 @@
 
 #include "transmog.h"
 #include "ScriptMgr.h"
-#include "AddonComm\AddonComm.h"
+#include "Custom\AddonComm\AddonComm.h"
 #include "DatabaseEnv.h"
 #include "Item.h"
 #include "Map.h"
