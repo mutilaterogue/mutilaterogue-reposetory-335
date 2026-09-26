@@ -1,0 +1,25 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\UI.xsd">
+	<!--
+		Коллекции для 3.3.5 (по раскладке Blizzard_Collections ретейла).
+		В FrameXML.toc одна строка (после TabSystem): Collections\Collections.xml
+
+		Blizzard_Collections.*          окно, вкладки (TabSystem), открытие
+		Blizzard_CollectionTemplates.*  общие шаблоны (строка списка, заглушка вкладки)
+		Blizzard_CompanionJournal.*      общий шаблон и логика вкладок компаньонов (маунты/питомцы)
+		Mounts\    вкладка "Транспорт"
+		Pets\      вкладка "Питомцы"
+		Toys\      вкладка "Игрушки"       (сервер: toy_collection.cpp)
+		Heirlooms\ вкладка "Наследуемые"    (в скором времени)
+		Wardrobe\  вкладка "Внешний вид"    (в скором времени)
+	-->
+	<Include file="Blizzard_Collections.xml"/>
+	<Include file="Blizzard_CollectionTemplates.xml"/>
+	<Include file="Data\Data.xml"/>
+	<Include file="Blizzard_CompanionJournal.xml"/>
+	<Include file="Mounts\Blizzard_MountCollection.xml"/>
+	<Include file="Pets\Blizzard_PetCollection.xml"/>
+	<Include file="Toys\Blizzard_ToyBox.xml"/>
+	<Include file="Heirlooms\Blizzard_HeirloomCollection.xml"/>
+	<Include file="Wardrobe\Blizzard_Wardrobe.xml"/>
+	<Script file="Blizzard_CollectionsInit.lua"/>
+</Ui>
