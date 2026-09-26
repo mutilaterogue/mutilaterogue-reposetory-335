@@ -217,11 +217,31 @@
 						<Anchors>
 							<Anchor point="BOTTOMLEFT" relativeTo="$parentSaveOutfitButton" relativePoint="BOTTOMRIGHT" x="9" y="2"/>
 						</Anchors>
+						<KeyValues>
+							<KeyValue key="sliceAtlas" value="common-currencybox-a" type="string"/>
+						</KeyValues>
 						<Layers>
+							<!-- атлас режется на 3 части (TransmogSlicedFrame_Update), а не растягивается -->
 							<Layer level="BACKGROUND">
-								<Texture atlas="common-currencybox-a" setAllPoints="true"/>
+								<Texture parentKey="Left">
+									<Anchors>
+										<Anchor point="TOPLEFT"/>
+										<Anchor point="BOTTOMLEFT"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="Right">
+									<Anchors>
+										<Anchor point="TOPRIGHT"/>
+										<Anchor point="BOTTOMRIGHT"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="Center"/>
 							</Layer>
 						</Layers>
+						<Scripts>
+							<OnShow function="TransmogSlicedFrame_Update"/>
+							<OnSizeChanged function="TransmogSlicedFrame_Update"/>
+						</Scripts>
 						<Frames>
 							<Frame name="TransmogFrameMoneyFrame" inherits="SmallMoneyFrameTemplate">
 								<Size x="141" y="15"/>

@@ -207,6 +207,11 @@ local function SetSliced(left, center, right, atlas, height)
 	return true;
 end
 
+-- рамка из 3 частей (Left/Center/Right) по атласу frame.sliceAtlas: поле с деньгами и т.п.
+function TransmogSlicedFrame_Update(self)
+	SetSliced(self.Left, self.Center, self.Right, self.sliceAtlas, self:GetHeight());
+end
+
 function TransmogUI.SetSlicedAtlas(button, atlas)
 	local height = button:GetHeight();
 	if not SetSliced(button.Left, button.Center, button.Right, atlas, height) and atlas ~= button.normalAtlas then
