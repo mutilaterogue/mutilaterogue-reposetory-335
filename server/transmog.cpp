@@ -16,7 +16,7 @@
  *   - cost = sell price of the transmogrified item (min 1 silver), reset is free
  *
  * AddonComm opcodes (client: Transmog\Blizzard_Transmog.lua):
- *   "TMOG_GET_STATE"                         -> "TMOG_STATE"  : "slot/itemId,..."
+ *   "TMOG_GET_STATE"                         -> "TMOG_STATE"  : "slot/itemId,..." (slot = client inventory slot id, 1 = head)
  *   "TMOG_APPLY" : "slot/itemId,..." (0 = restore) -> "TMOG_RESULT" : ok(1/0) : error : errorItem, then "TMOG_STATE"
  *   "TMOG_OPEN" / "TMOG_CLOSE"               server opens / closes the window (npc_transmogrifier)
  *
@@ -284,6 +284,8 @@ namespace Transmog
         return source && IsAppearanceCollected(collected, *source, itemId);
     }
 
+    // the client uses inventory slot ids (1 head ... 15 back, 16 main hand, 19 tabard),
+    // the server EquipmentSlots (0 head ... 14 back, 15 main hand, 18 tabard): client = server + 1
     SlotList ParseSlots(std::string const& text)
     {
         SlotList slots;
@@ -294,10 +296,10 @@ namespace Transmog
             size_t sep = token.find('/');
             if (sep == std::string::npos)
                 continue;
-            uint32 slot = CommToUInt32(token.substr(0, sep), EQUIPMENT_SLOT_END);
+            uint32 clientSlot = CommToUInt32(token.substr(0, sep), 0);
             uint32 itemId = CommToUInt32(token.substr(sep + 1), 0);
-            if (slot < EQUIPMENT_SLOT_END)
-                slots.emplace_back(uint8(slot), itemId);
+            if (clientSlot >= 1 && clientSlot <= EQUIPMENT_SLOT_END)
+                slots.emplace_back(uint8(clientSlot - 1), itemId);
         }
         return slots;
     }
@@ -310,7 +312,7 @@ namespace Transmog
         {
             if (!first)
                 text << ',';
-            text << uint32(slot) << '/' << itemId;
+            text << uint32(slot) + 1 << '/' << itemId;   // client slot id
             first = false;
         }
         return text.str();
