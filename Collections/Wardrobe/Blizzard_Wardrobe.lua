@@ -398,16 +398,16 @@ function WardrobeCollectionFrame_OnLoad(self)
 		local function SetCategory(category)
 			WardrobeCollectionFrame_SetCategory(self, category);
 		end
+		-- категории - подменю: раскрываются по одной при наведении
 		rootDescription:CreateDivider();
-		rootDescription:CreateTitle("Броня");
+		local armor = rootDescription:CreateSubmenu("Броня");
 		for _, info in ipairs(ARMOR_SLOTS) do
-			rootDescription:CreateRadio(info.name, IsCategory, SetCategory, info.category);
+			armor:CreateRadio(info.name, IsCategory, SetCategory, info.category);
 		end
 		for _, info in ipairs(WEAPON_SLOTS) do
-			rootDescription:CreateDivider();
-			rootDescription:CreateTitle(info.name);
+			local submenu = rootDescription:CreateSubmenu(info.name);
 			for _, cat in ipairs(info.categories) do
-				rootDescription:CreateRadio(cat[2], IsCategory, SetCategory, cat[1]);
+				submenu:CreateRadio(cat[2], IsCategory, SetCategory, cat[1]);
 			end
 		end
 	end);
