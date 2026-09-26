@@ -534,6 +534,8 @@ end
 ---------------------------------------------------------------------------
 -- server messages
 ---------------------------------------------------------------------------
+ERR_LEARN_HEIRLOOM_S = ERR_LEARN_HEIRLOOM_S or "Предмет %s добавлен в вашу коллекцию наследуемых предметов.";
+
 if Comm_Register then
 	Comm_Register(SMSG.HEIRLOOM_LIST, function(allText, ownedText)
 		HeirloomsJournal.requestElapsed = nil;
@@ -568,6 +570,12 @@ if Comm_Register then
 	Comm_Register(SMSG.HEIRLOOM_ADDED, function(itemId)
 		itemId = tonumber(itemId);
 		if itemId then
+			if not owned[itemId] then
+				-- ретейл: ERR_LEARN_HEIRLOOM_S системным сообщением
+				local _, link = GetItemInfo(itemId);
+				local info = ChatTypeInfo["SYSTEM"];
+				DEFAULT_CHAT_FRAME:AddMessage(ERR_LEARN_HEIRLOOM_S:format(link or ("item:" .. itemId)), info.r, info.g, info.b, info.id);
+			end
 			owned[itemId] = true;
 			if HeirloomsJournal:IsShown() then
 				HeirloomsJournal_Refresh(HeirloomsJournal);

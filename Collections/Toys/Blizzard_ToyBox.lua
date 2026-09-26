@@ -14,6 +14,8 @@ local BUTTON_PADDING_Y = 16;
 
 -- опкоды - имена: их не нужно добавлять ни в Server.lua, ни в AddonComm.h
 local OP_REQUEST, OP_USE = "TOYS_REQUEST", "TOYS_USE";
+ERR_LEARN_TOY_S = ERR_LEARN_TOY_S or "Игрушка %s добавлена в коллекцию.";
+
 local OP_LIST, OP_ADDED, OP_COOLDOWN = "TOYS_LIST", "TOYS_ADDED", "TOYS_COOLDOWN";
 
 local allToys = {};         -- item ids
@@ -357,7 +359,9 @@ if Comm_Register then
 				table.insert(allToys, itemId);
 			end
 			local _, link = GetItemInfo(itemId);
-			DEFAULT_CHAT_FRAME:AddMessage(("Новая игрушка в коллекции: %s"):format(link or ("item:" .. itemId)), 0.53, 0.67, 1);
+			-- ретейл: ERR_LEARN_TOY_S системным сообщением
+			local info = ChatTypeInfo["SYSTEM"];
+			DEFAULT_CHAT_FRAME:AddMessage(ERR_LEARN_TOY_S:format(link or ("item:" .. itemId)), info.r, info.g, info.b, info.id);
 			RefreshIfShown();
 		end
 	end);

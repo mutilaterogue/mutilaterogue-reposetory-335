@@ -7,6 +7,8 @@
 --   "APPEAR_ADDED"   <- itemId
 -- Every cell is a DressUpModel with the undressed player trying the item on.
 
+ERR_LEARN_TRANSMOG_S = ERR_LEARN_TRANSMOG_S or "Модель %s добавлена в вашу коллекцию.";
+
 local OP_PAGE, OP_SOURCES, OP_ADDED = "APPEAR_PAGE", "APPEAR_SOURCES", "APPEAR_ADDED";
 -- запросы называются иначе, чем ответы: аддон-шёпот самому себе приходит и клиенту тоже
 local OP_GET_PAGE, OP_GET_SOURCES = "APPEAR_GET_PAGE", "APPEAR_GET_SOURCES";
@@ -608,7 +610,9 @@ if Comm_Register then
 		end
 		sourcesCache = {};
 		local _, link = GetItemInfo(itemId);
-		DEFAULT_CHAT_FRAME:AddMessage(("Новый облик в коллекции: %s"):format(link or ("item:" .. itemId)), 0.53, 0.67, 1);
+		-- ретейл: ERR_LEARN_TRANSMOG_S системным сообщением
+		local info = ChatTypeInfo["SYSTEM"];
+		DEFAULT_CHAT_FRAME:AddMessage(ERR_LEARN_TRANSMOG_S:format(link or ("item:" .. itemId)), info.r, info.g, info.b, info.id);
 		if WardrobeCollectionFrame:IsShown() then
 			WardrobeCollectionFrame_Request(WardrobeCollectionFrame);
 		end

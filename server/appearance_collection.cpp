@@ -37,6 +37,7 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "Util.h"
+#include "World.h"
 #include "WorldSession.h"
 #include "Timer.h"
 
@@ -53,6 +54,7 @@ namespace
     constexpr uint32 PAGE_SIZE = 18;
     constexpr uint32 MAX_SOURCES = 30;
     constexpr uint32 SCAN_INTERVAL_MS = 5000;
+    constexpr uint32 WORLD_SCAN_INTERVAL_MS = 10000;   // all online players
 
     constexpr uint32 C_WARRIOR = 1 << 0, C_PALADIN = 1 << 1, C_HUNTER = 1 << 2, C_ROGUE = 1 << 3, C_PRIEST = 1 << 4,
         C_DEATH_KNIGHT = 1 << 5, C_SHAMAN = 1 << 6, C_MAGE = 1 << 7, C_WARLOCK = 1 << 8, C_DRUID = 1 << 10;
@@ -321,23 +323,31 @@ namespace
             sAddonComm->Send(player, "APPEAR_ADDED", itemId);
     }
 
-    // equipped items always count; items in the bags - only soulbound ones
+    // retail: the appearance is collected only when the item can no longer be traded or refunded -
+    // soulbound (BoE after equipping) and the 2 hour BoP trade / vendor refund window is over
+    bool IsCollectable(Item const* item)
+    {
+        return item && item->IsSoulBound() && !item->IsBOPTradeable() && !item->IsRefundable();
+    }
+
+    // equipped items and items in the bags; tradeable ones are picked up by a later scan
     void ScanInventory(Player* player, bool notify)
     {
         for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
             if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
-                CollectItem(player, item->GetEntry(), notify);
+                if (IsCollectable(item))
+                    CollectItem(player, item->GetEntry(), notify);
 
         for (uint8 slot = INVENTORY_SLOT_ITEM_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
             if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
-                if (item->IsSoulBound())
+                if (IsCollectable(item))
                     CollectItem(player, item->GetEntry(), notify);
 
         for (uint8 bagSlot = INVENTORY_SLOT_BAG_START; bagSlot < INVENTORY_SLOT_BAG_END; ++bagSlot)
             if (Bag* bag = player->GetBagByPos(bagSlot))
                 for (uint32 i = 0; i < bag->GetBagSize(); ++i)
                     if (Item* item = bag->GetItemByPos(uint8(i)))
-                        if (item->IsSoulBound())
+                        if (IsCollectable(item))
                             CollectItem(player, item->GetEntry(), notify);
     }
 
@@ -493,6 +503,25 @@ public:
     {
         LoadAppearances();
     }
+
+    // equipped BoE items and items whose trade / refund window has ended
+    void OnUpdate(uint32 diff) override
+    {
+        if (scanTimer > diff)
+        {
+            scanTimer -= diff;
+            return;
+        }
+        scanTimer = WORLD_SCAN_INTERVAL_MS;
+
+        for (auto const& [accountId, session] : sWorld->GetAllSessions())
+            if (Player* player = session->GetPlayer())
+                if (player->IsInWorld())
+                    ScanInventory(player, true);
+    }
+
+private:
+    uint32 scanTimer = WORLD_SCAN_INTERVAL_MS;
 };
 
 class appearance_collection_player : public PlayerScript
@@ -517,19 +546,19 @@ public:
 
     void OnLootItem(Player* player, Item* item, uint32 /*count*/, ObjectGuid /*lootGuid*/) override
     {
-        if (item && item->IsSoulBound())
+        if (IsCollectable(item))
             CollectItem(player, item->GetEntry(), true);
     }
 
     void OnCreateItem(Player* player, Item* item, uint32 /*count*/) override
     {
-        if (item && item->IsSoulBound())
+        if (IsCollectable(item))
             CollectItem(player, item->GetEntry(), true);
     }
 
     void OnQuestRewardItem(Player* player, Item* item, uint32 /*count*/) override
     {
-        if (item && item->IsSoulBound())
+        if (IsCollectable(item))
             CollectItem(player, item->GetEntry(), true);
     }
 };
