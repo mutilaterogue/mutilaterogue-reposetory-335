@@ -24,6 +24,7 @@ void AddSC_collections_creature_cache();
 void AddSC_heirloom_collection();
 void AddSC_toy_collection();
 void AddSC_appearance_collection();
+void AddSC_transmog();
 
 void AddCustomScripts()
 {
@@ -32,4 +33,5 @@ void AddCustomScripts()
     AddSC_heirloom_collection();
     AddSC_toy_collection();
     AddSC_appearance_collection();
+    AddSC_transmog();
 }
