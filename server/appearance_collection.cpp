@@ -170,6 +170,35 @@ namespace
         return mask;
     }
 
+    constexpr uint32 ITEM_FLAG_DEPRECATED_MASK = 0x00000010;
+
+    // тестовые/служебные предметы: TEST, Тест, [PH], Deprecated, OLD, Monster и т.п. (без учёта регистра)
+    bool IsJunkName(std::string const& name)
+    {
+        if (name.empty())
+            return false;
+
+        std::wstring wname;
+        if (!Utf8toWStr(name, wname))
+            return false;
+        wstrToLower(wname);
+
+        static std::wstring const contains[] = {
+            L"test", L"тест", L"[ph]", L"(ph)", L"deprecated", L"unused", L"не используется", L"placeholder",
+            L"monster -", L"npc equip", L"qa ", L"zzold", L"zz ", L"[dnd]", L"dnd ",
+        };
+        for (std::wstring const& word : contains)
+            if (wname.find(word) != std::wstring::npos)
+                return true;
+
+        static std::wstring const prefixes[] = { L"ph ", L"old ", L"old_", L"monster", L"zz" };
+        for (std::wstring const& prefix : prefixes)
+            if (wname.compare(0, prefix.size(), prefix) == 0)
+                return true;
+
+        return false;
+    }
+
     void LoadAppearances()
     {
         itemData.clear();
@@ -187,7 +216,7 @@ namespace
         }
 
         QueryResult result = WorldDatabase.Query(
-            "SELECT entry, class, subclass, displayid, Quality, InventoryType, AllowableClass, ItemLevel, name "
+            "SELECT entry, class, subclass, displayid, Quality, InventoryType, AllowableClass, ItemLevel, name, Flags "
             "FROM item_template WHERE class IN (2, 4) AND displayid > 0 AND Quality > 0 ORDER BY ItemLevel, entry");
         if (!result)
         {
@@ -208,17 +237,24 @@ namespace
             uint32 itemLevel = fields[7].GetUInt32();
             std::string name = fields[8].GetString();
 
-            if (name.rfind("Test", 0) == 0 || name.rfind("OLD", 0) == 0 || name.rfind("Monster", 0) == 0
-                || name.find("Deprecated") != std::string::npos || name.find("DEPRECATED") != std::string::npos)
+            uint32 flags = fields[9].GetUInt32();
+            if (flags & ITEM_FLAG_DEPRECATED_MASK)       // 0x10: cannot equip or use
                 continue;
 
             uint32 category = GetCategory(itemClass, subClass, inventoryType);
             if (!category)
                 continue;
 
+            std::string localeName;
             auto localeItr = localeNames.find(entry);
-            if (localeItr != localeNames.end() && !localeItr->second.empty())
-                name = localeItr->second;
+            if (localeItr != localeNames.end())
+                localeName = localeItr->second;
+
+            if (IsJunkName(name) || IsJunkName(localeName))
+                continue;
+
+            if (!localeName.empty())
+                name = localeName;
 
             ItemData& data = itemData[entry];
             data.itemId = entry;
