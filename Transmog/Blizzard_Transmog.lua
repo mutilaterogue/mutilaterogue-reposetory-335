@@ -358,7 +358,8 @@ function TransmogFrame_OnLoad(self)
 	purchaseText:SetTextColor(0.5, 0.5, 0.5);
 
 	-- SaveOutfitButton (128x28 at 9,14) + MoneyFrame (152x24)
-	local saveOutfit = CreateFrame("Button", nil, outfits, "UIPanelButtonTemplate");
+	-- ретейл: SharedButtonTemplate (ThreeSliceButtonTemplate, красная кнопка)
+	local saveOutfit = CreateFrame("Button", nil, outfits, "SharedButtonTemplate");
 	saveOutfit:SetSize(128, 28);
 	saveOutfit:SetPoint("BOTTOMLEFT", 9, 14);
 	saveOutfit:SetText("Сохранить образ");
@@ -528,7 +529,7 @@ function TransmogFrame_OnLoad(self)
 		table.insert(self.slotButtons, button);
 	end
 
-	local apply = CreateFrame("Button", nil, preview, "UIPanelButtonTemplate");
+	local apply = CreateFrame("Button", nil, preview, "SharedButtonTemplate");
 	apply:SetSize(150, 28);
 	apply:SetFrameLevel(model:GetFrameLevel() + 5);
 	apply:SetPoint("BOTTOMRIGHT", -21, 14);
