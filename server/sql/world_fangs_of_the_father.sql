@@ -1,4 +1,4 @@
--- world DB: «Клыки Отца» (spell_rog_fangs_of_the_father.cpp)
+-- world DB: «Клыки Отца» (spell_rogue.cpp: spell_rog_fangs_of_the_father, spell_rog_fury_of_the_destroyer)
 DELETE FROM `spell_script_names` WHERE `spell_id` IN (109939, 109949);
 INSERT INTO `spell_script_names` (`spell_id`, `ScriptName`) VALUES
 (109939, 'spell_rog_fangs_of_the_father'),
