@@ -124,7 +124,12 @@ local function DressModel(model)
 	if not entry then
 		return;
 	end
-	model:SetUnit("player");
+	-- SetUnit только один раз: повторный SetUnit на уже загруженной модели в 3.3.5
+	-- сбрасывает её в обычную позу/камеру, и SetPosition больше не действует
+	if not model.unitSet then
+		model:SetUnit("player");
+		model.unitSet = true;
+	end
 	model:Undress();
 	model:TryOn("item:" .. entry.itemId);
 	ApplyCamera(model);
