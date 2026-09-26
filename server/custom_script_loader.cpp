@@ -27,6 +27,7 @@ void AddSC_appearance_collection();
 void AddSC_transmog();
 void AddSC_transmog_outfits();
 void AddSC_transmog_sets();
+void AddSC_spell_rog_fangs_of_the_father();
 
 void AddCustomScripts()
 {
@@ -38,4 +39,5 @@ void AddCustomScripts()
     AddSC_transmog();
     AddSC_transmog_outfits();
     AddSC_transmog_sets();
+    AddSC_spell_rog_fangs_of_the_father();
 }
