@@ -1,0 +1,336 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Script file="PlayerFrame.lua"/>
+
+	<Button name="PlayerFrame" frameStrata="LOW" toplevel="true" movable="true" inherits="SecureUnitButtonTemplate" parent="UIParent">
+		<Size x="232" y="100"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" x="-19" y="-4"/>
+		</Anchors>
+		<HitRectInsets>
+			<AbsInset left="6" right="0" top="4" bottom="9"/>
+		</HitRectInsets>
+		<Frames>
+			<Frame name="PlayerFrameContainer" setAllPoints="true">
+				<Layers>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture name="PlayerPortrait" parentKey="PlayerPortrait">
+							<Size x="60" y="60"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="24" y="-19"/>
+							</Anchors>
+						</Texture>
+						<!-- retail: the portrait masked to the frame's round hole (MaskTexture, WotLKExtensions) -->
+						<MaskTexture parentKey="PlayerPortraitMask" atlas="UI-HUD-UnitFrame-Player-Portrait-Mask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+							<Size x="60" y="60"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="24" y="-19"/>
+							</Anchors>
+							<MaskedTextures>
+								<MaskedTexture childKey="PlayerPortrait"/>
+							</MaskedTextures>
+						</MaskTexture>
+					</Layer>
+					<Layer level="ARTWORK" textureSubLevel="2">
+						<Texture name="PlayerFrameBackground">
+							<Size x="124" y="32"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="85" y="-40"/>
+							</Anchors>
+							<Color r="0" g="0" b="0" a="0.5"/>
+						</Texture>
+						<Texture name="PlayerFrameVehicleTexture" atlas="UI-HUD-UnitFrame-Player-PortraitOn-Vehicle" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="-2" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerFrameTexture" atlas="UI-HUD-UnitFrame-Player-PortraitOn" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerFrameAlternatePowerTexture" atlas="UI-HUD-UnitFrame-Player-PortraitOn-ClassResource" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="-1"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture name="PlayerFrameFlash" atlas="UI-HUD-UnitFrame-Player-PortraitOn-InCombat" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="-1" y="1"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<Frame name="PlayerFrameContent" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<FontString name="PlayerName" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+							<Size x="96" y="12"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="88" y="-27"/>
+							</Anchors>
+						</FontString>
+						<FontString name="PlayerLevelText" inherits="GameFontNormalSmall" justifyH="RIGHT" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="-24" y="-28"/>
+							</Anchors>
+						</FontString>
+						<FontString name="PlayerHitIndicator" inherits="NumberFontNormalHuge" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="54" y="-50"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="2">
+						<Texture name="PlayerStatusTexture" atlas="UI-HUD-UnitFrame-Player-PortraitOn-Status" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="17" y="-14"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<StatusBar name="PlayerFrameHealthBar" inherits="TextStatusBar">
+						<Size x="124" y="20"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="85" y="-40"/>
+						</Anchors>
+						<Layers>
+							<Layer level="OVERLAY" textureSubLevel="1">
+								<FontString name="PlayerFrameHealthBarText" inherits="TextStatusBarText">
+									<Anchors>
+										<Anchor point="CENTER" x="0" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<BarTexture atlas="UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health"/>
+						<Scripts>
+							<OnLoad>
+								TextStatusBar_Initialize(self);
+								self.textLockable = 1;
+								self.lockColor = true;
+								self.cvar = "playerStatusText";
+								self.cvarLabel = "STATUS_TEXT_PLAYER";
+							</OnLoad>
+							<OnValueChanged function="UnitFrameHealthBar_OnValueChanged"/>
+							<OnSizeChanged>
+								UnitFrameHealPredictionBars_UpdateSize(self);
+							</OnSizeChanged>
+							<OnMouseUp>
+								self:GetParent():GetParent():Click(button);
+							</OnMouseUp>
+						</Scripts>
+					</StatusBar>
+					<StatusBar name="PlayerFrameManaBar" inherits="TextStatusBar">
+						<Size x="124" y="9"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="85" y="-62"/>
+						</Anchors>
+						<Layers>
+							<Layer level="OVERLAY" textureSubLevel="1">
+								<FontString name="PlayerFrameManaBarText" inherits="TextStatusBarText">
+									<Anchors>
+										<Anchor point="CENTER" x="0" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<BarTexture atlas="UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana"/>
+						<Scripts>
+							<OnLoad>
+								TextStatusBar_Initialize(self);
+								self.textLockable = 1;
+								self.lockColor = true;
+								self.cvar = "playerStatusText";
+								self.cvarLabel = "STATUS_TEXT_PLAYER";
+							</OnLoad>
+							<OnMouseUp>
+								self:GetParent():GetParent():Click(button);
+							</OnMouseUp>
+						</Scripts>
+					</StatusBar>
+				</Frames>
+			</Frame>
+
+			<Frame name="PlayerFrameContextual" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture name="PlayerLeaderIcon" atlas="UI-HUD-UnitFrame-Player-Group-LeaderIcon" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="86" y="-10"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerGuideIcon" atlas="UI-HUD-UnitFrame-Player-Group-GuideIcon" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="86" y="-10"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerMasterIcon" file="Interface\GroupFrame\UI-Group-MasterLooter" hidden="true">
+							<Size x="16" y="16"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="108" y="-10"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerFrameRoleIcon" atlas="roleicon-tiny-tank" hidden="true">
+							<Size x="12" y="12"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="196" y="-27"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerAttackIcon" atlas="UI-HUD-UnitFrame-Player-CombatIcon" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="64" y="-62"/>
+							</Anchors>
+						</Texture>
+						<Texture name="PlayerFrameCornerIcon" atlas="UI-HUD-UnitFrame-Player-PortraitOn-CornerEmbellishment" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="58" y="-53"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="2">
+						<Texture name="PlayerPVPIcon" hidden="true">
+							<Size x="39" y="37"/>
+							<Anchors>
+								<Anchor point="TOP" relativePoint="TOPLEFT" x="25" y="-50"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="4">
+						<FontString name="PlayerPVPTimerText" inherits="GameFontNormalSmall" hidden="true">
+							<Anchors>
+								<Anchor point="TOP" relativeTo="PlayerPVPIcon" relativePoint="BOTTOM" x="0" y="2"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame name="PlayerPVPIconHitArea" enableMouse="true" hidden="true">
+						<Size x="39" y="37"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="PlayerPVPIcon"/>
+						</Anchors>
+						<Scripts>
+							<OnEnter>
+								GameTooltip_AddNewbieTip(self, self.tooltipTitle, 1.0, 1.0, 1.0, self.tooltipText, 1);
+							</OnEnter>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Frame>
+					<Frame name="PlayerFrameReadyCheck" inherits="ReadyCheckStatusTemplate" hidden="true">
+						<Size x="40" y="40"/>
+						<Anchors>
+							<Anchor point="CENTER" relativeTo="PlayerPortrait" relativePoint="CENTER"/>
+						</Anchors>
+						<Scripts>
+							<OnLoad function="RaiseFrameLevelByTwo"/>
+						</Scripts>
+					</Frame>
+					<Button name="PlayerSpeakerFrame" inherits="VoiceChatSpeakerTemplate" hidden="true">
+						<Size x="20" y="20"/>
+						<Anchors>
+							<Anchor point="LEFT" relativePoint="RIGHT" x="0" y="-3"/>
+						</Anchors>
+						<Scripts>
+							<OnUpdate function="VoiceChat_OnUpdate"/>
+						</Scripts>
+					</Button>
+
+					<!-- отдых: ретейловый флипбук, кадры крутит PlayerFrame.lua -->
+					<Frame name="PlayerRestLoop" hidden="true">
+						<Size x="20" y="20"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="64" y="-6"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture name="PlayerRestIcon" atlas="UI-HUD-UnitFrame-Player-Rest-Flipbook">
+									<Size x="30" y="30"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+					</Frame>
+
+					<Frame name="PlayerPlayTime" enableMouse="true" hidden="true">
+						<Size x="29" y="29"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="-21" y="-24"/>
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture name="PlayerPlayTimeIcon" atlas="UI-HUD-UnitFrame-Player-PlayTimeTired" useAtlasSize="true"/>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnEnter>
+								GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+								GameTooltip:SetText(self.tooltip, nil, nil, nil, nil, true);
+							</OnEnter>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Frame>
+
+					<Frame name="PlayerFrameGroupIndicator" hidden="true">
+						<Size x="10" y="16"/>
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" relativePoint="TOPLEFT" x="210" y="-29"/>
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture name="PlayerFrameGroupIndicatorLeft" atlas="UI-HUD-UnitFrame-Player-GroupIndicatorLeft" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="TOPLEFT"/>
+									</Anchors>
+								</Texture>
+								<Texture name="PlayerFrameGroupIndicatorRight" atlas="UI-HUD-UnitFrame-Player-GroupIndicatorRight" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="TOPRIGHT"/>
+									</Anchors>
+								</Texture>
+								<Texture name="PlayerFrameGroupIndicatorMiddle" atlas="_UI-HUD-UnitFrame-Player-GroupIndicatorMid" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="LEFT" relativeTo="PlayerFrameGroupIndicatorLeft" relativePoint="RIGHT"/>
+										<Anchor point="RIGHT" relativeTo="PlayerFrameGroupIndicatorRight" relativePoint="LEFT"/>
+									</Anchors>
+								</Texture>
+								<FontString name="PlayerFrameGroupIndicatorText" inherits="GameFontHighlightSmall" alpha="0.7">
+									<Anchors>
+										<Anchor point="LEFT" x="20" y="2"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+					</Frame>
+				</Frames>
+			</Frame>
+			<StatusBar name="PlayerFrameMyHealPredictionBar" inherits="MyHealPredictionBarTemplate"/>
+			<StatusBar name="PlayerFrameOtherHealPredictionBar" inherits="OtherHealPredictionBarTemplate"/>
+
+			<Frame name="PlayerFrameDropDown" inherits="UIDropDownMenuTemplate" id="1" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="106" y="-27"/>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="PlayerFrameDropDown_OnLoad"/>
+				</Scripts>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="PlayerFrame_OnLoad"/>
+			<OnEvent function="PlayerFrame_OnEvent"/>
+			<OnUpdate function="PlayerFrame_OnUpdate"/>
+			<OnEnter function="UnitFrame_OnEnter"/>
+			<OnLeave function="UnitFrame_OnLeave"/>
+			<OnReceiveDrag function="PlayerFrame_OnReceiveDrag"/>
+			<OnDragStart function="PlayerFrame_OnDragStart"/>
+			<OnDragStop function="PlayerFrame_OnDragStop"/>
+		</Scripts>
+	</Button>
+</Ui>

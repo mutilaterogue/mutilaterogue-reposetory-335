@@ -1,0 +1,372 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\UI.xsd">
+	<!-- Шаблоны окна трансмогрификации (ретейл: Blizzard_TransmogTemplates) -->
+	<Script file="Blizzard_TransmogTemplates.lua"/>
+
+	<DressUpModel name="TransmogItemModelTemplate" virtual="true" enableMouse="true">
+		<Size x="100" y="132"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture setAllPoints="true">
+					<Color r="0" g="0" b="0"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="TransmogItemModel_OnLoad"/>
+			<OnMouseDown function="TransmogItemModel_OnMouseDown"/>
+			<OnEnter function="TransmogItemModel_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</DressUpModel>
+
+	<Button name="TransmogSlotButtonTemplate" virtual="true">
+		<Size x="59" y="59"/>
+		<Layers>
+			<Layer level="BORDER">
+				<Texture name="$parentBackground" parentKey="Background" atlas="transmog-gearSlot-default">
+					<Size x="59" y="59"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="Icon">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentPending" parentKey="Pending" atlas="transmog-gearSlot-pending" hidden="true">
+					<Size x="59" y="59"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSelected" parentKey="Selected" atlas="transmog-gearSlot-selected" hidden="true">
+					<Size x="59" y="59"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentTransmogged" parentKey="Transmogged" atlas="transmog-icon-checkmark" hidden="true">
+					<Size x="20" y="20"/>
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="8" y="-6"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<HighlightTexture atlas="transmog-gearSlot-selected" alphaMode="ADD"/>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+			</OnLoad>
+			<OnClick function="TransmogSlotButton_OnClick"/>
+			<OnEnter function="TransmogSlotButton_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+	<!-- кнопка common-button-tertiary (ретейл: PurchaseOutfitButton, DisplayTypes).
+	     В ретейле атлас режется слайсами, 3.3.5 так не умеет - режем на 3 части сами (TransmogUI.SetSlicedAtlas) -->
+	<Button name="TransmogTertiaryButtonTemplate" virtual="true">
+		<KeyValues>
+			<KeyValue key="normalAtlas" value="common-button-tertiary-normal-small" type="string"/>
+			<KeyValue key="pushedAtlas" value="common-button-tertiary-pressed-small" type="string"/>
+			<KeyValue key="disabledAtlas" value="common-button-tertiary-disabled-small" type="string"/>
+			<KeyValue key="hoverAtlas" value="common-button-tertiary-hover-small" type="string"/>
+		</KeyValues>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Left">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Right">
+					<Anchors>
+						<Anchor point="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Center"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="HighlightLeft" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="HighlightRight" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="HighlightCenter" alphaMode="ADD"/>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnShow function="TransmogTertiaryButton_Update"/>
+			<OnSizeChanged function="TransmogTertiaryButton_Update"/>
+			<OnMouseDown function="TransmogTertiaryButton_OnMouseDown"/>
+			<OnMouseUp function="TransmogTertiaryButton_Update"/>
+			<OnEnable function="TransmogTertiaryButton_Update"/>
+			<OnDisable function="TransmogTertiaryButton_Update"/>
+		</Scripts>
+	</Button>
+
+	<Button name="TransmogDisplayTypeButtonTemplate" inherits="TransmogTertiaryButtonTemplate" virtual="true">
+		<Size x="188" y="36"/>
+		<ButtonText parentKey="Label">
+			<Anchors>
+				<Anchor point="LEFT" x="38" y="0"/>
+			</Anchors>
+		</ButtonText>
+		<NormalFont style="GameFontNormal"/>
+		<HighlightFont style="GameFontHighlight"/>
+		<DisabledFont style="GameFontDisable"/>
+	</Button>
+
+	<!-- квадратная кнопка (ретейл: ToggleOptions / ClearAllPendingButton) -->
+	<Button name="TransmogSquareButtonTemplate" virtual="true">
+		<Size x="36" y="36"/>
+		<KeyValues>
+			<KeyValue key="normalAtlas" value="common-button-tertiary-square-normal" type="string"/>
+			<KeyValue key="pushedAtlas" value="common-button-tertiary-square-pressed" type="string"/>
+		</KeyValues>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="NormalTex" atlas="common-button-tertiary-square-normal" setAllPoints="true"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="HighlightTex" atlas="common-button-tertiary-square-normal" alphaMode="ADD" setAllPoints="true"/>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnMouseDown function="TransmogSquareButton_OnMouseDown"/>
+			<OnMouseUp function="TransmogSquareButton_OnMouseUp"/>
+			<OnEnable function="TransmogSquareButton_OnMouseUp"/>
+			<OnEnter function="TransmogTooltipButton_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<!-- кнопки управления моделью (ретейл: ModelSceneControlButtonTemplate); иконка - KeyValue iconAtlas -->
+	<Button name="TransmogControlButtonTemplate" virtual="true">
+		<Size x="26" y="26"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" setAllPoints="true"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Highlight" alphaMode="ADD" setAllPoints="true"/>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="TransmogControlButton_OnLoad"/>
+			<OnMouseDown function="TransmogControlButton_OnMouseDown"/>
+			<OnMouseUp function="TransmogControlButton_OnMouseUp"/>
+			<OnEnter function="TransmogTooltipButton_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<!-- ретейл: TransmogIllusionSlotTemplate (иллюзий в 3.3.5 нет - всегда недоступен) -->
+	<Frame name="TransmogIllusionSlotTemplate" virtual="true">
+		<Size x="42" y="42"/>
+		<Layers>
+			<Layer level="BORDER">
+				<Texture parentKey="Border" atlas="transmog-gearSlot-default-small" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" atlas="transmog-gearSlot-unassigned-enchant" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Disabled" atlas="transmog-icon-disabled-small" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- ретейл: TransmogOutfitEntryTemplate - иконка в spellframe + карточка 208x43 -->
+	<Button name="TransmogOutfitEntryTemplate" virtual="true">
+		<Size x="260" y="45"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentCard" parentKey="Card" atlas="transmog-outfit-card">
+					<Size x="208" y="43"/>
+					<Anchors>
+						<Anchor point="LEFT" x="52" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture parentKey="Selected" atlas="transmog-outfit-card-selected" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentCard"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentCard"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="Icon">
+					<Size x="36" y="36"/>
+					<Anchors>
+						<Anchor point="LEFT" x="9" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="SpellFrame" atlas="transmog-outfit-spellFrame" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentIcon"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentName" parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentCard" x="10" y="6"/>
+						<Anchor point="RIGHT" relativeTo="$parentCard" x="-8" y="6"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Sub" inherits="GameFontDisableSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT" x="0" y="-1"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture atlas="transmog-outfit-card" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentCard"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentCard"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+			</OnLoad>
+			<OnClick function="TransmogOutfitEntry_OnClick"/>
+			<OnEnter function="TransmogOutfitEntry_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<!-- ретейл: TransmogSetBaseModelTemplate - карточка комплекта 178x218 (наборы и свои комплекты).
+	     Рамка и подпись - в дочернем Overlay: области самой модели рисуются под ней -->
+	<DressUpModel name="TransmogSetBaseModelTemplate" enableMouse="true" virtual="true">
+		<Size x="178" y="218"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" setAllPoints="true">
+					<Color r="0" g="0" b="0"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="Overlay" setAllPoints="true">
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="IncompleteOverlay" setAllPoints="true" alpha="0.5" hidden="true">
+							<Color r="0" g="0" b="0"/>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Border" atlas="transmog-setcard-default">
+							<Size x="194" y="234"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+						<FontString parentKey="Name" inherits="GameFontNormal" justifyH="CENTER" justifyV="BOTTOM">
+							<Size x="166" y="0"/>
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="24"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Progress" inherits="GameFontHighlightSmall" justifyH="CENTER">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="9"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture parentKey="TransmogStateTexture" atlas="transmog-setcard-transmogrified" hidden="true">
+							<Size x="194" y="234"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Highlight" atlas="transmog-itemcard-default" alphaMode="ADD" hidden="true">
+							<Size x="194" y="234"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="TransmogSetModel_OnLoad"/>
+			<OnUpdate function="TransmogSetModel_OnUpdate"/>
+			<OnEnter function="TransmogSetModel_OnEnter"/>
+			<OnLeave function="TransmogSetModel_OnLeave"/>
+		</Scripts>
+	</DressUpModel>
+
+	<DressUpModel name="TransmogSetModelTemplate" inherits="TransmogSetBaseModelTemplate" virtual="true">
+		<Scripts>
+			<OnMouseUp function="TransmogSetModel_OnMouseUp"/>
+		</Scripts>
+	</DressUpModel>
+
+	<DressUpModel name="TransmogCustomSetModelTemplate" inherits="TransmogSetBaseModelTemplate" virtual="true">
+		<Scripts>
+			<OnMouseUp function="TransmogCustomSetModel_OnMouseUp"/>
+		</Scripts>
+	</DressUpModel>
+
+	<!-- ретейл: TransmogSituationTemplate - строка условия с выпадающим списком; id: 1 местность, 2 передвижение, 3 бой -->
+	<Frame name="TransmogSituationTemplate" virtual="true">
+		<Size x="554" y="50"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Title" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="170" y="0"/>
+					<Anchors>
+						<Anchor point="LEFT" x="35" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button parentKey="Dropdown" inherits="WowStyle1DropdownTemplate">
+				<Size x="260" y="26"/>
+				<Anchors>
+					<Anchor point="RIGHT" x="-35" y="-2"/>
+				</Anchors>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad function="TransmogSituation_OnLoad"/>
+		</Scripts>
+	</Frame>
+</Ui>

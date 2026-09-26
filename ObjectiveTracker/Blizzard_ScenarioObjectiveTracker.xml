@@ -1,0 +1,78 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!--
+		ScenarioObjectiveTracker (retail) for 3.3.5: the dungeon display - stage block with the dungeon
+		name and one line per boss. Data: Blizzard_ScenarioCompat335.lua (C_Scenario on the journal data).
+		No challenge mode, proving grounds, widgets, Maw buffs or scenario spells.
+		3.3.5 has no relativeKey / parentArray: anchors use $parent names, the fixed blocks are listed in Lua.
+	-->
+	<Frame name="ScenarioObjectiveTracker" mixin="ScenarioObjectiveTrackerMixin" inherits="ObjectiveTrackerModuleTemplate">
+		<Frames>
+			<Frame name="$parentObjectivesBlock" parentKey="ObjectivesBlock" inherits="ObjectiveTrackerBlockTemplate" hidden="true"/>
+
+			<Frame name="$parentStageBlock" parentKey="StageBlock" hidden="true" enableMouse="true">
+				<Size x="201" y="83"/>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture name="$parentNormalBG" parentKey="NormalBG">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BORDER">
+						<Texture name="$parentFinalBG" parentKey="FinalBG" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-4" y="2"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentGlowTexture" parentKey="GlowTexture" alphaMode="ADD" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString name="$parentStage" parentKey="Stage" inherits="QuestTitleFont" justifyH="LEFT" justifyV="TOP">
+							<Size x="210" y="36"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="15" y="-18"/>
+							</Anchors>
+							<Color r="1" g="0.914" b="0.682"/>
+							<Shadow>
+								<Offset>
+									<AbsDimension x="1" y="-1"/>
+								</Offset>
+								<Color r="0" g="0" b="0"/>
+							</Shadow>
+						</FontString>
+						<FontString name="$parentCompleteLabel" parentKey="CompleteLabel" inherits="QuestTitleFont" hidden="true">
+							<Anchors>
+								<Anchor point="LEFT" x="15" y="3"/>
+							</Anchors>
+							<Color r="1" g="0.914" b="0.682"/>
+							<Shadow>
+								<Offset>
+									<AbsDimension x="1" y="-1"/>
+								</Offset>
+								<Color r="0" g="0" b="0"/>
+							</Shadow>
+						</FontString>
+						<FontString name="$parentName" parentKey="Name" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+							<Size x="172" y="28"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentStage" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
+							</Anchors>
+							<Color r="1" g="0.831" b="0.380"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						ScenarioObjectiveTrackerStage_OnEnter(self);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Frame>
+		</Frames>
+	</Frame>
+</Ui>

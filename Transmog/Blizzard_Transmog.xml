@@ -1,0 +1,1146 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\UI.xsd">
+	<!-- Окно трансмогрификации (ретейл 12.x TransmogFrame, Blizzard_Transmog.xml) для 3.3.5.
+	     Разметка здесь, в Lua - только логика. Геометрия ретейла: окно 1618x883,
+	     OutfitCollection 312 | CharacterPreview 658 | WardrobeCollection 644, высота панелей 860.
+	     В FrameXML.toc - после Collections\Collections.xml: Transmog\Blizzard_Transmog.xml -->
+	<Script file="Blizzard_TransmogStrings.lua"/>
+	<Script file="Blizzard_TransmogShared.lua"/>
+	<Include file="Blizzard_TransmogTemplates.xml"/>
+	<Script file="Blizzard_TransmogOutfits.lua"/>
+	<Script file="Blizzard_Transmog.lua"/>
+	<Script file="Blizzard_TransmogSets.lua"/>
+	<Script file="Blizzard_TransmogCustomSets.lua"/>
+	<Script file="Blizzard_TransmogSituations.lua"/>
+
+	<Frame name="TransmogFrame" inherits="RetailPortraitFrameTemplate" parent="UIParent" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="HIGH">
+		<Size x="1618" y="883"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Frames>
+			<!-- OutfitCollection -->
+			<Frame name="$parentOutfitCollection" parentKey="OutfitCollection">
+				<Size x="312" y="860"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="2" y="-21"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Background" atlas="transmog-outfit-darkBG" setAllPoints="true"/>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture parentKey="TopTexture" atlas="transmog-outfit-toptexture" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOP"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="BottomTexture" atlas="transmog-outfit-bottomtexture" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="BOTTOM"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="2">
+						<Texture parentKey="DividerBar" atlas="transmog-outfit-darkBG-cornerLine">
+							<Size x="6" y="860"/>
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="2" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<!-- ShowEquippedGearSpellFrame -->
+					<Button name="$parentShowEquippedGear" parentKey="ShowEquippedGear">
+						<Size x="280" y="45"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="14" y="-44"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture name="$parentIcon" parentKey="Icon" file="Interface\Icons\INV_Chest_Chain_15">
+									<Size x="36" y="36"/>
+									<Anchors>
+										<Anchor point="LEFT" x="5" y="0"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+							<Layer level="OVERLAY">
+								<Texture parentKey="Border" atlas="transmog-outfit-spellFrame" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="CENTER" relativeTo="$parentIcon"/>
+									</Anchors>
+								</Texture>
+								<FontString parentKey="Text" inherits="GameFontNormal" text="TRANSMOG_SHOW_EQUIPPED_GEAR">
+									<Anchors>
+										<Anchor point="LEFT" relativeTo="$parentIcon" relativePoint="RIGHT" x="12" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+							<Layer level="OVERLAY" textureSubLevel="1">
+								<Texture parentKey="Active" atlas="transmog-outfit-spellFrame-active" useAtlasSize="true" hidden="true">
+									<Anchors>
+										<Anchor point="CENTER" relativeTo="$parentIcon"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnClick function="TransmogFrame_ToggleShowEquipped"/>
+						</Scripts>
+					</Button>
+
+					<!-- OutfitList -->
+					<Frame name="$parentOutfitList" parentKey="OutfitList" enableMouseWheel="true">
+						<Size x="300" y="650"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="5" y="-102"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture parentKey="TopDivider" atlas="transmog-outfit-dividerLine" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="TOP"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="BottomDivider" atlas="transmog-outfit-dividerLine" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="BOTTOM"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Frames>
+								<Button name="$parentEntry1" inherits="TransmogOutfitEntryTemplate" id="1">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-4"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry2" inherits="TransmogOutfitEntryTemplate" id="2">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-52"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry3" inherits="TransmogOutfitEntryTemplate" id="3">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-100"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry4" inherits="TransmogOutfitEntryTemplate" id="4">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-148"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry5" inherits="TransmogOutfitEntryTemplate" id="5">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-196"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry6" inherits="TransmogOutfitEntryTemplate" id="6">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-244"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry7" inherits="TransmogOutfitEntryTemplate" id="7">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-292"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry8" inherits="TransmogOutfitEntryTemplate" id="8">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-340"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry9" inherits="TransmogOutfitEntryTemplate" id="9">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-388"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry10" inherits="TransmogOutfitEntryTemplate" id="10">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-436"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry11" inherits="TransmogOutfitEntryTemplate" id="11">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-484"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry12" inherits="TransmogOutfitEntryTemplate" id="12">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-532"/>
+									</Anchors>
+								</Button>
+								<Button name="$parentEntry13" inherits="TransmogOutfitEntryTemplate" id="13">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="5" y="-580"/>
+									</Anchors>
+								</Button>
+						</Frames>
+						<Scripts>
+							<OnMouseWheel function="TransmogOutfitList_OnMouseWheel"/>
+						</Scripts>
+					</Frame>
+
+					<!-- PurchaseOutfitButton: слоты образов пока не продаются -->
+					<Button name="$parentPurchaseOutfitButton" parentKey="PurchaseOutfitButton" inherits="TransmogTertiaryButtonTemplate">
+						<Size x="287" y="41"/>
+						<Anchors>
+							<Anchor point="TOP" relativeTo="$parentOutfitList" relativePoint="BOTTOM" x="-3" y="-10"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture parentKey="Icon" atlas="transmog-icon-add" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="LEFT" x="14" y="0"/>
+									</Anchors>
+								</Texture>
+								<FontString parentKey="Text" inherits="GameFontDisable" text="TRANSMOG_PURCHASE_OUTFIT_SLOT">
+									<Anchors>
+										<Anchor point="LEFT" x="42" y="1"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+					</Button>
+
+					<!-- SaveOutfitButton + MoneyFrame -->
+					<Button name="$parentSaveOutfitButton" parentKey="SaveOutfitButton" inherits="SharedButtonTemplate" text="TRANSMOG_SAVE_OUTFIT">
+						<Size x="128" y="28"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" x="9" y="14"/>
+						</Anchors>
+						<Scripts>
+							<OnClick function="TransmogFrame_SaveOutfitClick"/>
+						</Scripts>
+					</Button>
+					<Frame name="$parentMoneyBox" parentKey="MoneyBox">
+						<Size x="152" y="24"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" relativeTo="$parentSaveOutfitButton" relativePoint="BOTTOMRIGHT" x="9" y="2"/>
+						</Anchors>
+						<KeyValues>
+							<KeyValue key="sliceAtlas" value="common-currencybox-a" type="string"/>
+						</KeyValues>
+						<Layers>
+							<!-- атлас режется на 3 части (TransmogSlicedFrame_Update), а не растягивается -->
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Left">
+									<Anchors>
+										<Anchor point="TOPLEFT"/>
+										<Anchor point="BOTTOMLEFT"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="Right">
+									<Anchors>
+										<Anchor point="TOPRIGHT"/>
+										<Anchor point="BOTTOMRIGHT"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="Center"/>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnShow function="TransmogSlicedFrame_Update"/>
+							<OnSizeChanged function="TransmogSlicedFrame_Update"/>
+						</Scripts>
+						<Frames>
+							<Frame name="TransmogFrameMoneyFrame" inherits="SmallMoneyFrameTemplate">
+								<Size x="141" y="15"/>
+								<Anchors>
+									<Anchor point="BOTTOMRIGHT" x="9" y="6"/>
+								</Anchors>
+							</Frame>
+						</Frames>
+					</Frame>
+				</Frames>
+			</Frame>
+
+			<!-- CharacterPreview -->
+			<Frame name="$parentCharacterPreview" parentKey="CharacterPreview">
+				<Size x="658" y="860"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentOutfitCollection" relativePoint="TOPRIGHT"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<!-- атлас по расе ставится в Lua (transmog-background-race-*) -->
+						<Texture parentKey="Background" setAllPoints="true"/>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture parentKey="Glow" atlas="transmog-locationBG-glow" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="BOTTOM"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="2">
+						<Texture parentKey="GradientLeft" atlas="transmog-outfit-darkBG-gradient">
+							<Size x="123" y="860"/>
+							<Anchors>
+								<Anchor point="LEFT"/>
+							</Anchors>
+						</Texture>
+						<!-- rotation="180" в ретейле: отражается в Lua по координатам атласа -->
+						<Texture parentKey="GradientRight" atlas="transmog-outfit-darkBG-gradient">
+							<Size x="123" y="860"/>
+							<Anchors>
+								<Anchor point="RIGHT"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<DressUpModel name="TransmogFramePreview" parentKey="Model" enableMouse="true" enableMouseWheel="true" setAllPoints="true">
+						<Scripts>
+							<OnMouseDown function="TransmogPreview_OnMouseDown"/>
+							<OnMouseUp function="TransmogPreview_OnMouseUp"/>
+							<OnMouseWheel function="TransmogPreview_OnMouseWheel"/>
+							<OnUpdate function="TransmogPreview_OnUpdate"/>
+						</Scripts>
+					</DressUpModel>
+
+					<!-- ControlFrame -->
+					<Frame name="$parentControlFrame" parentKey="ControlFrame">
+						<Size x="146" y="26"/>
+						<Anchors>
+							<Anchor point="TOP" x="0" y="-18"/>
+						</Anchors>
+						<Frames>
+							<Button parentKey="ZoomInButton" inherits="TransmogControlButtonTemplate">
+								<KeyValues>
+									<KeyValue key="iconAtlas" value="common-icon-zoomin" type="string"/>
+									<KeyValue key="tooltipText" value="Приблизить" type="string"/>
+								</KeyValues>
+								<Anchors>
+									<Anchor point="LEFT" x="0" y="0"/>
+								</Anchors>
+								<Scripts>
+									<OnClick>TransmogPreview_Zoom(1);</OnClick>
+								</Scripts>
+							</Button>
+							<Button parentKey="ZoomOutButton" inherits="TransmogControlButtonTemplate">
+								<KeyValues>
+									<KeyValue key="iconAtlas" value="common-icon-zoomout" type="string"/>
+									<KeyValue key="tooltipText" value="Отдалить" type="string"/>
+								</KeyValues>
+								<Anchors>
+									<Anchor point="LEFT" x="30" y="0"/>
+								</Anchors>
+								<Scripts>
+									<OnClick>TransmogPreview_Zoom(-1);</OnClick>
+								</Scripts>
+							</Button>
+							<Button parentKey="RotateLeftButton" inherits="TransmogControlButtonTemplate">
+								<KeyValues>
+									<KeyValue key="iconAtlas" value="common-icon-rotateleft" type="string"/>
+									<KeyValue key="tooltipText" value="Повернуть влево" type="string"/>
+									<KeyValue key="spin" value="-1" type="number"/>
+								</KeyValues>
+								<Anchors>
+									<Anchor point="LEFT" x="60" y="0"/>
+								</Anchors>
+							</Button>
+							<!-- common-icon-rotateright в клиенте другая картинка: rotateleft зеркально -->
+							<Button parentKey="RotateRightButton" inherits="TransmogControlButtonTemplate">
+								<KeyValues>
+									<KeyValue key="iconAtlas" value="common-icon-rotateleft" type="string"/>
+									<KeyValue key="tooltipText" value="Повернуть вправо" type="string"/>
+									<KeyValue key="spin" value="1" type="number"/>
+									<KeyValue key="mirror" value="true" type="boolean"/>
+								</KeyValues>
+								<Anchors>
+									<Anchor point="LEFT" x="90" y="0"/>
+								</Anchors>
+							</Button>
+							<Button parentKey="ResetButton" inherits="TransmogControlButtonTemplate">
+								<KeyValues>
+									<KeyValue key="iconAtlas" value="common-icon-undo" type="string"/>
+									<KeyValue key="tooltipText" value="Сбросить вид" type="string"/>
+								</KeyValues>
+								<Anchors>
+									<Anchor point="LEFT" x="120" y="0"/>
+								</Anchors>
+								<Scripts>
+									<OnClick>TransmogPreview_Reset();</OnClick>
+								</Scripts>
+							</Button>
+						</Frames>
+					</Frame>
+
+					<!-- ToggleOptions + ClearAllPendingButton -->
+					<Button parentKey="SheatheButton" inherits="TransmogSquareButtonTemplate">
+						<KeyValues>
+							<KeyValue key="tooltipText" value="TRANSMOG_SHEATHE_WEAPON_TOOLTIP" type="string"/>
+						</KeyValues>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-21" y="-94"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture parentKey="Icon" atlas="transmog-icon-hidden">
+									<Size x="18" y="18"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnClick function="TransmogFrame_ToggleWeapons"/>
+						</Scripts>
+					</Button>
+					<Button parentKey="ClearAllPendingButton" inherits="TransmogSquareButtonTemplate">
+						<KeyValues>
+							<KeyValue key="tooltipText" value="TRANSMOGRIFY_CLEAR_ALL_PENDING" type="string"/>
+						</KeyValues>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-21" y="-134"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture parentKey="Icon" atlas="common-icon-undo">
+									<Size x="18" y="18"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnClick function="TransmogFrame_ClearAllPending"/>
+						</Scripts>
+					</Button>
+
+					<!-- LeftSlots / RightSlots / BottomSlots: 59x59, отступ 5 -->
+						<Button name="$parentHeadSlot" parentKey="HeadSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="192"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentShoulderSlot" parentKey="ShoulderSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="128"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentBackSlot" parentKey="BackSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="64"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentChestSlot" parentKey="ChestSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="0"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentShirtSlot" parentKey="ShirtSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="-64"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentTabardSlot" parentKey="TabardSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="-128"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentWristSlot" parentKey="WristSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="LEFT" x="28" y="-192"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentHandsSlot" parentKey="HandsSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="RIGHT" x="-28" y="96"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentWaistSlot" parentKey="WaistSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="RIGHT" x="-28" y="32"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentLegsSlot" parentKey="LegsSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="RIGHT" x="-28" y="-32"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentFeetSlot" parentKey="FeetSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="RIGHT" x="-28" y="-96"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentMainHandSlot" parentKey="MainHandSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="BOTTOM" x="-64" y="94"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentSecondaryHandSlot" parentKey="SecondaryHandSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="94"/>
+							</Anchors>
+						</Button>
+						<Button name="$parentRangedSlot" parentKey="RangedSlot" inherits="TransmogSlotButtonTemplate">
+							<Anchors>
+								<Anchor point="BOTTOM" x="64" y="94"/>
+							</Anchors>
+						</Button>
+
+					<!-- TransmogIllusionSlotTemplate: иллюзий в 3.3.5 нет -->
+					<Frame parentKey="MainHandIllusion" inherits="TransmogIllusionSlotTemplate">
+						<Anchors>
+							<Anchor point="TOP" relativeTo="$parentMainHandSlot" relativePoint="BOTTOM" x="0" y="-4"/>
+						</Anchors>
+					</Frame>
+					<Frame parentKey="OffHandIllusion" inherits="TransmogIllusionSlotTemplate">
+						<Anchors>
+							<Anchor point="TOP" relativeTo="$parentSecondaryHandSlot" relativePoint="BOTTOM" x="0" y="-4"/>
+						</Anchors>
+					</Frame>
+
+					<Button name="$parentApplyButton" parentKey="ApplyButton" inherits="SharedButtonTemplate" text="TRANSMOGRIFY">
+						<Size x="150" y="28"/>
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" x="-21" y="14"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								TransmogFrame_Apply(TransmogFrame);
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
+			</Frame>
+
+			<!-- WardrobeCollection -->
+			<Frame name="$parentWardrobeCollection" parentKey="WardrobeCollection" mixin="TabSystemOwnerMixin">
+				<Size x="644" y="860"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentCharacterPreview" relativePoint="TOPRIGHT"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Background" atlas="transmog-outfit-darkBG" setAllPoints="true"/>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame name="$parentTabContent" parentKey="TabContent">
+						<Size x="644" y="823"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="0" y="-35"/>
+						</Anchors>
+						<Layers>
+							<Layer level="BACKGROUND">
+								<Texture parentKey="Background" atlas="transmog-tabs-frame-BG" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="4" y="-4"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+							<Layer level="BACKGROUND" textureSubLevel="1">
+								<Texture parentKey="Border" atlas="transmog-tabs-frame">
+									<Size x="661" y="841"/>
+									<Anchors>
+										<Anchor point="TOPLEFT" x="-11" y="12"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Frames>
+							<!-- ItemsFrame -->
+							<Frame name="$parentItemsFrame" parentKey="ItemsFrame" setAllPoints="true" enableMouseWheel="true">
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString name="$parentSlotTitle" parentKey="SlotTitle" inherits="GameFontHighlightHuge" justifyH="LEFT">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="23" y="-58"/>
+											</Anchors>
+										</FontString>
+									</Layer>
+									<Layer level="ARTWORK">
+										<Texture parentKey="Divider" atlas="transmog-tabs-header-line" useAtlasSize="true" alpha="0.1">
+											<Anchors>
+												<Anchor point="TOPLEFT" relativeTo="$parentSlotTitle" relativePoint="BOTTOMLEFT" x="0" y="-2"/>
+											</Anchors>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Button name="TransmogFrameFilterDropdown" parentKey="FilterButton" inherits="WowStyle1FilterDropdownTemplate">
+										<Anchors>
+											<Anchor point="TOPRIGHT" x="-29" y="-24"/>
+										</Anchors>
+									</Button>
+									<EditBox name="TransmogFrameSearchBox" parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false">
+										<Size x="150" y="20"/>
+										<Anchors>
+											<Anchor point="TOPRIGHT" relativeTo="TransmogFrameFilterDropdown" relativePoint="TOPLEFT" x="-10" y="1"/>
+										</Anchors>
+									</EditBox>
+
+									<!-- DisplayTypes: 188x36, отступ 25 -->
+									<Button name="$parentUnassignedButton" parentKey="UnassignedButton" inherits="TransmogDisplayTypeButtonTemplate" text="TRANSMOG_SLOT_DISPLAY_TYPE_UNASSIGNED">
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeTo="$parentSlotTitle" relativePoint="BOTTOMLEFT" x="16" y="-21"/>
+										</Anchors>
+										<Layers>
+											<Layer level="ARTWORK">
+												<Texture parentKey="Icon" atlas="transmog-icon-disabled">
+													<Size x="24" y="24"/>
+													<Anchors>
+														<Anchor point="LEFT" x="8" y="0"/>
+													</Anchors>
+												</Texture>
+											</Layer>
+										</Layers>
+										<Scripts>
+											<OnClick function="TransmogFrame_ClearSlotPending"/>
+										</Scripts>
+									</Button>
+									<Button name="$parentEquippedButton" parentKey="EquippedButton" inherits="TransmogDisplayTypeButtonTemplate" text="TRANSMOG_SLOT_DISPLAY_TYPE_EQUIPPED">
+										<Anchors>
+											<Anchor point="LEFT" relativeTo="$parentUnassignedButton" relativePoint="RIGHT" x="25" y="0"/>
+										</Anchors>
+										<Layers>
+											<Layer level="ARTWORK">
+												<Texture parentKey="Icon" file="Interface\Icons\INV_Chest_Chain_15">
+													<Size x="24" y="24"/>
+													<Anchors>
+														<Anchor point="LEFT" x="8" y="0"/>
+													</Anchors>
+												</Texture>
+											</Layer>
+										</Layers>
+										<Scripts>
+											<OnClick function="TransmogFrame_RestoreSlot"/>
+										</Scripts>
+									</Button>
+
+									<!-- PagedContent: сетка 5x4 моделей 100x132, отступ 20 -->
+										<DressUpModel name="$parentModel1" inherits="TransmogItemModelTemplate" id="1" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="30" y="-163"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel2" inherits="TransmogItemModelTemplate" id="2" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="150" y="-163"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel3" inherits="TransmogItemModelTemplate" id="3" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="270" y="-163"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel4" inherits="TransmogItemModelTemplate" id="4" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="390" y="-163"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel5" inherits="TransmogItemModelTemplate" id="5" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="510" y="-163"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel6" inherits="TransmogItemModelTemplate" id="6" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="30" y="-315"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel7" inherits="TransmogItemModelTemplate" id="7" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="150" y="-315"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel8" inherits="TransmogItemModelTemplate" id="8" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="270" y="-315"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel9" inherits="TransmogItemModelTemplate" id="9" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="390" y="-315"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel10" inherits="TransmogItemModelTemplate" id="10" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="510" y="-315"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel11" inherits="TransmogItemModelTemplate" id="11" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="30" y="-467"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel12" inherits="TransmogItemModelTemplate" id="12" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="150" y="-467"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel13" inherits="TransmogItemModelTemplate" id="13" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="270" y="-467"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel14" inherits="TransmogItemModelTemplate" id="14" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="390" y="-467"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel15" inherits="TransmogItemModelTemplate" id="15" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="510" y="-467"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel16" inherits="TransmogItemModelTemplate" id="16" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="30" y="-619"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel17" inherits="TransmogItemModelTemplate" id="17" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="150" y="-619"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel18" inherits="TransmogItemModelTemplate" id="18" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="270" y="-619"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel19" inherits="TransmogItemModelTemplate" id="19" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="390" y="-619"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentModel20" inherits="TransmogItemModelTemplate" id="20" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="510" y="-619"/>
+											</Anchors>
+										</DressUpModel>
+
+									<Frame name="$parentPagingControls" parentKey="PagingControls">
+										<Size x="160" y="32"/>
+										<Anchors>
+											<Anchor point="BOTTOM" x="20" y="16"/>
+										</Anchors>
+										<Layers>
+											<Layer level="OVERLAY">
+												<FontString parentKey="Text" inherits="GameFontHighlight">
+													<Anchors>
+														<Anchor point="RIGHT" x="-72" y="0"/>
+													</Anchors>
+												</FontString>
+											</Layer>
+										</Layers>
+										<Frames>
+											<Button parentKey="PrevPageButton">
+												<Size x="32" y="32"/>
+												<Anchors>
+													<Anchor point="RIGHT" x="-34" y="0"/>
+												</Anchors>
+												<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Up"/>
+												<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Down"/>
+												<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Disabled"/>
+												<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+												<Scripts>
+													<OnClick>TransmogFrame_SetPage(TransmogFrame, (TransmogFrame.page or 1) - 1);</OnClick>
+												</Scripts>
+											</Button>
+											<Button parentKey="NextPageButton">
+												<Size x="32" y="32"/>
+												<Anchors>
+													<Anchor point="RIGHT" x="0" y="0"/>
+												</Anchors>
+												<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Up"/>
+												<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Down"/>
+												<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Disabled"/>
+												<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+												<Scripts>
+													<OnClick>TransmogFrame_SetPage(TransmogFrame, (TransmogFrame.page or 1) + 1);</OnClick>
+												</Scripts>
+											</Button>
+										</Frames>
+									</Frame>
+
+									<Frame parentKey="GridMessageFrame" setAllPoints="true">
+										<Layers>
+											<Layer level="OVERLAY">
+												<FontString parentKey="Text" inherits="GameFontHighlightLarge">
+													<Anchors>
+														<Anchor point="CENTER" x="0" y="-40"/>
+													</Anchors>
+												</FontString>
+											</Layer>
+										</Layers>
+									</Frame>
+								</Frames>
+								<Scripts>
+									<OnMouseWheel>
+										TransmogFrame_SetPage(TransmogFrame, (TransmogFrame.page or 1) - delta);
+									</OnMouseWheel>
+								</Scripts>
+							</Frame>
+
+							<!-- SetsFrame: комплекты (ItemSet.dbc), карточки 178x218 по 3x3 -->
+							<Frame name="$parentSetsFrame" parentKey="SetsFrame" setAllPoints="true" hidden="true" enableMouseWheel="true">
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString parentKey="NoEntriesText" inherits="GameFontNormalLarge" text="TRANSMOG_SETS_NONE" hidden="true">
+											<Size x="590" y="0"/>
+											<Anchors>
+												<Anchor point="CENTER" x="-3" y="31"/>
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Button name="TransmogFrameSetsFilterDropdown" parentKey="FilterButton" inherits="WowStyle1FilterDropdownTemplate">
+										<Anchors>
+											<Anchor point="TOPRIGHT" x="-29" y="-24"/>
+										</Anchors>
+									</Button>
+									<EditBox name="TransmogFrameSetsSearchBox" parentKey="SearchBox" inherits="SearchBoxTemplate" autoFocus="false">
+										<Size x="150" y="20"/>
+										<Anchors>
+											<Anchor point="TOPRIGHT" relativeTo="TransmogFrameSetsFilterDropdown" relativePoint="TOPLEFT" x="-10" y="1"/>
+										</Anchors>
+									</EditBox>
+										<DressUpModel name="$parentSet1" inherits="TransmogSetModelTemplate" id="1" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="26" y="-72"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet2" inherits="TransmogSetModelTemplate" id="2" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="231" y="-72"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet3" inherits="TransmogSetModelTemplate" id="3" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="436" y="-72"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet4" inherits="TransmogSetModelTemplate" id="4" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="26" y="-309"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet5" inherits="TransmogSetModelTemplate" id="5" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="231" y="-309"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet6" inherits="TransmogSetModelTemplate" id="6" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="436" y="-309"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet7" inherits="TransmogSetModelTemplate" id="7" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="26" y="-546"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet8" inherits="TransmogSetModelTemplate" id="8" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="231" y="-546"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentSet9" inherits="TransmogSetModelTemplate" id="9" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="436" y="-546"/>
+											</Anchors>
+										</DressUpModel>
+										<Frame parentKey="PagingControls">
+											<Size x="160" y="32"/>
+											<Anchors>
+												<Anchor point="BOTTOM" x="20" y="16"/>
+											</Anchors>
+											<Layers>
+												<Layer level="OVERLAY">
+													<FontString parentKey="Text" inherits="GameFontHighlight">
+														<Anchors>
+															<Anchor point="RIGHT" x="-72" y="0"/>
+														</Anchors>
+													</FontString>
+												</Layer>
+											</Layers>
+											<Frames>
+												<Button parentKey="PrevPageButton">
+													<Size x="32" y="32"/>
+													<Anchors>
+														<Anchor point="RIGHT" x="-34" y="0"/>
+													</Anchors>
+													<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Up"/>
+													<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Down"/>
+													<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Disabled"/>
+													<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+													<Scripts>
+														<OnClick>TransmogSetsFrame_ChangePage(self:GetParent():GetParent(), -1);</OnClick>
+													</Scripts>
+												</Button>
+												<Button parentKey="NextPageButton">
+													<Size x="32" y="32"/>
+													<Anchors>
+														<Anchor point="RIGHT" x="0" y="0"/>
+													</Anchors>
+													<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Up"/>
+													<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Down"/>
+													<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Disabled"/>
+													<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+													<Scripts>
+														<OnClick>TransmogSetsFrame_ChangePage(self:GetParent():GetParent(), 1);</OnClick>
+													</Scripts>
+												</Button>
+											</Frames>
+										</Frame>
+								</Frames>
+								<Scripts>
+									<OnLoad function="TransmogSetsFrame_OnLoad"/>
+									<OnShow function="TransmogSetsFrame_OnShow"/>
+									<OnMouseWheel>TransmogSetsFrame_ChangePage(self, -delta);</OnMouseWheel>
+								</Scripts>
+							</Frame>
+
+							<!-- CustomSetsFrame: свои комплекты (на аккаунт) -->
+							<Frame name="$parentCustomSetsFrame" parentKey="CustomSetsFrame" setAllPoints="true" hidden="true" enableMouseWheel="true">
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString parentKey="NoEntriesText" inherits="GameFontNormalLarge" text="TRANSMOG_CUSTOM_SETS_NONE" hidden="true">
+											<Size x="590" y="0"/>
+											<Anchors>
+												<Anchor point="CENTER" x="-3" y="31"/>
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Button parentKey="NewCustomSetButton" inherits="SharedButtonTemplate" text="TRANSMOG_CUSTOM_SET_NEW">
+										<Size x="180" y="32"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" x="22" y="-22"/>
+										</Anchors>
+										<Scripts>
+											<OnClick function="TransmogCustomSetsFrame_NewSet"/>
+										</Scripts>
+									</Button>
+										<DressUpModel name="$parentCustomSet1" inherits="TransmogCustomSetModelTemplate" id="1" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="26" y="-72"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet2" inherits="TransmogCustomSetModelTemplate" id="2" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="231" y="-72"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet3" inherits="TransmogCustomSetModelTemplate" id="3" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="436" y="-72"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet4" inherits="TransmogCustomSetModelTemplate" id="4" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="26" y="-309"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet5" inherits="TransmogCustomSetModelTemplate" id="5" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="231" y="-309"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet6" inherits="TransmogCustomSetModelTemplate" id="6" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="436" y="-309"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet7" inherits="TransmogCustomSetModelTemplate" id="7" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="26" y="-546"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet8" inherits="TransmogCustomSetModelTemplate" id="8" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="231" y="-546"/>
+											</Anchors>
+										</DressUpModel>
+										<DressUpModel name="$parentCustomSet9" inherits="TransmogCustomSetModelTemplate" id="9" hidden="true">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="436" y="-546"/>
+											</Anchors>
+										</DressUpModel>
+										<Frame parentKey="PagingControls">
+											<Size x="160" y="32"/>
+											<Anchors>
+												<Anchor point="BOTTOM" x="20" y="16"/>
+											</Anchors>
+											<Layers>
+												<Layer level="OVERLAY">
+													<FontString parentKey="Text" inherits="GameFontHighlight">
+														<Anchors>
+															<Anchor point="RIGHT" x="-72" y="0"/>
+														</Anchors>
+													</FontString>
+												</Layer>
+											</Layers>
+											<Frames>
+												<Button parentKey="PrevPageButton">
+													<Size x="32" y="32"/>
+													<Anchors>
+														<Anchor point="RIGHT" x="-34" y="0"/>
+													</Anchors>
+													<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Up"/>
+													<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Down"/>
+													<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Disabled"/>
+													<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+													<Scripts>
+														<OnClick>TransmogCustomSetsFrame_ChangePage(self:GetParent():GetParent(), -1);</OnClick>
+													</Scripts>
+												</Button>
+												<Button parentKey="NextPageButton">
+													<Size x="32" y="32"/>
+													<Anchors>
+														<Anchor point="RIGHT" x="0" y="0"/>
+													</Anchors>
+													<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Up"/>
+													<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Down"/>
+													<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Disabled"/>
+													<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+													<Scripts>
+														<OnClick>TransmogCustomSetsFrame_ChangePage(self:GetParent():GetParent(), 1);</OnClick>
+													</Scripts>
+												</Button>
+											</Frames>
+										</Frame>
+								</Frames>
+								<Scripts>
+									<OnLoad function="TransmogCustomSetsFrame_OnLoad"/>
+									<OnShow function="TransmogCustomSetsFrame_OnShow"/>
+									<OnMouseWheel>TransmogCustomSetsFrame_ChangePage(self, -delta);</OnMouseWheel>
+								</Scripts>
+							</Frame>
+
+							<!-- SituationsFrame: условия автоматической смены выбранного наряда -->
+							<Frame name="$parentSituationsFrame" parentKey="SituationsFrame" setAllPoints="true" hidden="true">
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString parentKey="DescriptionText" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP" text="TRANSMOG_SITUATIONS_DESCRIPTION">
+											<Size x="425" y="0"/>
+											<Anchors>
+												<Anchor point="TOPLEFT" x="29" y="-55"/>
+											</Anchors>
+										</FontString>
+										<FontString parentKey="OutfitName" inherits="GameFontHighlightLarge" justifyH="LEFT">
+											<Anchors>
+												<Anchor point="TOPLEFT" x="45" y="-170"/>
+											</Anchors>
+										</FontString>
+										<FontString parentKey="NoOutfitText" inherits="GameFontNormalLarge" text="TRANSMOG_SITUATIONS_SELECT_OUTFIT" hidden="true">
+											<Size x="500" y="0"/>
+											<Anchors>
+												<Anchor point="CENTER" x="0" y="0"/>
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Button parentKey="DefaultsButton" inherits="SharedButtonTemplate" text="TRANSMOG_SITUATIONS_DEFAULTS">
+										<Size x="129" y="30"/>
+										<Anchors>
+											<Anchor point="TOPRIGHT" x="-29" y="-52"/>
+										</Anchors>
+										<Scripts>
+											<OnClick function="TransmogSituationsFrame_SetDefaults"/>
+										</Scripts>
+									</Button>
+									<Frame name="$parentSituations" parentKey="Situations">
+										<Size x="554" y="194"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" x="43" y="-235"/>
+										</Anchors>
+										<Layers>
+											<Layer level="BACKGROUND">
+												<Texture parentKey="Background" atlas="transmog-situations-containerbg" setAllPoints="true"/>
+											</Layer>
+										</Layers>
+										<Frames>
+											<Frame parentKey="Location" inherits="TransmogSituationTemplate" id="1">
+												<Anchors>
+													<Anchor point="TOPLEFT" x="0" y="-22"/>
+												</Anchors>
+											</Frame>
+											<Frame parentKey="Movement" inherits="TransmogSituationTemplate" id="2">
+												<Anchors>
+													<Anchor point="TOPLEFT" x="0" y="-72"/>
+												</Anchors>
+											</Frame>
+											<Frame parentKey="Combat" inherits="TransmogSituationTemplate" id="3">
+												<Anchors>
+													<Anchor point="TOPLEFT" x="0" y="-122"/>
+												</Anchors>
+											</Frame>
+										</Frames>
+									</Frame>
+									<CheckButton name="$parentEnabledToggle" parentKey="EnabledToggle" inherits="UICheckButtonTemplate">
+										<Size x="30" y="29"/>
+										<Anchors>
+											<Anchor point="BOTTOMLEFT" relativeTo="$parentSituations" relativePoint="TOPLEFT" x="0" y="10"/>
+										</Anchors>
+										<Scripts>
+											<OnClick function="TransmogSituationsFrame_ToggleEnabled"/>
+										</Scripts>
+									</CheckButton>
+									<Button name="$parentApplyButton" parentKey="ApplyButton" inherits="SharedButtonTemplate" motionScriptsWhileDisabled="true" text="TRANSMOG_SITUATIONS_APPLY">
+										<Size x="165" y="33"/>
+										<Anchors>
+											<Anchor point="BOTTOM" x="0" y="32"/>
+										</Anchors>
+										<Scripts>
+											<OnClick function="TransmogSituationsFrame_Apply"/>
+											<OnEnter function="TransmogSituationsFrame_ApplyOnEnter"/>
+											<OnLeave function="GameTooltip_Hide"/>
+										</Scripts>
+									</Button>
+									<Button parentKey="UndoButton" inherits="TransmogControlButtonTemplate">
+										<Size x="22" y="22"/>
+										<KeyValues>
+											<KeyValue key="iconAtlas" value="common-icon-undo" type="string"/>
+											<KeyValue key="tooltipText" value="TRANSMOG_SITUATIONS_UNDO" type="string"/>
+										</KeyValues>
+										<Anchors>
+											<Anchor point="LEFT" relativeTo="$parentApplyButton" relativePoint="RIGHT" x="10" y="0"/>
+										</Anchors>
+										<Scripts>
+											<OnClick function="TransmogSituationsFrame_Undo"/>
+										</Scripts>
+									</Button>
+								</Frames>
+								<Scripts>
+									<OnLoad function="TransmogSituationsFrame_OnLoad"/>
+									<OnShow function="TransmogSituationsFrame_Refresh"/>
+								</Scripts>
+							</Frame>
+						</Frames>
+					</Frame>
+
+					<Frame name="$parentTabHeaders" parentKey="TabHeaders" inherits="TabSystemTemplate">
+						<KeyValues>
+							<KeyValue key="tabTemplate" value="TabSystemTopButtonTemplate" type="string"/>
+							<KeyValue key="minTabWidth" value="95" type="number"/>
+							<KeyValue key="maxTabWidth" value="170" type="number"/>
+						</KeyValues>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="32" y="-12"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="TransmogFrame_OnLoad"/>
+			<OnShow function="TransmogFrame_OnShow"/>
+			<OnHide function="TransmogFrame_OnHide"/>
+			<OnEvent function="TransmogFrame_OnEvent"/>
+			<OnUpdate function="TransmogFrame_OnUpdate"/>
+			<OnDragStart>self:StartMoving();</OnDragStart>
+			<OnDragStop>self:StopMovingOrSizing();</OnDragStop>
+		</Scripts>
+	</Frame>
+</Ui>
