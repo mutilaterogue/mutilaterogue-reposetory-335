@@ -11,7 +11,10 @@
  * Item data is read straight from item_template (+ item_template_locale ruRU names),
  * so it does not depend on ItemTemplate field names of the core fork.
  *
- * AddonComm opcodes (names, nothing to add to AddonComm.h / Server.lua):
+ * AddonComm opcodes (names, nothing to add to AddonComm.h / Server.lua).
+ * Client and server names must differ: the client also receives its own addon whisper.
+ *   "APPEAR_GET_PAGE" -> "APPEAR_PAGE"
+ *   "APPEAR_GET_SOURCES" -> "APPEAR_SOURCES"
  *   "APPEAR_PAGE"    C: category : classId(0 = all) : flags(1 collected, 2 not collected) : page : search
  *                    S: category : page : numPages : collectedCount : totalCount : "displayId/itemId/c,..."
  *   "APPEAR_SOURCES" C: category : displayId
@@ -456,8 +459,8 @@ class appearance_collection_player : public PlayerScript
 public:
     appearance_collection_player() : PlayerScript("appearance_collection_player")
     {
-        sAddonComm->Register(std::string("APPEAR_PAGE"), &HandlePage);
-        sAddonComm->Register(std::string("APPEAR_SOURCES"), &HandleSources);
+        sAddonComm->Register(std::string("APPEAR_GET_PAGE"), &HandlePage);
+        sAddonComm->Register(std::string("APPEAR_GET_SOURCES"), &HandleSources);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override

@@ -8,6 +8,8 @@
 -- Every cell is a DressUpModel with the undressed player trying the item on.
 
 local OP_PAGE, OP_SOURCES, OP_ADDED = "APPEAR_PAGE", "APPEAR_SOURCES", "APPEAR_ADDED";
+-- запросы называются иначе, чем ответы: аддон-шёпот самому себе приходит и клиенту тоже
+local OP_GET_PAGE, OP_GET_SOURCES = "APPEAR_GET_PAGE", "APPEAR_GET_SOURCES";
 local NUM_MODELS = 18;
 
 -- categories: same numbers as on the server
@@ -195,7 +197,7 @@ function WardrobeItemsModel_OnEnter(self)
 	if entry then
 		local key = frame.category .. ":" .. entry.displayId;
 		if not sourcesCache[key] and Comm_Send then
-			Comm_Send(OP_SOURCES, frame.category, entry.displayId);
+			Comm_Send(OP_GET_SOURCES, frame.category, entry.displayId);
 		end
 	end
 	ShowAppearanceTooltip(self);
@@ -299,7 +301,7 @@ function WardrobeCollectionFrame_Request(self)
 	local search = (self.searchText or ""):gsub(":", " ");
 	self.waiting = true;
 	self.requestElapsed = 0;
-	Comm_Send(OP_PAGE, self.category, self.classId or 0, flags, self.page or 1, search);
+	Comm_Send(OP_GET_PAGE, self.category, self.classId or 0, flags, self.page or 1, search);
 end
 
 local function UpdatePage(self)
