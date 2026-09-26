@@ -25,8 +25,8 @@
 		<Size x="42" y="42"/>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentBackground" parentKey="Background" file="Interface\Buttons\UI-EmptySlot-Disabled">
-					<Size x="58" y="58"/>
+				<Texture name="$parentBackground" parentKey="Background" atlas="transmog-gearSlot-default">
+					<Size x="59" y="59"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
 					</Anchors>
@@ -41,19 +41,19 @@
 				</Texture>
 			</Layer>
 			<Layer level="OVERLAY">
-				<Texture name="$parentPending" parentKey="Pending" file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD" hidden="true">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="-4" y="4"/>
-						<Anchor point="BOTTOMRIGHT" x="4" y="-4"/>
-					</Anchors>
-				</Texture>
-				<Texture name="$parentSelected" parentKey="Selected" file="Interface\Buttons\UI-ActionButton-Border" alphaMode="ADD" hidden="true">
-					<Size x="72" y="72"/>
+				<Texture name="$parentPending" parentKey="Pending" atlas="transmog-gearSlot-pending" hidden="true">
+					<Size x="59" y="59"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
 					</Anchors>
 				</Texture>
-				<Texture name="$parentTransmogged" parentKey="Transmogged" file="Interface\RAIDFRAME\ReadyCheck-Ready" hidden="true">
+				<Texture name="$parentSelected" parentKey="Selected" atlas="transmog-gearSlot-selected" hidden="true">
+					<Size x="59" y="59"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentTransmogged" parentKey="Transmogged" atlas="transmog-icon-checkmark" hidden="true">
 					<Size x="20" y="20"/>
 					<Anchors>
 						<Anchor point="BOTTOMRIGHT" x="8" y="-6"/>
@@ -61,7 +61,7 @@
 				</Texture>
 			</Layer>
 		</Layers>
-		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+		<HighlightTexture atlas="transmog-gearSlot-selected" alphaMode="ADD"/>
 		<Scripts>
 			<OnLoad>
 				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
