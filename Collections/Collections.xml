@@ -10,7 +10,7 @@
 		Pets\      вкладка "Питомцы"
 		Toys\      вкладка "Игрушки"       (сервер: toy_collection.cpp)
 		Heirlooms\ вкладка "Наследуемые"    (в скором времени)
-		Wardrobe\  вкладка "Внешний вид"    (в скором времени)
+		Wardrobe\  вкладка "Внешний вид"   (сервер: appearance_collection.cpp)
 	-->
 	<Include file="Blizzard_Collections.xml"/>
 	<Include file="Blizzard_CollectionTemplates.xml"/>

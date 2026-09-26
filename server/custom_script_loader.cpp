@@ -23,6 +23,7 @@ void AddSC_cs_talent_tree();
 void AddSC_collections_creature_cache();
 void AddSC_heirloom_collection();
 void AddSC_toy_collection();
+void AddSC_appearance_collection();
 
 void AddCustomScripts()
 {
@@ -30,4 +31,5 @@ void AddCustomScripts()
     AddSC_collections_creature_cache();
     AddSC_heirloom_collection();
     AddSC_toy_collection();
+    AddSC_appearance_collection();
 }
