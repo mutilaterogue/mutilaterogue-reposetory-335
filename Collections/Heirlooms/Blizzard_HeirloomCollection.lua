@@ -140,14 +140,14 @@ local function BuildPages(list)
 	local function NewPage()
 		page = {};
 		table.insert(pages, page);
-		y, column, lastGroup = 0, COLUMNS, nil;
+		y, column, lastGroup = 0, 0, nil;
 	end
 	NewPage();
 
 	for _, entry in ipairs(list) do
 		if entry.group ~= lastGroup then
-			if column < COLUMNS then
-				y = y + ROW_HEIGHT;       -- закрыть неполный ряд прошлой группы
+			if column > 0 then
+				y = y + ROW_HEIGHT;       -- закрыть последний ряд прошлой группы (и полный тоже)
 			end
 			-- заголовок + хотя бы один ряд должны влезть
 			if y > 0 and y + HEADER_HEIGHT + ROW_HEIGHT > PAGE_HEIGHT then
