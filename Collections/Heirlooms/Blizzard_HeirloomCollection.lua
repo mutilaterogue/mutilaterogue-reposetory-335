@@ -10,6 +10,41 @@ local COLUMNS, ROWS = 3, 6;
 local PER_PAGE = COLUMNS * ROWS;
 local BUTTON_WIDTH, BUTTON_HEIGHT = 208, 50;
 local BUTTON_PADDING_Y = 16;
+local ROW_HEIGHT = BUTTON_HEIGHT + BUTTON_PADDING_Y;
+local HEADER_HEIGHT = 34;                  -- заголовок слота («Голова», «Плечи»...)
+local PAGE_HEIGHT = ROWS * ROW_HEIGHT;     -- высота страницы, как было при 6 рядах
+
+-- группы по слоту, в порядке как в ретейле; equipLoc из GetItemInfo
+local SLOT_GROUPS = {
+	{ key = "HEAD",     text = INVTYPE_HEAD or "Голова",          locs = { INVTYPE_HEAD = true } },
+	{ key = "NECK",     text = INVTYPE_NECK or "Шея",             locs = { INVTYPE_NECK = true } },
+	{ key = "SHOULDER", text = INVTYPE_SHOULDER or "Плечи",       locs = { INVTYPE_SHOULDER = true } },
+	{ key = "CLOAK",    text = INVTYPE_CLOAK or "Спина",          locs = { INVTYPE_CLOAK = true } },
+	{ key = "CHEST",    text = INVTYPE_CHEST or "Грудь",          locs = { INVTYPE_CHEST = true, INVTYPE_ROBE = true } },
+	{ key = "LEGS",     text = INVTYPE_LEGS or "Ноги",            locs = { INVTYPE_LEGS = true } },
+	{ key = "FINGER",   text = INVTYPE_FINGER or "Палец",         locs = { INVTYPE_FINGER = true } },
+	{ key = "TRINKET",  text = INVTYPE_TRINKET or "Аксессуар",    locs = { INVTYPE_TRINKET = true } },
+	{ key = "ONEHAND",  text = "Одноручное оружие",               locs = { INVTYPE_WEAPON = true, INVTYPE_WEAPONMAINHAND = true, INVTYPE_WEAPONOFFHAND = true } },
+	{ key = "TWOHAND",  text = INVTYPE_2HWEAPON or "Двуручное",   locs = { INVTYPE_2HWEAPON = true } },
+	{ key = "RANGED",   text = INVTYPE_RANGED or "Дальний бой",   locs = { INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_THROWN = true, INVTYPE_RELIC = true } },
+	{ key = "OFFHAND",  text = "Левая рука",                      locs = { INVTYPE_SHIELD = true, INVTYPE_HOLDABLE = true } },
+	{ key = "OTHER",    text = "Прочее",                          locs = {} },
+};
+local GROUP_ORDER = {};
+for index, group in ipairs(SLOT_GROUPS) do
+	GROUP_ORDER[group.key] = index;
+end
+
+local function GetSlotGroup(equipLoc)
+	if equipLoc and equipLoc ~= "" then
+		for index, group in ipairs(SLOT_GROUPS) do
+			if group.locs[equipLoc] then
+				return index;
+			end
+		end
+	end
+	return GROUP_ORDER.OTHER;
+end
 
 -- opcodes come from Server.lua (CMSG / SMSG); they must match AddonComm.h on the server
 CMSG = CMSG or {};
@@ -64,7 +99,7 @@ local function BuildList(self)
 	local waiting = false;
 
 	for _, itemId in ipairs(allHeirlooms) do
-		local name, link, _, _, _, _, _, _, _, icon = GetItemInfo(itemId);
+		local name, link, _, _, _, _, _, _, equipLoc, icon = GetItemInfo(itemId);
 		if not name then
 			RequestItem(itemId);
 			waiting = true;
@@ -75,11 +110,17 @@ local function BuildList(self)
 		if IsForClass(itemId, self.classFilter)
 			and (isOwned and filters.collected or not isOwned and filters.notCollected)
 			and (search == "" or name:lower():find(search, 1, true)) then
-			table.insert(list, { itemId = itemId, name = name, icon = icon, owned = isOwned });
+			local group = GetSlotGroup(equipLoc);
+			if not self.slotFilter or self.slotFilter == group then
+				table.insert(list, { itemId = itemId, name = name, icon = icon, owned = isOwned, group = group });
+			end
 		end
 	end
 
 	table.sort(list, function(a, b)
+		if a.group ~= b.group then
+			return a.group < b.group;
+		end
 		if a.owned ~= b.owned then
 			return a.owned;
 		end
@@ -90,18 +131,107 @@ local function BuildList(self)
 	return waiting;
 end
 
+-- делит список на страницы: заголовок слота + сетка COLUMNS в ряд.
+-- pages[i] = { { header = groupIndex, y = ... }, { entry = ..., column = ..., y = ... }, ... }
+local function BuildPages(list)
+	local pages = {};
+	local page, y, column, lastGroup;
+
+	local function NewPage()
+		page = {};
+		table.insert(pages, page);
+		y, column, lastGroup = 0, COLUMNS, nil;
+	end
+	NewPage();
+
+	for _, entry in ipairs(list) do
+		if entry.group ~= lastGroup then
+			if column < COLUMNS then
+				y = y + ROW_HEIGHT;       -- закрыть неполный ряд прошлой группы
+			end
+			-- заголовок + хотя бы один ряд должны влезть
+			if y > 0 and y + HEADER_HEIGHT + ROW_HEIGHT > PAGE_HEIGHT then
+				NewPage();
+			end
+			table.insert(page, { header = entry.group, y = y });
+			y = y + HEADER_HEIGHT;
+			column, lastGroup = 0, entry.group;
+		elseif column >= COLUMNS then
+			y = y + ROW_HEIGHT;
+			column = 0;
+			if y + ROW_HEIGHT > PAGE_HEIGHT then
+				NewPage();
+				-- продолжение группы на новой странице - повторяем заголовок
+				table.insert(page, { header = entry.group, y = y });
+				y = y + HEADER_HEIGHT;
+				column, lastGroup = 0, entry.group;
+			end
+		end
+		table.insert(page, { entry = entry, column = column, y = y });
+		column = column + 1;
+	end
+	return pages;
+end
+
+local function AcquireHeader(self, index)
+	self.headers = self.headers or {};
+	local header = self.headers[index];
+	if not header then
+		header = CreateFrame("Frame", nil, self.IconsFrame);
+		header:SetSize(COLUMNS * BUTTON_WIDTH, HEADER_HEIGHT);
+		header.text = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+		header.text:SetPoint("CENTER", 0, 2);
+		header.text:SetTextColor(0.9, 0.8, 0.5);
+		header.left = header:CreateTexture(nil, "ARTWORK");
+		header.left:SetTexture("Interface\\Common\\UI-TooltipDivider-Transparent");
+		header.left:SetHeight(8);
+		header.left:SetPoint("LEFT", 0, 2);
+		header.left:SetPoint("RIGHT", header.text, "LEFT", -10, 0);
+		header.right = header:CreateTexture(nil, "ARTWORK");
+		header.right:SetTexture("Interface\\Common\\UI-TooltipDivider-Transparent");
+		header.right:SetHeight(8);
+		header.right:SetPoint("LEFT", header.text, "RIGHT", 10, 0);
+		header.right:SetPoint("RIGHT", -40, 2);
+		self.headers[index] = header;
+	end
+	return header;
+end
+
 local function UpdateButtons(self)
+	self.pages = BuildPages(self.list);
 	local page = self.page or 1;
-	local maxPages = math.max(1, math.ceil(#self.list / PER_PAGE));
+	local maxPages = math.max(1, #self.pages);
 	if page > maxPages then
 		page = maxPages;
 		self.page = page;
 	end
 
+	for _, header in ipairs(self.headers or {}) do
+		header:Hide();
+	end
+	local buttonIndex, headerIndex = 0, 0;
+	local layout = {};
+	for _, element in ipairs(self.pages[page] or {}) do
+		if element.header then
+			headerIndex = headerIndex + 1;
+			local header = AcquireHeader(self, headerIndex);
+			header:ClearAllPoints();
+			header:SetPoint("TOPLEFT", self.IconsFrame, "TOPLEFT", 40, -12 - element.y);
+			header.text:SetText(SLOT_GROUPS[element.header].text);
+			header:Show();
+		else
+			buttonIndex = buttonIndex + 1;
+			layout[buttonIndex] = element;
+		end
+	end
+
 	for index, button in ipairs(self.buttons) do
-		local entry = self.list[(page - 1) * PER_PAGE + index];
+		local element = layout[index];
+		local entry = element and element.entry;
 		button.entry = entry;
 		if entry then
+			button:ClearAllPoints();
+			button:SetPoint("TOPLEFT", self.IconsFrame, "TOPLEFT", 40 + element.column * BUTTON_WIDTH, -12 - element.y);
 			button.iconTexture:SetTexture(entry.icon or "Interface\\Icons\\INV_Misc_QuestionMark");
 			button.iconTexture:SetDesaturated(not entry.owned);
 			button.iconTexture:SetAlpha(entry.owned and 1 or 0.18);
@@ -222,7 +352,7 @@ function HeirloomsJournal_OnLoad(self)
 	self.PagingFrame.PrevPageButton:SetScript("OnClick", function() SetPage((self.page or 1) - 1); end);
 	self.PagingFrame.NextPageButton:SetScript("OnClick", function() SetPage((self.page or 1) + 1); end);
 	self.IconsFrame:SetScript("OnMouseWheel", function(_, delta)
-		local maxPages = math.max(1, math.ceil(#self.list / PER_PAGE));
+		local maxPages = math.max(1, #(self.pages or {}));
 		local page = math.max(1, math.min(maxPages, (self.page or 1) - delta));
 		if page ~= self.page then
 			SetPage(page);
@@ -241,10 +371,11 @@ function HeirloomsJournal_OnLoad(self)
 
 	local filter = self.FilterDropdown;
 	filter:SetIsDefaultCallback(function()
-		return self.filters.collected and self.filters.notCollected;
+		return self.filters.collected and self.filters.notCollected and not self.slotFilter;
 	end);
 	filter:SetDefaultCallback(function()
 		self.filters.collected, self.filters.notCollected = true, true;
+		self.slotFilter = nil;
 	end);
 	filter:SetUpdateCallback(function() HeirloomsJournal_Refresh(self); end);
 	filter:SetupMenu(function(dropdown, rootDescription)
@@ -257,6 +388,21 @@ function HeirloomsJournal_OnLoad(self)
 				filter:ValidateResetState();
 				HeirloomsJournal_Refresh(self);
 			end);
+		end
+		rootDescription:CreateDivider();
+		rootDescription:CreateTitle("Слот");
+		local function IsSlot(group)
+			return self.slotFilter == group;
+		end
+		local function SetSlot(group)
+			self.slotFilter = group;
+			self.page = 1;
+			filter:ValidateResetState();
+			HeirloomsJournal_Refresh(self);
+		end
+		rootDescription:CreateRadio("Все слоты", function() return self.slotFilter == nil; end, function() SetSlot(nil); end);
+		for index, group in ipairs(SLOT_GROUPS) do
+			rootDescription:CreateRadio(group.text, IsSlot, SetSlot, index);
 		end
 	end);
 
