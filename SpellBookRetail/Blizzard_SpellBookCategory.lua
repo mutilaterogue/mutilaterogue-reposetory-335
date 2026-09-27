@@ -362,20 +362,21 @@ end
 
 
 --------------------------- Guild --------------------------------
--- Гильдейские заклинания: вкладка книги 3.3.5 от SkillLine 821 («Гильдия»). Сервер учит их, пока персонаж
--- в гильдии (server/guild_spells.cpp). Вкладка ищется по названию SkillLine 821 в SkillLine.dbc.
-
-GUILD_SPELLBOOK_SKILL_LINE = 821;
+-- Гильдейские заклинания: клиент 3.3.5 сам делает вкладку книги, когда изучен спелл из SkillLineAbility
+-- с SkillLine 821. Здесь она просто показывается отдельной кнопкой «Гильдия».
 GUILD_SPELLBOOK_TAB_NAME = GUILD_SPELLBOOK_TAB_NAME or GUILD or "Гильдия";
 
--- номер вкладки книги (GetSpellTabInfo) с гильдейскими заклинаниями или nil
+-- вкладка гильдии: по названию, иначе первая вкладка после «Общие» и веток талантов
 function SpellBookGuildCategory_GetTabIndex()
 	local numTabs = GetNumSpellTabs() or 0;
+	local firstExtra = 2 + (GetNumTalentTabs(false, false) or 0);
 	for tabIndex = 1, numTabs do
-		local name = GetSpellTabInfo(tabIndex);
-		if name and name == GUILD_SPELLBOOK_TAB_NAME then
+		if GetSpellTabInfo(tabIndex) == GUILD_SPELLBOOK_TAB_NAME then
 			return tabIndex;
 		end
+	end
+	if numTabs >= firstExtra then
+		return firstExtra;
 	end
 	return nil;
 end
@@ -416,11 +417,8 @@ function SpellBookGuildCategoryMixin:UpdateSpellGroups()
 	return anyChanges;
 end
 
--- кнопка «Гильдия» есть только у персонажа в гильдии, у которого есть гильдейские заклинания
+-- кнопка «Гильдия» появляется, как только в книге есть вкладка гильдии
 function SpellBookGuildCategoryMixin:IsAvailable()
-	if not IsInGuild() then
-		return false;
-	end
 	local tabIndex = SpellBookGuildCategory_GetTabIndex();
 	if not tabIndex then
 		return false;
