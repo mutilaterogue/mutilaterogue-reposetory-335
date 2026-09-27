@@ -394,11 +394,12 @@ end
 function SpellBookGuildCategoryMixin:UpdateSpellGroups()
 	local newSpellGroups = {};
 	local tabIndex = SpellBookGuildCategory_GetTabIndex();
-	if tabIndex then
-		local _, _, offset, numSpells = GetSpellTabInfo(tabIndex);
+	-- смещение и количество - через C_SpellBook, как у остальных категорий (своя нумерация ячеек)
+	local skillLineInfo = tabIndex and C_SpellBook.GetSpellBookSkillLineInfo(tabIndex);
+	if skillLineInfo and (skillLineInfo.numSpellBookItems or 0) > 0 then
 		table.insert(newSpellGroups, {
-			slotIndexOffset = offset or 0,
-			numSpellBookItems = numSpells or 0,
+			slotIndexOffset = skillLineInfo.itemIndexOffset,
+			numSpellBookItems = skillLineInfo.numSpellBookItems,
 			skillLineIndex = tabIndex,
 			showActionBarStatuses = true,
 			spellBookItemSlotIndices = {},
@@ -423,8 +424,8 @@ function SpellBookGuildCategoryMixin:IsAvailable()
 	if not tabIndex then
 		return false;
 	end
-	local _, _, _, numSpells = GetSpellTabInfo(tabIndex);
-	return (numSpells or 0) > 0;
+	local skillLineInfo = C_SpellBook.GetSpellBookSkillLineInfo(tabIndex);
+	return skillLineInfo ~= nil and (skillLineInfo.numSpellBookItems or 0) > 0;
 end
 
 function SpellBookGuildCategoryMixin:ContainsSkillLine(skillLineIndex)
