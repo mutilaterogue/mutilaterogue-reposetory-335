@@ -248,14 +248,14 @@
 				<!-- 3.3.5 не берёт размер из файла: страницы книги растягиваются на левую и правую половину Inset -->
 				<Texture name="$parentBgLeft" file="Interface\Archeology\Arch-BookItemLeft" parentKey="bgLeft">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="2" y="-2" relativeTo="$parentInset" />
-						<Anchor point="BOTTOMRIGHT" x="0" y="2" relativeTo="$parentInset" relativePoint="BOTTOM" />
+						<Anchor point="TOPLEFT" x="4" y="-4" relativeTo="$parentInset" />
+						<Anchor point="BOTTOMRIGHT" x="0" y="4" relativeTo="$parentInset" relativePoint="BOTTOM" />
 					</Anchors>
 				</Texture>
 				<Texture name="$parentBgRight" file="Interface\Archeology\Arch-BookItemRight" parentKey="bgRight">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentBgLeft" relativePoint="TOPRIGHT" />
-						<Anchor point="BOTTOMRIGHT" x="-2" y="2" relativeTo="$parentInset" />
+						<Anchor point="BOTTOMRIGHT" x="-4" y="4" relativeTo="$parentInset" />
 					</Anchors>
 				</Texture>
 			</Layer>
@@ -332,7 +332,7 @@
 			<Button name="$parentSummarytButton" parentKey="tab1" id="1">
 				<Size x="63" y="57"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="-22" y="-50" relativePoint="TOPRIGHT"/>
+					<Anchor point="TOPLEFT" x="2" y="-50" relativePoint="TOPRIGHT"/>
 				</Anchors>
 				<Layers>
 					<Layer level="OVERLAY">
@@ -376,7 +376,7 @@
 			<Button name="$parentCompletedButton"  parentKey="tab2" id="2">
 				<Size x="63" y="57"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="-22" y="-120" relativePoint="TOPRIGHT"/>
+					<Anchor point="TOPLEFT" x="2" y="-120" relativePoint="TOPRIGHT"/>
 				</Anchors>
 				<Scripts>
 					<OnClick>
