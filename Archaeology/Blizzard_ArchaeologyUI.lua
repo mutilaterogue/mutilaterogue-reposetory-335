@@ -59,8 +59,11 @@ end
 
 
 -- портрет: RetailPortrait/ButtonFrameTemplate клиента (PortraitContainer), иначе старый ArchaeologyFramePortrait
+ARCHAEOLOGY_PORTRAIT_ICON = ARCHAEOLOGY_PORTRAIT_ICON or "Interface\\Icons\\Trade_Archaeology";
+
 function ArchaeologyFrame_SetPortrait(texture)
 	local frame = ArchaeologyFrame;
+	texture = texture or ARCHAEOLOGY_PORTRAIT_ICON;
 	if frame.SetPortraitToAsset then
 		frame:SetPortraitToAsset(texture);
 	elseif ArchaeologyFramePortrait then
@@ -82,6 +85,8 @@ function ArchaeologyFrame_OnLoad(self)
 		self.CloseButton:SetFrameLevel(self:GetFrameLevel() + 20);
 	end
 	self.infoButton:SetFrameLevel(self:GetFrameLevel() + 20);
+	-- портрет сразу, даже если навык ещё не изучен
+	ArchaeologyFrame_SetPortrait(ARCHAEOLOGY_PORTRAIT_ICON);
 	
 	self.bgLeft:SetTexture(ArcheologyLayoutInfo[ARCHAEOLOGY_SUMMARY_PAGE].bgFileL);
 	self.bgRight:SetTexture(ArcheologyLayoutInfo[ARCHAEOLOGY_SUMMARY_PAGE].bgFileR);
