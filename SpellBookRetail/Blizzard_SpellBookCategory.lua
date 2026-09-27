@@ -364,19 +364,17 @@ end
 --------------------------- Guild --------------------------------
 -- Гильдейские заклинания: клиент 3.3.5 сам делает вкладку книги, когда изучен спелл из SkillLineAbility
 -- с SkillLine 821. Здесь она просто показывается отдельной кнопкой «Гильдия».
-GUILD_SPELLBOOK_TAB_NAME = GUILD_SPELLBOOK_TAB_NAME or GUILD or "Гильдия";
+-- название вкладки = название SkillLine 821 в SkillLine.dbc
+GUILD_SPELLBOOK_TAB_NAME = GUILD_SPELLBOOK_TAB_NAME or "Гильдейские бонусы";
+GUILD_SPELLBOOK_CATEGORY_NAME = GUILD_SPELLBOOK_CATEGORY_NAME or GUILD or "Гильдия";   -- подпись кнопки
 
--- вкладка гильдии: по названию, иначе первая вкладка после «Общие» и веток талантов
+-- вкладка книги с гильдейскими заклинаниями - только по названию, иначе nil
 function SpellBookGuildCategory_GetTabIndex()
 	local numTabs = GetNumSpellTabs() or 0;
-	local firstExtra = 2 + (GetNumTalentTabs(false, false) or 0);
 	for tabIndex = 1, numTabs do
 		if GetSpellTabInfo(tabIndex) == GUILD_SPELLBOOK_TAB_NAME then
 			return tabIndex;
 		end
-	end
-	if numTabs >= firstExtra then
-		return firstExtra;
 	end
 	return nil;
 end
@@ -384,7 +382,7 @@ end
 SpellBookGuildCategoryMixin = CreateFromMixins(BaseSpellBookCategoryMixin);
 
 function SpellBookGuildCategoryMixin:Init(spellBookFrame)
-	self.displayName = GUILD_SPELLBOOK_TAB_NAME;
+	self.displayName = GUILD_SPELLBOOK_CATEGORY_NAME;
 	self.spellBank = Enum.SpellBookSpellBank.Player;
 	self.categoryEnum = PlayerSpellsUtil.SpellBookCategories.Guild;
 
