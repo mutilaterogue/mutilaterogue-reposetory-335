@@ -59,6 +59,7 @@ end
 
 
 -- портрет: RetailPortrait/ButtonFrameTemplate клиента (PortraitContainer), иначе старый ArchaeologyFramePortrait
+ARCHAEOLOGY_PORTRAIT_OFFSET_X, ARCHAEOLOGY_PORTRAIT_OFFSET_Y = 4, -8;   -- сдвиг портрета вправо / вниз
 ARCHAEOLOGY_PORTRAIT_ICON = ARCHAEOLOGY_PORTRAIT_ICON or "Interface\\Icons\\Trade_Archaeology";
 
 function ArchaeologyFrame_SetPortrait(texture)
@@ -87,6 +88,13 @@ function ArchaeologyFrame_OnLoad(self)
 	self.infoButton:SetFrameLevel(self:GetFrameLevel() + 20);
 	-- портрет сразу, даже если навык ещё не изучен
 	ArchaeologyFrame_SetPortrait(ARCHAEOLOGY_PORTRAIT_ICON);
+	-- портрет шаблона чуть ниже, чтобы не выходил за рамку окна
+	local portrait = self.PortraitContainer or ArchaeologyFramePortrait;
+	if portrait and portrait:GetNumPoints() > 0 then
+		local point, relativeTo, relativePoint, x, y = portrait:GetPoint(1);
+		portrait:ClearAllPoints();
+		portrait:SetPoint(point, relativeTo, relativePoint, (x or 0) + ARCHAEOLOGY_PORTRAIT_OFFSET_X, (y or 0) + ARCHAEOLOGY_PORTRAIT_OFFSET_Y);
+	end
 	
 	self.bgLeft:SetTexture(ArcheologyLayoutInfo[ARCHAEOLOGY_SUMMARY_PAGE].bgFileL);
 	self.bgRight:SetTexture(ArcheologyLayoutInfo[ARCHAEOLOGY_SUMMARY_PAGE].bgFileR);
