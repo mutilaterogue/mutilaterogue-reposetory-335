@@ -100,7 +100,12 @@ function ArchaeologyFrame_OnLoad(self)
 	end	
 	
 	local name = GetArchaeologyInfo();
-	self.TitleText:SetText(name);
+	-- ButtonFrameTemplate клиента: заголовок через SetTitle (TitleText нет)
+	if self.SetTitle then
+		self:SetTitle(name);
+	elseif self.TitleText then
+		self.TitleText:SetText(name);
+	end
 	self.helpPage.titleText:SetText(name);
 	
 	
@@ -162,6 +167,9 @@ end
 
 
 function ArchaeologyFrame_OnEvent(self, event, ...)
+	if not self.currentFrame then
+		return;   -- окно ещё не загружено
+	end
 	if event == "ARTIFACT_COMPLETE" then
 		local name  = ...;
 		if self.artifactPage:IsShown() and self.artifactPage.currentName == name  then
