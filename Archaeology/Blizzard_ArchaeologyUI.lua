@@ -71,6 +71,17 @@ end
 function ArchaeologyFrame_OnLoad(self)
 	ButtonFrameTemplate_HideButtonBar(ArchaeologyFrame);
 	ButtonFrameTemplate_HideAttic(ArchaeologyFrame);
+	-- 3.3.5: Inset шаблона закрывал страницы книги (дочерние фреймы рисуются поверх текстур окна);
+	-- страницы к нему только привязаны, сам он не нужен
+	if self.Inset then
+		self.Inset:SetAlpha(0);
+		self.Inset:EnableMouse(false);
+	end
+	-- кнопки закрытия и справки - поверх страниц
+	if self.CloseButton then
+		self.CloseButton:SetFrameLevel(self:GetFrameLevel() + 20);
+	end
+	self.infoButton:SetFrameLevel(self:GetFrameLevel() + 20);
 	
 	self.bgLeft:SetTexture(ArcheologyLayoutInfo[ARCHAEOLOGY_SUMMARY_PAGE].bgFileL);
 	self.bgRight:SetTexture(ArcheologyLayoutInfo[ARCHAEOLOGY_SUMMARY_PAGE].bgFileR);
