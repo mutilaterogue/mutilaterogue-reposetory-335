@@ -6,7 +6,7 @@
  * Персонаж - characters: character_archaeology (фрагменты и текущий проект расы), character_archaeology_history,
  * character_archaeology_digsite (4 активных места раскопок на континент).
  *
- * Раскопки: «Исследование» (ARCH_SURVEY, клиент: /survey или кнопка на полосе раскопок) внутри места раскопок
+ * Раскопки: «Исследовать» (80451, кнопка на полосе раскопок или /cast Исследовать) внутри места раскопок
  * ставит телескоп в сторону находки: красный > 80 ярдов, жёлтый > 40, зелёный ближе. В 8 ярдах появляется находка;
  * её использование даёт фрагменты расы места и навык. После 3 находок место заменяется новым на том же континенте.
  *
@@ -17,7 +17,7 @@
  *   "ARCH_GET"                     -> "ARCH_STATE" : "branch/fragments/project,..."  + "ARCH_HISTORY" : "project/count/firstTime,..."
  *   "ARCH_SOLVE" : branch : keystones -> "ARCH_COMPLETE" : project, "ARCH_STATE", "ARCH_HISTORY"   (ошибка: "ARCH_ERROR" : текст)
  *   "ARCH_SITES_GET"               -> "ARCH_SITE" : site : zoneName : x : y : finds (x, y - 0..10000 на карте зоны) x N, "ARCH_SITES_END"
- *   "ARCH_SURVEY"                  -> телескоп / находка, "ARCH_DIGSITE" : site : finds : max
+ *   «Исследовать» (80451, spell_archaeology_survey) -> телескоп / находка, "ARCH_DIGSITE" : site : finds : max
  *   сервер сам: "ARCH_ENTER" : site : finds : max / "ARCH_LEAVE" - вход и выход из места раскопок
  *
  * Регистрация: AddSC_archaeology(); SQL: sql/characters_archaeology.sql, sql/world_archaeology_gameobjects.sql,
@@ -25,6 +25,10 @@
  */
 
 #include "ScriptMgr.h"
+#include "Creature.h"
+#include "SpellScript.h"
+#include "ScriptedGossip.h"
+#include "ScriptedCreature.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
@@ -52,8 +56,9 @@
 namespace
 {
     constexpr uint32 SKILL_ARCHAEOLOGY = 794;
+    constexpr uint32 SPELL_SURVEY = 80451;                        // «Исследовать»
     constexpr uint32 SITES_PER_CONTINENT = 4;
-    constexpr uint32 FINDS_PER_SITE = 3;
+    constexpr uint32 FINDS_PER_SITE = 6;                        // Cata 4.3: 6 находок на место
     constexpr uint32 KEYSTONE_FRAGMENTS = 12;
     constexpr uint32 FRAGMENTS_MIN = 5, FRAGMENTS_MAX = 9;        // за находку
     constexpr uint32 RARE_CHANCE = 10;                            // % редкого проекта
@@ -448,6 +453,13 @@ namespace
         SendState(player);
     }
 
+    // можно ли сейчас исследовать (для CheckCast заклинания 80451)
+    bool CanSurvey(Player* player)
+    {
+        auto itr = players.find(player->GetGUID().GetCounter());
+        return itr != players.end() && CurrentDigsite(player, itr->second) != nullptr;
+    }
+
     void HandleSurvey(Player* player, std::vector<std::string> const& /*args*/)
     {
         PlayerData& data = Data(player);
@@ -599,7 +611,6 @@ public:
         sAddonComm->Register(std::string("ARCH_GET"), &HandleGet);
         sAddonComm->Register(std::string("ARCH_SITES_GET"), &HandleSitesGet);
         sAddonComm->Register(std::string("ARCH_SOLVE"), &HandleSolve);
-        sAddonComm->Register(std::string("ARCH_SURVEY"), &HandleSurvey);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
@@ -613,8 +624,128 @@ public:
     }
 };
 
+// 80451 - Исследовать: вне места раскопок не применяется, после применения - телескоп / находка
+class spell_archaeology_survey : public SpellScript
+{
+    PrepareSpellScript(spell_archaeology_survey);
+
+    SpellCastResult CheckCast()
+    {
+        Player* player = GetCaster()->ToPlayer();
+        if (!player || !CanSurvey(player))
+            return SPELL_FAILED_NOT_HERE;
+        return SPELL_CAST_OK;
+    }
+
+    void HandleAfterCast()
+    {
+        if (Player* player = GetCaster()->ToPlayer())
+            HandleSurvey(player, {});
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_archaeology_survey::CheckCast);
+        AfterCast += SpellCastFn(spell_archaeology_survey::HandleAfterCast);
+    }
+};
+
+// Тренер археологии (sql/world_archaeology_trainer.sql): ранги навыка 794 через диалог, без заклинаний рангов в Spell.dbc.
+// Изучение ранга: навык с потолком ранга + «Исследовать» (80451). Как в Cata: следующий ранг - по уровню и навыку.
+namespace
+{
+    struct ArchaeologyRank { char const* Name; uint8 Level; uint16 RequiredSkill; uint16 MaxSkill; uint32 Cost; };
+    ArchaeologyRank const ARCHAEOLOGY_RANKS[] =
+    {
+        { "Ученик",          5,   0,  75,     100 },   //  1 серебро
+        { "Подмастерье",    10,  50, 150,     500 },
+        { "Умелец",         20, 125, 225,   10000 },   //  1 золото
+        { "Искусник",       35, 200, 300,   50000 },
+        { "Мастер",         50, 275, 375,  100000 },
+        { "Великий мастер", 65, 350, 450,  250000 },
+        { "Знаток",         75, 425, 525,  500000 },
+    };
+    constexpr uint32 GOSSIP_ACTION_LEARN = 1000;
+
+    std::string MoneyText(uint32 copper)
+    {
+        std::ostringstream text;
+        if (copper >= 10000)
+            text << copper / 10000 << " з ";
+        if (copper % 10000 >= 100)
+            text << (copper % 10000) / 100 << " с";
+        return text.str();
+    }
+
+    // следующий ранг, который можно изучить сейчас (или nullptr)
+    int NextRank(Player* player)
+    {
+        uint16 max = player->HasSkill(SKILL_ARCHAEOLOGY) ? player->GetMaxSkillValue(SKILL_ARCHAEOLOGY) : 0;
+        for (int i = 0; i < int(std::size(ARCHAEOLOGY_RANKS)); ++i)
+            if (ARCHAEOLOGY_RANKS[i].MaxSkill > max)
+                return i;
+        return -1;
+    }
+}
+
+struct npc_archaeology_trainer : public ScriptedAI
+{
+    npc_archaeology_trainer(Creature* creature) : ScriptedAI(creature) { }
+
+    bool OnGossipHello(Player* player) override
+    {
+        ClearGossipMenuFor(player);
+        int rank = NextRank(player);
+        if (rank >= 0)
+        {
+            ArchaeologyRank const& r = ARCHAEOLOGY_RANKS[rank];
+            std::ostringstream text;
+            text << "Археология: " << r.Name << " (до " << r.MaxSkill << ") - " << MoneyText(r.Cost);
+            AddGossipItemFor(player, GOSSIP_ICON_TRAINER, text.str(), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_LEARN + rank);
+        }
+        SendGossipMenuFor(player, player->GetGossipTextId(me), me->GetGUID());
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
+    {
+        uint32 action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+        CloseGossipMenuFor(player);
+        int rank = int(action) - int(GOSSIP_ACTION_LEARN);
+        if (rank < 0 || rank >= int(std::size(ARCHAEOLOGY_RANKS)) || rank != NextRank(player))
+            return true;
+
+        ArchaeologyRank const& r = ARCHAEOLOGY_RANKS[rank];
+        uint16 value = player->HasSkill(SKILL_ARCHAEOLOGY) ? player->GetSkillValue(SKILL_ARCHAEOLOGY) : 1;
+        if (player->GetLevel() < r.Level)
+        {
+            me->Whisper(Trinity::StringFormat("Приходи, когда достигнешь {} уровня.", r.Level), LANG_UNIVERSAL, player);
+            return true;
+        }
+        if (rank > 0 && value < r.RequiredSkill)
+        {
+            me->Whisper(Trinity::StringFormat("Нужен навык археологии {}.", r.RequiredSkill), LANG_UNIVERSAL, player);
+            return true;
+        }
+        if (!player->HasEnoughMoney(uint64(r.Cost)))
+        {
+            player->SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, me, 0, 0);
+            return true;
+        }
+
+        player->ModifyMoney(-int64(r.Cost));
+        player->SetSkill(SKILL_ARCHAEOLOGY, uint16(rank + 1), std::max<uint16>(value, 1), r.MaxSkill);
+        if (!player->HasSpell(SPELL_SURVEY))
+            player->LearnSpell(SPELL_SURVEY, false);
+        me->CastSpell(player, 483, true);   // визуал изучения (Learning)
+        return true;
+    }
+};
+
 void AddSC_archaeology()
 {
+    RegisterSpellScript(spell_archaeology_survey);
+    RegisterCreatureAI(npc_archaeology_trainer);
     new archaeology_world();
     new archaeology_player();
     RegisterGameObjectAI(go_archaeology_find);

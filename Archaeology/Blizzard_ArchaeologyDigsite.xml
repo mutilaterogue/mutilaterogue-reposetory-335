@@ -45,7 +45,8 @@
 				<BarTexture file="Interface\PaperDollInfoFrame\UI-Character-Skills-Bar"/>
 				<BarColor r="0.8" g="0.55" b="0.2"/>
 			</StatusBar>
-			<Button name="$parentSurveyButton" parentKey="SurveyButton">
+			<!-- «Исследовать» (80451) - защищённая кнопка заклинания -->
+			<Button name="$parentSurveyButton" parentKey="SurveyButton" inherits="SecureActionButtonTemplate">
 				<Size x="36" y="36"/>
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentBar" relativePoint="RIGHT" x="10" y="6"/>
@@ -54,11 +55,10 @@
 				<PushedTexture file="Interface\Icons\INV_Misc_Shovel_01"/>
 				<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
 				<Scripts>
-					<OnClick function="ArchaeologySurvey"/>
 					<OnEnter>
 						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 						GameTooltip:SetText(ARCHAEOLOGY_SURVEY);
-						GameTooltip:AddLine("Показывает направление к ближайшей находке. Также: /survey", 1, 1, 1, true);
+						GameTooltip:AddLine("Показывает направление к ближайшей находке. Также: /cast Исследовать", 1, 1, 1, true);
 						GameTooltip:Show();
 					</OnEnter>
 					<OnLeave function="GameTooltip_Hide"/>
