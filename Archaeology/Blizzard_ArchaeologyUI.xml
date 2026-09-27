@@ -245,14 +245,17 @@
 				</Texture>
 			</Layer>
 			<Layer level="BACKGROUND">
+				<!-- 3.3.5 не берёт размер из файла: страницы книги растягиваются на левую и правую половину Inset -->
 				<Texture name="$parentBgLeft" file="Interface\Archeology\Arch-BookItemLeft" parentKey="bgLeft">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="2" y="-2" relativeTo="$parentInset" />
+						<Anchor point="BOTTOMRIGHT" x="0" y="2" relativeTo="$parentInset" relativePoint="BOTTOM" />
 					</Anchors>
 				</Texture>
 				<Texture name="$parentBgRight" file="Interface\Archeology\Arch-BookItemRight" parentKey="bgRight">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentBgLeft" relativePoint="TOPRIGHT" />
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2" relativeTo="$parentInset" />
 					</Anchors>
 				</Texture>
 			</Layer>

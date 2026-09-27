@@ -1,7 +1,7 @@
 
 
 
-UIPanelWindows["ArchaeologyFrame"] = {area = "left", pushable = 3, showFailedFunc = "ArchaeologyFrame_ShowFailed" };
+UIPanelWindows["ArchaeologyFrame"] = {area = "left", pushable = 3, xOffset = "15", yOffset = "-10", showFailedFunc = "ArchaeologyFrame_ShowFailed" };
 
 ARCHAEOLOGY_BUTTON_HEIGHT = 59;
 ARCHAEOLOGY_MID_TITLE_YOFFSET = -110;
@@ -57,6 +57,16 @@ function ArchaeologyFrame_ShowFailed(self)
 end
 
 
+
+-- портрет: RetailPortrait/ButtonFrameTemplate клиента (PortraitContainer), иначе старый ArchaeologyFramePortrait
+function ArchaeologyFrame_SetPortrait(texture)
+	local frame = ArchaeologyFrame;
+	if frame.SetPortraitToAsset then
+		frame:SetPortraitToAsset(texture);
+	elseif ArchaeologyFramePortrait then
+		SetPortraitToTexture(ArchaeologyFramePortrait, texture);
+	end
+end
 
 function ArchaeologyFrame_OnLoad(self)
 	ButtonFrameTemplate_HideButtonBar(ArchaeologyFrame);
@@ -132,7 +142,7 @@ function ArchaeologyFrame_OnShow(self)
 	-- 3.3.5: нет GetProfessions - навык археологии из списка навыков
 	local name, texture, rank, maxRank = Archaeology_GetSkillInfo();
 	if name then
-		SetPortraitToTexture(ArchaeologyFramePortrait, texture);
+		ArchaeologyFrame_SetPortrait(texture);
 		self.rankBar:SetMinMaxValues(0, maxRank);
 		self.rankBar:SetValue(rank);
 		self.rankBar.text:SetText(rank.."/"..maxRank);
@@ -190,7 +200,7 @@ function ArchaeologyFrame_OnEvent(self, event, ...)
 		-- 3.3.5: нет GetProfessions - навык археологии из списка навыков
 		local name, texture, rank, maxRank = Archaeology_GetSkillInfo();
 		if name then
-			SetPortraitToTexture(ArchaeologyFramePortrait, texture);
+			ArchaeologyFrame_SetPortrait(texture);
 			self.rankBar:SetMinMaxValues(0, maxRank);
 			self.rankBar:SetValue(rank);
 			self.rankBar.text:SetText(rank.."/"..maxRank);
