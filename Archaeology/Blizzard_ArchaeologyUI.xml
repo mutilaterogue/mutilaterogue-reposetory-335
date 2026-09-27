@@ -245,18 +245,18 @@
 				</Texture>
 			</Layer>
 			<Layer level="BORDER">
-				<!-- книга Cata: страница 512 + край 64 (512x512 и 64x512), ужаты по ширине окна 550: 478 + 60, внутри рамки -->
+				<!-- книга Cata: страница 512 + край 64 (512x512 и 64x512); край текстуры частично прозрачный, поэтому заходит за правый и нижний край окна -->
 				<Texture name="$parentBgLeft" file="Interface\Archeology\Arch-BookItemLeft" parentKey="bgLeft">
-					<Size x="478" y="0"/>
+					<Size x="490" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="6" y="-24"/>
-						<Anchor point="BOTTOM" y="6"/>
+						<Anchor point="BOTTOM" y="-12"/>
 					</Anchors>
 				</Texture>
 				<Texture name="$parentBgRight" file="Interface\Archeology\Arch-BookItemRight" parentKey="bgRight">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentBgLeft" relativePoint="TOPRIGHT"/>
-						<Anchor point="BOTTOMRIGHT" x="-6" y="6"/>
+						<Anchor point="BOTTOMRIGHT" x="14" y="-12"/>
 					</Anchors>
 				</Texture>
 			</Layer>
