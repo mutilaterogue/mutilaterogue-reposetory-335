@@ -1,6 +1,6 @@
 -- IdTip для FrameXML (3.3.5): ID заклинаний, предметов, NPC, заданий, достижений и символов в подсказках.
 -- В отличие от аддона IdTip строки с ID всегда в самом низу подсказки - после строки трансмогрификации
--- и всего, что дописывают другие хуки: ID собираются и дописываются, когда подсказка уже заполнена.
+-- и всего, что дописывают другие хуки: дописанные позже строки переносятся над ID.
 -- Подключение: в FrameXML.toc после GameTooltip.lua / ItemRef.lua - IdTip.lua
 
 local select, tonumber, UnitAura, UnitExists, UnitIsUnit, UnitClass, UnitName, UnitGUID =
@@ -18,39 +18,73 @@ local TYPES = {
 };
 
 ---------------------------------------------------------------------------
--- отложенные строки: [tooltip] = { { left, right, r, g, b, r2, g2, b2 }, ... }
+-- строки с ID добавляются сразу (без задержки - подсказка не мигает), а если после них кто-то
+-- дописал строку (трансмог и т.п.), она переносится выше, и ID снова оказываются внизу
+-- own[tooltip] = { start = первая строка с ID, count = сколько, keys = { [left] = true } }
 ---------------------------------------------------------------------------
-local pending = {};
-local flusher = CreateFrame("Frame");
-flusher:Hide();
+local own = {};
+local adding = false;
 
-local function Flush()
-	for tooltip, lines in pairs(pending) do
-		if tooltip:IsShown() then
-			for _, line in ipairs(lines) do
-				tooltip:AddDoubleLine(line[1], line[2], line[3], line[4], line[5], line[6], line[7], line[8]);
-			end
-			tooltip:Show();
-		end
-		pending[tooltip] = nil;
-	end
-	flusher:Hide();
+local function Line(tooltip, i)
+	local name = tooltip:GetName();
+	return _G[name .. "TextLeft" .. i], _G[name .. "TextRight" .. i];
 end
-flusher:SetScript("OnUpdate", Flush);
+
+local function GetLine(tooltip, i)
+	local left, right = Line(tooltip, i);
+	local lr, lg, lb = left:GetTextColor();
+	local rr, rg, rb = right:GetTextColor();
+	return { left:GetText(), lr, lg, lb, right:IsShown() and right:GetText() or nil, rr, rg, rb };
+end
+
+local function SetLine(tooltip, i, data)
+	local left, right = Line(tooltip, i);
+	left:SetText(data[1]);
+	left:SetTextColor(data[2], data[3], data[4]);
+	if data[5] then
+		right:SetText(data[5]);
+		right:SetTextColor(data[6], data[7], data[8]);
+		right:Show();
+	else
+		right:SetText(nil);
+		right:Hide();
+	end
+end
+
+-- после чужого AddLine/AddDoubleLine: новая последняя строка уходит над строками с ID
+local function OnAdd(tooltip)
+	local data = own[tooltip];
+	if adding or not data then
+		return;
+	end
+	local last = tooltip:NumLines();
+	if data.start + data.count ~= last then
+		return;
+	end
+	local added = GetLine(tooltip, last);
+	for i = last, data.start + 1, -1 do
+		SetLine(tooltip, i, GetLine(tooltip, i - 1));
+	end
+	SetLine(tooltip, data.start, added);
+	data.start = data.start + 1;
+	tooltip:Show();
+end
 
 local function Queue(tooltip, left, right, r, g, b, r2, g2, b2)
-	local lines = pending[tooltip];
-	if not lines then
-		lines = {};
-		pending[tooltip] = lines;
+	local data = own[tooltip];
+	if data and data.keys[left] then
+		return;   -- уже есть (подсказки талантов обновляются несколько раз)
 	end
-	for _, line in ipairs(lines) do
-		if line[1] == left then
-			return;   -- уже есть (подсказки талантов обновляются несколько раз)
-		end
+	adding = true;
+	tooltip:AddDoubleLine(left, right, r or 1, g or 0.82, b or 0, r2 or 1, g2 or 1, b2 or 1);
+	adding = false;
+	if not data then
+		data = { start = tooltip:NumLines(), count = 0, keys = {} };
+		own[tooltip] = data;
 	end
-	table.insert(lines, { left, right, r or 1, g or 0.82, b or 0, r2 or 1, g2 or 1, b2 or 1 });
-	flusher:Show();   -- дописать в следующем кадре, когда все хуки уже отработали
+	data.count = data.count + 1;
+	data.keys[left] = true;
+	tooltip:Show();
 end
 
 local function AddId(tooltip, id, kind)
@@ -59,9 +93,9 @@ local function AddId(tooltip, id, kind)
 	end
 end
 
--- новая подсказка - старые отложенные строки не нужны
+-- новая подсказка - старые строки с ID забыть
 local function Cleared(tooltip)
-	pending[tooltip] = nil;
+	own[tooltip] = nil;
 end
 
 -- FrameXML грузится раньше, чем создаются GameTooltip/ItemRefTooltip/ShoppingTooltip (они в XML ниже по .toc),
@@ -73,6 +107,8 @@ for _, tooltip in ipairs(tooltips) do
 	if tooltip then
 		tooltip:HookScript("OnTooltipCleared", Cleared);
 		tooltip:HookScript("OnHide", Cleared);
+		hooksecurefunc(tooltip, "AddLine", OnAdd);
+		hooksecurefunc(tooltip, "AddDoubleLine", OnAdd);
 	end
 end
 
