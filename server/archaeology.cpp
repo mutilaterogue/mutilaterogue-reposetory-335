@@ -646,8 +646,17 @@ class spell_archaeology_survey : public SpellScript
             HandleSurvey(player, {});
     }
 
+    // эффекты из Spell.dbc (например, призыв объекта с MiscValue 1 -> «Gameobject Entry: 1 not created») не нужны:
+    // исследование целиком делает HandleSurvey
+    void PreventEffects(SpellEffIndex effIndex)
+    {
+        PreventHitDefaultEffect(effIndex);
+    }
+
     void Register() override
     {
+        OnEffectLaunch += SpellEffectFn(spell_archaeology_survey::PreventEffects, EFFECT_ALL, SPELL_EFFECT_ANY);
+        OnEffectHit += SpellEffectFn(spell_archaeology_survey::PreventEffects, EFFECT_ALL, SPELL_EFFECT_ANY);
         OnCheckCast += SpellCheckCastFn(spell_archaeology_survey::CheckCast);
         AfterCast += SpellCastFn(spell_archaeology_survey::HandleAfterCast);
     }
