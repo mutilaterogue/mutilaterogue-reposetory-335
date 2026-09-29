@@ -27,6 +27,7 @@
 #include "Chat.h"
 #include "ChatCommand.h"
 #include "DatabaseEnv.h"
+#include "EventProcessor.h"
 #include "Item.h"
 #include "ItemTemplate.h"
 #include "Log.h"
@@ -239,10 +240,51 @@ public:
         sAddonComm->Register(std::string("ISCALE_SHOW"), &HandleShow);
     }
 
+    // как SendReforgePackets у Reforger: через секунду после входа - кэш всех предметов с бонусом,
+    // чтобы окно персонажа и GetItemInfo сразу видели новые значения, а не только после наведения
+    class SendCachesEvent : public BasicEvent
+    {
+    public:
+        explicit SendCachesEvent(Player* player) : _player(player) { }
+
+        bool Execute(uint64, uint32) override
+        {
+            std::unordered_map<uint32, int32> sent;   // entry -> бонус (кэш клиента - по номеру предмета)
+            auto send = [&](Item* item)
+            {
+                if (!item)
+                    return;
+                int32 bonus = ItemScaling::GetBonus(item);
+                if (!bonus || sent.count(item->GetEntry()))
+                    return;
+                sent[item->GetEntry()] = bonus;
+                ItemScaling::SendItemCache(_player, item->GetTemplate(), bonus);
+            };
+            // надетые - первыми: у одинаковых предметов в кэше будет бонус надетого
+            for (uint8 slot = EQUIPMENT_SLOT_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
+                send(_player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+            for (uint8 slot = BANK_SLOT_ITEM_START; slot < BANK_SLOT_ITEM_END; ++slot)
+                send(_player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+            for (uint8 bagSlot : { uint8(INVENTORY_SLOT_BAG_START), uint8(INVENTORY_SLOT_BAG_START + 1), uint8(INVENTORY_SLOT_BAG_START + 2), uint8(INVENTORY_SLOT_BAG_START + 3) })
+                if (Bag* bag = _player->GetBagByPos(bagSlot))
+                    for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                        send(bag->GetItemByPos(uint8(i)));
+            for (uint8 bagSlot = BANK_SLOT_BAG_START; bagSlot < BANK_SLOT_BAG_END; ++bagSlot)
+                if (Bag* bag = _player->GetBagByPos(bagSlot))
+                    for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                        send(bag->GetItemByPos(uint8(i)));
+            return true;
+        }
+
+    private:
+        Player* _player;
+    };
+
     void OnLogin(Player* player, bool /*firstLogin*/) override
     {
         SendConfig(player);
         SendItems(player);
+        player->m_Events.AddEvent(new SendCachesEvent(player), player->m_Events.CalculateTime(Milliseconds(1000)));
     }
 };
 
