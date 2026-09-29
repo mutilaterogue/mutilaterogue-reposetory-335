@@ -112,6 +112,14 @@ local function CanUse(talents)
 end
 
 function PlayerSpellsLoadouts.SetupDropdown(talents, dropdown)
+	-- список внизу окна: после открытия меню переносится над кнопкой (иначе уходит за нижний край экрана)
+	hooksecurefunc(dropdown, "OnMenuOpened", function(self, menu)
+		menu = menu or self.menu;
+		if menu and menu.ClearAllPoints then
+			menu:ClearAllPoints();
+			menu:SetPoint("BOTTOMLEFT", self, "TOPLEFT", 0, 2);
+		end
+	end);
 	dropdown:SetupMenu(function(owner, rootDescription)
 		if not CanUse(talents) then
 			rootDescription:CreateTitle(TALENT_LOADOUT_OTHER_SPEC);
