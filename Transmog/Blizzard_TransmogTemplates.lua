@@ -142,7 +142,7 @@ function TransmogSlotButton_OnEnter(self)
 	local shown = itemId and GetItemInfo(itemId);
 	if frame.pending[slotId] == 0 then
 		GameTooltip:AddLine(TRANSMOGRIFY_TOOLTIP_REVERT, 1, 0.82, 0);
-	elseif shown and (changed or frame.applied[slotId]) then
+	elseif shown and changed then   -- уже применённый облик дописывает Blizzard_TransmogTooltip.lua
 		GameTooltip:AddLine(TRANSMOGRIFIED:format(shown), 1, 0.5, 1, true);
 	end
 	GameTooltip:AddLine("ЛКМ - выбрать слот, ПКМ - отменить изменение / вернуть облик.", 0.5, 0.5, 0.5, true);

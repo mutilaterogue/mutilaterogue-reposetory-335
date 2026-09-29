@@ -71,6 +71,7 @@ namespace Transmog
     SlotList GetCurrentLooks(Player* player);
 
     void SendState(Player* player);
+    void SendItems(Player* player);
     void SendResult(Player* player, ApplyResult const& result);
     std::string SanitizeName(std::string name, size_t maxBytes);
 }

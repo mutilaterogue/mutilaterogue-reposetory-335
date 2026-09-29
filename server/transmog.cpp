@@ -19,6 +19,7 @@
  *   "TMOG_GET_STATE"                         -> "TMOG_STATE"  : "slot/itemId,..." (slot = client inventory slot id, 1 = head)
  *   "TMOG_APPLY" : "slot/itemId,..." (0 = restore) -> "TMOG_RESULT" : ok(1/0) : error : errorItem, then "TMOG_STATE"
  *   "TMOG_OPEN" / "TMOG_CLOSE"               server opens / closes the window (npc_transmogrifier)
+ *   "TMOG_ITEMS_GET"                         -> "TMOG_ITEMS" : "bag/slot/fakeEntry,..." (подсказки предметов, bag 255 - экипировка)
  *
  * Setup: sql/characters_transmog.sql, core/Player_transmog.patch, register AddSC_transmog().
  * NPC: creature_template.ScriptName = 'npc_transmogrifier', npcflag 1 (gossip).
@@ -27,6 +28,7 @@
 #include "transmog.h"
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
+#include "Bag.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "Item.h"
@@ -482,9 +484,50 @@ namespace Transmog
         return looks;
     }
 
+    // облик предмета, если он трансмогрифицирован этим персонажем
+    uint32 GetFakeEntry(Player* player, Item* item)
+    {
+        auto itr = transmogs.find(item->GetGUID().GetCounter());
+        if (itr == transmogs.end() || itr->second.Owner != player->GetGUID().GetCounter())
+            return 0;
+        return itr->second.FakeEntry;
+    }
+
+    // для подсказок: "bag/slot/fakeEntry,..." в номерах клиента
+    // bag 255 - экипировка (slot = GetInventorySlotInfo), 0 - рюкзак, 1..4 - сумки (slot с 1)
+    void SendItems(Player* player)
+    {
+        std::ostringstream list;
+        bool first = true;
+        auto add = [&](uint32 bag, uint32 slot, Item* item)
+        {
+            if (!item)
+                return;
+            uint32 fake = GetFakeEntry(player, item);
+            if (!fake)
+                return;
+            if (!first)
+                list << ',';
+            list << bag << '/' << slot << '/' << fake;
+            first = false;
+        };
+
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+            add(255, slot + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+        for (uint8 slot = INVENTORY_SLOT_ITEM_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
+            add(0, slot - INVENTORY_SLOT_ITEM_START + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+        for (uint8 bagSlot = INVENTORY_SLOT_BAG_START; bagSlot < INVENTORY_SLOT_BAG_END; ++bagSlot)
+            if (Bag* bag = player->GetBagByPos(bagSlot))
+                for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                    add(bagSlot - INVENTORY_SLOT_BAG_START + 1, i + 1, bag->GetItemByPos(uint8(i)));
+
+        sAddonComm->Send(player, "TMOG_ITEMS", list.str());
+    }
+
     void SendState(Player* player)
     {
         sAddonComm->Send(player, "TMOG_STATE", FormatSlots(GetCurrentLooks(player)));
+        SendItems(player);
     }
 
     void SendResult(Player* player, ApplyResult const& result)
@@ -528,12 +571,14 @@ public:
     transmog_player() : PlayerScript("transmog_player")
     {
         sAddonComm->Register(std::string("TMOG_GET_STATE"), &HandleGetState);
+        sAddonComm->Register(std::string("TMOG_ITEMS_GET"), [](Player* player, std::vector<std::string> const&) { Transmog::SendItems(player); });
         sAddonComm->Register(std::string("TMOG_APPLY"), &HandleApply);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
     {
         LoadPlayer(player);
+        Transmog::SendItems(player);
     }
 
     void OnLogout(Player* player) override

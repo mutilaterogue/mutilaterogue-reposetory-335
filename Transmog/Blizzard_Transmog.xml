@@ -11,6 +11,7 @@
 	<Script file="Blizzard_TransmogSets.lua"/>
 	<Script file="Blizzard_TransmogCustomSets.lua"/>
 	<Script file="Blizzard_TransmogSituations.lua"/>
+	<Script file="Blizzard_TransmogTooltip.lua"/>
 
 	<Frame name="TransmogFrame" inherits="RetailPortraitFrameTemplate" parent="UIParent" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="HIGH">
 		<Size x="1618" y="883"/>
