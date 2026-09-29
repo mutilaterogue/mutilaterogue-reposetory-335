@@ -112,10 +112,6 @@ local function CanUse(talents)
 end
 
 function PlayerSpellsLoadouts.SetupDropdown(talents, dropdown)
-	-- список внизу окна - меню вверх (если menuPoint из XML не подхватился)
-	if dropdown.SetMenuAnchor and AnchorUtil and AnchorUtil.CreateAnchor then
-		dropdown:SetMenuAnchor(AnchorUtil.CreateAnchor("BOTTOMLEFT", dropdown, "TOPLEFT", 0, 2));
-	end
 	dropdown:SetupMenu(function(owner, rootDescription)
 		if not CanUse(talents) then
 			rootDescription:CreateTitle(TALENT_LOADOUT_OTHER_SPEC);
