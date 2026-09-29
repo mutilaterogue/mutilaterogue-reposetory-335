@@ -447,7 +447,7 @@ function TransmogFrame_OnLoad(self)
 		self.TitleContainer.TitleText:SetText(TRANSMOGRIFY);
 	end
 	if self.PortraitContainer and self.PortraitContainer.portrait then
-		SetPortraitToTexture(self.PortraitContainer.portrait, "Interface\\Icons\\INV_Arcane_Orb");
+		self.PortraitContainer.portrait:SetAtlas("transmog-icon-UI", true);
 	end
 	if self.SetFrameLevelsFromBaseLevel then
 		self:SetFrameLevelsFromBaseLevel(self:GetFrameLevel());
