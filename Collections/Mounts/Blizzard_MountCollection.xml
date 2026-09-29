@@ -1,0 +1,23 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\..\UI.xsd">
+	<Script file="Blizzard_MountCollection.lua"/>
+
+	<Frame name="MountJournal" parent="CollectionsJournal" setAllPoints="true" inherits="CollectionsCompanionJournalTemplate" hidden="true">
+		<Frames>
+			<!-- как в ретейле: заклинание "Случайное избранное средство передвижения" (150544).
+			     Заклинание добавляется на сервере/в DBC под тем же ID. -->
+			<Frame name="$parentSummonRandomFavoriteSpellFrame" parentKey="SummonRandomFavoriteSpellFrame" inherits="UIPanelSpellButtonFrameTemplate" mixin="MountJournalSummonRandomFavoriteSpellFrameMixin">
+				<Size x="206" y="33"/>
+				<KeyValues>
+					<KeyValue key="spellID" value="150544" type="number"/>
+					<KeyValue key="labelText" value="MOUNT_JOURNAL_SUMMON_RANDOM_FAVORITE_MOUNT" type="global"/>
+				</KeyValues>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-8" y="-25"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="MountJournal_OnLoad"/>
+		</Scripts>
+	</Frame>
+</Ui>
