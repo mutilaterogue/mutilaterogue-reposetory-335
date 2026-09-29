@@ -276,6 +276,69 @@
 							</Anchors>
 						</Texture>
 					</Layer>
+					<!-- ретейл: CharacterPreview.SavedFrame - вспышка на полу после применения (Blizzard_TransmogAnimations.lua).
+					     Текстуры самого CharacterPreview: так они всегда под моделью -->
+					<Layer level="ARTWORK">
+						<Texture parentKey="SavedGlow" alpha="0" atlas="transmog-locationBG-glow" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK" textureSubLevel="1">
+						<Texture parentKey="LinesGlowFX" alpha="0" atlas="transmog-FX-floorLines-Glw">
+							<Size x="670" y="250"/>
+							<Anchors>
+								<Anchor point="CENTER" x="8" y="-297"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK" textureSubLevel="2">
+						<Texture parentKey="Rays1FX" alpha="0" atlas="transmog-FX-FloorRaysB">
+							<Size x="586" y="366"/>
+							<Anchors>
+								<Anchor point="CENTER" x="-27" y="-237"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Rays2FX" alpha="0" atlas="transmog-FX-FloorRaysA">
+							<Size x="468" y="276"/>
+							<Anchors>
+								<Anchor point="CENTER" x="98" y="-217"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK" textureSubLevel="3">
+						<Texture parentKey="LinesFade1FX" alpha="0" atlas="transmog-FX-FloorLinesFade-1b">
+							<Size x="342" y="172"/>
+							<Anchors>
+								<Anchor point="CENTER" x="178" y="-255"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="LinesFade2FX" alpha="0" atlas="transmog-FX-FloorLinesFade-1a">
+							<Size x="458" y="220"/>
+							<Anchors>
+								<Anchor point="CENTER" x="-107" y="-342"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="LinesFade3FX" alpha="0" atlas="transmog-FX-FloorLinesFade-2a">
+							<Size x="178" y="160"/>
+							<Anchors>
+								<Anchor point="CENTER" x="-237" y="-327"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="LinesFade4FX" alpha="0" atlas="transmog-FX-FloorLinesFade-2b">
+							<Size x="214" y="86"/>
+							<Anchors>
+								<Anchor point="CENTER" x="208" y="-222"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="LinesFade5FX" alpha="0" atlas="transmog-FX-FloorLinesFade-4">
+							<Size x="750" y="338"/>
+							<Anchors>
+								<Anchor point="CENTER" x="8" y="-297"/>
+							</Anchors>
+						</Texture>
+					</Layer>
 					<Layer level="BACKGROUND" textureSubLevel="2">
 						<Texture parentKey="GradientLeft" atlas="transmog-outfit-darkBG-gradient">
 							<Size x="123" y="860"/>
@@ -293,82 +356,6 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<!-- ретейл: CharacterPreview SavedFrame - вспышка на полу после применения (Blizzard_TransmogAnimations.lua) -->
-					<Frame parentKey="SavedFrame" hidden="true">
-						<Size x="658" y="386"/>
-						<Anchors>
-							<Anchor point="BOTTOM"/>
-						</Anchors>
-						<Layers>
-							<Layer level="ARTWORK">
-								<Texture parentKey="Glow" atlas="transmog-locationBG-glow" useAtlasSize="true">
-									<Anchors>
-										<Anchor point="BOTTOM" x="0" y="0"/>
-									</Anchors>
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK" textureSubLevel="1">
-								<Texture parentKey="LinesGlowFX" atlas="transmog-FX-floorLines-Glw">
-									<Size x="670" y="250"/>
-									<Anchors>
-										<Anchor point="CENTER" x="8" y="-60"/>
-									</Anchors>
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK" textureSubLevel="2">
-								<Texture parentKey="Rays1FX" atlas="transmog-FX-FloorRaysB">
-									<Size x="586" y="366"/>
-									<Anchors>
-										<Anchor point="CENTER" x="-27" y="0"/>
-									</Anchors>
-								</Texture>
-								<Texture parentKey="Rays2FX" atlas="transmog-FX-FloorRaysA">
-									<Size x="468" y="276"/>
-									<Anchors>
-										<Anchor point="CENTER" x="98" y="20"/>
-									</Anchors>
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK" textureSubLevel="3">
-								<Texture parentKey="LinesFade1FX" atlas="transmog-FX-FloorLinesFade-1b">
-									<Size x="342" y="172"/>
-									<Anchors>
-										<Anchor point="CENTER" x="178" y="-18"/>
-									</Anchors>
-								</Texture>
-								<Texture parentKey="LinesFade2FX" atlas="transmog-FX-FloorLinesFade-1a">
-									<Size x="458" y="220"/>
-									<Anchors>
-										<Anchor point="CENTER" x="-107" y="-105"/>
-									</Anchors>
-								</Texture>
-								<Texture parentKey="LinesFade3FX" atlas="transmog-FX-FloorLinesFade-2a">
-									<Size x="178" y="160"/>
-									<Anchors>
-										<Anchor point="CENTER" x="-237" y="-90"/>
-									</Anchors>
-								</Texture>
-								<Texture parentKey="LinesFade4FX" atlas="transmog-FX-FloorLinesFade-2b">
-									<Size x="214" y="86"/>
-									<Anchors>
-										<Anchor point="CENTER" x="208" y="15"/>
-									</Anchors>
-								</Texture>
-								<Texture parentKey="LinesFade5FX" atlas="transmog-FX-FloorLinesFade-4">
-									<Size x="750" y="338"/>
-									<Anchors>
-										<Anchor point="CENTER" x="8" y="-60"/>
-									</Anchors>
-								</Texture>
-							</Layer>
-						</Layers>
-						<Scripts>
-							<OnLoad>
-								-- под моделью персонажа
-								self:SetFrameLevel(self:GetParent():GetFrameLevel() + 1);
-							</OnLoad>
-						</Scripts>
-					</Frame>
 					<DressUpModel name="TransmogFramePreview" parentKey="Model" enableMouse="true" enableMouseWheel="true" setAllPoints="true">
 						<Scripts>
 							<OnMouseDown function="TransmogPreview_OnMouseDown"/>

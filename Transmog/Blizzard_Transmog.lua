@@ -94,20 +94,12 @@ function TransmogUI.UpdateSlotButton(self, button)
 end
 
 function TransmogUI.PlayPreviewSaved(self)
-	local saved = self.CharacterPreview.SavedFrame;
-	if not saved.Anim then
-		saved.Anim = TransmogAnim.Create(saved, TransmogAnim.PREVIEW_SAVED);
-		local model = self.CharacterPreview.Model;
-		if model:GetFrameLevel() <= saved:GetFrameLevel() then
-			model:SetFrameLevel(saved:GetFrameLevel() + 1);
-		end
-		saved.Anim:SetScript("OnFinished", function()
-			saved:Hide();
-		end);
+	local preview = self.CharacterPreview;
+	if not preview.SavedAnim then
+		preview.SavedAnim = TransmogAnim.Create(preview, TransmogAnim.PREVIEW_SAVED);
 	end
-	if not saved:IsShown() then
-		saved:Show();
-		saved.Anim:Restart();
+	if not preview.SavedAnim:IsPlaying() then
+		preview.SavedAnim:Restart();
 	end
 end
 

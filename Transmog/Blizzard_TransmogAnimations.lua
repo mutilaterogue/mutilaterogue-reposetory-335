@@ -234,7 +234,7 @@ TransmogAnim.SLOT_SAVED = {
 	{ "Glow", "alpha", 0.5, 0.23, 1, 0 },
 };
 
--- TransmogFrame.CharacterPreview.SavedFrame.Anim - вспышка на полу под моделью
+-- TransmogFrame.CharacterPreview.SavedFrame.Anim - вспышка на полу под моделью (Glow -> SavedGlow)
 TransmogAnim.PREVIEW_SAVED = {
 	{ "LinesFade1FX", "alpha", 0, 0.4, 0, 0 },
 	{ "LinesFade1FX", "alpha", 0.4, 0.13, 0, 0.17 },
@@ -259,7 +259,7 @@ TransmogAnim.PREVIEW_SAVED = {
 	{ "Rays2FX", "move", 0.33, 1, 0, 20 },
 	{ "LinesGlowFX", "alpha", 0, 0.17, 0, 0.2 },
 	{ "LinesGlowFX", "alpha", 0.17, 0.67, 0.2, 0 },
-	{ "Glow", "alpha", 0, 0.33, 0, 1 },
-	{ "Glow", "alpha", 0.33, 0.2, 1, 1 },
-	{ "Glow", "alpha", 0.53, 0.47, 1, 0 },
+	{ "SavedGlow", "alpha", 0, 0.33, 0, 1 },
+	{ "SavedGlow", "alpha", 0.33, 0.2, 1, 1 },
+	{ "SavedGlow", "alpha", 0.53, 0.47, 1, 0 },
 };
