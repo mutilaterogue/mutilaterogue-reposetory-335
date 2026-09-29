@@ -86,7 +86,7 @@ function TransmogSituationsFrame_Refresh(self)
 	local outfit = TransmogFrame.selectedOutfit;
 	local hasOutfit = outfit ~= nil;
 	self.NoOutfitText:SetShown(not hasOutfit);
-	for _, region in ipairs({ self.DescriptionText, self.OutfitName, self.DefaultsButton, self.Situations, self.EnabledToggle, self.ApplyButton, self.UndoButton }) do
+	for _, region in ipairs({ self.DescriptionText, self.DefaultsButton, self.Situations, self.EnabledToggle, self.ApplyButton, self.UndoButton }) do
 		region:SetShown(hasOutfit);
 	end
 	if not hasOutfit then

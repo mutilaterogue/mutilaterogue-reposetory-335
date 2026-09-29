@@ -28,3 +28,6 @@ CREATE TABLE IF NOT EXISTS `account_transmog_custom_sets` (
   `slots` TEXT NOT NULL,
   PRIMARY KEY (`accountId`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- иллюзии оружия в наряде (transmog_illusions.cpp): "slot/enchantId,..." - для уже созданной таблицы
+ALTER TABLE `character_transmog_outfits` ADD COLUMN `illusions` TEXT NULL AFTER `sit_combat`;

@@ -43,6 +43,7 @@
 #include <map>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -64,6 +65,7 @@ namespace
         std::string Name;
         uint32 Icon = 0;
         Transmog::SlotList Slots;
+        Transmog::SlotList Illusions;   // правая/левая рука -> иллюзия (transmog_illusions.cpp)
         bool SituationsEnabled = false;
         uint8 Location = LOC_ANY;
         uint8 Movement = MOVE_ANY;
@@ -80,6 +82,8 @@ namespace
     };
 
     std::unordered_map<ObjectGuid::LowType, PlayerOutfits> outfitsByPlayer;
+    // окно трансмогрификации открыто - ситуации не переодевают (клиент: "TMOG_WINDOW" : 1/0)
+    std::unordered_set<ObjectGuid::LowType> windowOpen;
     uint32 situationTimer = SITUATION_INTERVAL_MS;
 
     std::string Arg(std::vector<std::string> const& args, size_t index)
@@ -138,7 +142,7 @@ namespace
             data.Active = result->Fetch()[1].GetUInt32();
         }
 
-        if (QueryResult result = CharacterDatabase.PQuery("SELECT id, name, icon, slots, CAST(sit_enabled AS SIGNED), CAST(sit_location AS SIGNED), CAST(sit_movement AS SIGNED), CAST(sit_combat AS SIGNED) FROM character_transmog_outfits WHERE guid = {}", guid))
+        if (QueryResult result = CharacterDatabase.PQuery("SELECT id, name, icon, slots, CAST(sit_enabled AS SIGNED), CAST(sit_location AS SIGNED), CAST(sit_movement AS SIGNED), CAST(sit_combat AS SIGNED), illusions FROM character_transmog_outfits WHERE guid = {}", guid))
         {
             do
             {
@@ -152,6 +156,7 @@ namespace
                 outfit.Location = uint8(std::min<int64>(fields[5].GetInt64(), LOC_MAX - 1));
                 outfit.Movement = uint8(std::min<int64>(fields[6].GetInt64(), MOVE_MAX - 1));
                 outfit.Combat = uint8(std::min<int64>(fields[7].GetInt64(), COMBAT_MAX - 1));
+                outfit.Illusions = Transmog::ParseSlots(fields[8].GetString());
             } while (result->NextRow());
         }
     }
@@ -166,10 +171,11 @@ namespace
     {
         std::string name = outfit.Name;
         CharacterDatabase.EscapeString(name);
-        CharacterDatabase.PExecute("REPLACE INTO character_transmog_outfits (guid, id, name, icon, slots, sit_enabled, sit_location, sit_movement, sit_combat) "
-            "VALUES ({}, {}, '{}', {}, '{}', {}, {}, {}, {})",
+        CharacterDatabase.PExecute("REPLACE INTO character_transmog_outfits (guid, id, name, icon, slots, sit_enabled, sit_location, sit_movement, sit_combat, illusions) "
+            "VALUES ({}, {}, '{}', {}, '{}', {}, {}, {}, {}, '{}')",
             player->GetGUID().GetCounter(), outfit.Id, name, outfit.Icon, Transmog::FormatSlots(outfit.Slots),
-            outfit.SituationsEnabled ? 1 : 0, uint32(outfit.Location), uint32(outfit.Movement), uint32(outfit.Combat));
+            outfit.SituationsEnabled ? 1 : 0, uint32(outfit.Location), uint32(outfit.Movement), uint32(outfit.Combat),
+            Transmog::FormatSlots(outfit.Illusions));
     }
 
     uint64 NextSlotCost(PlayerOutfits const& data)
@@ -184,7 +190,8 @@ namespace
         PlayerOutfits& data = GetOutfits(player);
         for (auto const& [id, outfit] : data.Outfits)
             sAddonComm->Send(player, "TMOG_OUTFIT", outfit.Id, outfit.Name, outfit.Icon, Transmog::FormatSlots(outfit.Slots),
-                outfit.SituationsEnabled ? 1 : 0, uint32(outfit.Location), uint32(outfit.Movement), uint32(outfit.Combat));
+                outfit.SituationsEnabled ? 1 : 0, uint32(outfit.Location), uint32(outfit.Movement), uint32(outfit.Combat),
+                Transmog::FormatSlots(outfit.Illusions));
         sAddonComm->Send(player, "TMOG_OUTFITS_END", data.Unlocked, MAX_OUTFITS, NextSlotCost(data), data.Active);
     }
 
@@ -205,6 +212,24 @@ namespace
         Transmog::ApplyResult result = Transmog::ApplyLooks(player, looks, false, true);
         if (result.Ok)
         {
+            // иллюзии наряда (без иллюзии - снять); что нельзя наложить на надетое оружие - пропустить
+            Transmog::SlotList illusions;
+            for (uint8 slot : { uint8(EQUIPMENT_SLOT_MAINHAND), uint8(EQUIPMENT_SLOT_OFFHAND) })
+            {
+                uint32 enchant = 0;
+                for (auto const& [outfitSlot, outfitEnchant] : outfit.Illusions)
+                    if (outfitSlot == slot)
+                        enchant = outfitEnchant;
+                if (enchant == Transmog::GetIllusion(player, slot))
+                    continue;
+                Transmog::SlotList single{ { slot, enchant } };
+                uint64 cost = 0;
+                if (Transmog::CheckIllusions(player, single, cost).Error.empty())
+                    illusions.emplace_back(slot, enchant);
+            }
+            if (!illusions.empty())
+                Transmog::ApplyIllusions(player, illusions);
+
             PlayerOutfits& data = GetOutfits(player);
             data.Active = outfit.Id;
             SaveMeta(player, data);
@@ -229,6 +254,24 @@ namespace
         Transmog::SlotList slots = FilterSlots(player, Transmog::ParseSlots(Arg(args, 3)), removed);
         if (slots.empty() && removed)
             return SendError(player, "TRANSMOG_OUTFIT_ALL_INVALID_APPEARANCES");
+
+        // иллюзии: только открытые и подходящие к надетому оружию
+        Transmog::SlotList illusions;
+        uint64 illusionCost = 0;
+        for (auto const& [slot, enchant] : Transmog::ParseSlots(Arg(args, 4)))
+        {
+            if (!enchant)
+                continue;
+            Transmog::SlotList single{ { slot, enchant } };
+            uint64 cost = 0;
+            if (Transmog::CheckIllusions(player, single, cost).Error.empty())
+            {
+                illusions.emplace_back(slot, enchant);
+                illusionCost += cost;
+            }
+            else
+                removed = true;
+        }
 
         Outfit* outfit = nullptr;
         if (id)
@@ -260,7 +303,7 @@ namespace
             if (!same)
                 changed.emplace_back(slot, itemId);
         }
-        if (uint64 cost = Transmog::GetCost(player, changed))
+        if (uint64 cost = Transmog::GetCost(player, changed) + illusionCost)
         {
             if (!player->HasEnoughMoney(cost))
                 return SendError(player, "ERR_TRANSMOG_OUTFIT_SLOT_CANNOT_AFFORD");
@@ -282,6 +325,7 @@ namespace
         else if (!outfit->Icon && !slots.empty())
             outfit->Icon = slots.front().second;
         outfit->Slots = slots;
+        outfit->Illusions = illusions;
         SaveOutfit(player, *outfit);
 
         Transmog::ApplyResult result = EquipOutfit(player, *outfit);
@@ -405,7 +449,7 @@ namespace
                 best = &outfit;
         }
 
-        if (!best || best->Id == data.Active)
+        if (!best || best->Id == data.Active || windowOpen.count(player->GetGUID().GetCounter()))
             return;
         if (EquipOutfit(player, *best).Ok)
         {
@@ -539,6 +583,13 @@ public:
         sAddonComm->Register(std::string("TMOG_OUTFIT_DEL"), &HandleOutfitDelete);
         sAddonComm->Register(std::string("TMOG_OUTFIT_BUY"), &HandleOutfitBuy);
         sAddonComm->Register(std::string("TMOG_OUTFIT_SIT"), &HandleOutfitSituations);
+        sAddonComm->Register(std::string("TMOG_WINDOW"), [](Player* player, std::vector<std::string> const& args)
+        {
+            if (ArgUInt(args, 0))
+                windowOpen.insert(player->GetGUID().GetCounter());
+            else
+                windowOpen.erase(player->GetGUID().GetCounter());
+        });
         sAddonComm->Register(std::string("TMOG_CSETS_GET"), &HandleCustomSetsGet);
         sAddonComm->Register(std::string("TMOG_CSET_SAVE"), &HandleCustomSetSave);
         sAddonComm->Register(std::string("TMOG_CSET_DEL"), &HandleCustomSetDelete);
@@ -552,6 +603,7 @@ public:
     void OnLogout(Player* player) override
     {
         outfitsByPlayer.erase(player->GetGUID().GetCounter());
+        windowOpen.erase(player->GetGUID().GetCounter());
     }
 };
 

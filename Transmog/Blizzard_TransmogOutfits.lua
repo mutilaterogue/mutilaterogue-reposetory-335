@@ -72,6 +72,7 @@ function TransmogFrame_SelectOutfit(outfit, equip)
 	frame.selectedOutfit = outfit;
 	if equip and outfit and Comm_Send then
 		wipe(frame.pending);
+		wipe(frame.pendingIllusion);
 		Comm_Send(TransmogUI.OP_OUTFIT_EQUIP, outfit.id);
 		frame.applyElapsed = 0;
 	end
@@ -117,7 +118,15 @@ function TransmogUI.SendSaveOutfit(id, name)
 		for _, outfit in ipairs(TransmogOutfits or {}) do
 			frame.savingOutfit.known[outfit.id] = true;
 		end
-		Comm_Send(TransmogUI.OP_OUTFIT_SAVE, id, name or "", icon, TransmogUI.FormatSlots(looks));
+		-- иллюзии, показанные на оружии (изменение или наложенная)
+		local illusions = {};
+		for _, slotId in ipairs({ 16, 17 }) do
+			local enchant = TransmogUI.GetDisplayedIllusion(frame, slotId);
+			if enchant and enchant > 0 then
+				table.insert(illusions, slotId .. "/" .. enchant);
+			end
+		end
+		Comm_Send(TransmogUI.OP_OUTFIT_SAVE, id, name or "", icon, TransmogUI.FormatSlots(looks), table.concat(illusions, ","));
 		frame.applyElapsed = 0;
 	end
 end

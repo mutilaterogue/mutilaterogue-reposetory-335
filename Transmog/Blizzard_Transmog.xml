@@ -1093,7 +1093,7 @@
 												<Anchor point="TOPLEFT" x="29" y="-55"/>
 											</Anchors>
 										</FontString>
-										<FontString parentKey="OutfitName" inherits="GameFontHighlightLarge" justifyH="LEFT">
+										<FontString parentKey="OutfitName" inherits="GameFontHighlightLarge" justifyH="LEFT" hidden="true">
 											<Anchors>
 												<Anchor point="TOPLEFT" x="45" y="-170"/>
 											</Anchors>
@@ -1117,7 +1117,8 @@
 										</Scripts>
 									</Button>
 									<Frame name="$parentSituations" parentKey="Situations">
-										<Size x="554" y="194"/>
+										<!-- ретейл: VerticalLayoutFrame, отступы 22, строки 50 через 15 -->
+										<Size x="554" y="224"/>
 										<Anchors>
 											<Anchor point="TOPLEFT" x="43" y="-235"/>
 										</Anchors>
@@ -1134,12 +1135,12 @@
 											</Frame>
 											<Frame parentKey="Movement" inherits="TransmogSituationTemplate" id="2">
 												<Anchors>
-													<Anchor point="TOPLEFT" x="0" y="-72"/>
+													<Anchor point="TOPLEFT" x="0" y="-87"/>
 												</Anchors>
 											</Frame>
 											<Frame parentKey="Combat" inherits="TransmogSituationTemplate" id="3">
 												<Anchors>
-													<Anchor point="TOPLEFT" x="0" y="-122"/>
+													<Anchor point="TOPLEFT" x="0" y="-152"/>
 												</Anchors>
 											</Frame>
 										</Frames>

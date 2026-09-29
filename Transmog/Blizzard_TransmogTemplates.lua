@@ -328,3 +328,63 @@ function TransmogControlButton_OnMouseUp(self)
 		TransmogFramePreview.spin = nil;
 	end
 end
+
+-- атлас рамки кусками 3x3 (ретейл: у атласа есть поля нарезки, и SetAtlas режет сам; в 3.3.5 атлас
+-- растягивается целиком и мылится). Углы - в родном размере, края тянутся по одной оси, середина - по двум.
+-- texture - текстура из разметки: остаётся невидимой рамкой, куски встают по её краям
+function TransmogUI.SetNineSliceAtlas(texture, atlas, margin)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if not info then
+		return;
+	end
+	local l = info.leftTexCoord or info.left;
+	local r = info.rightTexCoord or info.right;
+	local t = info.topTexCoord or info.top;
+	local b = info.bottomTexCoord or info.bottom;
+	local w, h = info.width, info.height;
+	if not (l and r and t and b and w and h) or w <= 0 or h <= 0 then
+		return;
+	end
+	margin = margin or math.floor(math.min(w, h) / 3);
+	local mx, my = (r - l) * margin / w, (b - t) * margin / h;
+
+	local parent = texture:GetParent();
+	local layer, subLevel = texture:GetDrawLayer();
+	texture:SetAlpha(0);
+	texture.slices = texture.slices or {};
+
+	-- столбцы/строки: { координаты атласа, точки привязки }
+	local cols = { { l, l + mx }, { l + mx, r - mx }, { r - mx, r } };
+	local rows = { { t, t + my }, { t + my, b - my }, { b - my, b } };
+	for row = 1, 3 do
+		for col = 1, 3 do
+			local index = (row - 1) * 3 + col;
+			local slice = texture.slices[index];
+			if not slice then
+				slice = parent:CreateTexture(nil, layer, nil, subLevel);
+				texture.slices[index] = slice;
+			end
+			slice:SetTexture(info.file);
+			slice:SetTexCoord(cols[col][1], cols[col][2], rows[row][1], rows[row][2]);
+			slice:ClearAllPoints();
+			-- смещение от угла рамки: середина отступает на поле, края и углы - вплотную к краю
+			local x1 = col == 2 and margin or 0;
+			local y1 = row == 2 and -margin or 0;
+			local left = col == 3 and "RIGHT" or "LEFT";
+			local top = row == 3 and "BOTTOM" or "TOP";
+			slice:SetPoint(top .. left, texture, top .. left, x1, y1);
+			-- размер: углы и края - margin, остальное - растяжка до противоположного края
+			if col == 2 then
+				slice:SetPoint((row == 3 and "BOTTOM" or "TOP") .. "RIGHT", texture, (row == 3 and "BOTTOM" or "TOP") .. "RIGHT", -margin, y1);
+			else
+				slice:SetWidth(margin);
+			end
+			if row == 2 then
+				slice:SetPoint("BOTTOM" .. left, texture, "BOTTOM" .. left, x1, margin);
+			else
+				slice:SetHeight(margin);
+			end
+			slice:Show();
+		end
+	end
+end

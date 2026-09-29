@@ -494,6 +494,9 @@ function TransmogFrame_OnLoad(self)
 	local wardrobe = self.WardrobeCollection;
 	local items = wardrobe.TabContent.ItemsFrame;
 	SetupTabs(wardrobe);
+	-- рамки с нарезкой в ретейле - кусками, иначе мыло
+	TransmogUI.SetNineSliceAtlas(wardrobe.TabContent.Border, "transmog-tabs-frame");
+	TransmogUI.SetNineSliceAtlas(wardrobe.TabContent.SituationsFrame.Situations.Background, "transmog-situations-containerbg");
 	self.SlotTitle = items.SlotTitle;
 	self.GridMessage = items.GridMessageFrame.Text;
 	local paging = items.PagingControls;
@@ -552,6 +555,7 @@ function TransmogFrame_OnShow(self)
 	wipe(self.pending);
 	wipe(self.pendingIllusion);
 	if Comm_Send then
+		Comm_Send("TMOG_WINDOW", 1);   -- пока окно открыто, ситуации не переодевают
 		Comm_Send(OP_GET_STATE);
 		Comm_Send(TransmogUI.OP_OUTFITS_GET);
 	end
@@ -573,6 +577,9 @@ end
 
 function TransmogFrame_OnHide(self)
 	PlaySound("igCharacterInfoClose");
+	if Comm_Send then
+		Comm_Send("TMOG_WINDOW", 0);
+	end
 	StaticPopup_Hide("TRANSMOG_OUTFIT_NAME");
 	StaticPopup_Hide("TRANSMOG_OUTFIT_DELETE");
 	StaticPopup_Hide("TRANSMOG_OUTFIT_BUY");
