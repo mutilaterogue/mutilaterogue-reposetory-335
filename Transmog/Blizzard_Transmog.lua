@@ -30,7 +30,7 @@ function TransmogUI.GetDisplayedItem(self, slotId)
 end
 
 function TransmogUI.HasPending(self)
-	return next(self.pending) ~= nil;
+	return next(self.pending) ~= nil or next(self.pendingIllusion) ~= nil;
 end
 
 function TransmogUI.GetCost(self)
@@ -42,7 +42,7 @@ function TransmogUI.GetCost(self)
 			cost = cost + math.max(sellPrice or 0, 10000 / 100);   -- как у трансмогрификаторов 3.3.5: цена продажи, минимум 1 серебро
 		end
 	end
-	return cost;
+	return cost + TransmogUI.GetIllusionCost(self);
 end
 
 ---------------------------------------------------------------------------
@@ -65,8 +65,8 @@ function TransmogUI.UpdatePreview(self)
 	end
 	for _, info in ipairs(SLOTS) do
 		local itemId, changed = TransmogUI.GetDisplayedItem(self, info.id);
-		if itemId and (changed or self.applied[info.id]) then
-			model:TryOn("item:" .. itemId);
+		if itemId and (changed or self.applied[info.id] or self.pendingIllusion[info.id] ~= nil) then
+			model:TryOn(TransmogUI.PreviewItemString(self, info.id, itemId));
 		end
 	end
 end
@@ -103,24 +103,50 @@ function TransmogUI.PlayPreviewSaved(self)
 	end
 end
 
+-- рамка карточки в сетке: атлас и «ожидает применения»
+function TransmogUI.GetCardState(self, entry)
+	if entry.illusion then
+		return TransmogUI.GetIllusionCardAtlas(self, entry);
+	end
+	local slotId = self.selectedSlot;
+	if not slotId then
+		return "transmog-itemCard-default", false;
+	end
+	local pendingItem = self.pending[slotId];
+	if pendingItem ~= nil and pendingItem ~= 0 and entry.itemId == pendingItem then
+		return "transmog-itemcard-transmogrified-pending", true;
+	elseif entry.itemId == TransmogUI.GetDisplayedItem(self, slotId) then
+		return "transmog-itemCard-current", false;
+	elseif entry.itemId == self.applied[slotId] then
+		return "transmog-itemCard-transmogrified", false;
+	end
+	return "transmog-itemCard-default", false;
+end
+
+-- вспышка после применения: карточка того, что теперь наложено
+local function IsCardSaved(self, entry)
+	if not self.gridSaved then
+		return false;
+	end
+	if entry.illusion then
+		return entry.illusion.id == self.appliedIllusion[self.illusionSlot];
+	end
+	local savedItem = self.selectedSlot and self.applied[self.selectedSlot];
+	return savedItem ~= nil and entry.itemId == savedItem;
+end
+
 -- карточки в сетке и комплекты: цикл ожидания без перерисовки моделей
 function TransmogUI.UpdateCardStates(self)
 	if self.gridModels then
-		local pendingItem = self.selectedSlot and self.pending[self.selectedSlot];
 		for index, model in ipairs(self.gridModels) do
 			local entry = self.entries and self.entries[index];
-			local isPending = entry and pendingItem ~= nil and pendingItem ~= 0 and entry.itemId == pendingItem;
+			local atlas, isPending;
+			if entry then
+				atlas, isPending = TransmogUI.GetCardState(self, entry);
+			end
 			TransmogAnim.SetCardState(model, isPending);
 			if entry and model:IsShown() then
-				if isPending then
-					model.Border.Card:SetAtlas("transmog-itemcard-transmogrified-pending", true);
-				elseif entry.itemId == TransmogUI.GetDisplayedItem(self, self.selectedSlot) then
-					model.Border.Card:SetAtlas("transmog-itemCard-current", true);
-				elseif entry.itemId == self.applied[self.selectedSlot] then
-					model.Border.Card:SetAtlas("transmog-itemCard-transmogrified", true);
-				else
-					model.Border.Card:SetAtlas("transmog-itemCard-default", true);
-				end
+				model.Border.Card:SetAtlas(atlas, true);
 			end
 		end
 	end
@@ -134,6 +160,7 @@ function TransmogUI.UpdateSlots(self)
 		TransmogUI.UpdateSlotButton(self, button);
 	end
 
+	TransmogUI.UpdateIllusionSlots(self);
 	TransmogUI.UpdateCardStates(self);
 
 	local cost = TransmogUI.GetCost(self);
@@ -146,30 +173,22 @@ end
 -- appearance grid (right)
 ---------------------------------------------------------------------------
 function TransmogUI.UpdateGrid(self)
-	local selectedItem = self.selectedSlot and TransmogUI.GetDisplayedItem(self, self.selectedSlot);
+	if self.illusionSlot then
+		TransmogUI.UpdateIllusionGrid(self);
+	end
 	for index, model in ipairs(self.gridModels) do
 		local entry = self.entries[index];
 		model.entry = entry;
 		if entry then
 			model:Show();
 			model.Border:Show();
-			local pendingItem = self.selectedSlot and self.pending[self.selectedSlot];
-			local isPending = pendingItem ~= nil and pendingItem ~= 0 and entry.itemId == pendingItem;
-			if isPending then
-				model.Border.Card:SetAtlas("transmog-itemcard-transmogrified-pending", true);
-			elseif entry.itemId == selectedItem then
-				model.Border.Card:SetAtlas("transmog-itemCard-current", true);
-			elseif entry.itemId == (self.selectedSlot and self.applied[self.selectedSlot]) then
-				model.Border.Card:SetAtlas("transmog-itemCard-transmogrified", true);
-			else
-				model.Border.Card:SetAtlas("transmog-itemCard-default", true);
-			end
+			local atlas, isPending = TransmogUI.GetCardState(self, entry);
+			model.Border.Card:SetAtlas(atlas, true);
 			model.Border.Card:SetDesaturated(not entry.collected);
 			model:SetAlpha(entry.collected and 1 or 0.6);
 			TransmogUI.DressGridModel(model);
 			model.redressIndex, model.redressTime = 1, 0.1;
-			local savedItem = self.gridSaved and self.selectedSlot and self.applied[self.selectedSlot];
-			TransmogAnim.SetCardState(model, isPending, savedItem ~= nil and entry.itemId == savedItem);
+			TransmogAnim.SetCardState(model, isPending, IsCardSaved(self, entry));
 		else
 			model:Hide();
 			model.Border:Hide();
@@ -183,7 +202,7 @@ function TransmogUI.UpdateGrid(self)
 	paging.Prev:SetEnabled((self.page or 1) > 1);
 	paging.Next:SetEnabled((self.page or 1) < (self.numPages or 1));
 
-	if not self.selectedSlot then
+	if not self.selectedSlot and not self.illusionSlot then
 		self.GridMessage:SetText("Выберите слот на персонаже");
 		self.GridMessage:Show();
 	elseif not self.category then
@@ -198,6 +217,10 @@ function TransmogUI.UpdateGrid(self)
 end
 
 function TransmogUI.RequestPage(self)
+	if self.illusionSlot then
+		TransmogUI.RequestIllusions(self);
+		return;
+	end
 	self.entries = {};
 	if not self.selectedSlot or not self.category or not Comm_Send then
 		TransmogUI.UpdateGrid(self);
@@ -218,6 +241,7 @@ function TransmogFrame_SelectSlot(self, slotId)
 		return;
 	end
 	self.selectedSlot = slotId;
+	self.illusionSlot = nil;
 	self.category = TransmogUI.GetItemCategory(info, link);
 	self.page = 1;
 	self.SlotTitle:SetText(info.name);
@@ -275,6 +299,12 @@ function TransmogFrame_ToggleShowEquipped()
 	for slotId in pairs(frame.applied) do
 		frame.pending[slotId] = 0;
 	end
+	wipe(frame.pendingIllusion);
+	for slotId, enchant in pairs(frame.appliedIllusion) do
+		if enchant > 0 then
+			frame.pendingIllusion[slotId] = 0;
+		end
+	end
 	frame.selectedOutfit = nil;
 	PlaySound("igMainMenuOptionCheckBoxOn");
 	TransmogUI.UpdateOutfits(frame);
@@ -299,6 +329,7 @@ end
 
 function TransmogFrame_ClearAllPending()
 	wipe(TransmogFrame.pending);
+	wipe(TransmogFrame.pendingIllusion);
 	PlaySound("igMainMenuOptionCheckBoxOff");
 	RefreshAll(TransmogFrame);
 end
@@ -306,7 +337,10 @@ end
 -- DisplayTypes: «Не назначено» - убрать изменение слота, «Надетая экипировка» - вернуть облик предмета
 function TransmogFrame_ClearSlotPending()
 	local frame = TransmogFrame;
-	if frame.selectedSlot then
+	if frame.illusionSlot then
+		frame.pendingIllusion[frame.illusionSlot] = nil;
+		RefreshAll(frame);
+	elseif frame.selectedSlot then
 		frame.pending[frame.selectedSlot] = nil;
 		RefreshAll(frame);
 	end
@@ -314,6 +348,12 @@ end
 
 function TransmogFrame_RestoreSlot()
 	local frame = TransmogFrame;
+	if frame.illusionSlot then
+		local illusionSlot = frame.illusionSlot;
+		frame.pendingIllusion[illusionSlot] = (frame.appliedIllusion[illusionSlot] or 0) > 0 and 0 or nil;
+		RefreshAll(frame);
+		return;
+	end
 	local slotId = frame.selectedSlot;
 	if slotId then
 		frame.pending[slotId] = frame.applied[slotId] and 0 or nil;
@@ -395,6 +435,8 @@ end
 function TransmogFrame_OnLoad(self)
 	self.pending = {};
 	self.applied = {};
+	self.pendingIllusion = {};   -- [16/17] = enchantId (0 = убрать), Blizzard_TransmogIllusions.lua
+	self.appliedIllusion = {};
 	self.entries = {};
 	tinsert(UISpecialFrames, self:GetName());
 	self:RegisterForDrag("LeftButton");
@@ -508,6 +550,7 @@ end
 function TransmogFrame_OnShow(self)
 	PlaySound("igCharacterInfoOpen");
 	wipe(self.pending);
+	wipe(self.pendingIllusion);
 	if Comm_Send then
 		Comm_Send(OP_GET_STATE);
 		Comm_Send(TransmogUI.OP_OUTFITS_GET);
@@ -557,8 +600,12 @@ function TransmogFrame_Apply(self)
 	for slotId, itemId in pairs(self.pending) do
 		table.insert(list, slotId .. "/" .. itemId);
 	end
+	local illusions = {};
+	for slotId, enchant in pairs(self.pendingIllusion) do
+		table.insert(illusions, slotId .. "/" .. enchant);
+	end
 	if Comm_Send then
-		Comm_Send(OP_APPLY, table.concat(list, ","));
+		Comm_Send(OP_APPLY, table.concat(list, ","), table.concat(illusions, ","));
 	end
 	self.applyElapsed = 0;
 end
@@ -578,8 +625,9 @@ function TransmogUI.ParseSlots(text)
 end
 
 if Comm_Register then
-	Comm_Register(OP_STATE, function(text)
+	Comm_Register(OP_STATE, function(text, illusionsText)
 		TransmogFrame.applied = TransmogUI.ParseSlots(text);
+		TransmogFrame.appliedIllusion = TransmogUI.ParseSlots(illusionsText);
 		if TransmogFrame:IsShown() then
 			TransmogUI.UpdateSlots(TransmogFrame);
 			TransmogUI.UpdatePreview(TransmogFrame);
@@ -599,6 +647,15 @@ if Comm_Register then
 				end
 			end
 			TransmogUI.PlayPreviewSaved(frame);
+			local preview = frame.CharacterPreview;
+			for _, button in ipairs({ preview.MainHandIllusion, preview.OffHandIllusion }) do
+				local slotId = button:GetID();
+				if frame.pendingIllusion[slotId] ~= nil then
+					TransmogUI.PlaySlotSaved(button);
+					frame.appliedIllusion[slotId] = frame.pendingIllusion[slotId] ~= 0 and frame.pendingIllusion[slotId] or nil;
+				end
+			end
+			wipe(frame.pendingIllusion);
 			frame.gridSaved = true;
 			if TransmogUI.PlaySetCardsSaved then
 				TransmogUI.PlaySetCardsSaved(frame);
@@ -637,7 +694,7 @@ if Comm_Register then
 			return;
 		end
 		local frame = TransmogFrame;
-		if tonumber(category) ~= frame.category then
+		if frame.illusionSlot or tonumber(category) ~= frame.category then
 			return;
 		end
 		frame.waiting, frame.noAnswer, frame.requestElapsed = false, nil, nil;

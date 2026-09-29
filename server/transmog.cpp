@@ -167,7 +167,31 @@ namespace
             return;
         }
 
-        Transmog::ApplyResult result = Transmog::ApplyLooks(player, Transmog::ParseSlots(args.empty() ? std::string() : args[0]), true, false);
+        // args[0] - облики "slot/itemId,...", args[1] - иллюзии "slot/enchantId,..." (0 = убрать)
+        Transmog::SlotList looks = Transmog::ParseSlots(args.size() > 0 ? args[0] : std::string());
+        Transmog::SlotList illusions = Transmog::ParseSlots(args.size() > 1 ? args[1] : std::string());
+
+        // сначала проверить всё (и хватит ли денег на облики и иллюзии вместе), потом менять
+        uint64 illusionCost = 0;
+        Transmog::ApplyResult result = Transmog::CheckIllusions(player, illusions, illusionCost);
+        if (!result.Error.empty())
+        {
+            Transmog::SendResult(player, result);
+            return;
+        }
+        if (!player->HasEnoughMoney(Transmog::GetCost(player, looks) + illusionCost))
+        {
+            Transmog::SendResult(player, Fail("ERR_TRANSMOG_OUTFIT_SLOT_CANNOT_AFFORD"));
+            return;
+        }
+
+        result = looks.empty() && !illusions.empty() ? Transmog::ApplyResult{ true } : Transmog::ApplyLooks(player, looks, true, false);
+        if (result.Ok && !illusions.empty())
+        {
+            if (illusionCost)
+                player->ModifyMoney(-int64(illusionCost));
+            Transmog::ApplyIllusions(player, illusions);
+        }
         Transmog::SendResult(player, result);
         if (result.Ok)
             Transmog::SendState(player);
@@ -457,8 +481,18 @@ namespace Transmog
             }
             else
             {
-                transmogs.erase(itemGuid);
-                trans->Append(Trinity::StringFormat("DELETE FROM character_transmog WHERE item_guid = {}", itemGuid).c_str());
+                // облик предмета, но иллюзия остаётся
+                auto itr = transmogs.find(itemGuid);
+                if (itr != transmogs.end() && itr->second.Owner == owner && itr->second.Illusion)
+                {
+                    itr->second.FakeEntry = 0;
+                    trans->Append(Trinity::StringFormat("UPDATE character_transmog SET fake_entry = 0 WHERE item_guid = {}", itemGuid).c_str());
+                }
+                else
+                {
+                    transmogs.erase(itemGuid);
+                    trans->Append(Trinity::StringFormat("DELETE FROM character_transmog WHERE item_guid = {}", itemGuid).c_str());
+                }
             }
             change.Target->SetState(ITEM_CHANGED, player);
             player->SetVisibleItemSlot(change.Slot, change.Target);
@@ -491,6 +525,45 @@ namespace Transmog
         if (itr == transmogs.end() || itr->second.Owner != player->GetGUID().GetCounter())
             return 0;
         return itr->second.FakeEntry;
+    }
+
+    uint32 GetIllusion(Player* player, uint8 slot)
+    {
+        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item)
+            return 0;
+        auto itr = transmogs.find(item->GetGUID().GetCounter());
+        if (itr == transmogs.end() || itr->second.Owner != player->GetGUID().GetCounter())
+            return 0;
+        return itr->second.Illusion;
+    }
+
+    void SetIllusion(Player* player, uint8 slot, uint32 enchant, CharacterDatabaseTransaction trans)
+    {
+        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item)
+            return;
+        ObjectGuid::LowType owner = player->GetGUID().GetCounter();
+        ObjectGuid::LowType itemGuid = item->GetGUID().GetCounter();
+        TransmogData& data = transmogs[itemGuid];
+        if (data.Owner != owner)
+            data = TransmogData();
+        data.Owner = owner;
+        data.Illusion = enchant;
+        if (!data.FakeEntry && !data.Illusion)
+        {
+            transmogs.erase(itemGuid);
+            trans->Append(Trinity::StringFormat("DELETE FROM character_transmog WHERE item_guid = {}", itemGuid).c_str());
+        }
+        else
+        {
+            trans->Append(Trinity::StringFormat("REPLACE INTO character_transmog (item_guid, owner, fake_entry, illusion) VALUES ({}, {}, {}, {})",
+                itemGuid, owner, data.FakeEntry, data.Illusion).c_str());
+            item->SetNotRefundable(player);
+            item->ClearSoulboundTradeable(player);
+        }
+        item->SetState(ITEM_CHANGED, player);
+        player->SetVisibleItemSlot(slot, item);
     }
 
     // для подсказок: "bag/slot/fakeEntry,..." в номерах клиента
@@ -535,7 +608,7 @@ namespace Transmog
 
     void SendState(Player* player)
     {
-        sAddonComm->Send(player, "TMOG_STATE", FormatSlots(GetCurrentLooks(player)));
+        sAddonComm->Send(player, "TMOG_STATE", FormatSlots(GetCurrentLooks(player)), FormatIllusions(player));
         SendItems(player);
     }
 

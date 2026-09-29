@@ -23,7 +23,11 @@ function TransmogUI.DressGridModel(model)
 		model.unitSet = true;
 	end
 	model:Undress();
-	model:TryOn("item:" .. entry.itemId);
+	if entry.illusion then
+		model:TryOn("item:" .. entry.itemId .. ":" .. entry.illusion.id);   -- оружие руки с иллюзией
+	else
+		model:TryOn("item:" .. entry.itemId);
+	end
 	TransmogUI.ApplyCamera(model);
 end
 
@@ -63,6 +67,10 @@ end
 function TransmogItemModel_OnMouseDown(self, button)
 	local frame = TransmogFrame;
 	local entry = self.entry;
+	if entry and entry.illusion and frame.illusionSlot then
+		TransmogUI.OnIllusionCardClick(frame, entry);
+		return;
+	end
 	if not entry or not frame.selectedSlot then
 		return;
 	end
@@ -92,6 +100,10 @@ end
 function TransmogItemModel_OnEnter(self)
 	local entry = self.entry;
 	if not entry then
+		return;
+	end
+	if entry.illusion then
+		TransmogUI.OnIllusionCardEnter(self, entry);
 		return;
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");

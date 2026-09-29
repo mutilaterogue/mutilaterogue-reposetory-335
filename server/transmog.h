@@ -11,6 +11,7 @@
 #define CUSTOM_TRANSMOG_H
 
 #include "Define.h"
+#include "DatabaseEnvFwd.h"
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -69,6 +70,15 @@ namespace Transmog
 
     // current transmogrified looks of the equipped items
     SlotList GetCurrentLooks(Player* player);
+
+    // иллюзии (transmog_illusions.cpp). Иллюзия хранится на предмете вместе с обликом (character_transmog.illusion)
+    uint32 GetIllusion(Player* player, uint8 slot);
+    // enchant 0 - убрать; пишет в transaction, обновляет вид слота
+    void SetIllusion(Player* player, uint8 slot, uint32 enchant, CharacterDatabaseTransaction trans);
+    // "slot/enchant,..." (клиентские ячейки) - проверка всего списка; cost - цена; на ошибке Error
+    ApplyResult CheckIllusions(Player* player, SlotList const& illusions, uint64& cost);
+    void ApplyIllusions(Player* player, SlotList const& illusions);
+    std::string FormatIllusions(Player* player);
 
     void SendState(Player* player);
     void SendItems(Player* player);

@@ -269,33 +269,160 @@
 		</Scripts>
 	</Button>
 
-	<!-- ретейл: TransmogIllusionSlotTemplate (иллюзий в 3.3.5 нет - всегда недоступен) -->
-	<Frame name="TransmogIllusionSlotTemplate" virtual="true">
+	<!-- ретейл: TransmogIllusionSlotTemplate - иллюзия оружия (Blizzard_TransmogIllusions.lua, server/transmog_illusions.cpp).
+	     Анимации Pending/Saved - те же, что у слота (TransmogAnim.SLOT_*), размеры - ретейловские для маленького слота -->
+	<Button name="TransmogIllusionSlotTemplate" virtual="true">
 		<Size x="42" y="42"/>
 		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Icon" atlas="transmog-gearSlot-unassigned-enchant" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
 			<Layer level="BORDER">
 				<Texture parentKey="Border" atlas="transmog-gearSlot-default-small" useAtlasSize="true">
 					<Anchors>
-						<Anchor point="CENTER"/>
+						<Anchor point="CENTER" x="0" y="0"/>
 					</Anchors>
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<Texture parentKey="Icon" atlas="transmog-gearSlot-unassigned-enchant" useAtlasSize="true">
+				<Texture parentKey="DisabledIcon" atlas="transmog-icon-disabled-small" useAtlasSize="true" hidden="true">
 					<Anchors>
-						<Anchor point="CENTER"/>
+						<Anchor point="CENTER" x="0" y="0"/>
 					</Anchors>
 				</Texture>
-			</Layer>
-			<Layer level="OVERLAY">
-				<Texture parentKey="Disabled" atlas="transmog-icon-disabled-small" useAtlasSize="true">
+				<Texture parentKey="Selected" atlas="transmog-gearSlot-selected" hidden="true">
+					<Size x="46" y="46"/>
 					<Anchors>
-						<Anchor point="CENTER"/>
+						<Anchor point="CENTER" x="0" y="0"/>
 					</Anchors>
 				</Texture>
 			</Layer>
 		</Layers>
-	</Frame>
+		<Frames>
+			<Frame parentKey="PendingFrame" setAllPoints="true" hidden="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Border" atlas="transmog-gearSlot-pending">
+							<Size x="50" y="50"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Glow" atlas="transmog-gearSlot-transmogrified-Glw">
+							<Size x="50" y="50"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Highlight" atlas="transmog-gearSlot-transmogrified-HL">
+							<Size x="44" y="44"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture parentKey="FlipbookLeft" atlas="transmog-gearSlot-flipbook-loop-Left">
+							<Size x="9" y="30"/>
+							<Anchors>
+								<Anchor point="CENTER" x="-13" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookRight" atlas="transmog-gearSlot-flipbook-loop-Right">
+							<Size x="9" y="30"/>
+							<Anchors>
+								<Anchor point="CENTER" x="13" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookTop" atlas="transmog-gearSlot-flipbook-loop-Top">
+							<Size x="30" y="9"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="13"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookBottom" atlas="transmog-gearSlot-flipbook-loop-Bottom">
+							<Size x="30" y="9"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="-13"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookStart" atlas="transmog-gearSlot-flipbook-start">
+							<Size x="54" y="54"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0.5"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="SavedFrame" setAllPoints="true" hidden="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Glow" atlas="transmog-gearSlot-transmogrified-Glw">
+							<Size x="50" y="50"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Highlight" atlas="transmog-gearSlot-transmogrified-HL">
+							<Size x="44" y="44"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="LineSquare" atlas="transmog-gearSlot-lineSquare">
+							<Size x="26" y="26"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="BackgroundFX" atlas="transmog-gearSlot-FX-spark-BG">
+							<Size x="54" y="54"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FrameGlow" atlas="transmog-gearSlot-transmogrified-Frame-Glw">
+							<Size x="38" y="38"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture parentKey="FlipbookSparks" atlas="transmog-gearSlot-flipbook-sparks">
+							<Size x="48" y="48"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookStart" atlas="transmog-gearSlot-flipbook-start">
+							<Size x="50" y="50"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<HighlightTexture atlas="transmog-gearSlot-selected" alphaMode="ADD">
+			<Size x="46" y="46"/>
+			<Anchors>
+				<Anchor point="CENTER"/>
+			</Anchors>
+		</HighlightTexture>
+		<Scripts>
+			<OnLoad function="TransmogIllusionSlot_OnLoad"/>
+			<OnClick function="TransmogIllusionSlot_OnClick"/>
+			<OnEnter function="TransmogIllusionSlot_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
 
 	<!-- ретейл: TransmogOutfitEntryTemplate - иконка в spellframe + карточка 208x43 -->
 	<Button name="TransmogOutfitEntryTemplate" virtual="true">

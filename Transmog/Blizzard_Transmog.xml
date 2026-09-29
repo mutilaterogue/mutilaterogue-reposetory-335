@@ -9,6 +9,7 @@
 	<Include file="Blizzard_TransmogTemplates.xml"/>
 	<Script file="Blizzard_TransmogOutfits.lua"/>
 	<Script file="Blizzard_Transmog.lua"/>
+	<Script file="Blizzard_TransmogIllusions.lua"/>
 	<Script file="Blizzard_TransmogSets.lua"/>
 	<Script file="Blizzard_TransmogCustomSets.lua"/>
 	<Script file="Blizzard_TransmogSituations.lua"/>
@@ -549,17 +550,17 @@
 							</Anchors>
 						</Button>
 
-					<!-- TransmogIllusionSlotTemplate: иллюзий в 3.3.5 нет -->
-					<Frame parentKey="MainHandIllusion" inherits="TransmogIllusionSlotTemplate">
+					<!-- ретейл: TransmogIllusionSlotTemplate - иллюзии оружия; id - ячейка оружия -->
+					<Button name="$parentMainHandIllusion" parentKey="MainHandIllusion" inherits="TransmogIllusionSlotTemplate" id="16">
 						<Anchors>
 							<Anchor point="TOP" relativeTo="$parentMainHandSlot" relativePoint="BOTTOM" x="0" y="-4"/>
 						</Anchors>
-					</Frame>
-					<Frame parentKey="OffHandIllusion" inherits="TransmogIllusionSlotTemplate">
+					</Button>
+					<Button name="$parentOffHandIllusion" parentKey="OffHandIllusion" inherits="TransmogIllusionSlotTemplate" id="17">
 						<Anchors>
 							<Anchor point="TOP" relativeTo="$parentSecondaryHandSlot" relativePoint="BOTTOM" x="0" y="-4"/>
 						</Anchors>
-					</Frame>
+					</Button>
 
 					<Button name="$parentApplyButton" parentKey="ApplyButton" inherits="SharedButtonTemplate" text="TRANSMOGRIFY">
 						<Size x="150" y="28"/>

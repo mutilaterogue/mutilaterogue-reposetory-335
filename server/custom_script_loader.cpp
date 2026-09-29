@@ -27,6 +27,7 @@ void AddSC_appearance_collection();
 void AddSC_transmog();
 void AddSC_transmog_outfits();
 void AddSC_transmog_sets();
+void AddSC_transmog_illusions();
 void AddSC_archaeology();
 
 void AddCustomScripts()
@@ -39,5 +40,6 @@ void AddCustomScripts()
     AddSC_transmog();
     AddSC_transmog_outfits();
     AddSC_transmog_sets();
+    AddSC_transmog_illusions();
     AddSC_archaeology();
 }
