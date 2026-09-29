@@ -64,6 +64,9 @@ local function Cleared(tooltip)
 	pending[tooltip] = nil;
 end
 
+-- FrameXML грузится раньше, чем создаются GameTooltip/ItemRefTooltip/ShoppingTooltip (они в XML ниже по .toc),
+-- поэтому хуки ставятся на PLAYER_LOGIN, когда все подсказки уже существуют
+local function Init()
 local tooltips = { GameTooltip, ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2, ShoppingTooltip3,
 	ItemRefShoppingTooltip1, ItemRefShoppingTooltip2, ItemRefShoppingTooltip3 };
 for _, tooltip in ipairs(tooltips) do
@@ -194,6 +197,15 @@ hooksecurefunc("SelectQuestLogEntry", function()
 		GameTooltip:Show();
 		AddId(GameTooltip, id, TYPES.quest);
 	end
+end);
+
+end
+
+local initFrame = CreateFrame("Frame");
+initFrame:RegisterEvent("PLAYER_LOGIN");
+initFrame:SetScript("OnEvent", function(self)
+	self:UnregisterEvent("PLAYER_LOGIN");
+	Init();
 end);
 
 ---------------------------------------------------------------------------
