@@ -24,6 +24,7 @@
  * tools/archaeology/world_archaeology.sql.
  */
 
+// Русские строки в кавычках записаны байтами UTF-8 (\xNN): иначе компилятор перекодирует их в кодировку системы («?????» в игре).
 #include "ScriptMgr.h"
 #include "Creature.h"
 #include "SpellScript.h"
@@ -420,18 +421,18 @@ namespace
 
         keystones = std::min(keystones, project.Sockets);
         if (keystones && (!branch.Keystone || !player->HasItemCount(branch.Keystone, keystones)))
-            return SendError(player, "Недостаточно краеугольных камней.");
+            return SendError(player, "\xd0\x9d\xd0\xb5\xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb0\xd1\x82\xd0\xbe\xd1\x87\xd0\xbd\xd0\xbe \xd0\xba\xd1\x80\xd0\xb0\xd0\xb5\xd1\x83\xd0\xb3\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd1\x85 \xd0\xba\xd0\xb0\xd0\xbc\xd0\xbd\xd0\xb5\xd0\xb9.");
 
         uint32 fromKeystones = keystones * KEYSTONE_FRAGMENTS;
         uint32 fromFragments = project.Fragments > fromKeystones ? project.Fragments - fromKeystones : 0;
         if (state.Fragments < fromFragments)
-            return SendError(player, "Недостаточно фрагментов.");
+            return SendError(player, "\xd0\x9d\xd0\xb5\xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb0\xd1\x82\xd0\xbe\xd1\x87\xd0\xbd\xd0\xbe \xd1\x84\xd1\x80\xd0\xb0\xd0\xb3\xd0\xbc\xd0\xb5\xd0\xbd\xd1\x82\xd0\xbe\xd0\xb2.");
 
         if (project.RewardItem)
         {
             ItemPosCountVec dest;
             if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, project.RewardItem, 1) != EQUIP_ERR_OK)
-                return SendError(player, "Нет места в сумках.");
+                return SendError(player, "\xd0\x9d\xd0\xb5\xd1\x82 \xd0\xbc\xd0\xb5\xd1\x81\xd1\x82\xd0\xb0 \xd0\xb2 \xd1\x81\xd1\x83\xd0\xbc\xd0\xba\xd0\xb0\xd1\x85.");
             if (Item* item = player->StoreNewItem(dest, project.RewardItem, true))
                 player->SendNewItem(item, 1, true, false);
         }
@@ -465,13 +466,13 @@ namespace
         PlayerData& data = Data(player);
         DigSite* dig = CurrentDigsite(player, data);
         if (!dig)
-            return SendError(player, "Здесь нет места раскопок.");
+            return SendError(player, "\xd0\x97\xd0\xb4\xd0\xb5\xd1\x81\xd1\x8c \xd0\xbd\xd0\xb5\xd1\x82 \xd0\xbc\xd0\xb5\xd1\x81\xd1\x82\xd0\xb0 \xd1\x80\xd0\xb0\xd1\x81\xd0\xba\xd0\xbe\xd0\xbf\xd0\xbe\xd0\xba.");
         if (player->IsMounted() || player->IsInCombat())
-            return SendError(player, "Сейчас нельзя проводить исследование.");
+            return SendError(player, "\xd0\xa1\xd0\xb5\xd0\xb9\xd1\x87\xd0\xb0\xd1\x81 \xd0\xbd\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbf\xd1\x80\xd0\xbe\xd0\xb2\xd0\xbe\xd0\xb4\xd0\xb8\xd1\x82\xd1\x8c \xd0\xb8\xd1\x81\xd1\x81\xd0\xbb\xd0\xb5\xd0\xb4\xd0\xbe\xd0\xb2\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5.");
         if (!data.FindGuid.IsEmpty())
             if (GameObject* old = player->GetMap()->GetGameObject(data.FindGuid))
                 if (old->isSpawned())
-                    return SendError(player, "Находка уже рядом - заберите её.");
+                    return SendError(player, "\xd0\x9d\xd0\xb0\xd1\x85\xd0\xbe\xd0\xb4\xd0\xba\xd0\xb0 \xd1\x83\xd0\xb6\xd0\xb5 \xd1\x80\xd1\x8f\xd0\xb4\xd0\xbe\xd0\xbc - \xd0\xb7\xd0\xb0\xd0\xb1\xd0\xb5\xd1\x80\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xb5\xd1\x91.");
 
         Site const& site = sites.at(dig->Site);
         if (!dig->HasTarget)
@@ -499,6 +500,8 @@ namespace
         float angle = std::atan2(dy, dx);
         Position pos(px + std::cos(angle) * 1.5f, py + std::sin(angle) * 1.5f, pz, angle);
         player->SummonGameObject(entry, pos, QuaternionData::fromEulerAnglesZYX(angle, 0.0f, 0.0f), Seconds(8));
+        // направление к находке на полосе раскопок: 1 - далеко, 2 - ближе, 3 - рядом; угол мира в тысячных радиана
+        sAddonComm->Send(player, "ARCH_SURVEY", entry == GO_SURVEY_RED ? 1 : entry == GO_SURVEY_YELLOW ? 2 : 3, int32(angle * 1000.0f));
         sAddonComm->Send(player, "ARCH_DIGSITE", dig->Site, dig->Finds, FINDS_PER_SITE);
     }
 
@@ -657,13 +660,13 @@ namespace
     struct ArchaeologyRank { char const* Name; uint8 Level; uint16 RequiredSkill; uint16 MaxSkill; uint32 Cost; };
     ArchaeologyRank const ARCHAEOLOGY_RANKS[] =
     {
-        { "Ученик",          5,   0,  75,     100 },   //  1 серебро
-        { "Подмастерье",    10,  50, 150,     500 },
-        { "Умелец",         20, 125, 225,   10000 },   //  1 золото
-        { "Искусник",       35, 200, 300,   50000 },
-        { "Мастер",         50, 275, 375,  100000 },
-        { "Великий мастер", 65, 350, 450,  250000 },
-        { "Знаток",         75, 425, 525,  500000 },
+        { "\xd0\xa3\xd1\x87\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xba",          5,   0,  75,     100 },   //  1 серебро
+        { "\xd0\x9f\xd0\xbe\xd0\xb4\xd0\xbc\xd0\xb0\xd1\x81\xd1\x82\xd0\xb5\xd1\x80\xd1\x8c\xd0\xb5",    10,  50, 150,     500 },
+        { "\xd0\xa3\xd0\xbc\xd0\xb5\xd0\xbb\xd0\xb5\xd1\x86",         20, 125, 225,   10000 },   //  1 золото
+        { "\xd0\x98\xd1\x81\xd0\xba\xd1\x83\xd1\x81\xd0\xbd\xd0\xb8\xd0\xba",       35, 200, 300,   50000 },
+        { "\xd0\x9c\xd0\xb0\xd1\x81\xd1\x82\xd0\xb5\xd1\x80",         50, 275, 375,  100000 },
+        { "\xd0\x92\xd0\xb5\xd0\xbb\xd0\xb8\xd0\xba\xd0\xb8\xd0\xb9 \xd0\xbc\xd0\xb0\xd1\x81\xd1\x82\xd0\xb5\xd1\x80", 65, 350, 450,  250000 },
+        { "\xd0\x97\xd0\xbd\xd0\xb0\xd1\x82\xd0\xbe\xd0\xba",         75, 425, 525,  500000 },
     };
     constexpr uint32 GOSSIP_ACTION_LEARN = 1000;
 
@@ -671,9 +674,9 @@ namespace
     {
         std::ostringstream text;
         if (copper >= 10000)
-            text << copper / 10000 << " з ";
+            text << copper / 10000 << " \xd0\xb7 ";
         if (copper % 10000 >= 100)
-            text << (copper % 10000) / 100 << " с";
+            text << (copper % 10000) / 100 << " \xd1\x81";
         return text.str();
     }
 
@@ -700,7 +703,7 @@ struct npc_archaeology_trainer : public ScriptedAI
         {
             ArchaeologyRank const& r = ARCHAEOLOGY_RANKS[rank];
             std::ostringstream text;
-            text << "Археология: " << r.Name << " (до " << r.MaxSkill << ") - " << MoneyText(r.Cost);
+            text << "\xd0\x90\xd1\x80\xd1\x85\xd0\xb5\xd0\xbe\xd0\xbb\xd0\xbe\xd0\xb3\xd0\xb8\xd1\x8f: " << r.Name << " (\xd0\xb4\xd0\xbe " << r.MaxSkill << ") - " << MoneyText(r.Cost);
             AddGossipItemFor(player, GOSSIP_ICON_TRAINER, text.str(), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_LEARN + rank);
         }
         SendGossipMenuFor(player, player->GetGossipTextId(me), me->GetGUID());
@@ -719,12 +722,12 @@ struct npc_archaeology_trainer : public ScriptedAI
         uint16 value = player->HasSkill(SKILL_ARCHAEOLOGY) ? player->GetSkillValue(SKILL_ARCHAEOLOGY) : 1;
         if (player->GetLevel() < r.Level)
         {
-            me->Whisper(Trinity::StringFormat("Приходи, когда достигнешь {} уровня.", r.Level), LANG_UNIVERSAL, player);
+            me->Whisper(Trinity::StringFormat("\xd0\x9f\xd1\x80\xd0\xb8\xd1\x85\xd0\xbe\xd0\xb4\xd0\xb8, \xd0\xba\xd0\xbe\xd0\xb3\xd0\xb4\xd0\xb0 \xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb8\xd0\xb3\xd0\xbd\xd0\xb5\xd1\x88\xd1\x8c {} \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xbd\xd1\x8f.", r.Level), LANG_UNIVERSAL, player);
             return true;
         }
         if (rank > 0 && value < r.RequiredSkill)
         {
-            me->Whisper(Trinity::StringFormat("Нужен навык археологии {}.", r.RequiredSkill), LANG_UNIVERSAL, player);
+            me->Whisper(Trinity::StringFormat("\xd0\x9d\xd1\x83\xd0\xb6\xd0\xb5\xd0\xbd \xd0\xbd\xd0\xb0\xd0\xb2\xd1\x8b\xd0\xba \xd0\xb0\xd1\x80\xd1\x85\xd0\xb5\xd0\xbe\xd0\xbb\xd0\xbe\xd0\xb3\xd0\xb8\xd0\xb8 {}.", r.RequiredSkill), LANG_UNIVERSAL, player);
             return true;
         }
         if (!player->HasEnoughMoney(uint64(r.Cost)))

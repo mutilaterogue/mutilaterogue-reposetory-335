@@ -186,7 +186,7 @@ namespace
         wstrToLower(wname);
 
         static std::wstring const contains[] = {
-            L"test", L"тест", L"[ph]", L"(ph)", L"deprecated", L"unused", L"не используется", L"placeholder",
+            L"test", L"\xd1\x82\xd0\xb5\xd1\x81\xd1\x82", L"[ph]", L"(ph)", L"deprecated", L"unused", L"\xd0\xbd\xd0\xb5 \xd0\xb8\xd1\x81\xd0\xbf\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x83\xd0\xb5\xd1\x82\xd1\x81\xd1\x8f", L"placeholder",
             L"monster -", L"npc equip", L"qa ", L"zzold", L"zz ", L"[dnd]", L"dnd ",
         };
         for (std::wstring const& word : contains)

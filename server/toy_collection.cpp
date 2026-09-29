@@ -262,7 +262,7 @@ namespace
             target = player->GetSelectedUnit();
             if (!target)
             {
-                ChatHandler(player->GetSession()).SendSysMessage("Нужна цель.");
+                ChatHandler(player->GetSession()).SendSysMessage("\xd0\x9d\xd1\x83\xd0\xb6\xd0\xbd\xd0\xb0 \xd1\x86\xd0\xb5\xd0\xbb\xd1\x8c.");
                 return;
             }
         }

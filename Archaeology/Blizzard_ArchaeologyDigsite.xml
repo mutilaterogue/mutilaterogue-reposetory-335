@@ -45,6 +45,35 @@
 				<BarTexture file="Interface\PaperDollInfoFrame\UI-Character-Skills-Bar"/>
 				<BarColor r="0.8" g="0.55" b="0.2"/>
 			</StatusBar>
+			<!-- направление к находке после «Исследовать» (вместо модели телескопа): цвет - как далеко, стрелка - куда идти -->
+			<Frame name="$parentSurvey" parentKey="Survey" hidden="true">
+				<Size x="40" y="40"/>
+				<Anchors>
+					<Anchor point="RIGHT" relativeTo="$parentBar" relativePoint="LEFT" x="-10" y="6"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Light" file="Interface\Cooldown\star4" alphaMode="ADD">
+							<Size x="48" y="48"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<!-- стрелка в текстуре смотрит вниз, поворот - в Lua -->
+						<Texture parentKey="Arrow" file="Interface\Buttons\UI-MicroStream-Yellow">
+							<Size x="32" y="32"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnUpdate function="ArchaeologySurvey_OnUpdate"/>
+				</Scripts>
+			</Frame>
 			<!-- «Исследовать» (80451) - защищённая кнопка заклинания -->
 			<Button name="$parentSurveyButton" parentKey="SurveyButton" inherits="SecureActionButtonTemplate">
 				<Size x="36" y="36"/>
