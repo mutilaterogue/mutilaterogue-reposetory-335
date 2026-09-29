@@ -9,7 +9,7 @@
  * Validation order is the retail one (HandleTransmogrifyItems): everything is checked first,
  * then money is taken, then all slots are applied - on any error nothing changes.
  *   - slot is a visible equipment slot and holds an item
- *   - no legendary items (retail ERR_TRANSMOGRIFY_LEGENDARY)
+ *   - legendary items only when ALLOW_LEGENDARY (retail: never, ERR_TRANSMOGRIFY_LEGENDARY)
  *   - CanTransmogrifyItemWithItem: same class, armor subclass, weapon type, slot group
  *   - player->CanUseItem(appearance)                                 (retail: CanUseItem)
  *   - appearance collected on the account (account_appearances, same displayid + compatible type)
@@ -49,6 +49,8 @@ namespace
     // false: the window works anywhere (/transmog); true: only next to npc_transmogrifier (like retail)
     constexpr bool REQUIRE_NPC = false;
     constexpr uint32 MIN_COST = 100;   // 1 silver
+    // true: легендарные предметы можно трансмогрифицировать и брать их облик (ретейл: false - ERR_TRANSMOGRIFY_LEGENDARY)
+    constexpr bool ALLOW_LEGENDARY = true;
 
     struct TransmogData
     {
@@ -383,7 +385,7 @@ namespace Transmog
                     error = "ERR_TRANSMOGRIFY_INVALID_DESTINATION", errorItem = target->GetEntry();
                 else if (!sourceData || !sourceTemplate)
                     error = "ERR_TRANSMOGRIFY_INVALID_SOURCE";
-                else if (targetData->Quality == ITEM_QUALITY_LEGENDARY || sourceData->Quality == ITEM_QUALITY_LEGENDARY)
+                else if (!ALLOW_LEGENDARY && (targetData->Quality == ITEM_QUALITY_LEGENDARY || sourceData->Quality == ITEM_QUALITY_LEGENDARY))
                     error = "ERR_TRANSMOGRIFY_LEGENDARY";
                 else if (!CanTransmogrifyItemWithItem(*targetData, *sourceData))
                     error = "ERR_TRANSMOGRIFY_MISMATCH";
