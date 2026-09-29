@@ -1,0 +1,67 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\UI.xsd">
+	<Script file="Blizzard_PlayerSpellsFrame.lua"/>
+
+	<Frame name="PlayerSpellsFrame" mixin="PlayerSpellsFrameMixin" inherits="RetailPortraitFrameTemplate, TabSystemOwnerTemplate" parent="UIParent" toplevel="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="HIGH">
+		<KeyValues>
+			<KeyValue key="minimizedWidth" value="809" type="number"/>
+			<KeyValue key="maximizedWidth" value="1618" type="number"/>
+		</KeyValues>
+		<Size x="1618" y="883"/>
+		<Anchors>
+			<Anchor point="CENTER" x="0" y="0"/>
+		</Anchors>
+		<Frames>
+			<Frame parentKey="MaximizeMinimizeButton" inherits="MaximizeMinimizeButtonFrameTemplate"/>
+			<Frame parentKey="TabSystem" inherits="TabSystemTemplate">
+				<KeyValues>
+					<KeyValue key="minTabWidth" value="100" type="number"/>
+					<KeyValue key="maxTabWidth" value="150" type="number"/>
+					<KeyValue key="tabSelectSound" value="SOUNDKIT.UI_CLASS_TALENT_TAB" type="global"/>
+				</KeyValues>
+			</Frame>
+			<Frame parentKey="TalentsContainer" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-24"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Bg" setAllPoints="true">
+							<Color r="0.04" g="0.04" b="0.04" a="1"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="GlyphContainer" hidden="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-24"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture setAllPoints="true">
+							<Color r="0.04" g="0.04" b="0.04" a="1"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="SpellBookFrame" inherits="SpellBookFrameTemplate" hidden="true">
+				<KeyValues>
+					<KeyValue key="minimizedWidth" value="806" type="number"/>
+					<KeyValue key="maximizedWidth" value="1612" type="number"/>
+				</KeyValues>
+				<Size x="1612" y="856"/>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="0" y="4"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnShow method="OnShow"/>
+			<OnHide method="OnHide"/>
+			<OnEvent method="OnEvent"/>
+		</Scripts>
+	</Frame>
+</Ui>
