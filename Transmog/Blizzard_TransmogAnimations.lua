@@ -270,3 +270,170 @@ TransmogAnim.PREVIEW_SAVED = {
 	{ "SavedGlow", "alpha", 0.33, 0.2, 1, 1 },
 	{ "SavedGlow", "alpha", 0.53, 0.47, 1, 0 },
 };
+
+-- TransmogItemModelTemplate / TransmogSetBaseModelTemplate .PendingFrame.Anim (looping="REPEAT")
+TransmogAnim.CARD_PENDING = {
+	{ "PendingFX", "alpha", 0, 1, 0, 1 },
+	{ "PendingFX", "alpha", 1, 1.33, 1, 0 },
+	{ "FlipbookTop", "flip", 0, 2.33, 7, 10, 70, "transmog-itemSlot-flipbook-loop-Top" },
+	{ "FlipbookBottom", "flip", 0, 2.33, 7, 10, 70, "transmog-itemSlot-flipbook-loop-Bottom" },
+	{ "FlipbookRight", "flip", 0, 2.33, 3, 30, 70, "transmog-itemSlot-flipbook-loop-Right" },
+	{ "FlipbookLeft", "flip", 0, 2.33, 3, 30, 70, "transmog-itemSlot-flipbook-loop-Left" },
+	{ "SmokeFXLeft", "move", 0, 2.33, 0, 30 },
+	{ "SmokeFXLeft", "alpha", 0, 1, 0, 1 },
+	{ "SmokeFXLeft", "alpha", 1, 1.33, 1, 0 },
+	{ "SmokeFXRight", "move", 0, 2.33, 0, -20 },
+	{ "SmokeFXRight", "alpha", 0, 0.5, 0, 1 },
+	{ "SmokeFXRight", "alpha", 0.5, 1.83, 1, 0 },
+	{ "SmokeFXTop", "move", 0, 2.33, 20, 0 },
+	{ "SmokeFXTop", "alpha", 0, 1, 0, 1 },
+	{ "SmokeFXTop", "alpha", 1, 1.33, 1, 0 },
+	{ "SmokeFXBottom", "move", 0, 2.33, -20, 0 },
+	{ "SmokeFXBottom", "alpha", 0, 0.83, 0, 0.6 },
+	{ "SmokeFXBottom", "alpha", 0.83, 1.5, 0.6, 0 },
+};
+
+local function CardSaved(sideDuration, sparksTo)
+	return {
+		{ "FlipbookSparks", "alpha", 0, 0, 0, 0 },
+		{ "FlipbookSparks", "alpha", 0.33, 0.6, 1, sparksTo },
+		{ "FlipbookSparks", "flip", 0.33, 0.6, 3, 6, 18, "transmog-itemSlot-flipbook-sparks" },
+		{ "FlipbookLeft", "flip", 0, 0.4, 1, 14, 14, "transmog-itemSlot-flipbook-startLeft" },
+		{ "FlipbookRight", "flip", 0, 0.4, 1, 14, 14, "transmog-itemSlot-flipbook-startRight" },
+		{ "FlipbookTop", "flip", 0, sideDuration, 3, 4, 12, "transmog-itemSlot-flipbook-startTop" },
+		{ "FlipbookBottom", "flip", 0, sideDuration, 3, 4, 12, "transmog-itemSlot-flipbook-startBottom" },
+		{ "Electrified1", "alpha", 0, 0.2, 0, 1 },
+		{ "Electrified1", "alpha", 0.2, 0.63, 1, 1 },
+		{ "Electrified1", "alpha", 0.83, 0.23, 1, 0 },
+		{ "Electrified2", "alpha", 0, 0.33, 0, 0 },
+		{ "Electrified2", "alpha", 0.33, 0.2, 1, 0 },
+	};
+end
+-- .SavedFrame.Anim: карточка предмета / карточка комплекта
+TransmogAnim.ITEMCARD_SAVED = CardSaved(0.4, 1);
+TransmogAnim.SETCARD_SAVED = CardSaved(0.43, 0.7);
+
+-- TransmogOutfitEntryTemplate.OutfitButton.AnimSaved / AnimNew
+TransmogAnim.OUTFIT_SAVED = {
+	{ "GlowPurple", "alpha", 0, 1.2, 1, 1 },
+	{ "GlowPurple", "alpha", 1.2, 0.3, 1, 0 },
+	{ "SelectedPurple", "alpha", 0, 1.2, 1, 1 },
+	{ "SelectedPurple", "alpha", 1.2, 0.3, 1, 0 },
+	{ "Selected", "alpha", 0, 1.2, 0, 0 },
+	{ "Selected", "alpha", 1.2, 0.3, 0, 1 },
+};
+TransmogAnim.OUTFIT_NEW = {
+	{ "Glow", "alpha", 0, 0.24, 1, 1 },
+	{ "Glow", "alpha", 0.24, 0.3, 1, 0 },
+};
+
+---------------------------------------------------------------------------
+-- эффекты карточек (ретейл: PendingFrame/SavedFrame в TransmogItemModelTemplate и TransmogSetBaseModelTemplate).
+-- Карточки - DressUpModel, области модели рисуются под ней, поэтому эффекты - в отдельных кадрах над карточкой.
+-- Текстура: { ключ, атлас, ширина или nil (размер атласа), высота, x, y }
+---------------------------------------------------------------------------
+TransmogAnim.ITEMCARD_FX = {
+	pending = {
+		{ "SmokeFXRight", "transmog-itemCard-transmogrified-pending-FX3", nil, nil, 44, 1 },
+		{ "SmokeFXLeft", "transmog-itemCard-transmogrified-pending-FX3", nil, nil, -54, -10 },
+		{ "SmokeFXTop", "transmog-itemCard-transmogrified-pending-FX2", nil, nil, -10, 65 },
+		{ "SmokeFXBottom", "transmog-itemCard-transmogrified-pending-FX2", nil, nil, 10, -63 },
+		{ "FlipbookRight", "transmog-itemSlot-flipbook-loop-Right", 17, 134, 52, 0 },
+		{ "FlipbookLeft", "transmog-itemSlot-flipbook-loop-Left", 17, 134, -52, 0 },
+		{ "FlipbookTop", "transmog-itemSlot-flipbook-loop-Top", 99, 17, 0, 67 },
+		{ "FlipbookBottom", "transmog-itemSlot-flipbook-loop-Bottom", 99, 17, 0, -68 },
+		{ "PendingFX", "transmog-itemCard-transmogrified-pending-FX1", nil, nil, 0, 0 },
+	},
+	saved = {
+		{ "FlipbookRight", "transmog-itemSlot-flipbook-startRight", 35, 165, 53, 0 },
+		{ "FlipbookLeft", "transmog-itemSlot-flipbook-startLeft", 35, 165, -53, 0 },
+		{ "FlipbookTop", "transmog-itemSlot-flipbook-startTop", 112, 25, 0, 68 },
+		{ "FlipbookBottom", "transmog-itemSlot-flipbook-startBottom", 112, 25, 0, -68 },
+		{ "Electrified1", "transmog-itemCard-electrified", nil, nil, 0, 0 },
+		{ "Electrified2", "transmog-itemCard-electrified", nil, nil, 0, 0 },
+		{ "FlipbookSparks", "transmog-itemSlot-flipbook-sparks", 150, 208, 8, 0 },
+	},
+	savedAnim = TransmogAnim.ITEMCARD_SAVED,
+};
+
+TransmogAnim.SETCARD_FX = {
+	pending = {
+		{ "SmokeFXRight", "transmog-setCard-transmogrified-pending-FX3", nil, nil, 88, 1 },
+		{ "SmokeFXLeft", "transmog-setCard-transmogrified-pending-FX3", nil, nil, -92, 0 },
+		{ "SmokeFXTop", "transmog-setCard-transmogrified-pending-FX2", nil, nil, 0, 108 },
+		{ "SmokeFXBottom", "transmog-setCard-transmogrified-pending-FX2", nil, nil, 0, -108 },
+		{ "FlipbookRight", "transmog-itemSlot-flipbook-loop-Right", 20, 230, 92, 0 },
+		{ "FlipbookLeft", "transmog-itemSlot-flipbook-loop-Left", 20, 226, -92, 0 },
+		{ "FlipbookTop", "transmog-itemSlot-flipbook-loop-Top", 180, 20, 0, 111 },
+		{ "FlipbookBottom", "transmog-itemSlot-flipbook-loop-Bottom", 180, 20, 0, -112 },
+		{ "PendingFX", "transmog-setCard-transmogrified-pending-FX1", 194, 234, 0, 0 },
+	},
+	saved = {
+		{ "FlipbookRight", "transmog-itemSlot-flipbook-startRight", 55, 260, 90, 0 },
+		{ "FlipbookLeft", "transmog-itemSlot-flipbook-startLeft", 55, 260, -90, 0 },
+		{ "FlipbookTop", "transmog-itemSlot-flipbook-startTop", 225, 51, 0, 110 },
+		{ "FlipbookBottom", "transmog-itemSlot-flipbook-startBottom", 225, 51, 0, -110 },
+		{ "Electrified1", "transmog-itemCard-electrified", 215, 260, 0, 0 },
+		{ "Electrified2", "transmog-itemCard-electrified", 215, 260, 0, 0 },
+		{ "FlipbookSparks", "transmog-itemSlot-flipbook-sparks", 260, 290, 12, 0 },
+	},
+	savedAnim = TransmogAnim.SETCARD_SAVED,
+};
+
+local function CreateFXFrame(card, level, textures)
+	local frame = CreateFrame("Frame", nil, card:GetParent());
+	frame:SetAllPoints(card);
+	frame:SetFrameLevel(level);
+	frame:Hide();
+	for _, info in ipairs(textures) do
+		local texture = frame:CreateTexture(nil, "OVERLAY");
+		texture:SetAtlas(info[2], not info[3]);
+		if info[3] then
+			texture:SetWidth(info[3]);
+			texture:SetHeight(info[4]);
+		end
+		texture:SetPoint("CENTER", info[5], info[6]);
+		frame[info[1]] = texture;
+	end
+	return frame;
+end
+
+-- card.PendingFrame (.Anim - цикл) и card.SavedFrame (.Anim - один раз); спрятать карточку - TransmogAnim.SetCardState(card)
+function TransmogAnim.SetupCard(card, spec, level)
+	local pending = CreateFXFrame(card, level, spec.pending);
+	pending.Anim = TransmogAnim.Create(pending, TransmogAnim.CARD_PENDING, true);
+	local saved = CreateFXFrame(card, level + 1, spec.saved);
+	saved.Anim = TransmogAnim.Create(saved, spec.savedAnim);
+	saved.Anim:SetScript("OnFinished", function()
+		saved:Hide();
+	end);
+	card.PendingFrame, card.SavedFrame = pending, saved;
+	-- эффекты лежат не на самой карточке - прятать вместе с ней
+	card:HookScript("OnHide", function()
+		pending.Anim:Stop();
+		pending:Hide();
+		saved.Anim:Stop();
+		saved:Hide();
+	end);
+end
+
+-- ретейл: TransmogItemModelMixin:UpdateState - цикл ожидания; playSaved - вспышка после применения
+function TransmogAnim.SetCardState(card, hasPending, playSaved)
+	local pending = card.PendingFrame;
+	if hasPending and card:IsShown() then
+		if not pending:IsShown() then
+			pending:Show();
+			pending.Anim:Restart();
+		end
+	else
+		pending.Anim:Stop();
+		pending:Hide();
+	end
+	if playSaved and card:IsShown() then
+		card.SavedFrame:Show();
+		card.SavedFrame.Anim:Restart();
+	elseif not card:IsShown() then
+		card.SavedFrame.Anim:Stop();
+		card.SavedFrame:Hide();
+	end
+end

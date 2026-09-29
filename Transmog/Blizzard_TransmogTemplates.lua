@@ -41,6 +41,7 @@ function TransmogItemModel_OnLoad(self)
 	border.Hover:Hide();
 	border:Hide();
 	self.Border = border;
+	TransmogAnim.SetupCard(self, TransmogAnim.ITEMCARD_FX, border:GetFrameLevel() + 1);
 
 	self:SetScript("OnUpdate", function(model, elapsed)
 		model.Border.Hover:SetShown(model:IsMouseOver());

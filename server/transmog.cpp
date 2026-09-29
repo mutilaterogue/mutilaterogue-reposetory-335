@@ -521,6 +521,15 @@ namespace Transmog
                 for (uint32 i = 0; i < bag->GetBagSize(); ++i)
                     add(bagSlot - INVENTORY_SLOT_BAG_START + 1, i + 1, bag->GetItemByPos(uint8(i)));
 
+        // банк: ячейки банка - как экипировка (клиентский inventory slot = серверный + 1),
+        // банковские сумки - клиентские bag 5..11
+        for (uint8 slot = BANK_SLOT_ITEM_START; slot < BANK_SLOT_ITEM_END; ++slot)
+            add(255, slot + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+        for (uint8 bagSlot = BANK_SLOT_BAG_START; bagSlot < BANK_SLOT_BAG_END; ++bagSlot)
+            if (Bag* bag = player->GetBagByPos(bagSlot))
+                for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                    add(bagSlot - BANK_SLOT_BAG_START + 5, i + 1, bag->GetItemByPos(uint8(i)));
+
         sAddonComm->Send(player, "TMOG_ITEMS", list.str());
     }
 

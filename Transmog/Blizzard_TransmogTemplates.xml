@@ -343,6 +343,28 @@
 					</Anchors>
 				</FontString>
 			</Layer>
+			<!-- ретейл: OutfitButton.AnimSaved / AnimNew (Blizzard_TransmogAnimations.lua) -->
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<Texture parentKey="SelectedPurple" alpha="0" atlas="transmog-outfit-card-selected-purple" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentCard"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="2">
+				<Texture parentKey="Glow" alpha="0" atlas="transmog-outfit-card-lineGlw">
+					<Size x="215" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentCard"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="GlowPurple" alpha="0" atlas="transmog-outfit-card-lineGlw-purple">
+					<Size x="215" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentCard"/>
+					</Anchors>
+				</Texture>
+			</Layer>
 			<Layer level="HIGHLIGHT">
 				<Texture atlas="transmog-outfit-card" alphaMode="ADD">
 					<Anchors>
@@ -353,9 +375,7 @@
 			</Layer>
 		</Layers>
 		<Scripts>
-			<OnLoad>
-				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-			</OnLoad>
+			<OnLoad function="TransmogOutfitEntry_OnLoad"/>
 			<OnClick function="TransmogOutfitEntry_OnClick"/>
 			<OnEnter function="TransmogOutfitEntry_OnEnter"/>
 			<OnLeave function="GameTooltip_Hide"/>

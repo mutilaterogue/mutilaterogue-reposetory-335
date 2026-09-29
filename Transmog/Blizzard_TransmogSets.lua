@@ -26,6 +26,14 @@ function TransmogUI.DressSetModel(model)
 	model:SetFacing(0);
 end
 
+local IsSetCardPending;
+
+local function SetStateTexture(card, isPending)
+	local texture = card.Overlay.TransmogStateTexture;
+	texture:SetAtlas("transmog-setcard-transmogrified-pending");
+	texture:SetShown(isPending);
+end
+
 function TransmogUI.ShowSetCard(model, looks, name, progress, complete)
 	model.looks = looks;
 	model.Overlay.Name:SetText(name or "");
@@ -34,10 +42,51 @@ function TransmogUI.ShowSetCard(model, looks, name, progress, complete)
 	model:Show();
 	TransmogUI.DressSetModel(model);
 	model.redressIndex, model.redressTime = 1, TransmogUI.REDRESS_DELAYS[1];
+	local isPending = IsSetCardPending(TransmogFrame, model);
+	SetStateTexture(model, isPending);
+	TransmogAnim.SetCardState(model, isPending);
 end
 
 function TransmogSetModel_OnLoad(self)
 	self.Overlay:SetFrameLevel(self:GetFrameLevel() + 2);
+	TransmogAnim.SetupCard(self, TransmogAnim.SETCARD_FX, self:GetFrameLevel() + 3);
+	TransmogUI.setCards = TransmogUI.setCards or {};
+	table.insert(TransmogUI.setCards, self);
+end
+
+-- комплект «ожидает»: все изменения в окне - из этого комплекта (ретейл: PendingFrame карточки комплекта)
+function IsSetCardPending(frame, card)
+	if not card:IsShown() or not card.looks or not frame.pending then
+		return false;
+	end
+	local bySlot = TransmogUI.LooksBySlot(card.looks);
+	local count = 0;
+	for slotId, itemId in pairs(frame.pending) do
+		if itemId ~= 0 and bySlot[slotId] == itemId then
+			count = count + 1;
+		else
+			return false;
+		end
+	end
+	return count > 0;
+end
+
+function TransmogUI.UpdateSetCardStates(frame)
+	for _, card in ipairs(TransmogUI.setCards or {}) do
+		local isPending = IsSetCardPending(frame, card);
+		SetStateTexture(card, isPending);
+		TransmogAnim.SetCardState(card, isPending);
+	end
+end
+
+-- вызывается до сброса frame.pending после успешного применения
+function TransmogUI.PlaySetCardsSaved(frame)
+	for _, card in ipairs(TransmogUI.setCards or {}) do
+		if IsSetCardPending(frame, card) then
+			card.Overlay.TransmogStateTexture:Hide();
+			TransmogAnim.SetCardState(card, false, true);
+		end
+	end
 end
 
 function TransmogSetModel_OnUpdate(self, elapsed)

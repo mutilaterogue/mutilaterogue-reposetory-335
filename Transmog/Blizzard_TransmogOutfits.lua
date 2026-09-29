@@ -112,6 +112,11 @@ function TransmogUI.SendSaveOutfit(id, name)
 		end
 	end
 	if Comm_Send then
+		-- для анимации: какой наряд сохраняли и какие были до этого (новый - тот, которого не было)
+		frame.savingOutfit = { id = tonumber(id) or 0, known = {} };
+		for _, outfit in ipairs(TransmogOutfits or {}) do
+			frame.savingOutfit.known[outfit.id] = true;
+		end
 		Comm_Send(TransmogUI.OP_OUTFIT_SAVE, id, name or "", icon, TransmogUI.FormatSlots(looks));
 		frame.applyElapsed = 0;
 	end
@@ -155,6 +160,25 @@ local function OpenOutfitMenu(button)
 end
 
 -- ЛКМ - надеть наряд (бесплатно), ПКМ - меню: название, сохранить, удалить
+function TransmogOutfitEntry_OnLoad(self)
+	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+	self.AnimSaved = TransmogAnim.Create(self, TransmogAnim.OUTFIT_SAVED);
+	self.AnimNew = TransmogAnim.Create(self, TransmogAnim.OUTFIT_NEW);
+end
+
+-- ретейл: AnimateViewedOutfitSaved / AnimateOutfitAdded - после ответа сервера на сохранение
+local function AnimateOutfit(frame, outfitId, isNew)
+	for _, button in ipairs(frame.outfitButtons) do
+		if button:IsShown() and button.outfit and button.outfit.id == outfitId then
+			if isNew then
+				button.AnimNew:Restart();
+			else
+				button.AnimSaved:Restart();
+			end
+		end
+	end
+end
+
 function TransmogOutfitEntry_OnClick(self, mouseButton)
 	if not self.outfit then
 		return;
@@ -299,6 +323,20 @@ if Comm_Register then
 		frame.selectedOutfit = TransmogUI.GetOutfit(selectedId or info.active);
 		frame.applyElapsed = nil;
 		TransmogUI.UpdateOutfits(frame);
+
+		local saving = frame.savingOutfit;
+		frame.savingOutfit = nil;
+		if saving then
+			if saving.known[saving.id] then
+				AnimateOutfit(frame, saving.id, false);
+			else
+				for _, outfit in ipairs(TransmogOutfits) do
+					if not saving.known[outfit.id] then
+						AnimateOutfit(frame, outfit.id, true);
+					end
+				end
+			end
+		end
 	end);
 
 	-- ситуация на сервере надела другой наряд

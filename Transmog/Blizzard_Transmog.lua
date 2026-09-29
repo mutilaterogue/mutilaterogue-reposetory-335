@@ -103,10 +103,38 @@ function TransmogUI.PlayPreviewSaved(self)
 	end
 end
 
+-- карточки в сетке и комплекты: цикл ожидания без перерисовки моделей
+function TransmogUI.UpdateCardStates(self)
+	if self.gridModels then
+		local pendingItem = self.selectedSlot and self.pending[self.selectedSlot];
+		for index, model in ipairs(self.gridModels) do
+			local entry = self.entries and self.entries[index];
+			local isPending = entry and pendingItem ~= nil and pendingItem ~= 0 and entry.itemId == pendingItem;
+			TransmogAnim.SetCardState(model, isPending);
+			if entry and model:IsShown() then
+				if isPending then
+					model.Border.Card:SetAtlas("transmog-itemcard-transmogrified-pending", true);
+				elseif entry.itemId == TransmogUI.GetDisplayedItem(self, self.selectedSlot) then
+					model.Border.Card:SetAtlas("transmog-itemCard-current", true);
+				elseif entry.itemId == self.applied[self.selectedSlot] then
+					model.Border.Card:SetAtlas("transmog-itemCard-transmogrified", true);
+				else
+					model.Border.Card:SetAtlas("transmog-itemCard-default", true);
+				end
+			end
+		end
+	end
+	if TransmogUI.UpdateSetCardStates then
+		TransmogUI.UpdateSetCardStates(self);
+	end
+end
+
 function TransmogUI.UpdateSlots(self)
 	for _, button in ipairs(self.slotButtons) do
 		TransmogUI.UpdateSlotButton(self, button);
 	end
+
+	TransmogUI.UpdateCardStates(self);
 
 	local cost = TransmogUI.GetCost(self);
 	MoneyFrame_Update(self.MoneyFrame:GetName(), cost);
@@ -125,7 +153,11 @@ function TransmogUI.UpdateGrid(self)
 		if entry then
 			model:Show();
 			model.Border:Show();
-			if entry.itemId == selectedItem then
+			local pendingItem = self.selectedSlot and self.pending[self.selectedSlot];
+			local isPending = pendingItem ~= nil and pendingItem ~= 0 and entry.itemId == pendingItem;
+			if isPending then
+				model.Border.Card:SetAtlas("transmog-itemcard-transmogrified-pending", true);
+			elseif entry.itemId == selectedItem then
 				model.Border.Card:SetAtlas("transmog-itemCard-current", true);
 			elseif entry.itemId == (self.selectedSlot and self.applied[self.selectedSlot]) then
 				model.Border.Card:SetAtlas("transmog-itemCard-transmogrified", true);
@@ -136,11 +168,15 @@ function TransmogUI.UpdateGrid(self)
 			model:SetAlpha(entry.collected and 1 or 0.6);
 			TransmogUI.DressGridModel(model);
 			model.redressIndex, model.redressTime = 1, 0.1;
+			local savedItem = self.gridSaved and self.selectedSlot and self.applied[self.selectedSlot];
+			TransmogAnim.SetCardState(model, isPending, savedItem ~= nil and entry.itemId == savedItem);
 		else
 			model:Hide();
 			model.Border:Hide();
+			TransmogAnim.SetCardState(model, false);
 		end
 	end
+	self.gridSaved = nil;
 
 	local paging = self.Paging;
 	paging.Text:SetFormattedText(PAGE_NUMBER_WITH_MAX or "Стр. %d/%d", self.page or 1, self.numPages or 1);
@@ -563,6 +599,10 @@ if Comm_Register then
 				end
 			end
 			TransmogUI.PlayPreviewSaved(frame);
+			frame.gridSaved = true;
+			if TransmogUI.PlaySetCardsSaved then
+				TransmogUI.PlaySetCardsSaved(frame);
+			end
 			for slotId, itemId in pairs(frame.pending) do
 				frame.applied[slotId] = (itemId ~= 0) and itemId or nil;
 			end

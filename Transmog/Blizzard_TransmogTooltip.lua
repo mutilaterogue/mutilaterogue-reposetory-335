@@ -1,6 +1,6 @@
 -- Трансмогрификация: строка «Предмет трансмогрифицирован в: ...» в подсказке предмета (всегда, не только в окне).
 -- Сервер (transmog.cpp) присылает облики предметов персонажа по ячейкам:
---   "TMOG_ITEMS_GET" -> "TMOG_ITEMS" : "bag/slot/fakeEntry,..."   bag 255 - экипировка, 0 - рюкзак, 1..4 - сумки
+--   "TMOG_ITEMS_GET" -> "TMOG_ITEMS" : "bag/slot/fakeEntry,..."   bag 255 - экипировка и ячейки банка, 0 - рюкзак, 1..4 - сумки, 5..11 - сумки банка
 
 local looks = {};          -- [bag][slot] = fakeEntry
 local requestDelay;
@@ -33,11 +33,48 @@ hooksecurefunc(GameTooltip, "SetBagItem", function(self, bag, slot)
 	end
 end);
 
+-- окно сравнения (ShoppingTooltip) показывает надетый предмет по ссылке - ищем его ячейку
+local function FindEquippedSlot(link)
+	if not link then
+		return nil;
+	end
+	for slot = 1, 19 do
+		if GetInventoryItemLink("player", slot) == link then
+			return slot;
+		end
+	end
+end
+
+local function OnCompareItem(self)
+	if not looks[255] then
+		return;
+	end
+	local _, link = self:GetItem();
+	local slot = FindEquippedSlot(link);
+	if slot then
+		AddLine(self, looks[255][slot]);
+	end
+end
+
+local compareHooks = CreateFrame("Frame");
+compareHooks:RegisterEvent("PLAYER_LOGIN");
+compareHooks:SetScript("OnEvent", function(self)
+	self:UnregisterEvent("PLAYER_LOGIN");
+	for _, name in ipairs({ "ShoppingTooltip1", "ShoppingTooltip2", "ShoppingTooltip3" }) do
+		local tooltip = _G[name];
+		if tooltip then
+			tooltip:HookScript("OnTooltipSetItem", OnCompareItem);
+		end
+	end
+end);
+
 -- после перекладывания предметов ячейки меняются - спросить заново (с задержкой, BAG_UPDATE приходит пачкой)
 local watcher = CreateFrame("Frame");
 watcher:RegisterEvent("BAG_UPDATE");
 watcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED");
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD");
+watcher:RegisterEvent("BANKFRAME_OPENED");
+watcher:RegisterEvent("PLAYERBANKSLOTS_CHANGED");
 watcher:SetScript("OnEvent", function()
 	requestDelay = 0.5;
 end);
