@@ -779,6 +779,13 @@
 					</Button>
 					<!-- ретейл: ClassTalentLoadoutDropdown - наборы талантов (Blizzard_PlayerSpellsLoadouts.lua) -->
 					<Button parentKey="LoadoutDropdown" inherits="WowStyle1DropdownTemplate">
+						<!-- внизу окна: меню открывается вверх (ретейл: menuPoint/menuRelativePoint) -->
+						<KeyValues>
+							<KeyValue key="menuPoint" value="BOTTOMLEFT" type="string"/>
+							<KeyValue key="menuRelativePoint" value="TOPLEFT" type="string"/>
+							<KeyValue key="menuPointX" value="0" type="number"/>
+							<KeyValue key="menuPointY" value="2" type="number"/>
+						</KeyValues>
 						<Size x="240" y="26"/>
 						<Anchors><Anchor point="RIGHT" x="-362" y="0"/></Anchors>
 					</Button>

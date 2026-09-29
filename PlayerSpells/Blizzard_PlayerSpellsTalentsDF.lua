@@ -14,8 +14,8 @@ local ATLAS = {
 	lineLocked = "talents-arrow-line-gray",
 };
 local NODE_SIZE = 50;          -- рамка узла (кнопка 3.3.5 - 37)
-local ICON_SIZE_CIRCLE = 34;   -- круглая иконка внутри кольца
-local ICON_SIZE_SQUARE = 32;
+local ICON_SIZE_CIRCLE = 45;   -- круглая иконка внутри кольца
+local ICON_SIZE_SQUARE = 45;
 local LINE_THICKNESS = 6;
 local NODE_RADIUS = 18;        -- линии начинаются и заканчиваются у края узла
 local POINTS_PER_TIER, PET_POINTS_PER_TIER = 5, 3;
