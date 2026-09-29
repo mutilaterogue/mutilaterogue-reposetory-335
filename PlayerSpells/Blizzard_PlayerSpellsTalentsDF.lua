@@ -14,6 +14,8 @@ local ATLAS = {
 	lineLocked = "talents-arrow-line-gray",
 };
 local NODE_SIZE = 50;          -- рамка узла (кнопка 3.3.5 - 37)
+local ICON_SIZE_CIRCLE = 34;   -- круглая иконка внутри кольца
+local ICON_SIZE_SQUARE = 32;
 local LINE_THICKNESS = 6;
 local NODE_RADIUS = 18;        -- линии начинаются и заканчиваются у края узла
 local POINTS_PER_TIER, PET_POINTS_PER_TIER = 5, 3;
@@ -107,6 +109,12 @@ local function SkinNode(button, shape, state, iconPath)
 	HideClassicArt(button);
 	local icon = _G[button:GetName() .. "IconTexture"];
 	if icon and iconPath then
+		-- иконка - внутри рамки узла (ретейл: маска круга/квадрата; в 3.3.5 масок нет - по размеру)
+		local size = shape == "circle" and ICON_SIZE_CIRCLE or ICON_SIZE_SQUARE;
+		icon:ClearAllPoints();
+		icon:SetPoint("CENTER", button, "CENTER", 0, 0);
+		icon:SetWidth(size);
+		icon:SetHeight(size);
 		if shape == "circle" then
 			SetPortraitToTexture(icon, iconPath);
 			icon:SetTexCoord(0, 1, 0, 1);
