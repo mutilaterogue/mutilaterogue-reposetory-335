@@ -15,8 +15,15 @@ local active = {};
 local driver = CreateFrame("Frame");
 driver:Hide();
 driver:SetScript("OnUpdate", function(self, elapsed)
+	-- копия списка: OnFinished может запускать/останавливать другие анимации (pairs по изменяемой таблице ломается)
+	local list = {};
 	for anim in pairs(active) do
-		anim:Tick(elapsed);
+		list[#list + 1] = anim;
+	end
+	for _, anim in ipairs(list) do
+		if active[anim] then
+			anim:Tick(elapsed);
+		end
 	end
 	if not next(active) then
 		self:Hide();
