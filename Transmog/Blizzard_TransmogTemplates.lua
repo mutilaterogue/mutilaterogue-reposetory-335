@@ -107,6 +107,51 @@ end
 ---------------------------------------------------------------------------
 -- slot buttons
 ---------------------------------------------------------------------------
+function TransmogSlotButton_OnLoad(self)
+	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+	local pending, saved = self.PendingFrame, self.SavedFrame;
+	pending.AnimStart = TransmogAnim.Create(pending, TransmogAnim.SLOT_PENDING_START);
+	pending.AnimLoop = TransmogAnim.Create(pending, TransmogAnim.SLOT_PENDING_LOOP, true);
+	saved.Anim = TransmogAnim.Create(saved, TransmogAnim.SLOT_SAVED);
+	saved.Anim:SetScript("OnFinished", function()
+		saved:Hide();
+		if TransmogFrame:IsShown() then
+			TransmogUI.UpdateSlotButton(TransmogFrame, self);
+		end
+	end);
+end
+
+-- ретейл: TransmogAppearanceSlotMixin:Update - рамка ожидания; вступление только если вид в слоте сменился
+function TransmogUI.UpdateSlotPending(button, hasPending, itemId)
+	local pending = button.PendingFrame;
+	if hasPending and not button.SavedFrame:IsShown() then
+		if not pending:IsShown() then
+			pending:Show();
+			pending.AnimLoop:Restart();
+		end
+		if button.lastPendingItem ~= itemId then
+			pending.AnimStart:Restart();
+		end
+		button.lastPendingItem = itemId;
+	else
+		pending.AnimStart:Finish();
+		pending.AnimLoop:Stop();
+		pending:Hide();
+		button.lastPendingItem = nil;
+	end
+end
+
+-- ретейл: TransmogAppearanceSlotMixin:OnTransmogrifySuccess
+function TransmogUI.PlaySlotSaved(button)
+	local saved = button.SavedFrame;
+	if saved:IsShown() then
+		return;
+	end
+	TransmogUI.UpdateSlotPending(button, false);
+	saved:Show();
+	saved.Anim:Restart();
+end
+
 function TransmogSlotButton_OnClick(self, button)
 	local frame = TransmogFrame;
 	local slotId = self.info.id;

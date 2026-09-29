@@ -88,9 +88,27 @@ function TransmogUI.UpdateSlotButton(self, button)
 		button.Background:SetAtlas("transmog-gearSlot-disabled");
 		button:Disable();
 	end
-	button.Pending:SetShown(changed);
+	TransmogUI.UpdateSlotPending(button, changed, itemId);
 	button.Selected:SetShown(self.selectedSlot == slotId);
 	button.Transmogged:SetShown(self.applied[slotId] ~= nil and self.pending[slotId] ~= 0);
+end
+
+function TransmogUI.PlayPreviewSaved(self)
+	local saved = self.CharacterPreview.SavedFrame;
+	if not saved.Anim then
+		saved.Anim = TransmogAnim.Create(saved, TransmogAnim.PREVIEW_SAVED);
+		local model = self.CharacterPreview.Model;
+		if model:GetFrameLevel() <= saved:GetFrameLevel() then
+			model:SetFrameLevel(saved:GetFrameLevel() + 1);
+		end
+		saved.Anim:SetScript("OnFinished", function()
+			saved:Hide();
+		end);
+	end
+	if not saved:IsShown() then
+		saved:Show();
+		saved.Anim:Restart();
+	end
 end
 
 function TransmogUI.UpdateSlots(self)
@@ -546,6 +564,13 @@ if Comm_Register then
 		local frame = TransmogFrame;
 		frame.applyElapsed = nil;
 		if ok == "1" then
+			-- ретейл: VIEWED_TRANSMOG_OUTFIT_SLOT_SAVE_SUCCESS - вспышка на слотах и на полу под моделью
+			for _, button in ipairs(frame.slotButtons) do
+				if frame.pending[button.info.id] then
+					TransmogUI.PlaySlotSaved(button);
+				end
+			end
+			TransmogUI.PlayPreviewSaved(frame);
 			for slotId, itemId in pairs(frame.pending) do
 				frame.applied[slotId] = (itemId ~= 0) and itemId or nil;
 			end

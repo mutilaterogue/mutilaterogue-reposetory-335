@@ -39,12 +39,6 @@
 				</Texture>
 			</Layer>
 			<Layer level="OVERLAY">
-				<Texture name="$parentPending" parentKey="Pending" atlas="transmog-gearSlot-pending" hidden="true">
-					<Size x="59" y="59"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
 				<Texture name="$parentSelected" parentKey="Selected" atlas="transmog-gearSlot-selected" hidden="true">
 					<Size x="59" y="59"/>
 					<Anchors>
@@ -59,11 +53,110 @@
 				</Texture>
 			</Layer>
 		</Layers>
+		<Frames>
+			<!-- ретейл: PendingFrame (AnimStart + AnimLoop) и SavedFrame (Anim), проигрываются в Blizzard_TransmogAnimations.lua -->
+			<Frame parentKey="PendingFrame" setAllPoints="true" hidden="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Border" atlas="transmog-gearSlot-pending" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Glow" atlas="transmog-gearSlot-transmogrified-Glw" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Highlight" atlas="transmog-gearSlot-transmogrified-HL" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture parentKey="FlipbookLeft" atlas="transmog-gearSlot-flipbook-loop-Left">
+							<Size x="9" y="48"/>
+							<Anchors>
+								<Anchor point="CENTER" x="-20" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookRight" atlas="transmog-gearSlot-flipbook-loop-Right">
+							<Size x="9" y="48"/>
+							<Anchors>
+								<Anchor point="CENTER" x="20" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookTop" atlas="transmog-gearSlot-flipbook-loop-Top">
+							<Size x="48" y="9"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="20"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookBottom" atlas="transmog-gearSlot-flipbook-loop-Bottom">
+							<Size x="48" y="9"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="-20"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookStart" atlas="transmog-gearSlot-flipbook-start">
+							<Size x="85" y="85"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0.5"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="SavedFrame" setAllPoints="true" hidden="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Glow" atlas="transmog-gearSlot-transmogrified-Glw" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Highlight" atlas="transmog-gearSlot-transmogrified-HL" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="LineSquare" atlas="transmog-gearSlot-lineSquare" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="BackgroundFX" atlas="transmog-gearSlot-FX-spark-BG" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FrameGlow" atlas="transmog-gearSlot-transmogrified-Frame-Glw" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture parentKey="FlipbookSparks" atlas="transmog-gearSlot-flipbook-sparks">
+							<Size x="76" y="76"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="FlipbookStart" atlas="transmog-gearSlot-flipbook-start">
+							<Size x="85" y="85"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
 		<HighlightTexture atlas="transmog-gearSlot-selected" alphaMode="ADD"/>
 		<Scripts>
-			<OnLoad>
-				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-			</OnLoad>
+			<OnLoad function="TransmogSlotButton_OnLoad"/>
 			<OnClick function="TransmogSlotButton_OnClick"/>
 			<OnEnter function="TransmogSlotButton_OnEnter"/>
 			<OnLeave function="GameTooltip_Hide"/>
