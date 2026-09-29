@@ -54,6 +54,7 @@ function PlayerSpellsTalentsMixin:OnLoad()
 	bar.ResetButton:SetScript("OnClick", function()
 		ResetGroupPreviewTalentPoints(self.showPet, self:GetGroup());
 	end);
+	PlayerSpellsLoadouts.SetupDropdown(self, bar.LoadoutDropdown);
 end
 
 function PlayerSpellsTalentsMixin:OnShow()
@@ -64,6 +65,7 @@ function PlayerSpellsTalentsMixin:OnShow()
 		self.talentGroup = GetActiveTalentGroup(false, false) or 1;
 	end
 	self:Refresh();
+	PlayerSpellsLoadouts.Request();
 	SetButtonPulse(TalentMicroButton, 0, 1);
 end
 
@@ -118,6 +120,7 @@ local function RefreshTree(tree, tab, pet, group)
 
 	TalentFrame_Update(tree);
 	tree:Show();
+	PlayerSpellsTalentsDF.SkinTree(tree);
 end
 
 function PlayerSpellsTalentsMixin:Refresh()
@@ -178,6 +181,7 @@ function PlayerSpellsTalentsMixin:Refresh()
 	bar.ResetButton:SetShown(preview and canEdit);
 	bar.LearnButton:SetEnabled(previewSpent > 0);
 	bar.ResetButton:SetEnabled(previewSpent > 0);
+	PlayerSpellsLoadouts.UpdateDropdown(self);
 end
 
 ---------------------------------------------------------------------------

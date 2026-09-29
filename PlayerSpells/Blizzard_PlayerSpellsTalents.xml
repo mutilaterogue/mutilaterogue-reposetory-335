@@ -1,8 +1,21 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\UI.xsd">
+	<Script file="Blizzard_PlayerSpellsTalentsDF.lua"/>
 	<Script file="Blizzard_PlayerSpellsTalents.lua"/>
+	<Script file="Blizzard_PlayerSpellsLoadouts.lua"/>
 
+	<!-- узел в стиле Dragonflight: рамка ставится в Blizzard_PlayerSpellsTalentsDF.lua -->
 	<Button name="PlayerSpellsTalentButtonTemplate" inherits="TalentButtonTemplate" virtual="true">
+		<Layers>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture parentKey="Node" hidden="true">
+					<Size x="50" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
 		<Scripts>
 			<OnLoad>PlayerSpellsTalentButton_OnLoad(self);</OnLoad>
 			<OnClick>PlayerSpellsTalentButton_OnClick(self, button);</OnClick>
@@ -763,6 +776,11 @@
 					</Button>
 					<Button name="PlayerSpellsTalentsActivateButton" parentKey="ActivateButton" inherits="PlayerSpellsTalentsBarButtonTemplate">
 						<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsPetButton" relativePoint="RIGHT" x="0"/></Anchors>
+					</Button>
+					<!-- ретейл: ClassTalentLoadoutDropdown - наборы талантов (Blizzard_PlayerSpellsLoadouts.lua) -->
+					<Button parentKey="LoadoutDropdown" inherits="WowStyle1DropdownTemplate">
+						<Size x="240" y="26"/>
+						<Anchors><Anchor point="RIGHT" x="-362" y="0"/></Anchors>
 					</Button>
 					<Button name="PlayerSpellsTalentsLearnButton" parentKey="LearnButton" inherits="PlayerSpellsTalentsBarButtonTemplate">
 						<Anchors><Anchor point="RIGHT"/></Anchors>
