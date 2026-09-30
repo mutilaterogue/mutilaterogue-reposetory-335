@@ -148,6 +148,9 @@ function TransmogFrame_SelectIllusion(frame, slotId)
 	frame.selectedSlot = nil;
 	frame.category = TransmogUI.GetItemCategory(TransmogUI.SLOT_BY_ID[slotId], GetInventoryItemLink("player", slotId));
 	frame.page = 1;
+	if frame.WeaponDropdown then
+		frame.WeaponDropdown:Hide();
+	end
 	frame.SlotTitle:SetText((TRANSMOG_ENCHANT_SLOT or "Иллюзия") .. ": " .. TransmogUI.SLOT_BY_ID[slotId].name);
 	TransmogUI.UpdateSlots(frame);
 	TransmogUI.RequestIllusions(frame);
