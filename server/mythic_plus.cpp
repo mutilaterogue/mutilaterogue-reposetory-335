@@ -12,7 +12,8 @@
  * Use -> the client opens the keystone frame; the key is slotted and the run is started from there:
  *   - the key must be for this dungeon, the instance untouched (no boss killed, no run started);
  *   - every group member must be inside and alive, nobody in combat;
- *   - 10 s countdown (players rooted), then the timer starts.
+ *   - everybody is moved to the instance entrance, 10 s countdown behind the barrier (BARRIER_RADIUS,
+ *     optional gameobject BARRIER_ENTRY as the visual), then the timer starts.
  *
  * Run:
  *   - creatures: health and damage x LEVEL_SCALE ^ (level - 1), plus Fortified / Tyrannical;
@@ -63,6 +64,7 @@
 #include "Item.h"
 #include "Log.h"
 #include "Map.h"
+#include "ObjectMgr.h"
 #include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
@@ -91,6 +93,8 @@ namespace
     constexpr uint32 KEYSTONE_ITEM = 138019;
     constexpr uint32 FONT_ENTRY = 700010;
     constexpr uint32 CHEST_ENTRY = 700011;
+    constexpr uint32 BARRIER_ENTRY = 700012;        // countdown barrier at the entrance (optional template)
+    constexpr float BARRIER_RADIUS = 12.0f;         // during the countdown players stay this close to the entrance
 
     constexpr uint32 MIN_KEY_LEVEL = 1;
     constexpr uint32 MAX_KEY_LEVEL = 30;
@@ -216,6 +220,8 @@ namespace
         std::vector<SanguinePool> Pools;
         Position FontPos;
         bool HasFont = false;
+        Position StartPos;                      // instance entrance: players are moved here on start
+        ObjectGuid BarrierGuid;
         Position LastBossPos;                   // where the last killed boss died
         bool HasLastBoss = false;
         uint32 SyncTimer = 0;
@@ -624,18 +630,26 @@ namespace
 
     // ---------------------------------------------------------------- completion
     // the chest belongs to the map, not to a player: it stays when anybody leaves
-    void SpawnChest(Map* map, Position const& pos)
+    GameObject* SpawnGameObject(Map* map, uint32 entry, Position const& pos, uint32 despawnSec)
     {
+        if (!sObjectMgr->GetGameObjectTemplate(entry))
+            return nullptr;
         GameObject* go = new GameObject();
         QuaternionData rot = QuaternionData::fromEulerAnglesZYX(pos.GetOrientation(), 0.0f, 0.0f);
-        if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), CHEST_ENTRY, map, PHASEMASK_NORMAL, pos, rot, 255, GO_STATE_READY))
+        if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), entry, map, PHASEMASK_NORMAL, pos, rot, 255, GO_STATE_READY))
         {
             delete go;
-            return;
+            return nullptr;
         }
-        go->SetRespawnTime(CHEST_DESPAWN);
+        go->SetRespawnTime(despawnSec);
         go->SetSpawnedByDefault(false);
         map->AddToMap(go);
+        return go;
+    }
+
+    void SpawnChest(Map* map, Position const& pos)
+    {
+        SpawnGameObject(map, CHEST_ENTRY, pos, CHEST_DESPAWN);
     }
 
     void CompleteRun(Run& run)
@@ -875,9 +889,16 @@ namespace
         for (auto const& pair : map->GetCreatureBySpawnIdStore())
             ScaleCreature(run, pair.second);
 
+        // retail: everybody goes to the entrance and waits behind the barrier until the countdown ends
+        run.StartPos = run.FontPos;
+        if (AreaTrigger const* entrance = sObjectMgr->GetMapEntranceTrigger(run.MapId))
+            run.StartPos.Relocate(entrance->target_X, entrance->target_Y, entrance->target_Z, entrance->target_Orientation);
+        if (GameObject* barrier = SpawnGameObject(map, BARRIER_ENTRY, run.StartPos, COUNTDOWN_MS / IN_MILLISECONDS + 5))
+            run.BarrierGuid = barrier->GetGUID();
+
         ForEachPlayer(map, [&](Player* member)
         {
-            member->SetControlled(true, UNIT_STATE_ROOT);
+            member->NearTeleportTo(run.StartPos.GetPositionX(), run.StartPos.GetPositionY(), run.StartPos.GetPositionZ(), run.StartPos.GetOrientation());
             Message(member, MSG_STARTED);
             sAddonComm->Send(member, "MPLUS_FONT_CLOSE");
             s_slotted.erase(member->GetGUID());
@@ -1041,16 +1062,23 @@ namespace
         if (run.State == RUN_COUNTDOWN)
         {
             if (run.CountdownLeft > diff)
+            {
                 run.CountdownLeft -= diff;
+                // the barrier: nobody leaves the entrance before the start
+                ForEachPlayer(map, [&](Player* player)
+                {
+                    if (player->IsAlive() && !player->IsBeingTeleported() && player->GetExactDist2d(&run.StartPos) > BARRIER_RADIUS)
+                        player->NearTeleportTo(run.StartPos.GetPositionX(), run.StartPos.GetPositionY(), run.StartPos.GetPositionZ(), player->GetOrientation());
+                });
+            }
             else
             {
                 run.CountdownLeft = 0;
                 run.State = RUN_ACTIVE;
-                ForEachPlayer(map, [&](Player* player)
-                {
-                    player->SetControlled(false, UNIT_STATE_ROOT);
-                    Message(player, MSG_GO);
-                });
+                if (GameObject* barrier = map->GetGameObject(run.BarrierGuid))
+                    barrier->DespawnOrUnsummon();
+                run.BarrierGuid.Clear();
+                ForEachPlayer(map, [&](Player* player) { Message(player, MSG_GO); });
                 SyncRun(run);
             }
             return;

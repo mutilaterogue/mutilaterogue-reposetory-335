@@ -90,17 +90,21 @@ INSERT INTO `item_template` (`entry`, `class`, `subclass`, `SoundOverrideSubclas
 (138019, 13, 0, -1, 'Эпохальный ключ', 6418, 4, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, '', -1, 0);
 
 -- ---------------------------------------------------------------- Font of Power (goober) and completion chest
-SET @FONT_DISPLAY := 7898;   -- font model: put the display you want here
+SET @FONT_DISPLAY := 7898;     -- font model: put the display you want here
+SET @BARRIER_DISPLAY := 7898;  -- barrier model: put a force field / wall display here
 SET @CHEST_DISPLAY := (SELECT `displayId` FROM `gameobject_template` WHERE `entry` = 190663 LIMIT 1);  -- Dark Runed Chest
 
-DELETE FROM `gameobject_template` WHERE `entry` IN (700010, 700011);
+DELETE FROM `gameobject_template` WHERE `entry` IN (700010, 700011, 700012);
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `castBarCaption`, `unk1`, `size`,
   `Data0`, `Data1`, `Data2`, `Data3`, `Data4`, `Data5`, `Data6`, `Data7`, `Data8`, `Data9`, `Data10`, `Data11`, `Data12`,
   `Data13`, `Data14`, `Data15`, `Data16`, `Data17`, `Data18`, `Data19`, `Data20`, `Data21`, `Data22`, `Data23`, `AIName`, `ScriptName`, `VerifiedBuild`) VALUES
 (700010, 10, @FONT_DISPLAY, 'Купель силы', '', '', '', 1.5,
   0, 0, 0, 3000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 'go_mythic_plus_font', 0),
 (700011, 3, IFNULL(@CHEST_DISPLAY, 259), 'Сундук претендента', '', '', '', 1.5,
-  0, 700011, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0);
+  0, 700011, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0),
+-- countdown barrier at the entrance (visual only, the server keeps players inside BARRIER_RADIUS): set @BARRIER_DISPLAY
+(700012, 5, @BARRIER_DISPLAY, 'Барьер претендента', '', '', '', 1,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0);
 
 -- chest loot: gameobject_loot_template entry 700011 (fill with the rewards)
 DELETE FROM `gameobject_loot_template` WHERE `Entry` = 700011;
