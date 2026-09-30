@@ -8,6 +8,10 @@ CREATE TABLE `mythic_plus_dungeon` (
   `name` VARCHAR(100) NOT NULL,
   `time_limit` INT UNSIGNED NOT NULL DEFAULT 1800 COMMENT 'seconds',
   `forces_required` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 - 90% of the counted creatures',
+  `chest_x` FLOAT NULL DEFAULT NULL COMMENT 'completion chest position; NULL - where the last boss died',
+  `chest_y` FLOAT NULL DEFAULT NULL,
+  `chest_z` FLOAT NULL DEFAULT NULL,
+  `chest_o` FLOAT NULL DEFAULT NULL,
   PRIMARY KEY (`map_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -80,10 +84,10 @@ CREATE TABLE `mythic_plus_forces` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------- keystone item
-DELETE FROM `item_template` WHERE `entry` = 190100;
+DELETE FROM `item_template` WHERE `entry` = 138019;
 INSERT INTO `item_template` (`entry`, `class`, `subclass`, `SoundOverrideSubclass`, `name`, `displayid`, `Quality`, `Flags`, `BuyCount`,
   `BuyPrice`, `SellPrice`, `InventoryType`, `ItemLevel`, `RequiredLevel`, `maxcount`, `stackable`, `bonding`, `description`, `Material`, `VerifiedBuild`) VALUES
-(190100, 12, 0, -1, 'Эпохальный ключ', 6418, 4, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, '', -1, 0);
+(138019, 13, 0, -1, 'Эпохальный ключ', 6418, 4, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, '', -1, 0);
 
 -- ---------------------------------------------------------------- Font of Power (goober) and completion chest
 SET @FONT_DISPLAY := 7898;   -- font model: put the display you want here

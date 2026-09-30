@@ -23,8 +23,9 @@
  *   - deaths: DEATH_PENALTY seconds each;
  *   - complete = all bosses + forces. In time: key +1..+3 (60% / 80% of the timer), new random dungeon.
  *     Timer expired: the key goes -1 at once (retail). Group members without a key get one.
- *   - completion chest CHEST_ENTRY at the Font of Power (loot: gameobject_loot_template).
- *   - Mythic 0 completed: members without a key get a +2 key.
+ *   - completion chest CHEST_ENTRY (loot: gameobject_loot_template): at chest_x..chest_o of the dungeon row,
+ *     else where the last boss died; owned by the map, not by a player.
+ *   - Mythic 0 completed: members without a key get a +1 key.
  *
  * Affixes (retail ids, world.mythic_plus_affix / mythic_plus_affix_rotation):
  *   10 Fortified, 9 Tyrannical, 6 Raging, 7 Bolstering, 8 Sanguine, 11 Bursting, 12 Grievous, 4 Necrotic.
@@ -87,12 +88,13 @@ using namespace Trinity::ChatCommands;
 namespace
 {
     // ---------------------------------------------------------------- config
-    constexpr uint32 KEYSTONE_ITEM = 190100;
+    constexpr uint32 KEYSTONE_ITEM = 138019;
     constexpr uint32 FONT_ENTRY = 190110;
     constexpr uint32 CHEST_ENTRY = 190111;
 
-    constexpr uint32 MIN_KEY_LEVEL = 2;
+    constexpr uint32 MIN_KEY_LEVEL = 1;
     constexpr uint32 MAX_KEY_LEVEL = 30;
+    constexpr uint32 FIRST_AFFIX_LEVEL = 2;
     constexpr uint32 SECOND_AFFIX_LEVEL = 4;
     constexpr uint32 THIRD_AFFIX_LEVEL = 7;
 
@@ -135,6 +137,8 @@ namespace
         std::string Name;
         uint32 TimeLimit = DEFAULT_TIME_LIMIT;  // seconds
         uint32 ForcesRequired = 0;              // 0 - auto
+        bool HasChestPos = false;               // chest_x..chest_o set in the row
+        Position ChestPos;
     };
 
     struct AffixInfo
@@ -212,6 +216,8 @@ namespace
         std::vector<SanguinePool> Pools;
         Position FontPos;
         bool HasFont = false;
+        Position LastBossPos;                   // where the last killed boss died
+        bool HasLastBoss = false;
         uint32 SyncTimer = 0;
         uint32 TickTimer = 0;
         uint32 GrievousTimer = 0;
@@ -287,7 +293,7 @@ namespace
     {
         std::vector<uint32> week = WeekAffixes();
         std::vector<uint32> result;
-        if (level >= MIN_KEY_LEVEL && week.size() > 0)
+        if (level >= FIRST_AFFIX_LEVEL && week.size() > 0)
             result.push_back(week[0]);
         if (level >= SECOND_AFFIX_LEVEL && week.size() > 1)
             result.push_back(week[1]);
@@ -617,6 +623,21 @@ namespace
     }
 
     // ---------------------------------------------------------------- completion
+    // the chest belongs to the map, not to a player: it stays when anybody leaves
+    void SpawnChest(Map* map, Position const& pos)
+    {
+        GameObject* go = new GameObject();
+        QuaternionData rot = QuaternionData::fromEulerAnglesZYX(pos.GetOrientation(), 0.0f, 0.0f);
+        if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), CHEST_ENTRY, map, PHASEMASK_NORMAL, pos, rot, 255, GO_STATE_READY))
+        {
+            delete go;
+            return;
+        }
+        go->SetRespawnTime(CHEST_DESPAWN);
+        go->SetSpawnedByDefault(false);
+        map->AddToMap(go);
+    }
+
     void CompleteRun(Run& run)
     {
         if (run.Rewarded)
@@ -670,13 +691,16 @@ namespace
             SendRating(player);
         });
 
-        // Map has no SummonGameObject in this core: any player in the instance summons the chest
-        if (map && run.HasFont)
+        // chest: the dungeon row position, else where the last boss died, else the Font of Power
+        if (map)
         {
-            Player* summoner = nullptr;
-            ForEachPlayer(map, [&](Player* player) { if (!summoner) summoner = player; });
-            if (summoner)
-                summoner->SummonGameObject(CHEST_ENTRY, run.FontPos, QuaternionData::fromEulerAnglesZYX(run.FontPos.GetOrientation(), 0.0f, 0.0f), Seconds(CHEST_DESPAWN));
+            auto dungeon = s_dungeons.find(run.MapId);
+            if (dungeon != s_dungeons.end() && dungeon->second.HasChestPos)
+                SpawnChest(map, dungeon->second.ChestPos);
+            else if (run.HasLastBoss)
+                SpawnChest(map, run.LastBossPos);
+            else if (run.HasFont)
+                SpawnChest(map, run.FontPos);
         }
 
         SyncRun(run);
@@ -704,6 +728,8 @@ namespace
 
         if (IsBoss(creature))
         {
+            run.LastBossPos = creature->GetPosition();
+            run.HasLastBoss = true;
             bool found = false;
             for (Boss& boss : run.Bosses)
                 if (boss.Entry == creature->GetEntry() && !boss.Killed)
@@ -935,7 +961,7 @@ namespace
     void LoadData()
     {
         s_dungeons.clear();
-        if (QueryResult result = WorldDatabase.Query("SELECT CAST(map_id AS SIGNED), name, CAST(time_limit AS SIGNED), CAST(forces_required AS SIGNED) FROM mythic_plus_dungeon"))
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(map_id AS SIGNED), name, CAST(time_limit AS SIGNED), CAST(forces_required AS SIGNED), chest_x, chest_y, chest_z, chest_o FROM mythic_plus_dungeon"))
             do
             {
                 Field* f = result->Fetch();
@@ -944,6 +970,11 @@ namespace
                 info.Name = f[1].GetString();
                 info.TimeLimit = uint32(f[2].GetInt64());
                 info.ForcesRequired = uint32(f[3].GetInt64());
+                if (!f[4].IsNull() && !f[5].IsNull() && !f[6].IsNull())
+                {
+                    info.HasChestPos = true;
+                    info.ChestPos.Relocate(f[4].GetFloat(), f[5].GetFloat(), f[6].GetFloat(), f[7].IsNull() ? 0.0f : f[7].GetFloat());
+                }
                 s_dungeons[info.MapId] = info;
             } while (result->NextRow());
 

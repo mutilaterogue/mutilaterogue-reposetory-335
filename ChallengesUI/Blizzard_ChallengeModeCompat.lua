@@ -3,7 +3,7 @@
 -- Listeners: MythicPlus_RegisterCallback(func) -> func(event, ...), events:
 --   "AFFIXES", "KEY", "RATING", "RUN", "BOSSES", "COMPLETE", "FONT_OPEN", "FONT_CLOSE", "SLOTTED", "RESULT"
 
-KEYSTONE_ITEM_ID = 190100;
+KEYSTONE_ITEM_ID = 138019;
 
 MythicPlus = {
 	affixes = {},		-- [id] = { name, icon, description }
