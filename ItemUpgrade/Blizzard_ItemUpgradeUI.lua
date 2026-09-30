@@ -204,6 +204,11 @@ local function FitPreviews(left, right)
 		tooltip:SetScale(scale);
 		tooltip:SetWidth(width);
 	end
+	-- anchor offsets are in the tooltip's own scale
+	left:ClearAllPoints();
+	left:SetPoint("TOPLEFT", ItemUpgradeFrame, "TOPLEFT", 15 / scale, -180 / scale);
+	right:ClearAllPoints();
+	right:SetPoint("TOPLEFT", ItemUpgradeFrame, "TOP", 8 / scale, -180 / scale);
 end
 
 local function GeneratePreview(tooltip, info, levelInfo, baseInfo, isUpgrade)

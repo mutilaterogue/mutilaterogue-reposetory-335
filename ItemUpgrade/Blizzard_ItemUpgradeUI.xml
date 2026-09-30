@@ -33,16 +33,6 @@
 			<Anchor point="TOPLEFT" x="16" y="-116"/>
 		</Anchors>
 		<Layers>
-			<Layer level="BACKGROUND" textureSubLevel="-6">
-				<!-- fills the strip below BottomBG (template Bg is hidden) -->
-				<Texture parentKey="BottomFill">
-					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="2" y="30"/>
-						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
-					</Anchors>
-					<Color r="0.07" g="0.07" b="0.07" a="1"/>
-				</Texture>
-			</Layer>
 			<Layer level="BACKGROUND" textureSubLevel="-5">
 				<Texture name="$parentBottomBG" parentKey="BottomBG" atlas="ItemUpgrade_BottomPanel" useAtlasSize="true">
 					<Anchors>
