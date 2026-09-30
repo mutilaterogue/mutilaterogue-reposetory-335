@@ -93,24 +93,12 @@
 						</Texture>
 					</Layer>
 					<Layer level="OVERLAY">
-						<FontString name="$parentLevel" parentKey="Level" inherits="GameFontNormalLarge" justifyH="LEFT">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="28" y="-18"/>
-							</Anchors>
-						</FontString>
-						<FontString name="$parentTimeLeft" parentKey="TimeLeft" inherits="GameFontHighlightHuge" justifyH="LEFT">
-							<Anchors>
-								<Anchor point="TOPLEFT" relativeTo="$parentLevel" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
-							</Anchors>
-						</FontString>
+
 					</Layer>
 				</Layers>
 				<Frames>
 					<Frame name="$parentStartedDepleted" parentKey="StartedDepleted" hidden="true" enableMouse="true">
 						<Size x="19" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeTo="$parentLevel" relativePoint="RIGHT" x="4" y="0"/>
-						</Anchors>
 						<Layers>
 							<Layer level="ARTWORK">
 								<Texture atlas="ChallengeMode-icon-chest" useAtlasSize="true">
@@ -133,9 +121,6 @@
 					</Frame>
 					<Frame name="$parentTimesUpLootStatus" parentKey="TimesUpLootStatus" hidden="true" enableMouse="true">
 						<Size x="19" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeTo="$parentTimeLeft" relativePoint="RIGHT" x="4" y="0"/>
-						</Anchors>
 						<Layers>
 							<Layer level="ARTWORK">
 								<Texture atlas="ChallengeMode-icon-chest" useAtlasSize="true">
@@ -187,10 +172,22 @@
 						<BarTexture atlas="ChallengeMode-TimerFill"/>
 					</StatusBar>
 					<!-- the block frame art above the timer bar (retail: the bar uses the parent level, the art is OVERLAY) -->
-					<Frame parentKey="Border" setAllPoints="true">
+					<Frame name="$parentBorder" parentKey="Border" setAllPoints="true">
 						<Layers>
 							<Layer level="OVERLAY">
 								<Texture parentKey="Frame" atlas="challengemode-timer" setAllPoints="true"/>
+							</Layer>
+							<Layer level="OVERLAY" textureSubLevel="1">
+						<FontString name="$parentLevel" parentKey="Level" inherits="GameFontNormalLarge" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="28" y="-18"/>
+									</Anchors>
+								</FontString>
+								<FontString name="$parentTimeLeft" parentKey="TimeLeft" inherits="GameFontHighlightHuge" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeTo="$parentLevel" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+									</Anchors>
+								</FontString>
 							</Layer>
 						</Layers>
 					</Frame>

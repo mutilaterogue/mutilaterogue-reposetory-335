@@ -220,7 +220,11 @@ function ScenarioObjectiveTrackerChallengeModeMixin:OnLoad()
 	end);
 
 	self.affixFrames = {};
-	-- art above the bar, texts and icons above the art
+	-- art above the bar, texts and icons above the art (the texts live in Border)
+	self.Level = self.Border.Level;
+	self.TimeLeft = self.Border.TimeLeft;
+	self.StartedDepleted:SetPoint("LEFT", self.Level, "RIGHT", 4, 0);
+	self.TimesUpLootStatus:SetPoint("LEFT", self.TimeLeft, "RIGHT", 4, 0);
 	self.Border:SetFrameLevel(self.StatusBar:GetFrameLevel() + 1);
 	self.DeathCount:SetFrameLevel(self.Border:GetFrameLevel() + 1);
 	self.StartedDepleted:SetFrameLevel(self.Border:GetFrameLevel() + 1);
