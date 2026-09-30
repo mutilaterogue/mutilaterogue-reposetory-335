@@ -1,0 +1,6 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- Mythic+ windows. FrameXML.toc: ChallengesUI\Blizzard_ChallengesUIFrames.xml after the file that defines
+	     RetailPortraitFrameTemplate / InsetFrameTemplate (a template defined later is not applied). -->
+	<Include file="Blizzard_ChallengesFrame.xml"/>
+	<Include file="Blizzard_WeeklyRewards.xml"/>
+</Ui>
