@@ -174,7 +174,7 @@
 	</Frame>
 
 	<Frame name="WeeklyRewardsFrame" parent="UIParent" hidden="true" enableMouse="true" movable="true" toplevel="true" frameStrata="HIGH">
-		<Size x="1165" y="430"/>
+		<Size x="1165" y="657"/>
 		<Anchors>
 			<Anchor point="CENTER"/>
 		</Anchors>
@@ -192,6 +192,18 @@
 					<Anchors>
 						<Anchor point="TOPLEFT" x="10" y="-8"/>
 						<Anchor point="BOTTOMRIGHT" x="-10" y="8"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="1">
+				<Texture parentKey="Divider1" atlas="evergreen-weeklyrewards-divider" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-291"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Divider2" atlas="evergreen-weeklyrewards-divider" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-446"/>
 					</Anchors>
 				</Texture>
 			</Layer>
@@ -243,9 +255,19 @@
 					</Layer>
 				</Layers>
 			</Frame>
-			<Frame parentKey="MythicFrame" inherits="WeeklyRewardActivityTypeTemplate">
+			<Frame parentKey="RaidFrame" inherits="WeeklyRewardActivityTypeTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="68" y="-149"/>
+				</Anchors>
+			</Frame>
+			<Frame parentKey="MythicFrame" inherits="WeeklyRewardActivityTypeTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="68" y="-307"/>
+				</Anchors>
+			</Frame>
+			<Frame parentKey="WorldFrame" inherits="WeeklyRewardActivityTypeTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="68" y="-470"/>
 				</Anchors>
 			</Frame>
 			<Button parentKey="SelectRewardButton" inherits="UIPanelButtonTemplate" frameLevel="60" hidden="true">

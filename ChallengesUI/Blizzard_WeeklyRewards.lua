@@ -1,12 +1,19 @@
 -- Great Vault: port of retail Blizzard_WeeklyRewards.lua / WeeklyRewardsUtil.lua for 3.3.5.
--- Only the Activities (Mythic+) row. Data: MythicPlus.vault (Blizzard_ChallengeModeCompat.lua):
+-- Rows: raids, dungeons (Mythic+), world (delves, no progress source yet). Data: MythicPlus.vault (Blizzard_ChallengeModeCompat.lua):
 --   runs     - number of keystone runs this week
 --   levels   - their levels, best first
 --   options  - [slot] = { itemID, level, claimed } rolled from last week's runs
 --   claimed  - an option was already taken
 
 local NUM_COLUMNS = 3;
-local THRESHOLDS = { 1, 4, 8 };
+-- retail Enum.WeeklyRewardChestThresholdType
+local TYPE_ACTIVITIES, TYPE_RAID, TYPE_WORLD = 1, 3, 6;
+-- per row: thresholds and the first option slot on the server
+local ROWS = {
+	[TYPE_RAID] = { thresholds = { 2, 4, 6 }, slot = 4, key = "raid" },
+	[TYPE_ACTIVITIES] = { thresholds = { 1, 4, 8 }, slot = 1, key = "levels" },
+	[TYPE_WORLD] = { thresholds = { 1, 4, 8 }, slot = 7, key = "world" },
+};
 local SELECTION_STATE_HIDDEN = 1;
 local SELECTION_STATE_UNSELECTED = 2;
 local SELECTION_STATE_SELECTED = 3;
@@ -41,7 +48,7 @@ StaticPopupDialogs["CONFIRM_SELECT_WEEKLY_REWARD"] = {
 -- C_WeeklyRewards over MythicPlus.vault
 ---------------------------------------------------------------------------
 local function Vault()
-	return MythicPlus.vault or { runs = 0, levels = {}, options = {}, claimed = false };
+	return MythicPlus.vault or { runs = 0, levels = {}, raid = {}, world = {}, options = {}, claimed = false };
 end
 
 C_WeeklyRewards = C_WeeklyRewards or {};
@@ -59,22 +66,27 @@ function C_WeeklyRewards.GetActivities()
 	local vault = Vault();
 	local claiming = C_WeeklyRewards.CanClaimRewards();
 	local activities = {};
-	for index, threshold in ipairs(THRESHOLDS) do
-		local info = { type = 1, index = index, threshold = threshold, progress = math.min(vault.runs, threshold),
-			level = vault.levels[threshold] or 0, rewards = {} };
-		local option = vault.options[index];
-		if claiming and option and option.itemID > 0 then
-			info.rewards[1] = { id = option.itemID, level = option.level };
-			info.progress = threshold;
-			info.level = option.level;
+	for activityType, row in pairs(ROWS) do
+		local levels = vault[row.key] or {};
+		for index, threshold in ipairs(row.thresholds) do
+			local info = { type = activityType, index = index, threshold = threshold, progress = math.min(#levels, threshold),
+				level = levels[threshold] or 0, rewards = {}, slot = row.slot + index - 1 };
+			local option = vault.options[info.slot];
+			if claiming and option and option.itemID > 0 then
+				-- raid option level is the difficulty (0..3), shown as 1..4 like the progress
+				local level = activityType == TYPE_RAID and option.level + 1 or option.level;
+				info.rewards[1] = { id = option.itemID, level = level };
+				info.progress = threshold;
+				info.level = level;
+			end
+			table.insert(activities, info);
 		end
-		activities[index] = info;
 	end
 	return activities;
 end
 
 function C_WeeklyRewards.GetNumCompletedDungeonRuns()
-	return 0, 0, Vault().runs;
+	return 0, 0, #Vault().levels;
 end
 
 WeeklyRewardsUtil = { HeroicLevel = -1, MythicLevel = 0 };
@@ -132,7 +144,9 @@ end
 function WeeklyRewardsMixin:OnLoad()
 	self.Activities = {};
 	self:RegisterForDrag("LeftButton");
-	self:SetUpActivity(self.MythicFrame, DUNGEONS, "evergreen-weeklyrewards-category-dungeons", 1);
+	self:SetUpActivity(self.RaidFrame, RAIDS, "evergreen-weeklyrewards-category-raids", TYPE_RAID);
+	self:SetUpActivity(self.MythicFrame, DUNGEONS, "evergreen-weeklyrewards-category-dungeons", TYPE_ACTIVITIES);
+	self:SetUpActivity(self.WorldFrame, S("DELVES_LABEL"), "evergreen-weeklyrewards-category-world", TYPE_WORLD);
 	self.SelectRewardButton:SetText(S("WEEKLY_REWARDS_SELECT_REWARD"));
 	self.PreviousRewardNotification:SetText(S("WEEKLY_REWARDS_UNCLAIMED_REWARDS_FROM_PREVIOUS_TIME"));
 
@@ -275,7 +289,7 @@ function WeeklyRewardsMixin:SelectReward()
 	local activity = self.selectedActivity;
 	if activity then
 		PlaySound("igMainMenuOptionCheckBoxOn");
-		StaticPopup_Show("CONFIRM_SELECT_WEEKLY_REWARD", nil, nil, activity.index);
+		StaticPopup_Show("CONFIRM_SELECT_WEEKLY_REWARD", nil, nil, activity.info.slot);
 	end
 end
 
@@ -304,7 +318,13 @@ function WeeklyRewardsActivityMixin:MarkForPendingSheenAnim()
 end
 
 function WeeklyRewardsActivityMixin:Refresh(activityInfo)
-	self.Threshold:SetText(S("WEEKLY_REWARDS_THRESHOLD_DUNGEONS"):format(activityInfo.threshold));
+	local thresholdString = "WEEKLY_REWARDS_THRESHOLD_DUNGEONS";
+	if activityInfo.type == TYPE_RAID then
+		thresholdString = "WEEKLY_REWARDS_THRESHOLD_RAID";
+	elseif activityInfo.type == TYPE_WORLD then
+		thresholdString = "WEEKLY_REWARDS_THRESHOLD_WORLD";
+	end
+	self.Threshold:SetText(S(thresholdString):format(activityInfo.threshold));
 
 	self.unlocked = activityInfo.progress >= activityInfo.threshold;
 	self.hasRewards = #activityInfo.rewards > 0;
@@ -388,12 +408,22 @@ function WeeklyRewardsActivityMixin:SetProgressText(text)
 	elseif self.hasRewards then
 		self.Progress:SetText("");
 	elseif self.unlocked then
-		self.Progress:SetText(S("WEEKLY_REWARDS_MYTHIC"):format(activityInfo.level));
+		self.Progress:SetText(self:GetLevelText(activityInfo.level));
 	elseif C_WeeklyRewards.CanClaimRewards() then
 		self.Progress:SetText("");
 	else
 		self.Progress:SetText(S("GENERIC_FRACTION_STRING"):format(activityInfo.progress, activityInfo.threshold));
 	end
+end
+
+-- raid: difficulty 1..4 (10N, 25N, 10H, 25H); dungeons: keystone level; world: tier
+function WeeklyRewardsActivityMixin:GetLevelText(level)
+	if self.info.type == TYPE_RAID then
+		return S("RAID_DIFFICULTY" .. level);
+	elseif self.info.type == TYPE_WORLD then
+		return S("GREAT_VAULT_WORLD_TIER"):format(level);
+	end
+	return S("WEEKLY_REWARDS_MYTHIC"):format(level);
 end
 
 function WeeklyRewardsActivityMixin:OnMouseUp(button)
@@ -415,14 +445,24 @@ function WeeklyRewardsActivityMixin:OnEnter()
 		return;
 	end
 
-	local description = S("GREAT_VAULT_REWARDS_MYTHIC_INCOMPLETE");
-	local formatRemainingProgress = false;
-	if self.info.index == 2 then
-		description = S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_FIRST");
+	local description, formatRemainingProgress;
+	if self.info.type == TYPE_RAID then
+		description = S(self.info.progress == 0 and "GREAT_VAULT_REWARDS_RAID_INCOMPLETE" or "GREAT_VAULT_REWARDS_RAID_INPROGRESS");
 		formatRemainingProgress = true;
-	elseif self.info.index == 3 then
-		description = S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_SECOND");
+	elseif self.info.type == TYPE_WORLD then
+		description = S(self.info.index == 1 and "GREAT_VAULT_REWARDS_WORLD_INCOMPLETE"
+			or self.info.index == 2 and "GREAT_VAULT_REWARDS_WORLD_COMPLETED_FIRST" or "GREAT_VAULT_REWARDS_WORLD_COMPLETED_SECOND");
 		formatRemainingProgress = true;
+	else
+		description = S("GREAT_VAULT_REWARDS_MYTHIC_INCOMPLETE");
+		formatRemainingProgress = false;
+		if self.info.index == 2 then
+			description = S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_FIRST");
+			formatRemainingProgress = true;
+		elseif self.info.index == 3 then
+			description = S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_SECOND");
+			formatRemainingProgress = true;
+		end
 	end
 
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT", -7, -11);
@@ -432,7 +472,7 @@ function WeeklyRewardsActivityMixin:OnEnter()
 	end
 	GameTooltip:AddLine(description, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true);
 
-	if self.info.progress > 0 then
+	if self.info.progress > 0 and self.info.type == TYPE_ACTIVITIES then
 		GameTooltip:AddLine(" ");
 		local lowestLevel = WeeklyRewardsUtil.GetLowestLevelInTopDungeonRuns(self.info.threshold);
 		GameTooltip:AddLine(S("GREAT_VAULT_REWARDS_CURRENT_LEVEL_MYTHIC"):format(self.info.threshold, lowestLevel),
@@ -445,7 +485,11 @@ end
 function WeeklyRewardsActivityMixin:ShowPreviewItemTooltip()
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT", -7, -11);
 	GameTooltip:SetText(S("WEEKLY_REWARDS_CURRENT_REWARD"), 1, 1, 1);
-	GameTooltip:AddLine(S("WEEKLY_REWARDS_MYTHIC"):format(self.info.level), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true);
+	GameTooltip:AddLine(self:GetLevelText(self.info.level), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true);
+	if self.info.type ~= TYPE_ACTIVITIES then
+		GameTooltip:Show();
+		return;
+	end
 	GameTooltip:AddLine(" ");
 	local nextLevel = WeeklyRewardsUtil.GetNextMythicLevel(self.info.level);
 	if self.info.threshold == 1 then
@@ -516,6 +560,11 @@ function WeeklyRewardActivityItemMixin:SetRewards(rewards)
 		local r, g, b = GetItemQualityColor(quality);
 		self.Name:SetTextColor(r, g, b);
 	end
-	self:GetParent():SetProgressText(ITEM_MYTHIC .. " +" .. reward.level);
+	local activity = self:GetParent();
+	if activity.info.type == TYPE_ACTIVITIES then
+		activity:SetProgressText(ITEM_MYTHIC .. " +" .. reward.level);
+	else
+		activity:SetProgressText(activity:GetLevelText(reward.level));
+	end
 	self:Show();
 end

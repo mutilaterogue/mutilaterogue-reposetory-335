@@ -45,6 +45,8 @@
  *       "MPLUS_COMPLETE" : timed : upgrade : timeMs : level : newLevel : score : oldRating : newRating : mapId : name
  *       "MPLUS_MAPS" : id;name;timeLimit,...
  *       "MPLUS_VAULT" : runs this week : their levels (best first) : last week options slot;item;level;claimed,...
+ *                       : raid difficulties of this week's bosses (best first) : world levels (reserved)
+ *                       option slots: 1..3 dungeons, 4..6 raid, 7..9 world
  *       "MPLUS_VAULT_OPEN" (Great Vault object used)
  *       "MPLUS_RESULT" : message
  *  C->S "MPLUS_GET", "MPLUS_INSERT", "MPLUS_REMOVE", "MPLUS_START", "MPLUS_CLOSE",
@@ -106,6 +108,9 @@ namespace
     constexpr float FONT_RANGE = 10.0f;
     constexpr uint32 VAULT_LOOT = 252665;           // Great Vault options: rolled from this gameobject_loot_template
     constexpr uint32 VAULT_THRESHOLDS[3] = { 1, 4, 8 };   // runs of the week for the 1st, 2nd, 3rd option
+    constexpr uint32 VAULT_RAID_LOOT = 252665;      // raid row options: rolled from this gameobject_loot_template
+    constexpr uint32 VAULT_RAID_THRESHOLDS[3] = { 2, 4, 6 };  // raid bosses of the week (slots 4..6)
+    // slots 7..9 - world row (delves), no progress source yet
     constexpr uint32 BATTLE_RES_INTERVAL = 10 * MINUTE * IN_MILLISECONDS;   // +1 battle res charge
     constexpr int32 MYTHIC_ILVL_PER_LEVEL = 3;      // chest items: item level +3 per keystone level
     constexpr uint32 MYTHIC_ILVL_MAX_LEVEL = 20;    // ... up to this keystone level             // the keystone frame closes farther away than this
@@ -1054,10 +1059,39 @@ namespace
         return levels;
     }
 
-    uint32 RollVaultItem(Player* player)
+    // difficulties (0 10N, 1 25N, 2 10H, 3 25H) of the raid bosses killed in a week, best first
+    std::vector<uint32> WeekRaidLevels(ObjectGuid::LowType guid, uint32 week)
+    {
+        std::vector<uint32> levels;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(difficulty AS SIGNED) FROM character_vault_raid WHERE guid = {} AND week = {} ORDER BY difficulty DESC", guid, week).c_str()))
+            do
+                levels.push_back(uint32(result->Fetch()[0].GetInt64()));
+            while (result->NextRow());
+        return levels;
+    }
+
+    void RecordRaidBoss(Creature* boss)
+    {
+        Map* map = boss->GetMap();
+        if (!map || !map->IsRaid() || !(boss->IsDungeonBoss() || boss->isWorldBoss()))
+            return;
+        uint32 week = CurrentWeek();
+        uint32 difficulty = uint32(map->GetDifficultyID());
+        ForEachPlayer(map, [&](Player* member)
+        {
+            // one row per boss and week; a kill on a higher difficulty replaces the lower one
+            CharacterDatabase.Execute(Trinity::StringFormat(
+                "INSERT INTO character_vault_raid (guid, week, entry, map_id, difficulty) VALUES ({}, {}, {}, {}, {}) "
+                "ON DUPLICATE KEY UPDATE difficulty = GREATEST(difficulty, VALUES(difficulty))",
+                member->GetGUID().GetCounter(), week, boss->GetEntry(), map->GetId(), difficulty).c_str());
+        });
+    }
+
+    uint32 RollVaultItem(Player* player, uint32 lootId = VAULT_LOOT)
     {
         Loot loot;
-        loot.FillLoot(VAULT_LOOT, LootTemplates_Gameobject, player, true, true);
+        loot.FillLoot(lootId, LootTemplates_Gameobject, player, true, true);
         for (LootItem const& lootItem : loot.items)
             if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(lootItem.itemid))
                 if (proto->Class == ITEM_CLASS_WEAPON || proto->Class == ITEM_CLASS_ARMOR)
@@ -1085,6 +1119,14 @@ namespace
                         CharacterDatabase.DirectExecute(Trinity::StringFormat(
                             "INSERT INTO character_mythic_plus_vault (guid, week, slot, item_id, level, claimed) VALUES ({}, {}, {}, {}, {}, 0)",
                             guid, last, slot + 1, itemId, levels[VAULT_THRESHOLDS[slot] - 1]).c_str());
+
+            std::vector<uint32> raid = WeekRaidLevels(guid, last);
+            for (uint32 slot = 0; slot < 3; ++slot)
+                if (raid.size() >= VAULT_RAID_THRESHOLDS[slot])
+                    if (uint32 itemId = RollVaultItem(player, VAULT_RAID_LOOT))
+                        CharacterDatabase.DirectExecute(Trinity::StringFormat(
+                            "INSERT INTO character_mythic_plus_vault (guid, week, slot, item_id, level, claimed) VALUES ({}, {}, {}, {}, {}, 0)",
+                            guid, last, slot + 4, itemId, raid[VAULT_RAID_THRESHOLDS[slot] - 1]).c_str());
         }
 
         std::ostringstream options;
@@ -1103,7 +1145,12 @@ namespace
 
         // this week's progress: levels of the runs, best first
         std::vector<uint32> levels = WeekLevels(guid, week);
-        sAddonComm->Send(player, "MPLUS_VAULT", uint32(levels.size()), JoinIds(levels), options.str());
+        // raid difficulty is sent +1 (1 10N .. 4 25H): the client list skips zeros
+        std::vector<uint32> raid = WeekRaidLevels(guid, week);
+        for (uint32& difficulty : raid)
+            ++difficulty;
+        std::vector<uint32> world;
+        sAddonComm->Send(player, "MPLUS_VAULT", uint32(levels.size()), JoinIds(levels), options.str(), JoinIds(raid), JoinIds(world));
     }
 
     void HandleVaultGet(Player* player, std::vector<std::string> const& /*args*/)
@@ -1149,13 +1196,15 @@ namespace
             if (Item* item = player->StoreNewItem(dest, itemId, true))
             {
                 player->SendNewItem(item, 1, true, false);
-                MarkMythicItem(player, item, level);
+                if (slot <= 3)
+                    MarkMythicItem(player, item, level);
             }
         }
         else if (Item* item = Item::CreateItem(itemId, 1, player))
         {
             CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-            MarkMythicItem(player, item, level);
+            if (slot <= 3)
+                MarkMythicItem(player, item, level);
             item->SaveToDB(trans);
             MailDraft draft(MSG_VAULT_MAIL, "");
             draft.AddItem(item);
@@ -1868,6 +1917,8 @@ public:
             return;
         if (Run* run = FindRun(victim->GetMap()))
             OnCreatureDeath(*run, victim->ToCreature());
+        else
+            RecordRaidBoss(victim->ToCreature());
     }
 };
 

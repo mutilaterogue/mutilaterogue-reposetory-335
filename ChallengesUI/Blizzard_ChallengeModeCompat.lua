@@ -221,8 +221,10 @@ if Comm_Register then
 	end);
 
 	-- Great Vault: runs this week, their levels, last week's options slot;item;level;claimed
-	Comm_Register("MPLUS_VAULT", function(runs, levels, options)
-		local vault = { runs = tonumber(runs) or 0, levels = SplitIds(levels), options = {}, claimed = false };
+	-- + raid difficulties of this week's bosses, world levels; option slots 1..3 dungeons, 4..6 raid, 7..9 world
+	Comm_Register("MPLUS_VAULT", function(runs, levels, options, raid, world)
+		local vault = { runs = tonumber(runs) or 0, levels = SplitIds(levels), options = {}, claimed = false,
+			raid = SplitIds(raid), world = SplitIds(world) };
 		for entry in string.gmatch(options or "", "[^,]+") do
 			local slot, item, level, claimed = strsplit(";", entry);
 			slot = tonumber(slot);
