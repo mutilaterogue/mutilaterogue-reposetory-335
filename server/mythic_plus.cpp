@@ -535,8 +535,15 @@ namespace
     void SendBosses(Player* player, Run const& run)
     {
         std::ostringstream ss;
+        LocaleConstant locale = player->GetSession()->GetSessionDbLocaleIndex();
         for (size_t i = 0; i < run.Bosses.size(); ++i)
-            ss << (i ? "#" : "") << Sanitize(run.Bosses[i].Name);
+        {
+            // creature_template_locale in the player's language
+            std::string name = run.Bosses[i].Name;
+            if (CreatureLocale const* creatureLocale = sObjectMgr->GetCreatureLocale(run.Bosses[i].Entry))
+                ObjectMgr::GetLocaleString(creatureLocale->Name, locale, name);
+            ss << (i ? "#" : "") << Sanitize(name);
+        }
         std::string text = ss.str();
         sAddonComm->Send(player, "MPLUS_BOSSES", text.empty() ? std::string("-") : text);
         if (run.Level)
