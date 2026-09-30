@@ -317,7 +317,7 @@ namespace
 
     bool IsMythicMap(Map const* map)
     {
-        return map && map->IsDungeon() && !map->IsRaid() && map->GetDifficulty() == DUNGEON_DIFFICULTY_EPIC;
+        return map && map->IsDungeon() && !map->IsRaid() && map->GetDifficultyID() == DUNGEON_DIFFICULTY_EPIC;
     }
 
     Run* FindRun(Map const* map)
@@ -670,8 +670,14 @@ namespace
             SendRating(player);
         });
 
+        // Map has no SummonGameObject in this core: any player in the instance summons the chest
         if (map && run.HasFont)
-            map->SummonGameObject(CHEST_ENTRY, run.FontPos, QuaternionData::fromEulerAnglesZYX(run.FontPos.GetOrientation(), 0.0f, 0.0f), Seconds(CHEST_DESPAWN));
+        {
+            Player* summoner = nullptr;
+            ForEachPlayer(map, [&](Player* player) { if (!summoner) summoner = player; });
+            if (summoner)
+                summoner->SummonGameObject(CHEST_ENTRY, run.FontPos, QuaternionData::fromEulerAnglesZYX(run.FontPos.GetOrientation(), 0.0f, 0.0f), Seconds(CHEST_DESPAWN));
+        }
 
         SyncRun(run);
     }
