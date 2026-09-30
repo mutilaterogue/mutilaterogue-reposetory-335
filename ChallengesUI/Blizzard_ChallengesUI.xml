@@ -3,4 +3,7 @@
 	     before ObjectiveTracker (the scenario tracker reads MythicPlus). -->
 	<Script file="Blizzard_ChallengeModeCompat.lua"/>
 	<Include file="Blizzard_ChallengesKeystoneFrame.xml"/>
+	<Include file="Blizzard_ChallengeModeCompleteBanner.xml"/>
+	<Include file="Blizzard_ChallengesFrame.xml"/>
+	<Include file="Blizzard_WeeklyRewards.xml"/>
 </Ui>

@@ -1,0 +1,119 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- Great Vault (retail WeeklyRewardsFrame, the Mythic+ row) for 3.3.5. Server: server/mythic_plus.cpp
+	     (MPLUS_VAULT / MPLUS_VAULT_CHOOSE). Last week's runs give up to 3 options (1 / 4 / 8 runs), one is taken. -->
+	<Script file="Blizzard_WeeklyRewards.lua"/>
+
+	<!-- one activity (retail WeeklyRewardsActivityTemplate) -->
+	<Frame name="WeeklyRewardsActivityTemplate" virtual="true">
+		<Size x="190" y="200"/>
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate" setAllPoints="true"/>
+			<Button name="$parentItem" parentKey="ItemFrame">
+				<Size x="52" y="52"/>
+				<Anchors>
+					<Anchor point="CENTER" x="0" y="10"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture parentKey="Icon" setAllPoints="true"/>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Glow" atlas="gficon-chest-evergreen-greatvault-collect" alphaMode="ADD" hidden="true">
+							<Size x="120" y="106"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+				<Scripts>
+					<OnEnter function="WeeklyRewardsActivityItem_OnEnter"/>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Button>
+			<Button name="$parentSelect" parentKey="SelectButton" inherits="UIPanelButtonTemplate" text="WEEKLY_REWARDS_SELECT_REWARD" hidden="true">
+				<Size x="150" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOM" x="0" y="12"/>
+				</Anchors>
+				<Scripts>
+					<OnClick function="WeeklyRewardsActivitySelect_OnClick"/>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Threshold" inherits="GameFontNormalLarge" justifyH="CENTER">
+					<Size x="170" y="0"/>
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-14"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Progress" inherits="GameFontHighlightLarge" justifyH="CENTER">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-44"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Level" inherits="GameFontHighlight" justifyH="CENTER">
+					<Size x="170" y="0"/>
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="44"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="WeeklyRewardsFrame" inherits="RetailPortraitFrameTemplate" toplevel="true" parent="UIParent" enableMouse="true" movable="true" hidden="true">
+		<Size x="640" y="320"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="RowTitle" inherits="GameFontNormalHuge" text="MYTHIC_DUNGEONS">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-70"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Hint" inherits="GameFontHighlight" justifyH="CENTER">
+					<Size x="600" y="0"/>
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="14"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="$parentActivity1" inherits="WeeklyRewardsActivityTemplate" id="1">
+				<Anchors>
+					<Anchor point="TOP" x="-200" y="-96"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentActivity2" inherits="WeeklyRewardsActivityTemplate" id="2">
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-96"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentActivity3" inherits="WeeklyRewardsActivityTemplate" id="3">
+				<Anchors>
+					<Anchor point="TOP" x="200" y="-96"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="WeeklyRewardsFrame_OnLoad"/>
+			<OnShow function="WeeklyRewardsFrame_OnShow"/>
+			<OnHide>
+				PlaySound("igCharacterInfoClose");
+			</OnHide>
+			<OnDragStart>
+				self:StartMoving();
+			</OnDragStart>
+			<OnDragStop>
+				self:StopMovingOrSizing();
+			</OnDragStop>
+		</Scripts>
+	</Frame>
+</Ui>

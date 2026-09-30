@@ -194,8 +194,51 @@ if Comm_Register then
 		MythicPlus.forcesName = name or "";
 	end);
 
-	Comm_Register("MPLUS_COMPLETE", function(timed, upgrade, timeMs, level, newLevel, score)
-		Fire("COMPLETE", timed == "1", tonumber(upgrade) or 0, tonumber(timeMs) or 0, tonumber(level) or 0, tonumber(newLevel) or 0, tonumber(score) or 0);
+	-- retail C_ChallengeMode.GetChallengeCompletionInfo
+	Comm_Register("MPLUS_COMPLETE", function(timed, upgrade, timeMs, level, newLevel, score, oldRating, newRating, mapID, name)
+		MythicPlus.completion = {
+			onTime = timed == "1", keystoneUpgradeLevels = tonumber(upgrade) or 0, time = tonumber(timeMs) or 0,
+			level = tonumber(level) or 0, newLevel = tonumber(newLevel) or 0, score = tonumber(score) or 0,
+			oldOverallDungeonScore = tonumber(oldRating) or 0, newOverallDungeonScore = tonumber(newRating) or 0,
+			mapChallengeModeID = tonumber(mapID) or 0, name = name or "",
+		};
+		Fire("COMPLETE", MythicPlus.completion);
+	end);
+
+	-- dungeons of the season: id;name;timeLimit,...
+	Comm_Register("MPLUS_MAPS", function(list)
+		MythicPlus.maps = {};
+		MythicPlus.mapInfo = {};
+		for entry in string.gmatch(list or "", "[^,]+") do
+			local id, name, limit = strsplit(";", entry);
+			id = tonumber(id);
+			if id then
+				table.insert(MythicPlus.maps, id);
+				MythicPlus.mapInfo[id] = { name = name or "", timeLimit = tonumber(limit) or 0 };
+			end
+		end
+		Fire("MAPS");
+	end);
+
+	-- Great Vault: runs this week, their levels, last week's options slot;item;level;claimed
+	Comm_Register("MPLUS_VAULT", function(runs, levels, options)
+		local vault = { runs = tonumber(runs) or 0, levels = SplitIds(levels), options = {}, claimed = false };
+		for entry in string.gmatch(options or "", "[^,]+") do
+			local slot, item, level, claimed = strsplit(";", entry);
+			slot = tonumber(slot);
+			if slot then
+				vault.options[slot] = { itemID = tonumber(item) or 0, level = tonumber(level) or 0, claimed = claimed == "1" };
+				if claimed == "1" then
+					vault.claimed = true;
+				end
+			end
+		end
+		MythicPlus.vault = vault;
+		Fire("VAULT");
+	end);
+
+	Comm_Register("MPLUS_VAULT_OPEN", function()
+		Fire("VAULT_OPEN");
 	end);
 
 	Comm_Register("MPLUS_FONT_OPEN", function(mapID)
@@ -268,10 +311,22 @@ end
 
 -- name, id, timeLimit
 function C_ChallengeMode.GetMapUIInfo(mapID)
+	local info = MythicPlus.mapInfo and MythicPlus.mapInfo[mapID];
+	if info then
+		return info.name, mapID, info.timeLimit;
+	end
 	if MythicPlus.key and MythicPlus.key.mapID == mapID then
 		return MythicPlus.key.name, mapID, MythicPlus.key.timeLimit;
 	end
 	return nil, mapID, nil;
+end
+
+function C_ChallengeMode.GetMapTable()
+	return MythicPlus.maps or {};
+end
+
+function C_ChallengeMode.GetChallengeCompletionInfo()
+	return MythicPlus.completion;
 end
 
 function C_ChallengeMode.GetOverallDungeonScore()
