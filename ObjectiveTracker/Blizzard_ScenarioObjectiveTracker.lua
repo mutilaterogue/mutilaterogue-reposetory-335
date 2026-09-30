@@ -233,8 +233,9 @@ function ScenarioObjectiveTrackerChallengeModeMixin:CheckActivate()
 	end
 	local key = run.mapID .. ":" .. run.level;
 	if self.active ~= key then
-		self:Activate(run.timeLimit);
+		-- set first: Activate -> ForceExpand lays the tracker out again and comes back here
 		self.active = key;
+		self:Activate(run.timeLimit);
 	end
 	self:UpdateDeathCount();
 	self:UpdateTime(math.floor(MythicPlus_GetElapsedMs() / 1000));
