@@ -300,6 +300,7 @@ function ItemUpgradeFrame_ApplyTargetLevel(self, level)
 		FitPreviews(self.LeftItemPreviewFrame, self.RightItemPreviewFrame);
 	else
 		self.RightItemPreviewFrame:Hide();
+		FitPreviews(self.LeftItemPreviewFrame, self.LeftItemPreviewFrame);
 		self.Arrow:Hide();
 		self.FrameErrorText:SetText(failure or "");
 		self.FrameErrorText:SetShown(failure ~= nil);
