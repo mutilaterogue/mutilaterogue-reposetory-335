@@ -220,6 +220,11 @@ function ScenarioObjectiveTrackerChallengeModeMixin:OnLoad()
 	end);
 
 	self.affixFrames = {};
+	-- art above the bar, texts and icons above the art
+	self.Border:SetFrameLevel(self.StatusBar:GetFrameLevel() + 1);
+	self.DeathCount:SetFrameLevel(self.Border:GetFrameLevel() + 1);
+	self.StartedDepleted:SetFrameLevel(self.Border:GetFrameLevel() + 1);
+	self.TimesUpLootStatus:SetFrameLevel(self.Border:GetFrameLevel() + 1);
 	self:SetScript("OnUpdate", self.OnUpdate);
 end
 

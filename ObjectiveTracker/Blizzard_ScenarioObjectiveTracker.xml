@@ -64,6 +64,8 @@
 		<Scripts>
 			<OnLoad>
 				self.OnGet = ScenarioTrackerProgressBar_OnGet;
+				-- the fill between the background and the segmented frame
+				self.Bar:GetStatusBarTexture():SetDrawLayer("BORDER");
 			</OnLoad>
 		</Scripts>
 	</Frame>
@@ -91,7 +93,6 @@
 						</Texture>
 					</Layer>
 					<Layer level="OVERLAY">
-						<Texture parentKey="Frame" atlas="challengemode-timer" setAllPoints="true"/>
 						<FontString name="$parentLevel" parentKey="Level" inherits="GameFontNormalLarge" justifyH="LEFT">
 							<Anchors>
 								<Anchor point="TOPLEFT" x="28" y="-18"/>
@@ -185,6 +186,14 @@
 						</Anchors>
 						<BarTexture atlas="ChallengeMode-TimerFill"/>
 					</StatusBar>
+					<!-- the block frame art above the timer bar (retail: the bar uses the parent level, the art is OVERLAY) -->
+					<Frame parentKey="Border" setAllPoints="true">
+						<Layers>
+							<Layer level="OVERLAY">
+								<Texture parentKey="Frame" atlas="challengemode-timer" setAllPoints="true"/>
+							</Layer>
+						</Layers>
+					</Frame>
 				</Frames>
 			</Frame>
 
