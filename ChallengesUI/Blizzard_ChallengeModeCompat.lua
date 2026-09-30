@@ -58,6 +58,11 @@ function MythicPlus_GetAffixesForLevel(level)
 			table.insert(result, id);
 		end
 	end
+	-- seasonal affix (MPLUS_SEASON)
+	local season = MythicPlus.season;
+	if season and season.affix > 0 and level >= season.affixLevel and not tContains(result, season.affix) then
+		table.insert(result, season.affix);
+	end
 	return result;
 end
 
@@ -123,6 +128,11 @@ if Comm_Register then
 			MythicPlus.affixes[id] = { name = name or "", icon = icon or "", description = description or "" };
 			Fire("AFFIXES");
 		end
+	end);
+
+	Comm_Register("MPLUS_SEASON", function(id, name, affix, affixLevel)
+		MythicPlus.season = { id = tonumber(id) or 0, name = name or "", affix = tonumber(affix) or 0, affixLevel = tonumber(affixLevel) or 0 };
+		Fire("SEASON");
 	end);
 
 	Comm_Register("MPLUS_WEEK", function(list)

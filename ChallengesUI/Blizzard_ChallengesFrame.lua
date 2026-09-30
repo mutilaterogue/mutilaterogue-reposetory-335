@@ -177,6 +177,9 @@ function ChallengesFrame_Update(self)
 
 	local score = MythicPlus.rating or 0;
 	weekly.DungeonScoreInfo.Score:SetText(score);
+	if MythicPlus_GetScoreColor then
+		weekly.DungeonScoreInfo.Score:SetTextColor(MythicPlus_GetScoreColor(score));
+	end
 	weekly.DungeonScoreInfo:SetShown(chest:IsShown());
 
 	weekly.ThisWeekLabel:SetShown(state ~= CHEST_STATE_WALL_OF_TEXT);
@@ -188,6 +191,15 @@ end
 ---------------------------------------------------------------------------
 function ChallengesDungeonIcon_SetUp(self, mapInfo)
 	self.mapID = mapInfo.id;
+	-- click: season leaderboard of this dungeon
+	if not self.leaderboardHooked then
+		self.leaderboardHooked = true;
+		self:SetScript("OnMouseUp", function(icon, button)
+			if button == "LeftButton" and icon.mapID and ChallengesLeaderboard_Open then
+				ChallengesLeaderboard_Open(icon.mapID);
+			end
+		end);
+	end
 	local inst = JournalInstance(mapInfo.id);
 	self.Icon:SetTexture(inst and inst.button or DEFAULT_ICON);
 	if inst and inst.button then

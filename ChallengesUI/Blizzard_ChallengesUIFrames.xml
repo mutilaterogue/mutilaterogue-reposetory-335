@@ -3,4 +3,5 @@
 	     RetailPortraitFrameTemplate / InsetFrameTemplate (a template defined later is not applied). -->
 	<Include file="Blizzard_ChallengesFrame.xml"/>
 	<Include file="Blizzard_WeeklyRewards.xml"/>
+	<Include file="Blizzard_MythicPlusScore.xml"/>
 </Ui>

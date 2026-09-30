@@ -52,6 +52,16 @@
  *  C->S "MPLUS_GET", "MPLUS_INSERT", "MPLUS_REMOVE", "MPLUS_START", "MPLUS_CLOSE",
  *       "MPLUS_RELEASE" (release spirit: alive at the entrance or the last killed boss)
  *
+ * Also (sql/world_mythic_plus_ext.sql, sql/characters_mythic_plus_ext.sql):
+ *   - per-dungeon chest / vault loot (world.mythic_plus_dungeon_loot, 0 - CHEST_ENTRY / VAULT_LOOT);
+ *   - seasons (world.mythic_plus_season): rating, best runs and leaderboard per season, seasonal affix,
+ *     rewards by rating (world.mythic_plus_season_reward: title / item by mail / spell);
+ *   - affixes 13 Explosive, 14 Quaking, 122 Inspiring, 124 Storming, 132 Thundering;
+ *   - npc_mythic_plus_keystone: key reroll (once a week, REROLL_COST) and downgrade;
+ *   - "MPLUS_SEASON" : id : name : seasonal affix : its level, "MPLUS_SCORE_GET" / "MPLUS_SCORE", "MPLUS_LEADERS";
+ *   - pings: "PING" / "PING_POS" (see HandlePing);
+ *   - mythic items: the keystone bonus is restored on login if it was lost.
+ *
  * GM: .mplus key <level> [mapId], .mplus info, .mplus complete, .mplus reset
  *
  * Setup: sql/world_mythic_plus.sql, sql/characters_mythic_plus.sql, AddSC_mythic_plus() in custom_script_loader.cpp.
@@ -61,6 +71,11 @@
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Bag.h"
+#include "CharacterCache.h"
+#include "DBCStores.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
+#include "TemporarySummon.h"
 #include "Chat.h"
 #include "ChatCommand.h"
 #include "Creature.h"
@@ -130,6 +145,14 @@ namespace
     constexpr time_t WEEK_EPOCH = 1704265200;       // Wed 2024-01-03 07:00 UTC - weekly reset
     constexpr float BOLSTER_RANGE = 30.0f;
     constexpr float SANGUINE_RANGE = 5.0f;
+    // affix creatures (sql/world_mythic_plus_ext.sql): they do not count as enemy forces and are not scaled
+    constexpr uint32 EXPLOSIVE_ENTRY = 700020;      // Explosive orb
+    constexpr uint32 STORM_ENTRY = 700021;          // Storming tornado
+    constexpr uint32 KEYSTONE_NPC_ENTRY = 700022;   // npc_mythic_plus_keystone
+    constexpr uint32 REROLL_COST = 100 * GOLD;      // key reroll: once a week for this price
+    constexpr uint32 PING_INTERVAL = 1000;          // ms between two pings of one player
+    constexpr uint32 PING_DURATION = 5000;          // ms a ping stays on the receivers' screens
+    constexpr uint32 PING_UPDATE = 250;             // ms between position updates
     constexpr uint32 SANGUINE_DURATION = 20 * IN_MILLISECONDS;
 
     enum Affix : uint32
@@ -142,6 +165,11 @@ namespace
         AFFIX_FORTIFIED = 10,
         AFFIX_BURSTING = 11,
         AFFIX_GRIEVOUS = 12,
+        AFFIX_EXPLOSIVE = 13,
+        AFFIX_QUAKING = 14,
+        AFFIX_INSPIRING = 122,
+        AFFIX_STORMING = 124,
+        AFFIX_THUNDERING = 132,
     };
 
     enum RunState : uint32
@@ -250,6 +278,23 @@ namespace
         uint32 GrievousTimer = 0;
         uint32 BattleRes = 0;                   // charges (keystone run)
         uint32 BattleResTimer = 0;
+        // new affixes
+        struct AffixSummon
+        {
+            ObjectGuid Guid;
+            uint32 TimeLeft = 0;
+        };
+        std::vector<AffixSummon> Orbs;          // Explosive: explode when the time is up
+        std::vector<AffixSummon> Storms;        // Storming: damage around while they live
+        uint32 ExplosiveTimer = 0;
+        uint32 StormTimer = 0;
+        uint32 QuakeTimer = 0;
+        uint32 QuakeWarn = 0;                   // ms left until the quake (0 - none)
+        uint32 ThunderTimer = 0;
+        ObjectGuid ThunderA, ThunderB;          // marked players
+        uint32 ThunderLeft = 0;
+        std::unordered_set<ObjectGuid> Inspiring;
+        std::unordered_set<ObjectGuid> Inspired;
     };
 
     std::unordered_map<uint32, DungeonInfo> s_dungeons;
@@ -268,7 +313,51 @@ namespace
     std::unordered_set<ObjectGuid> s_slotted;                // players with the key in the font
     std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> s_lastInstance;
     std::unordered_map<ObjectGuid::LowType, uint32> s_mythicItems;
-    std::vector<ObjectGuid> s_pendingKick;                    // joined a group in the middle of a run    // item guid -> keystone level it dropped from   // player -> mythic map, instance
+    std::vector<ObjectGuid> s_pendingKick;
+
+    // per-dungeon loot (world.mythic_plus_dungeon_loot), 0 - the common entry
+    struct DungeonLoot
+    {
+        uint32 Chest = 0;
+        uint32 Vault = 0;
+    };
+    std::unordered_map<uint32, DungeonLoot> s_dungeonLoot;
+
+    // seasons (world.mythic_plus_season): rating, leaderboard and rewards are per season
+    struct Season
+    {
+        uint32 Id = 0;
+        time_t Start = 0;
+        std::string Name;
+        uint32 Affix = 0;           // seasonal affix, added from AffixLevel
+        uint32 AffixLevel = 10;
+    };
+    std::vector<Season> s_seasons;  // by start
+    struct SeasonReward
+    {
+        uint32 Season = 0;
+        uint32 Rating = 0;
+        uint32 TitleId = 0;
+        uint32 ItemId = 0;
+        uint32 SpellId = 0;
+    };
+    std::vector<SeasonReward> s_seasonRewards;
+
+    // pings: every receiver gets the position relative to himself until the ping expires
+    struct Ping
+    {
+        ObjectGuid Sender;
+        ObjectGuid Target;          // unit (follows it) or empty - the fixed position
+        Position Pos;
+        uint32 MapId = 0;
+        uint32 Id = 0;
+        uint32 Type = 0;
+        uint32 TimeLeft = PING_DURATION;
+        std::vector<ObjectGuid> Receivers;
+    };
+    std::vector<Ping> s_pings;
+    std::unordered_map<ObjectGuid, uint32> s_lastPing;  // player -> game ms
+    uint32 s_pingId = 0;                    // joined a group in the middle of a run    // item guid -> keystone level it dropped from   // player -> mythic map, instance
 
     // ---------------------------------------------------------------- strings (UTF-8)
     char const* const MSG_NOT_IN_DUNGEON = "\xd0\x9a\xd1\x83\xd0\xbf\xd0\xb5\xd0\xbb\xd1\x8c \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b \xd1\x80\xd0\xb0\xd0\xb1\xd0\xbe\xd1\x82\xd0\xb0\xd0\xb5\xd1\x82 \xd1\x82\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xba\xd0\xbe \xd0\xb2 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xbc \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5.";
@@ -298,6 +387,17 @@ namespace
     char const* const MSG_CHEST_NOT_YOURS = "\xd0\xad\xd1\x82\xd0\xbe\xd1\x82 \xd1\x81\xd1\x83\xd0\xbd\xd0\xb4\xd1\x83\xd0\xba \xd0\xbd\xd0\xb5 \xd0\xb4\xd0\xbb\xd1\x8f \xd0\xb2\xd0\xb0\xd1\x81.";
     char const* const MSG_CHEST_LOOTED = "\xd0\x92\xd1\x8b \xd1\x83\xd0\xb6\xd0\xb5 \xd0\xb7\xd0\xb0\xd0\xb1\xd1\x80\xd0\xb0\xd0\xbb\xd0\xb8 \xd1\x81\xd0\xb2\xd0\xbe\xd1\x8e \xd0\xbd\xd0\xb0\xd0\xb3\xd1\x80\xd0\xb0\xd0\xb4\xd1\x83.";
     char const* const MSG_CHEST_MAIL = "\xd0\x9d\xd0\xb0\xd0\xb3\xd1\x80\xd0\xb0\xd0\xb4\xd0\xb0 \xd0\xbf\xd1\x80\xd0\xb5\xd1\x82\xd0\xb5\xd0\xbd\xd0\xb4\xd0\xb5\xd0\xbd\xd1\x82\xd0\xb0";
+    char const* const MSG_SEASON_REWARD = "\xd0\x9d\xd0\xb0\xd0\xb3\xd1\x80\xd0\xb0\xd0\xb4\xd0\xb0 \xd1\x81\xd0\xb5\xd0\xb7\xd0\xbe\xd0\xbd\xd0\xb0 \xd0\xb7\xd0\xb0 \xd1\x80\xd0\xb5\xd0\xb9\xd1\x82\xd0\xb8\xd0\xbd\xd0\xb3 %u!";
+    char const* const MSG_REROLL_OPTION = "\xd0\xa1\xd0\xbc\xd0\xb5\xd0\xbd\xd0\xb8\xd1\x82\xd1\x8c \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87\xd0\xb0 (\xd1\x80\xd0\xb0\xd0\xb7 \xd0\xb2 \xd0\xbd\xd0\xb5\xd0\xb4\xd0\xb5\xd0\xbb\xd1\x8e, 100 \xd0\xb7\xd0\xbe\xd0\xbb\xd0\xbe\xd1\x82\xd1\x8b\xd1\x85)";
+    char const* const MSG_DOWNGRADE_OPTION = "\xd0\x9f\xd0\xbe\xd0\xbd\xd0\xb8\xd0\xb7\xd0\xb8\xd1\x82\xd1\x8c \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87\xd0\xb0 \xd0\xbd\xd0\xb0 1";
+    char const* const MSG_REROLL_DONE = "\xd0\x9a\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xb8\xd0\xb7\xd0\xbc\xd0\xb5\xd0\xbd\xd0\xb5\xd0\xbd: %s (%u).";
+    char const* const MSG_REROLL_USED = "\xd0\x92\xd1\x8b \xd1\x83\xd0\xb6\xd0\xb5 \xd0\xbc\xd0\xb5\xd0\xbd\xd1\x8f\xd0\xbb\xd0\xb8 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xbd\xd0\xb0 \xd1\x8d\xd1\x82\xd0\xbe\xd0\xb9 \xd0\xbd\xd0\xb5\xd0\xb4\xd0\xb5\xd0\xbb\xd0\xb5.";
+    char const* const MSG_REROLL_MONEY = "\xd0\x9d\xd0\xb5\xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb0\xd1\x82\xd0\xbe\xd1\x87\xd0\xbd\xd0\xbe \xd0\xb7\xd0\xbe\xd0\xbb\xd0\xbe\xd1\x82\xd0\xb0.";
+    char const* const MSG_DOWNGRADE_DONE = "\xd0\xa3\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87\xd0\xb0 \xd0\xbf\xd0\xbe\xd0\xbd\xd0\xb8\xd0\xb6\xd0\xb5\xd0\xbd: %s (%u).";
+    char const* const MSG_DOWNGRADE_MIN = "\xd0\x9a\xd0\xbb\xd1\x8e\xd1\x87 \xd1\x83\xd0\xb6\xd0\xb5 \xd0\xbc\xd0\xb8\xd0\xbd\xd0\xb8\xd0\xbc\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xb3\xd0\xbe \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xbd\xd1\x8f.";
+    char const* const MSG_KEY_BUSY = "\xd0\x9d\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbc\xd0\xb5\xd0\xbd\xd1\x8f\xd1\x82\xd1\x8c \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xb2\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb8\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd1\x8f.";
+    char const* const MSG_QUAKE = "\xd0\x97\xd0\xb5\xd0\xbc\xd0\xbb\xd1\x8f \xd0\xbd\xd0\xb0\xd1\x87\xd0\xb8\xd0\xbd\xd0\xb0\xd0\xb5\xd1\x82 \xd0\xb4\xd1\x80\xd0\xbe\xd0\xb6\xd0\xb0\xd1\x82\xd1\x8c! \xd0\x9e\xd1\x82\xd0\xbe\xd0\xb9\xd0\xb4\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xbe\xd1\x82 \xd1\x81\xd0\xbe\xd1\x8e\xd0\xb7\xd0\xbd\xd0\xb8\xd0\xba\xd0\xbe\xd0\xb2.";
+    char const* const MSG_THUNDER = "\xd0\x92\xd1\x8b \xd0\xbe\xd1\x82\xd0\xbc\xd0\xb5\xd1\x87\xd0\xb5\xd0\xbd\xd1\x8b \xd0\xb3\xd1\x80\xd0\xbe\xd0\xb7\xd0\xbe\xd0\xb9! \xd0\x9d\xd0\xb0\xd0\xb9\xd0\xb4\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xb2\xd1\x82\xd0\xbe\xd1\x80\xd0\xbe\xd0\xb3\xd0\xbe \xd0\xbe\xd1\x82\xd0\xbc\xd0\xb5\xd1\x87\xd0\xb5\xd0\xbd\xd0\xbd\xd0\xbe\xd0\xb3\xd0\xbe \xd0\xb8\xd0\xb3\xd1\x80\xd0\xbe\xd0\xba\xd0\xb0.";
     char const* const FORCES_NAME = "\xd0\x92\xd1\x80\xd0\xb0\xd0\xb6\xd0\xb5\xd1\x81\xd0\xba\xd0\xb8\xd0\xb5 \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b";
 
     // ---------------------------------------------------------------- helpers
@@ -330,6 +430,22 @@ namespace
         return now > WEEK_EPOCH ? uint32((now - WEEK_EPOCH) / WEEK) : 0;
     }
 
+    Season const* CurrentSeason()
+    {
+        time_t now = GameTime::GetGameTime();
+        Season const* current = nullptr;
+        for (Season const& season : s_seasons)
+            if (season.Start <= now)
+                current = &season;
+        return current;
+    }
+
+    uint32 CurrentSeasonId()
+    {
+        Season const* season = CurrentSeason();
+        return season ? season->Id : 0;
+    }
+
     std::vector<uint32> WeekAffixes()
     {
         if (s_rotation.empty())
@@ -347,6 +463,11 @@ namespace
             result.push_back(week[1]);
         if (level >= THIRD_AFFIX_LEVEL && week.size() > 2)
             result.push_back(week[2]);
+        // seasonal affix
+        if (Season const* season = CurrentSeason())
+            if (season->Affix && level >= season->AffixLevel
+                && std::find(result.begin(), result.end(), season->Affix) == result.end())
+                result.push_back(season->Affix);
         return result;
     }
 
@@ -413,7 +534,8 @@ namespace
         return creature && !creature->IsControlledByPlayer() && !creature->IsCritter() && !creature->IsTrigger()
             && !creature->IsCivilian() && creature->IsHostileToPlayers()
             // invisible helpers and event dummies cannot be killed: they must not raise the forces total
-            && !creature->HasUnitFlag(UNIT_FLAG_UNINTERACTIBLE) && creature->GetMaxHealth() > 1;
+            && !creature->HasUnitFlag(UNIT_FLAG_UNINTERACTIBLE) && creature->GetMaxHealth() > 1
+            && creature->GetEntry() != EXPLOSIVE_ENTRY && creature->GetEntry() != STORM_ENTRY;
     }
 
     bool IsBoss(Creature const* creature)
@@ -536,7 +658,7 @@ namespace
         std::ostringstream list;
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
             "SELECT CAST(map_id AS SIGNED), CAST(level AS SIGNED), CAST(time_ms AS SIGNED), CAST(timed AS SIGNED), CAST(score AS SIGNED) "
-            "FROM character_mythic_plus_best WHERE guid = {}", player->GetGUID().GetCounter()).c_str()))
+            "FROM character_mythic_plus_season_best WHERE guid = {} AND season = {}", player->GetGUID().GetCounter(), CurrentSeasonId()).c_str()))
         {
             bool first = true;
             do
@@ -554,7 +676,7 @@ namespace
     uint32 GetRating(ObjectGuid::LowType guid)
     {
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
-            "SELECT CAST(COALESCE(SUM(score), 0) AS SIGNED) FROM character_mythic_plus_best WHERE guid = {}", guid).c_str()))
+            "SELECT CAST(COALESCE(SUM(score), 0) AS SIGNED) FROM character_mythic_plus_season_best WHERE guid = {} AND season = {}", guid, CurrentSeasonId()).c_str()))
             return uint32(result->Fetch()[0].GetInt64());
         return 0;
     }
@@ -562,6 +684,17 @@ namespace
     void SaveBest(Player* player, Run const& run, bool timed, uint32 timeMs, uint32 score)
     {
         ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+        // this season (rating, leaderboard)
+        uint32 season = CurrentSeasonId();
+        bool better = true;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(score AS SIGNED) FROM character_mythic_plus_season_best WHERE guid = {} AND season = {} AND map_id = {}", guid, season, run.MapId).c_str()))
+            better = uint32(result->Fetch()[0].GetInt64()) < score;
+        if (better)
+            CharacterDatabase.DirectExecute(Trinity::StringFormat(
+                "REPLACE INTO character_mythic_plus_season_best (guid, season, map_id, level, time_ms, timed, score, date) VALUES ({}, {}, {}, {}, {}, {}, {}, UNIX_TIMESTAMP())",
+                guid, season, run.MapId, run.Level, timeMs, timed ? 1 : 0, score).c_str());
+        // all time
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
             "SELECT CAST(score AS SIGNED) FROM character_mythic_plus_best WHERE guid = {} AND map_id = {}", guid, run.MapId).c_str()))
             if (uint32(result->Fetch()[0].GetInt64()) >= score)
@@ -569,6 +702,51 @@ namespace
         CharacterDatabase.DirectExecute(Trinity::StringFormat(
             "REPLACE INTO character_mythic_plus_best (guid, map_id, level, time_ms, timed, affixes, score, date) VALUES ({}, {}, {}, {}, {}, '{}', {}, UNIX_TIMESTAMP())",
             guid, run.MapId, run.Level, timeMs, timed ? 1 : 0, JoinIds(run.Affixes), score).c_str());
+    }
+
+    // ---------------------------------------------------------------- season rewards (world.mythic_plus_season_reward)
+    void MailItem(Player* player, uint32 itemId, char const* subject)
+    {
+        CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+        MailDraft draft(subject, "");
+        if (Item* item = Item::CreateItem(itemId, 1, player))
+        {
+            item->SaveToDB(trans);
+            draft.AddItem(item);
+        }
+        draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+        CharacterDatabase.CommitTransaction(trans);
+    }
+
+    void CheckSeasonRewards(Player* player)
+    {
+        uint32 season = CurrentSeasonId();
+        if (!season)
+            return;
+        ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+        uint32 rating = GetRating(guid);
+        std::set<uint32> given;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(rating AS SIGNED) FROM character_mythic_plus_season_reward WHERE guid = {} AND season = {}", guid, season).c_str()))
+            do
+                given.insert(uint32(result->Fetch()[0].GetInt64()));
+            while (result->NextRow());
+
+        for (SeasonReward const& reward : s_seasonRewards)
+        {
+            if (reward.Season != season || reward.Rating > rating || given.count(reward.Rating))
+                continue;
+            CharacterDatabase.Execute(Trinity::StringFormat(
+                "INSERT IGNORE INTO character_mythic_plus_season_reward (guid, season, rating) VALUES ({}, {}, {})", guid, season, reward.Rating).c_str());
+            if (reward.TitleId)
+                if (CharTitlesEntry const* title = sCharTitlesStore.LookupEntry(reward.TitleId))
+                    player->SetTitle(title);
+            if (reward.SpellId && !player->HasSpell(reward.SpellId))
+                player->LearnSpell(reward.SpellId, false);
+            if (reward.ItemId)
+                MailItem(player, reward.ItemId, MSG_VAULT_MAIL);
+            Message(player, Fmt(MSG_SEASON_REWARD, reward.Rating));
+        }
     }
 
     // ---------------------------------------------------------------- run sync
@@ -643,7 +821,13 @@ namespace
         float mult = CreatureMult(run, creature, true);
         auto itr = run.Scaled.find(creature->GetGUID());
         if (itr == run.Scaled.end())
+        {
             itr = run.Scaled.emplace(creature->GetGUID(), CreatureScale{ creature->GetFlatModifierValue(UNIT_MOD_HEALTH, BASE_VALUE), 1.0f }).first;
+            // Inspiring: some non-boss enemies (20%) make themselves and the allies near them immune to crowd control
+            if (std::find(run.Affixes.begin(), run.Affixes.end(), uint32(AFFIX_INSPIRING)) != run.Affixes.end()
+                && !IsBoss(creature) && urand(0, 99) < 20)
+                run.Inspiring.insert(creature->GetGUID());
+        }
         if (std::fabs(itr->second.Applied - mult) < 0.001f)
             return;
         // through the health modifier: UpdateMaxHealth (auras, evade) keeps the scaled value
@@ -750,6 +934,43 @@ namespace
             } while (result->NextRow());
     }
 
+    // every item of the character, bank included
+    template <typename F>
+    void ForEachPlayerItem(Player* player, F&& func)
+    {
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
+            if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                func(item);
+        for (uint8 slot = BANK_SLOT_ITEM_START; slot < BANK_SLOT_ITEM_END; ++slot)
+            if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                func(item);
+        auto bags = [&](uint8 first, uint8 last)
+        {
+            for (uint8 bagSlot = first; bagSlot < last; ++bagSlot)
+                if (Bag* bag = player->GetBagByPos(bagSlot))
+                    for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                        if (Item* item = bag->GetItemByPos(uint8(i)))
+                            func(item);
+        };
+        bags(INVENTORY_SLOT_BAG_START, INVENTORY_SLOT_BAG_END);
+        bags(BANK_SLOT_BAG_START, BANK_SLOT_BAG_END);
+    }
+
+    // a mythic item must have at least the item level of its keystone (the bonus may have been lost:
+    // written before the item itself, server stopped without a save); upgrades only add to it
+    void ReconcileMythicItems(Player* player)
+    {
+        ForEachPlayerItem(player, [&](Item* item)
+        {
+            auto itr = s_mythicItems.find(item->GetGUID().GetCounter());
+            if (itr == s_mythicItems.end())
+                return;
+            int32 bonus = int32(std::min(itr->second, MYTHIC_ILVL_MAX_LEVEL)) * MYTHIC_ILVL_PER_LEVEL;
+            if (ItemScaling::GetBonus(item) < bonus)
+                ItemScaling::SetBonus(player, item, bonus);
+        });
+    }
+
     void HandleItemsGet(Player* player, std::vector<std::string> const& /*args*/)
     {
         SendMythicItems(player);
@@ -837,6 +1058,7 @@ namespace
             if (player->GetGUID().GetCounter() != run.KeyOwner)
                 GrantNewKey(player, std::max(MIN_KEY_LEVEL, run.Level - 1));
             SendRating(player);
+            CheckSeasonRewards(player);
         });
 
         // chest: the dungeon row position, else where the last boss died, else the Font of Power
@@ -1088,6 +1310,30 @@ namespace
         });
     }
 
+    uint32 ChestLoot(uint32 mapId)
+    {
+        auto itr = s_dungeonLoot.find(mapId);
+        return itr != s_dungeonLoot.end() && itr->second.Chest ? itr->second.Chest : CHEST_ENTRY;
+    }
+
+    uint32 VaultLoot(uint32 mapId)
+    {
+        auto itr = s_dungeonLoot.find(mapId);
+        return itr != s_dungeonLoot.end() && itr->second.Vault ? itr->second.Vault : VAULT_LOOT;
+    }
+
+    // maps of the runs of a week, in the order of WeekLevels (best first)
+    std::vector<uint32> WeekMaps(ObjectGuid::LowType guid, uint32 week)
+    {
+        std::vector<uint32> maps;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(map_id AS SIGNED) FROM character_mythic_plus_weekly WHERE guid = {} AND week = {} ORDER BY level DESC", guid, week).c_str()))
+            do
+                maps.push_back(uint32(result->Fetch()[0].GetInt64()));
+            while (result->NextRow());
+        return maps;
+    }
+
     uint32 RollVaultItem(Player* player, uint32 lootId = VAULT_LOOT)
     {
         Loot loot;
@@ -1113,9 +1359,10 @@ namespace
         if (!hasOptions && week)
         {
             std::vector<uint32> levels = WeekLevels(guid, last);
+            std::vector<uint32> maps = WeekMaps(guid, last);
             for (uint32 slot = 0; slot < 3; ++slot)
                 if (levels.size() >= VAULT_THRESHOLDS[slot])
-                    if (uint32 itemId = RollVaultItem(player))
+                    if (uint32 itemId = RollVaultItem(player, maps.size() >= VAULT_THRESHOLDS[slot] ? VaultLoot(maps[VAULT_THRESHOLDS[slot] - 1]) : VAULT_LOOT))
                         CharacterDatabase.DirectExecute(Trinity::StringFormat(
                             "INSERT INTO character_mythic_plus_vault (guid, week, slot, item_id, level, claimed) VALUES ({}, {}, {}, {}, {}, 0)",
                             guid, last, slot + 1, itemId, levels[VAULT_THRESHOLDS[slot] - 1]).c_str());
@@ -1242,6 +1489,7 @@ namespace
             sAddonComm->Send(player, "MPLUS_MAPS", maps.str());
         }
         SendKey(player);
+        SendSeason(player);
         SendRating(player);
         if (Run* run = FindRun(player->GetMap()))
         {
@@ -1397,6 +1645,38 @@ namespace
                 s_barriers[uint32(f[0].GetInt64())].push_back(spawn);
             } while (result->NextRow());
 
+        s_dungeonLoot.clear();
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(map_id AS SIGNED), CAST(chest_loot AS SIGNED), CAST(vault_loot AS SIGNED) FROM mythic_plus_dungeon_loot"))
+            do
+            {
+                Field* f = result->Fetch();
+                s_dungeonLoot[uint32(f[0].GetInt64())] = { uint32(f[1].GetInt64()), uint32(f[2].GetInt64()) };
+            } while (result->NextRow());
+
+        s_seasons.clear();
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(start_time AS SIGNED), name, CAST(seasonal_affix AS SIGNED), CAST(seasonal_affix_level AS SIGNED) FROM mythic_plus_season ORDER BY start_time"))
+            do
+            {
+                Field* f = result->Fetch();
+                Season season;
+                season.Id = uint32(f[0].GetInt64());
+                season.Start = time_t(f[1].GetInt64());
+                season.Name = f[2].GetString();
+                season.Affix = uint32(f[3].GetInt64());
+                season.AffixLevel = uint32(f[4].GetInt64());
+                s_seasons.push_back(season);
+            } while (result->NextRow());
+
+        s_seasonRewards.clear();
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(season AS SIGNED), CAST(rating AS SIGNED), CAST(title_id AS SIGNED), CAST(item_id AS SIGNED), CAST(spell_id AS SIGNED) FROM mythic_plus_season_reward"))
+            do
+            {
+                Field* f = result->Fetch();
+                s_seasonRewards.push_back({ uint32(f[0].GetInt64()), uint32(f[1].GetInt64()), uint32(f[2].GetInt64()), uint32(f[3].GetInt64()), uint32(f[4].GetInt64()) });
+            } while (result->NextRow());
+
+        TC_LOG_INFO("server.loading", ">> Mythic+: {} dungeon loot rows, {} seasons (current {}), {} season rewards",
+            s_dungeonLoot.size(), s_seasons.size(), CurrentSeasonId(), s_seasonRewards.size());
         TC_LOG_INFO("server.loading", ">> Mythic+: {} dungeons, {} affixes, {} rotation weeks, {} forces overrides, {} dungeons with barriers",
             s_dungeons.size(), s_affixes.size(), s_rotation.size(), s_forces.size(), s_barriers.size());
     }
@@ -1419,6 +1699,345 @@ namespace
             GiveKeyItem(player);
         else if (!hasRow && hasItem)
             player->DestroyItemCount(KEYSTONE_ITEM, 1, true);
+    }
+
+    // ---------------------------------------------------------------- new affixes (once a second)
+    // a random living non-boss enemy in combat (Explosive, Storming spawn next to it)
+    Creature* RandomFightingEnemy(Map* map)
+    {
+        std::vector<Creature*> list;
+        for (auto const& pair : map->GetCreatureBySpawnIdStore())
+        {
+            Creature* creature = pair.second;
+            if (creature->IsAlive() && creature->IsInCombat() && IsEnemyCreature(creature) && !IsBoss(creature))
+                list.push_back(creature);
+        }
+        return list.empty() ? nullptr : list[urand(0, uint32(list.size() - 1))];
+    }
+
+    Creature* SummonAffixCreature(Creature* near, uint32 entry, uint32 lifeMs)
+    {
+        if (!sObjectMgr->GetCreatureTemplate(entry))
+            return nullptr;
+        Position pos = near->GetRandomNearPosition(5.0f);
+        return near->SummonCreature(entry, pos, TEMPSUMMON_TIMED_DESPAWN, Milliseconds(lifeMs));
+    }
+
+    void UpdateNewAffixes(Run& run, Map* map)
+    {
+        uint32 const tick = IN_MILLISECONDS;
+
+        // Explosive: an orb appears near fighting enemies every 8 s and explodes after 6 s unless killed
+        if (HasAffix(run, AFFIX_EXPLOSIVE))
+        {
+            run.ExplosiveTimer += tick;
+            if (run.ExplosiveTimer >= 8 * IN_MILLISECONDS)
+            {
+                run.ExplosiveTimer = 0;
+                if (Creature* near = RandomFightingEnemy(map))
+                    if (Creature* orb = SummonAffixCreature(near, EXPLOSIVE_ENTRY, 7 * IN_MILLISECONDS))
+                    {
+                        uint32 health = 3000 + run.Level * 300;
+                        orb->SetMaxHealth(health);
+                        orb->SetHealth(health);
+                        orb->SetReactState(REACT_PASSIVE);
+                        orb->SetControlled(true, UNIT_STATE_ROOT);
+                        run.Orbs.push_back({ orb->GetGUID(), 6 * IN_MILLISECONDS });
+                    }
+            }
+        }
+        for (auto itr = run.Orbs.begin(); itr != run.Orbs.end();)
+        {
+            Creature* orb = map->GetCreature(itr->Guid);
+            if (!orb || !orb->IsAlive())
+            {
+                itr = run.Orbs.erase(itr);
+                continue;
+            }
+            if (itr->TimeLeft > tick)
+            {
+                itr->TimeLeft -= tick;
+                ++itr;
+                continue;
+            }
+            ForEachPlayer(map, [&](Player* player) { AffixDamage(run, player, player->CountPctFromMaxHealth(10), DAMAGE_FIRE); });
+            orb->DespawnOrUnsummon();
+            itr = run.Orbs.erase(itr);
+        }
+
+        // Storming: a tornado near fighting enemies every 12 s for 8 s, 8% per second to players within 4 yd
+        if (HasAffix(run, AFFIX_STORMING))
+        {
+            run.StormTimer += tick;
+            if (run.StormTimer >= 12 * IN_MILLISECONDS)
+            {
+                run.StormTimer = 0;
+                if (Creature* near = RandomFightingEnemy(map))
+                    if (Creature* storm = SummonAffixCreature(near, STORM_ENTRY, 8 * IN_MILLISECONDS))
+                    {
+                        storm->SetReactState(REACT_PASSIVE);
+                        storm->GetMotionMaster()->MoveRandom(8.0f);
+                        run.Storms.push_back({ storm->GetGUID(), 8 * IN_MILLISECONDS });
+                    }
+            }
+        }
+        for (auto itr = run.Storms.begin(); itr != run.Storms.end();)
+        {
+            Creature* storm = map->GetCreature(itr->Guid);
+            if (!storm || itr->TimeLeft <= tick)
+            {
+                itr = run.Storms.erase(itr);
+                continue;
+            }
+            itr->TimeLeft -= tick;
+            ForEachPlayer(map, [&](Player* player)
+            {
+                if (player->IsWithinDist(storm, 4.0f))
+                    AffixDamage(run, player, player->CountPctFromMaxHealth(8), DAMAGE_FALL);
+            });
+            ++itr;
+        }
+
+        // Quaking: every 20 s a warning, 2.5 s later 15% to every player plus 15% per ally within 8 yd, casts interrupted
+        if (HasAffix(run, AFFIX_QUAKING))
+        {
+            if (run.QuakeWarn)
+            {
+                run.QuakeWarn = run.QuakeWarn > tick ? run.QuakeWarn - tick : 0;
+                if (!run.QuakeWarn)
+                    ForEachPlayer(map, [&](Player* player)
+                    {
+                        if (!player->IsAlive())
+                            return;
+                        uint32 near = 0;
+                        ForEachPlayer(map, [&](Player* other)
+                        {
+                            if (other != player && other->IsAlive() && player->IsWithinDist(other, 8.0f))
+                                ++near;
+                        });
+                        player->InterruptNonMeleeSpells(false);
+                        AffixDamage(run, player, player->CountPctFromMaxHealth(15) * (1 + near), DAMAGE_FALL);
+                    });
+            }
+            run.QuakeTimer += tick;
+            if (run.QuakeTimer >= 20 * IN_MILLISECONDS)
+            {
+                run.QuakeTimer = 0;
+                run.QuakeWarn = 2 * IN_MILLISECONDS;
+                ForEachPlayer(map, [&](Player* player) { Result(player, MSG_QUAKE); });
+            }
+        }
+
+        // Thundering: every 70 s two players are marked for 15 s; they clear it by meeting (8 yd), else 50% each
+        if (HasAffix(run, AFFIX_THUNDERING))
+        {
+            if (run.ThunderLeft)
+            {
+                Player* a = ObjectAccessor::GetPlayer(map, run.ThunderA);
+                Player* b = ObjectAccessor::GetPlayer(map, run.ThunderB);
+                if (!a || !b || a->IsWithinDist(b, 8.0f))
+                    run.ThunderLeft = 0;
+                else if (run.ThunderLeft <= tick)
+                {
+                    run.ThunderLeft = 0;
+                    AffixDamage(run, a, a->CountPctFromMaxHealth(50), DAMAGE_FIRE);
+                    AffixDamage(run, b, b->CountPctFromMaxHealth(50), DAMAGE_FIRE);
+                }
+                else
+                    run.ThunderLeft -= tick;
+            }
+            run.ThunderTimer += tick;
+            if (run.ThunderTimer >= 70 * IN_MILLISECONDS)
+            {
+                run.ThunderTimer = 0;
+                std::vector<Player*> alive;
+                ForEachPlayer(map, [&](Player* player) { if (player->IsAlive() && player->IsInCombat()) alive.push_back(player); });
+                if (alive.size() >= 2)
+                {
+                    std::shuffle(alive.begin(), alive.end(), std::mt19937(urand(0, 0xFFFFFF)));
+                    run.ThunderA = alive[0]->GetGUID();
+                    run.ThunderB = alive[1]->GetGUID();
+                    run.ThunderLeft = 15 * IN_MILLISECONDS;
+                    Result(alive[0], MSG_THUNDER);
+                    Result(alive[1], MSG_THUNDER);
+                }
+            }
+        }
+
+        // Inspiring: the inspiring enemies and their allies within 10 yd are immune to crowd control
+        if (!run.Inspiring.empty())
+            for (auto const& pair : map->GetCreatureBySpawnIdStore())
+            {
+                Creature* creature = pair.second;
+                if (!creature->IsAlive() || !IsEnemyCreature(creature) || run.Inspired.count(creature->GetGUID()))
+                    continue;
+                bool near = run.Inspiring.count(creature->GetGUID()) != 0;
+                for (ObjectGuid const& guid : run.Inspiring)
+                    if (!near)
+                        if (Creature* source = map->GetCreature(guid))
+                            near = source->IsAlive() && source->IsInCombat() && creature->IsWithinDist(source, 10.0f);
+                if (!near)
+                    continue;
+                run.Inspired.insert(creature->GetGUID());
+                for (Mechanics mechanic : { MECHANIC_STUN, MECHANIC_FEAR, MECHANIC_ROOT, MECHANIC_SILENCE, MECHANIC_SLEEP,
+                                            MECHANIC_CHARM, MECHANIC_POLYMORPH, MECHANIC_HORROR, MECHANIC_DISORIENTED, MECHANIC_KNOCKOUT,
+                                            MECHANIC_SNARE, MECHANIC_FREEZE, MECHANIC_BANISH, MECHANIC_SAPPED })
+                    creature->ApplySpellImmune(0, IMMUNITY_MECHANIC, mechanic, true);
+            }
+    }
+
+    // ---------------------------------------------------------------- pings (group, AddonComm)
+    // C->S "PING" : type : target guid (0 - the sender's position)
+    // S->C "PING" : id : type : sender name : target name : dx : dy (yards, world, from the receiver) / "PING_POS" : id : dx : dy
+    void SendPingPos(Player* receiver, Ping const& ping, bool first, std::string const& senderName, std::string const& targetName)
+    {
+        float dx = ping.Pos.GetPositionX() - receiver->GetPositionX();
+        float dy = ping.Pos.GetPositionY() - receiver->GetPositionY();
+        if (first)
+            sAddonComm->Send(receiver, "PING", ping.Id, ping.Type, Sanitize(senderName), Sanitize(targetName), int32(dx), int32(dy));
+        else
+            sAddonComm->Send(receiver, "PING_POS", ping.Id, int32(dx), int32(dy));
+    }
+
+    void HandlePing(Player* player, std::vector<std::string> const& args)
+    {
+        uint32 type = args.empty() ? 0 : CommToUInt32(args[0]);
+        if (type < 1 || type > 4)
+            return;
+        uint32 now = GameTime::GetGameTimeMS();
+        auto last = s_lastPing.find(player->GetGUID());
+        if (last != s_lastPing.end() && now - last->second < PING_INTERVAL)
+            return;
+        s_lastPing[player->GetGUID()] = now;
+
+        Ping ping;
+        ping.Sender = player->GetGUID();
+        ping.Type = type;
+        ping.Id = ++s_pingId;
+        ping.MapId = player->GetMapId();
+        ping.Pos = player->GetPosition();
+        std::string targetName;
+        if (args.size() > 1 && !args[1].empty() && args[1] != "0")
+        {
+            uint64 raw = std::strtoull(args[1].c_str(), nullptr, 16);
+            if (Unit* target = ObjectAccessor::GetUnit(*player, ObjectGuid(raw)))
+                if (target->IsInWorld() && target->GetMap() == player->GetMap() && player->IsWithinDist(target, 200.0f))
+                {
+                    ping.Target = target->GetGUID();
+                    ping.Pos = target->GetPosition();
+                    targetName = target->GetName();
+                    if (Creature* creature = target->ToCreature())
+                        if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(creature->GetEntry()))
+                            ObjectMgr::GetLocaleString(locale->Name, player->GetSession()->GetSessionDbLocaleIndex(), targetName);
+                }
+        }
+
+        // the group on this map, or only the sender
+        std::vector<Player*> receivers;
+        if (Group* group = player->GetGroup())
+        {
+            for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+                if (Player* member = ref->GetSource())
+                    if (member->IsInWorld() && member->GetMap() == player->GetMap())
+                        receivers.push_back(member);
+        }
+        else
+            receivers.push_back(player);
+
+        for (Player* receiver : receivers)
+        {
+            ping.Receivers.push_back(receiver->GetGUID());
+            SendPingPos(receiver, ping, true, player->GetName(), targetName);
+        }
+        s_pings.push_back(ping);
+    }
+
+    void UpdatePings(uint32 diff)
+    {
+        static uint32 timer = 0;
+        timer += diff;
+        if (timer < PING_UPDATE)
+            return;
+        uint32 elapsed = timer;
+        timer = 0;
+        for (auto itr = s_pings.begin(); itr != s_pings.end();)
+        {
+            Ping& ping = *itr;
+            if (ping.TimeLeft <= elapsed)
+            {
+                itr = s_pings.erase(itr);
+                continue;
+            }
+            ping.TimeLeft -= elapsed;
+            for (ObjectGuid const& guid : ping.Receivers)
+            {
+                Player* receiver = ObjectAccessor::FindConnectedPlayer(guid);
+                if (!receiver || !receiver->IsInWorld() || receiver->GetMapId() != ping.MapId)
+                    continue;
+                if (!ping.Target.IsEmpty())
+                    if (Unit* target = ObjectAccessor::GetUnit(*receiver, ping.Target))
+                        ping.Pos = target->GetPosition();
+                SendPingPos(receiver, ping, false, "", "");
+            }
+            ++itr;
+        }
+    }
+
+    // ---------------------------------------------------------------- scores of other players, leaderboard
+    // C->S "MPLUS_SCORE_GET" : name -> S->C "MPLUS_SCORE" : name : rating : best level
+    void HandleScoreGet(Player* player, std::vector<std::string> const& args)
+    {
+        if (args.empty() || args[0].empty())
+            return;
+        ObjectGuid guid = sCharacterCache->GetCharacterGuidByName(args[0]);
+        if (guid.IsEmpty())
+            return;
+        uint32 rating = GetRating(guid.GetCounter());
+        uint32 best = 0;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(COALESCE(MAX(level), 0) AS SIGNED) FROM character_mythic_plus_season_best WHERE guid = {} AND season = {} AND timed = 1",
+            guid.GetCounter(), CurrentSeasonId()).c_str()))
+            best = uint32(result->Fetch()[0].GetInt64());
+        sAddonComm->Send(player, "MPLUS_SCORE", Sanitize(args[0]), rating, best);
+    }
+
+    // C->S "MPLUS_LEADERS" : mapId -> S->C "MPLUS_LEADERS" : mapId : name;level;timeMs;timed;score;class,... (top 10 of the season)
+    void HandleLeaders(Player* player, std::vector<std::string> const& args)
+    {
+        uint32 mapId = args.empty() ? 0 : CommToUInt32(args[0]);
+        std::ostringstream list;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT c.name, CAST(b.level AS SIGNED), CAST(b.time_ms AS SIGNED), CAST(b.timed AS SIGNED), CAST(b.score AS SIGNED), CAST(c.class AS SIGNED) "
+            "FROM character_mythic_plus_season_best b JOIN characters c ON c.guid = b.guid "
+            "WHERE b.season = {} AND b.map_id = {} ORDER BY b.score DESC, b.time_ms ASC LIMIT 10", CurrentSeasonId(), mapId).c_str()))
+        {
+            bool first = true;
+            do
+            {
+                Field* f = result->Fetch();
+                list << (first ? "" : ",") << f[0].GetString() << ";" << f[1].GetInt64() << ";" << f[2].GetInt64() << ";"
+                     << f[3].GetInt64() << ";" << f[4].GetInt64() << ";" << f[5].GetInt64();
+                first = false;
+            } while (result->NextRow());
+        }
+        sAddonComm->Send(player, "MPLUS_LEADERS", mapId, list.str());
+    }
+
+    void SendSeason(Player* player)
+    {
+        Season const* season = CurrentSeason();
+        sAddonComm->Send(player, "MPLUS_SEASON", season ? season->Id : 0, Sanitize(season ? season->Name : std::string()),
+            season ? season->Affix : 0, season ? season->AffixLevel : 0);
+    }
+
+    // ---------------------------------------------------------------- key reroll / downgrade (npc_mythic_plus_keystone)
+    bool KeyBusy(Player* player)
+    {
+        for (auto const& pair : s_runs)
+            if (pair.second.KeyOwner == player->GetGUID().GetCounter() && pair.second.Level
+                && (pair.second.State == RUN_COUNTDOWN || pair.second.State == RUN_ACTIVE))
+                return true;
+        return false;
     }
 
     // ---------------------------------------------------------------- update
@@ -1573,6 +2192,8 @@ namespace
                 }
             });
 
+            UpdateNewAffixes(run, map);
+
             // bosses killed without DealDamage (scripted kills, instakills): found and dead
             // (not found = grid unloaded or corpse gone - OnDamage already counted it)
             for (Boss& boss : run.Bosses)
@@ -1628,7 +2249,7 @@ struct go_mythic_plus_chest : public GameObjectAI
         }
 
         Loot loot;
-        loot.FillLoot(CHEST_ENTRY, LootTemplates_Gameobject, player, true);
+        loot.FillLoot(ChestLoot(run->MapId), LootTemplates_Gameobject, player, true);
 
         std::vector<std::pair<uint32, uint32>> mailItems;
         for (LootItem const& lootItem : loot.items)
@@ -1736,6 +2357,8 @@ public:
             }
         }
 
+        UpdatePings(diff);
+
         for (auto itr = s_runs.begin(); itr != s_runs.end();)
         {
             if (!sMapMgr->FindMap(itr->second.MapId, itr->second.InstanceId))
@@ -1763,14 +2386,19 @@ public:
         sAddonComm->Register(std::string("MPLUS_ITEMS_GET"), &HandleItemsGet);
         sAddonComm->Register(std::string("MPLUS_VAULT_GET"), &HandleVaultGet);
         sAddonComm->Register(std::string("MPLUS_VAULT_CHOOSE"), &HandleVaultChoose);
+        sAddonComm->Register(std::string("MPLUS_SCORE_GET"), &HandleScoreGet);
+        sAddonComm->Register(std::string("MPLUS_LEADERS"), &HandleLeaders);
+        sAddonComm->Register(std::string("PING"), &HandlePing);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
     {
         LoadKey(player);
         LoadMythicItems(player);
+        ReconcileMythicItems(player);
         SendAll(player);
         SendMythicItems(player);
+        CheckSeasonRewards(player);
     }
 
     void OnLogout(Player* player) override
@@ -1779,6 +2407,7 @@ public:
         s_slotted.erase(player->GetGUID());
         s_lastInstance.erase(player->GetGUID());
         s_keys.erase(player->GetGUID().GetCounter());
+        s_lastPing.erase(player->GetGUID());
     }
 
     void OnMapChanged(Player* player) override
@@ -2081,8 +2710,82 @@ struct go_mythic_plus_vault : public GameObjectAI
     }
 };
 
+// keystone NPC: another dungeon for the key once a week (gold), or the key one level lower
+struct npc_mythic_plus_keystone : public ScriptedAI
+{
+    npc_mythic_plus_keystone(Creature* creature) : ScriptedAI(creature) { }
+
+    enum
+    {
+        ACTION_REROLL = GOSSIP_ACTION_INFO_DEF + 1,
+        ACTION_DOWNGRADE = GOSSIP_ACTION_INFO_DEF + 2,
+    };
+
+    bool OnGossipHello(Player* player) override
+    {
+        ClearGossipMenuFor(player);
+        if (HasKey(player))
+        {
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, MSG_REROLL_OPTION, GOSSIP_SENDER_MAIN, ACTION_REROLL);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, MSG_DOWNGRADE_OPTION, GOSSIP_SENDER_MAIN, ACTION_DOWNGRADE);
+        }
+        SendGossipMenuFor(player, player->GetGossipTextId(me), me->GetGUID());
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
+    {
+        uint32 action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+        CloseGossipMenuFor(player);
+        ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+        auto key = s_keys.find(guid);
+        if (key == s_keys.end() || !key->second.MapId)
+            return true;
+        if (KeyBusy(player))
+        {
+            Message(player, MSG_KEY_BUSY);
+            return true;
+        }
+
+        if (action == ACTION_REROLL)
+        {
+            uint32 week = CurrentWeek();
+            if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+                "SELECT 1 FROM character_mythic_plus_reroll WHERE guid = {} AND week = {}", guid, week).c_str()))
+            {
+                Message(player, MSG_REROLL_USED);
+                return true;
+            }
+            if (!player->HasEnoughMoney(REROLL_COST))
+            {
+                Message(player, MSG_REROLL_MONEY);
+                return true;
+            }
+            player->ModifyMoney(-int32(REROLL_COST));
+            CharacterDatabase.Execute(Trinity::StringFormat("REPLACE INTO character_mythic_plus_reroll (guid, week) VALUES ({}, {})", guid, week).c_str());
+            uint32 level = key->second.Level;
+            SetKey(guid, RandomDungeon(key->second.MapId), level);
+            Message(player, Fmt(MSG_REROLL_DONE, DungeonName(s_keys[guid].MapId).c_str(), level));
+        }
+        else if (action == ACTION_DOWNGRADE)
+        {
+            if (key->second.Level <= MIN_KEY_LEVEL)
+            {
+                Message(player, MSG_DOWNGRADE_MIN);
+                return true;
+            }
+            uint32 mapId = key->second.MapId;
+            uint32 level = key->second.Level - 1;
+            SetKey(guid, mapId, level);
+            Message(player, Fmt(MSG_DOWNGRADE_DONE, DungeonName(mapId).c_str(), level));
+        }
+        return true;
+    }
+};
+
 void AddSC_mythic_plus()
 {
+    RegisterCreatureAI(npc_mythic_plus_keystone);
     new mythic_plus_group();
     RegisterSpellScript(spell_mythic_plus_battle_res);
     RegisterGameObjectAI(go_mythic_plus_vault);

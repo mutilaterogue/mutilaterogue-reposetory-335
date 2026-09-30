@@ -1,0 +1,9 @@
+Add to Interface\FrameXML\Bindings.xml (inside <Bindings>), then assign the key in Key Bindings:
+
+	<Binding name="PINGWHEEL" runOnUp="true" header="PINGSYSTEM">
+		if keystate == "down" then
+			PingWheel_Show();
+		else
+			PingWheel_Release();
+		end
+	</Binding>
