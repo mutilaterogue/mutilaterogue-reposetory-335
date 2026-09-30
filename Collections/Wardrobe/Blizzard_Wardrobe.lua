@@ -159,6 +159,9 @@ local function DressModel(model)
 	model:Undress();
 	if entry.illusion then
 		model:TryOn("item:" .. entry.itemId .. ":" .. entry.illusion.id);
+		if entry.offItemId then
+			model:TryOn("item:" .. entry.offItemId .. ":" .. entry.illusion.id);   -- второе оружие - в левую руку
+		end
 	else
 		model:TryOn("item:" .. entry.itemId);
 	end
@@ -229,9 +232,11 @@ function WardrobeItemsModel_OnMouseDown(self, button)
 			ChatEdit_InsertLink(link);
 		elseif IsModifiedClick("DRESSUP") then
 			-- ретейл: Ctrl+щелчок - осмотреть в примерочной (оружие с иллюзией, модель крутится и приближается)
-			local weaponLink = select(2, GetItemInfo(entry.itemId));
-			if weaponLink then
-				DressUpItemLink(weaponLink:gsub("item:(%d+):%d+", "item:%1:" .. entry.illusion.id, 1));
+			for _, itemId in ipairs({ entry.itemId, entry.offItemId }) do
+				local weaponLink = select(2, GetItemInfo(itemId));
+				if weaponLink then
+					DressUpItemLink((weaponLink:gsub("item:(%d+):%d+", "item:%1:" .. entry.illusion.id, 1)));
+				end
 			end
 		end
 		return;
@@ -417,12 +422,14 @@ function WardrobeIllusions_BuildPage(self)
 		end
 	end
 	local weapon = IllusionWeapon();
+	-- два оружия: иллюзия и на левой руке, если там оружие ближнего боя
+	local offWeapon = TransmogUI and TransmogUI.CanHaveIllusion and TransmogUI.CanHaveIllusion(17) and GetInventoryItemID("player", 17) or nil;
 	self.total, self.collected = all and #all or 0, collected;
 	self.numPages = math.max(1, math.ceil(#list / NUM_MODELS));
 	self.page = math.min(self.page or 1, self.numPages);
 	self.entries = {};
 	for index = (self.page - 1) * NUM_MODELS + 1, math.min(#list, self.page * NUM_MODELS) do
-		table.insert(self.entries, { itemId = weapon, illusion = list[index], collected = list[index].collected, displayId = 0 });
+		table.insert(self.entries, { itemId = weapon, offItemId = offWeapon, illusion = list[index], collected = list[index].collected, displayId = 0 });
 	end
 	self.waiting = all == nil;
 	self.noAnswer = nil;

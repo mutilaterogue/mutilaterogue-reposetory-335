@@ -43,6 +43,7 @@ namespace
 {
     constexpr uint32 ILLUSION_COST = 10000;   // 1 золото за слот (снять иллюзию - бесплатно)
     constexpr uint32 SKILL_ENCHANTING_ID = 333;
+    constexpr uint32 SKILL_RUNEFORGING_ID = 776;   // рунная ковка рыцарей смерти - тоже иллюзии
 
     struct Illusion
     {
@@ -75,7 +76,7 @@ namespace
             bool enchanting = false;
             SkillLineAbilityMapBounds bounds = sSpellMgr->GetSkillLineAbilityMapBounds(spellId);
             for (auto itr = bounds.first; itr != bounds.second; ++itr)
-                if (itr->second->SkillLine == SKILL_ENCHANTING_ID)
+                if (itr->second->SkillLine == SKILL_ENCHANTING_ID || itr->second->SkillLine == SKILL_RUNEFORGING_ID)
                     enchanting = true;
             if (!enchanting)
                 continue;
@@ -97,6 +98,32 @@ namespace
                     illusion.Spell = spellId;
                 }
             }
+        }
+
+        // свои иллюзии: world.transmog_illusion_extra (enchant_id - чары со свечением, spell_id - название и иконка в клиенте)
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(enchant_id AS SIGNED), CAST(spell_id AS SIGNED) FROM transmog_illusion_extra"))
+        {
+            do
+            {
+                Field* fields = result->Fetch();
+                uint32 enchantId = uint32(fields[0].GetInt64());
+                uint32 spellId = uint32(fields[1].GetInt64());
+                uint32 visual = GetVisual(enchantId);
+                if (!visual)
+                {
+                    TC_LOG_ERROR("sql.sql", "transmog_illusion_extra: enchant {} has no ItemVisual, skipped", enchantId);
+                    continue;
+                }
+                visualByEnchant[enchantId] = visual;
+                if (spellId)
+                    visualBySpell[spellId] = visual;
+                Illusion& illusion = illusionsByVisual[visual];
+                if (!illusion.Enchant)
+                {
+                    illusion.Enchant = enchantId;
+                    illusion.Spell = spellId;
+                }
+            } while (result->NextRow());
         }
 
         // любые другие чары с тем же видом (например, с предметов) - тоже открывают иллюзию
