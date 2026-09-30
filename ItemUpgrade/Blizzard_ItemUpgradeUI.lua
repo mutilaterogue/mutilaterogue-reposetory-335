@@ -98,9 +98,6 @@ function ItemUpgradeFrame_OnLoad(self)
 		local portrait = self.PortraitContainer.portrait;
 		SetPortraitToTexture(portrait, "Interface\\Icons\\Trade_BlackSmithing");
 	end
-	if self.CloseButton then
-		self.CloseButton:SetFrameLevel(self:GetFrameLevel() + 20);
-	end
 	ItemUpgradeFrame_SetupDropdown(self);
 	self.Ring:SetPoint("CENTER", self.UpgradeButton, "CENTER", 0, 0);
 	self.anim = { arrow = 0, glow = 0 };
