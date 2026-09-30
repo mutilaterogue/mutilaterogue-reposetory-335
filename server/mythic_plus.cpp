@@ -13,7 +13,7 @@
  *   - the key must be for this dungeon, the instance untouched (no boss killed, no run started);
  *   - every group member must be inside and alive, nobody in combat;
  *   - everybody is moved to the instance entrance, 10 s countdown behind the barrier (BARRIER_RADIUS,
- *     optional gameobject BARRIER_ENTRY as the visual), then the timer starts.
+ *     walls of world.mythic_plus_barrier as the visual), then the timer starts.
  *
  * Run:
  *   - creatures: health and damage x LEVEL_SCALE ^ (level - 1), plus Fortified / Tyrannical;
@@ -94,9 +94,9 @@ namespace
 {
     // ---------------------------------------------------------------- config
     constexpr uint32 KEYSTONE_ITEM = 138019;
-    constexpr uint32 FONT_ENTRY = 700010;
-    constexpr uint32 CHEST_ENTRY = 700011;
-    constexpr uint32 BARRIER_ENTRY = 700012;        // countdown barrier at the entrance (optional template)
+    constexpr uint32 FONT_ENTRY = 246779;           // Font of Power (ScriptName go_mythic_plus_font)
+    constexpr uint32 CHEST_ENTRY = 252665;          // Challenger's Cache, also its gameobject_loot_template entry
+    constexpr float FONT_RANGE = 10.0f;             // the keystone frame closes farther away than this
     constexpr float BARRIER_RADIUS = 12.0f;         // during the countdown players stay this close to the entrance
 
     constexpr uint32 MIN_KEY_LEVEL = 1;
@@ -226,7 +226,7 @@ namespace
         Position FontPos;
         bool HasFont = false;
         Position StartPos;                      // instance entrance: players are moved here on start
-        ObjectGuid BarrierGuid;
+        std::vector<ObjectGuid> BarrierGuids;
         Position LastBossPos;                   // where the last killed boss died
         bool HasLastBoss = false;
         uint32 SyncTimer = 0;
@@ -238,6 +238,12 @@ namespace
     std::map<uint32, AffixInfo> s_affixes;
     std::vector<std::vector<uint32>> s_rotation;
     std::unordered_map<uint32, uint32> s_forces;             // creature entry -> count
+    struct BarrierSpawn
+    {
+        uint32 Entry = 0;
+        Position Pos;
+    };
+    std::unordered_map<uint32, std::vector<BarrierSpawn>> s_barriers;   // map -> walls (world.mythic_plus_barrier)
     std::unordered_map<ObjectGuid::LowType, Keystone> s_keys;
     std::unordered_map<uint32, Run> s_runs;                  // instanceId -> run
     std::unordered_map<ObjectGuid, ObjectGuid> s_fontUser;   // player -> font
@@ -879,7 +885,7 @@ namespace
         if (itr == s_fontUser.end())
             return nullptr;
         GameObject* font = player->GetMap()->GetGameObject(itr->second);
-        if (!font || !player->IsWithinDistInMap(font, 10.0f))
+        if (!font || !player->IsWithinDistInMap(font, FONT_RANGE))
             return nullptr;
         return font;
     }
@@ -911,8 +917,12 @@ namespace
         run.StartPos = run.FontPos;
         if (AreaTriggerTeleport const* entrance = sObjectMgr->GetMapEntranceTrigger(run.MapId))
             run.StartPos.Relocate(entrance->target_X, entrance->target_Y, entrance->target_Z, entrance->target_Orientation);
-        if (GameObject* barrier = SpawnGameObject(map, BARRIER_ENTRY, run.StartPos, COUNTDOWN_MS / IN_MILLISECONDS + 5))
-            run.BarrierGuid = barrier->GetGUID();
+        // walls of this dungeon (world.mythic_plus_barrier), up while the countdown runs
+        auto barriers = s_barriers.find(run.MapId);
+        if (barriers != s_barriers.end())
+            for (BarrierSpawn const& spawn : barriers->second)
+                if (GameObject* barrier = SpawnGameObject(map, spawn.Entry, spawn.Pos, COUNTDOWN_MS / IN_MILLISECONDS + 5))
+                    run.BarrierGuids.push_back(barrier->GetGUID());
 
         ForEachPlayer(map, [&](Player* member)
         {
@@ -1076,8 +1086,19 @@ namespace
                 s_forces[uint32(f[0].GetInt64())] = uint32(f[1].GetInt64());
             } while (result->NextRow());
 
-        TC_LOG_INFO("server.loading", ">> Mythic+: {} dungeons, {} affixes, {} rotation weeks, {} forces overrides",
-            s_dungeons.size(), s_affixes.size(), s_rotation.size(), s_forces.size());
+        s_barriers.clear();
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(map_id AS SIGNED), CAST(entry AS SIGNED), x, y, z, o FROM mythic_plus_barrier"))
+            do
+            {
+                Field* f = result->Fetch();
+                BarrierSpawn spawn;
+                spawn.Entry = uint32(f[1].GetInt64());
+                spawn.Pos.Relocate(f[2].GetFloat(), f[3].GetFloat(), f[4].GetFloat(), f[5].GetFloat());
+                s_barriers[uint32(f[0].GetInt64())].push_back(spawn);
+            } while (result->NextRow());
+
+        TC_LOG_INFO("server.loading", ">> Mythic+: {} dungeons, {} affixes, {} rotation weeks, {} forces overrides, {} dungeons with barriers",
+            s_dungeons.size(), s_affixes.size(), s_rotation.size(), s_forces.size(), s_barriers.size());
     }
 
     void LoadKey(Player* player)
@@ -1123,9 +1144,10 @@ namespace
             {
                 run.CountdownLeft = 0;
                 run.State = RUN_ACTIVE;
-                if (GameObject* barrier = map->GetGameObject(run.BarrierGuid))
-                    barrier->DespawnOrUnsummon();
-                run.BarrierGuid.Clear();
+                for (ObjectGuid const& guid : run.BarrierGuids)
+                    if (GameObject* barrier = map->GetGameObject(guid))
+                        barrier->DespawnOrUnsummon();
+                run.BarrierGuids.clear();
                 ForEachPlayer(map, [&](Player* player) { Message(player, MSG_GO); });
                 SyncRun(run);
             }
@@ -1339,6 +1361,8 @@ struct go_mythic_plus_font : public GameObjectAI
 // ---------------------------------------------------------------- scripts
 class mythic_plus_world : public WorldScript
 {
+    uint32 fontTimer = 0;
+
 public:
     mythic_plus_world() : WorldScript("mythic_plus_world") { }
 
@@ -1349,6 +1373,27 @@ public:
 
     void OnUpdate(uint32 diff) override
     {
+        // walked away from the Font of Power: close the keystone frame
+        fontTimer += diff;
+        if (fontTimer >= 500)
+        {
+            fontTimer = 0;
+            for (auto itr = s_fontUser.begin(); itr != s_fontUser.end();)
+            {
+                Player* player = ObjectAccessor::FindConnectedPlayer(itr->first);
+                GameObject* font = player && player->IsInWorld() ? player->GetMap()->GetGameObject(itr->second) : nullptr;
+                if (player && font && player->IsWithinDistInMap(font, FONT_RANGE))
+                {
+                    ++itr;
+                    continue;
+                }
+                if (player)
+                    sAddonComm->Send(player, "MPLUS_FONT_CLOSE");
+                s_slotted.erase(itr->first);
+                itr = s_fontUser.erase(itr);
+            }
+        }
+
         for (auto itr = s_runs.begin(); itr != s_runs.end();)
         {
             if (!sMapMgr->FindMap(itr->second.MapId, itr->second.InstanceId))
