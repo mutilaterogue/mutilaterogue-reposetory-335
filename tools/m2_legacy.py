@@ -8,6 +8,7 @@ What it does:
   * texture file IDs (TXID) -> file names: textures are copied next to the model
     (name from the .manifest.json, else <model>_<fileid>.blp) and referenced by path;
   * drops particles / ribbons / lights / cameras (their retail layout differs);
+  * fills the empty texture unit lookup (3.3.5 crashes without it);
   * clamps materials (flags, blend mode 7 -> add) and skin batch shaders to 3.3.5 values;
   * writes <model>00.skin only (one skin profile); sequences must be inline (flag 0x20).
 """
@@ -95,6 +96,13 @@ def convert(src, out_dir, client_dir, manifest=None):
         path = (client_dir.rstrip('\\') + '\\' + blp).encode() + b'\0'
         struct.pack_into('<II', md, off + i * 16 + 8, len(path), len(md) + len(tail))
         tail += path
+    # texture unit (coord) lookup: retail models leave it empty, 3.3.5 reads it for every batch -> crash
+    count, off = struct.unpack_from('<II', md, H['texunit'])
+    if count == 0:
+        while (len(md) + len(tail)) % 4:
+            tail += b'\0'
+        struct.pack_into('<II', md, H['texunit'], 8, len(md) + len(tail))
+        tail += struct.pack('<8h', *([0] * 8))
     md += tail
     while len(md) % 16:
         md += b'\0'

@@ -477,7 +477,8 @@ local function MythicLine(tooltip, bag, slot)
 	if not level then
 		return;
 	end
-	local text = ITEM_MYTHIC .. " +" .. level;
+	-- retail ITEM_MYTHIC may be a format ("...: %d")
+	local text = ITEM_MYTHIC:find("%%d") and ITEM_MYTHIC:format(level) or (ITEM_MYTHIC .. " +" .. level);
 	local name = tooltip:GetName();
 	for i = 2, tooltip:NumLines() do
 		local line = _G[name .. "TextLeft" .. i];

@@ -573,7 +573,7 @@ function WeeklyRewardActivityItemMixin:SetRewards(rewards)
 	end
 	local activity = self:GetParent();
 	if activity.info.type == TYPE_ACTIVITIES then
-		activity:SetProgressText(ITEM_MYTHIC .. " +" .. reward.level);
+		activity:SetProgressText(ITEM_MYTHIC:find("%%d") and ITEM_MYTHIC:format(reward.level) or (ITEM_MYTHIC .. " +" .. reward.level));
 	else
 		activity:SetProgressText(activity:GetLevelText(reward.level));
 	end
