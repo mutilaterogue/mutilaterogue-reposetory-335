@@ -226,10 +226,15 @@
 							</Anchors>
 						</Texture>
 					</Layer>
-					<Layer level="OVERLAY" textureSubLevel="5">
+				</Layers>
+			</Frame>
+			<!-- own frame above BorderContainer: the decor is drawn over the border -->
+			<Frame parentKey="TopDecorFrame" setAllPoints="true" frameLevel="55">
+				<Layers>
+					<Layer level="OVERLAY">
 						<Texture parentKey="TopDecor" atlas="evergreen-weeklyrewards-frame-topdecor" useAtlasSize="true">
 							<Anchors>
-								<Anchor point="CENTER" relativePoint="TOP" x="0" y="10"/>
+								<Anchor point="CENTER" relativePoint="TOP" x="0" y="-16"/>
 							</Anchors>
 						</Texture>
 					</Layer>
