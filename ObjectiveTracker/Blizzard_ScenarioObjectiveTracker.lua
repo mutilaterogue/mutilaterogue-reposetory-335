@@ -233,7 +233,7 @@ function ScenarioObjectiveTrackerChallengeModeMixin:CheckActivate()
 	end
 	local key = run.mapID .. ":" .. run.level;
 	if self.active ~= key then
-		-- set first: Activate -> ForceExpand lays the tracker out again and comes back here
+		-- set first: activation must not run again during this layout
 		self.active = key;
 		self:Activate(run.timeLimit);
 	end
@@ -292,9 +292,6 @@ function ScenarioObjectiveTrackerChallengeModeMixin:Activate(timeLimit)
 	self:UpdateDeathCount();
 
 	self.StatusBar:SetMinMaxValues(0, self.timeLimit);
-	if ScenarioObjectiveTracker.ForceExpand then
-		ScenarioObjectiveTracker:ForceExpand();
-	end
 end
 
 function ScenarioObjectiveTrackerChallengeModeMixin:UpdateDeathCount()
