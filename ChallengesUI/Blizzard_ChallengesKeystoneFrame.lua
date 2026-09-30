@@ -154,9 +154,6 @@ function ChallengesKeystoneFrame_OnUpdate(self, elapsed)
 	end
 	if t >= INSERTED_DURATION then
 		-- InsertedAnim OnFinished: PulseAnim + StartButton
-		if not self.StartButton:IsEnabled() then
-			self.StartButton:Enable();
-		end
 		local p = ((t - INSERTED_DURATION) % PULSE_PERIOD) / (PULSE_PERIOD / 2);
 		self.BgBurst2:SetAlpha(p < 1 and 0.75 * p or 0.75 * (2 - p));
 	end
@@ -209,6 +206,7 @@ function ChallengesKeystoneFrame_OnKeystoneSlotted(self)
 	self.InstructionBackground:Hide();
 	self.Instructions:Hide();
 	self.KeystoneSlot.Texture:SetTexture(GetItemIcon(KEYSTONE_ITEM_ID));
+	self.StartButton:Enable();
 
 	local name, _, timeLimit = C_ChallengeMode.GetMapUIInfo(key.mapID);
 	self.DungeonName:SetText(name);

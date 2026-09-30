@@ -1,6 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- Font of Power: retail ChallengesKeystoneFrame (Blizzard_ChallengesUI.xml) 1:1 for 3.3.5.
-	     relativeKey -> $parent names, no MaskTexture, the XML AnimationGroups (fromAlpha/toAlpha) are
+	     relativeKey -> $parent names, MaskTexture through XMLExt (WotLKExtensions), the XML AnimationGroups (fromAlpha/toAlpha) are
 	     played in Lua (Blizzard_ChallengesKeystoneFrame.lua). Server: server/mythic_plus.cpp. -->
 	<Script file="Blizzard_ChallengesKeystoneFrame.lua"/>
 
@@ -17,12 +17,21 @@
 				</FontString>
 			</Layer>
 			<Layer level="ARTWORK">
-				<Texture parentKey="Portrait">
+				<Texture name="$parentPortrait" parentKey="Portrait">
 					<Size x="50" y="50"/>
 					<Anchors>
 						<Anchor point="CENTER" relativeTo="$parentBorder"/>
 					</Anchors>
 				</Texture>
+				<MaskTexture parentKey="CircleMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentPortrait"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentPortrait"/>
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="Portrait"/>
+					</MaskedTextures>
+				</MaskTexture>
 			</Layer>
 		</Layers>
 		<Scripts>
@@ -246,7 +255,7 @@
 			<Button name="$parentStartButton" parentKey="StartButton" inherits="UIPanelButtonTemplate" text="CHALLENGE_MODE_START_CHALLENGE">
 				<Size x="120" y="24"/>
 				<Anchors>
-					<Anchor point="BOTTOM" x="0" y="20"/>
+					<Anchor point="BOTTOM" x="0" y="34"/>
 				</Anchors>
 				<Scripts>
 					<OnShow>
@@ -264,12 +273,16 @@
 				</Anchors>
 				<Layers>
 					<Layer level="OVERLAY" textureSubLevel="2">
-						<Texture parentKey="Texture">
+						<Texture parentKey="Texture" setAllPoints="true"/>
+						<MaskTexture parentKey="CircleMask" file="Interface\CHARACTERFRAME\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
 							<Anchors>
 								<Anchor point="TOPLEFT" x="4" y="-4"/>
 								<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
 							</Anchors>
-						</Texture>
+							<MaskedTextures>
+								<MaskedTexture childKey="Texture"/>
+							</MaskedTextures>
+						</MaskTexture>
 					</Layer>
 				</Layers>
 				<Scripts>
