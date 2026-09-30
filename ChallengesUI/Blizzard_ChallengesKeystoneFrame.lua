@@ -176,6 +176,13 @@ local function CreateAndPositionAffixes(self, num)
 		end
 		self.Affixes[index] = frame;
 	end
+	for i = num + 1, #self.Affixes do
+		self.Affixes[i]:Hide();
+	end
+	if num == 0 then
+		return;		-- +1: no affixes
+	end
+
 	-- the leftmost affix
 	local frame = self.Affixes[1];
 	frame:ClearAllPoints();
