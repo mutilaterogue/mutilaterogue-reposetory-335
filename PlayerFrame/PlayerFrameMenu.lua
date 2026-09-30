@@ -12,6 +12,37 @@ local L = {
 	CONVERT_TO_PARTY = CONVERT_TO_PARTY or "Преобразовать в группу",
 };
 
+L.MYTHIC = PLAYER_DIFFICULTY6 or "Эпохальный";
+
+-- mythic = heroic + server flag (server/mythic_difficulty.cpp)
+local mythicState = false;
+
+local function Send(...)
+	if Comm_Send then
+		Comm_Send(...);
+	end
+end
+
+if Comm_Register then
+	Comm_Register("MYTHIC_STATE", function(state)
+		mythicState = tonumber(state) == 1;
+	end);
+	Comm_Register("MYTHIC_RESULT", function(err)
+		UIErrorsFrame:AddMessage(_G[err] or err, 1, 0.1, 0.1);
+	end);
+end
+
+local mythicWatcher = CreateFrame("Frame");
+mythicWatcher:RegisterEvent("PARTY_MEMBERS_CHANGED");
+mythicWatcher:RegisterEvent("PARTY_LEADER_CHANGED");
+mythicWatcher:SetScript("OnEvent", function()
+	Send("MYTHIC_GET");
+end);
+
+function PlayerFrameMenu_IsMythic()
+	return mythicState;
+end
+
 local LOOT_METHODS = {
 	{ "freeforall", LOOT_FREE_FOR_ALL },
 	{ "roundrobin", LOOT_ROUND_ROBIN },
@@ -127,11 +158,22 @@ local function AddInstanceSection(root)
 		local dungeon = root:CreateSubmenu(DUNGEON_DIFFICULTY);
 		for index = 1, 2 do
 			dungeon:CreateRadio(_G["DUNGEON_DIFFICULTY" .. index], function()
-				return GetDungeonDifficulty() == index;
+				return GetDungeonDifficulty() == index and not mythicState;
 			end, function()
 				SetDungeonDifficulty(index);
+				if mythicState then
+					Send("MYTHIC_SET", 0);
+				end
 			end);
 		end
+		dungeon:CreateRadio("|cffa335ee" .. L.MYTHIC .. "|r", function()
+			return GetDungeonDifficulty() == 2 and mythicState;
+		end, function()
+			if GetDungeonDifficulty() ~= 2 then
+				SetDungeonDifficulty(2);
+			end
+			Send("MYTHIC_SET", 1);
+		end);
 	end
 	if showRaid then
 		local raid = root:CreateSubmenu(RAID_DIFFICULTY);
