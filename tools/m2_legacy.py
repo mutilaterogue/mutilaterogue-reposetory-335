@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Convert a retail (chunked MD21, version 272+) M2 doodad to WotLK 3.3.5 (version 264).
 
-    m2_legacy.py <model.m2> <out_dir> <client path of the model dir> [--manifest file.manifest.json]
+    m2_legacy.py <model.m2 | folder> [out_dir] [client path of the model dir] [--manifest file.manifest.json]
+    e.g. m2_legacy.py C:\\wow.export\\item\\objectcomponents\\weapon  (all models, -> weapon_out, Item\\ObjectComponents\\Weapon)
 
 What it does:
   * unwraps MD21 -> MD20, version 264;
@@ -103,6 +104,12 @@ def convert(src, out_dir, client_dir, manifest=None):
             tail += b'\0'
         struct.pack_into('<II', md, H['texunit'], 8, len(md) + len(tail))
         tail += struct.pack('<8h', *([0] * 8))
+    # textures set from the DBC (item skins, type != 0) have no file id in the model: copy all of the manifest
+    for file in names.values():
+        src_blp = os.path.normpath(os.path.join(src_dir, file.replace('\\', '/')))
+        dst_blp = os.path.join(out_dir, os.path.basename(src_blp))
+        if os.path.exists(src_blp) and not os.path.exists(dst_blp):
+            shutil.copyfile(src_blp, dst_blp)
     md += tail
     while len(md) % 16:
         md += b'\0'
@@ -126,11 +133,44 @@ def convert(src, out_dir, client_dir, manifest=None):
     print('ok:', os.path.join(out_dir, base + '.m2'))
 
 
+def guess_client_dir(folder):
+    """...\item\objectcomponents\weapon -> Item\ObjectComponents\Weapon (from the item/world/creature part)."""
+    parts = os.path.normpath(folder).replace('/', '\\').split('\\')
+    for i, part in enumerate(parts):
+        if part.lower() in ('item', 'world', 'creature', 'character', 'spells', 'environments'):
+            return '\\'.join(p[:1].upper() + p[1:] for p in parts[i:])
+    return parts[-1]
+
+
+def convert_one(src, out_dir=None, client_dir=None, manifest=None):
+    folder = os.path.dirname(os.path.abspath(src))
+    base = os.path.splitext(os.path.basename(src))[0]
+    if manifest is None and os.path.exists(os.path.join(folder, base + '.manifest.json')):
+        manifest = os.path.join(folder, base + '.manifest.json')
+    convert(src, out_dir or folder + '_out', client_dir or guess_client_dir(folder), manifest)
+
+
 if __name__ == '__main__':
+    # m2_legacy.py <model.m2 | folder> [out_dir] [client dir] [--manifest file]
+    # a folder converts every .m2 in it; out_dir defaults to <folder>_out, the client dir is taken from the path
     args = sys.argv[1:]
     manifest = None
     if '--manifest' in args:
         i = args.index('--manifest')
         manifest = args[i + 1]
         del args[i:i + 2]
-    convert(args[0], args[1], args[2], manifest)
+    if not args:
+        print(__doc__)
+        sys.exit(1)
+    src = args[0]
+    out_dir = args[1] if len(args) > 1 else None
+    client_dir = args[2] if len(args) > 2 else None
+    if os.path.isdir(src):
+        for name in sorted(os.listdir(src)):
+            if name.lower().endswith('.m2'):
+                try:
+                    convert_one(os.path.join(src, name), out_dir or os.path.abspath(src) + '_out', client_dir or guess_client_dir(src))
+                except Exception as e:
+                    print('fail:', name, e)
+    else:
+        convert_one(src, out_dir, client_dir, manifest)
