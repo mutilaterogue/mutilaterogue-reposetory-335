@@ -227,6 +227,12 @@ function WardrobeItemsModel_OnMouseDown(self, button)
 		local link = GetSpellLink and GetSpellLink(entry.illusion.spell);
 		if IsModifiedClick("CHATLINK") and link then
 			ChatEdit_InsertLink(link);
+		elseif IsModifiedClick("DRESSUP") then
+			-- ретейл: Ctrl+щелчок - осмотреть в примерочной (оружие с иллюзией, модель крутится и приближается)
+			local weaponLink = select(2, GetItemInfo(entry.itemId));
+			if weaponLink then
+				DressUpItemLink(weaponLink:gsub("item:(%d+):%d+", "item:%1:" .. entry.illusion.id, 1));
+			end
 		end
 		return;
 	end
@@ -271,6 +277,8 @@ local function ShowIllusionTooltip(model, entry)
 	if not entry.collected then
 		GameTooltip:AddLine("Откроется, когда вы изучите эти чары или наденете оружие с ними.", 0.5, 0.5, 0.5, true);
 	end
+	GameTooltip:AddLine(" ");
+	GameTooltip:AddLine("Ctrl+щелчок - осмотреть", 0.5, 0.5, 0.5);
 	GameTooltip:Show();
 end
 
