@@ -126,7 +126,7 @@ local function AddInstanceSection(root)
 	root:CreateTitle(L.INSTANCE);
 	if showDungeon then
 		local dungeon = root:CreateSubmenu(DUNGEON_DIFFICULTY);
-		for index = 1, 3 do
+		for index = 1, 2 do
 			dungeon:CreateRadio(_G["DUNGEON_DIFFICULTY" .. index], function()
 				return GetDungeonDifficulty() == index;
 			end, function()
