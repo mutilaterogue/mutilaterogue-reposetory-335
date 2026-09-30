@@ -1,0 +1,93 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\UI.xsd">
+	<Script file="PortraitFrame.lua"/>
+	<Script file="MaximizeMinimizeButton.lua"/>
+	
+	<Frame name="RetailPortraitFrameTemplate" mixin="PortraitFrameMixin" virtual="true">
+		<Size x="338" y="424"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Bg" setAllPoints="true">
+					<Color r="0.05" g="0.05" b="0.05" a="0.95"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="PortraitContainer">
+				<Size x="1" y="1"/>
+				<Anchors>
+					<Anchor point="TOPLEFT"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="portrait">
+							<Size x="58" y="58"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-4" y="7"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="NineSlice" inherits="NineSlicePanelTemplate">
+				<KeyValues>
+					<KeyValue key="layoutType" value="PortraitFrameTemplate" type="string"/>
+				</KeyValues>
+			</Frame>
+			<Frame parentKey="TitleContainer">
+				<Size x="0" y="20"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="58" y="-1"/>
+					<Anchor point="TOPRIGHT" x="-24" y="-1"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString parentKey="TitleText" inherits="GameFontNormal" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOP" x="0" y="-5"/>
+								<Anchor point="LEFT" x="0"/>
+								<Anchor point="RIGHT" x="0"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Button parentKey="CloseButton" name="$parentCloseButton">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="1" y="0"/>
+				</Anchors>
+				<NormalTexture atlas="RedButton-Exit"/>
+				<PushedTexture atlas="RedButton-exit-pressed"/>
+				<DisabledTexture atlas="RedButton-Exit-Disabled"/>
+				<HighlightTexture atlas="RedButton-Highlight" alphaMode="ADD"/>
+				<Scripts>
+					<OnLoad>PortraitFrame_RaiseBorder(self:GetParent());</OnLoad>
+					<OnShow>PortraitFrame_RaiseBorder(self:GetParent());</OnShow>
+					<OnClick>HideUIPanel(self:GetParent());</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+	</Frame>
+
+	<Frame name="MaximizeMinimizeButtonFrameTemplate" mixin="MaximizeMinimizeButtonFrameMixin" virtual="true">
+		<Size x="24" y="24"/>
+		<Frames>
+			<Button parentKey="MaximizeButton" hidden="true" setAllPoints="true">
+				<NormalTexture atlas="RedButton-Expand"/>
+				<PushedTexture atlas="RedButton-Expand-Pressed"/>
+				<DisabledTexture atlas="RedButton-Expand-Disabled"/>
+				<HighlightTexture atlas="RedButton-Highlight" alphaMode="ADD"/>
+			</Button>
+			<Button parentKey="MinimizeButton" setAllPoints="true">
+				<NormalTexture atlas="RedButton-Condense"/>
+				<PushedTexture atlas="RedButton-Condense-Pressed"/>
+				<DisabledTexture atlas="RedButton-Condense-disabled"/>
+				<HighlightTexture atlas="RedButton-Highlight" alphaMode="ADD"/>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+		</Scripts>
+	</Frame>
+</Ui>
