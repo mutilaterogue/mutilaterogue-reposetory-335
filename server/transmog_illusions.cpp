@@ -16,14 +16,15 @@
  *   применение - вместе с обликами: "TMOG_APPLY" : облики : "slot/enchantId,..." (transmog.cpp)
  *   "TMOG_STATE" : облики : "slot/enchantId,..." - текущие иллюзии
  *
- * Установка: sql/characters_transmog_illusions.sql, AddSC_transmog_illusions() в custom_script_loader.cpp.
+ * Оружие со своим эффектом в модели (ItemDisplayInfo.ItemVisual) иллюзию не получает - core/DBC_itemdisplayinfo.patch.
+ *
+ * Установка: sql/characters_transmog_illusions.sql, core/DBC_itemdisplayinfo.patch, AddSC_transmog_illusions() в custom_script_loader.cpp.
  */
 
 #include "transmog.h"
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Bag.h"
-#include "Config.h"
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
 #include "Item.h"
@@ -36,7 +37,6 @@
 #include "StringFormat.h"
 #include "WorldSession.h"
 
-#include <fstream>
 #include <map>
 #include <sstream>
 #include <unordered_map>
@@ -54,7 +54,6 @@ namespace
         uint32 Spell = 0;     // рецепт чар (название и иконка в клиенте)
     };
 
-    std::unordered_set<uint32> displaysWithEffect;           // облики оружия со своим эффектом в модели (ItemDisplayInfo.ItemVisual)
     std::map<uint32, Illusion> illusionsByVisual;            // ItemVisual -> иллюзия (по порядку для списка)
     std::unordered_map<uint32, uint32> visualByEnchant;      // любые чары с видом -> ItemVisual
     std::unordered_map<uint32, uint32> visualBySpell;        // рецепт -> ItemVisual
@@ -65,36 +64,8 @@ namespace
         return enchant ? enchant->ItemVisual : 0;
     }
 
-    // ядро ItemDisplayInfo.dbc не грузит ("not used currently") - читаем сами: поле 23 ItemVisual - эффект,
-    // встроенный в модель оружия (ретейл: на такие предметы иллюзию наложить нельзя)
-    void LoadDisplayEffects()
-    {
-        displaysWithEffect.clear();
-        std::string path = sConfigMgr->GetStringDefault("DataDir", "./") + "/dbc/ItemDisplayInfo.dbc";
-        std::ifstream file(path, std::ios::binary);
-        uint32 header[5] = { };
-        if (!file || !file.read(reinterpret_cast<char*>(header), sizeof(header)) || header[0] != 0x43424457)   // 'WDBC'
-        {
-            TC_LOG_ERROR("server.loading", ">> transmog: cannot read {}, weapons with own effects are not excluded from illusions", path);
-            return;
-        }
-        uint32 records = header[1], fields = header[2], recordSize = header[3];
-        if (fields <= 23 || recordSize < 24 * 4)
-            return;
-        std::vector<char> record(recordSize);
-        for (uint32 i = 0; i < records && file.read(record.data(), recordSize); ++i)
-        {
-            uint32 id = *reinterpret_cast<uint32 const*>(&record[0]);
-            int32 itemVisual = *reinterpret_cast<int32 const*>(&record[23 * 4]);
-            if (itemVisual > 0)
-                displaysWithEffect.insert(id);
-        }
-        TC_LOG_INFO("server.loading", ">> transmog: {} weapon looks with own effects (no illusions)", uint32(displaysWithEffect.size()));
-    }
-
     void LoadIllusions()
     {
-        LoadDisplayEffects();
         illusionsByVisual.clear();
         visualByEnchant.clear();
         visualBySpell.clear();
@@ -246,8 +217,10 @@ namespace
         if (uint32 fake = Transmog::GetFakeEntry(player, item))
             if (ItemTemplate const* fakeProto = sObjectMgr->GetItemTemplate(fake))
                 look = fakeProto;
-        if (displaysWithEffect.count(look->DisplayInfoID))
-            return false;
+        // ItemDisplayInfo.ItemVisual - эффект, встроенный в модель (ядро грузит его: core/DBC_itemdisplayinfo.patch)
+        if (ItemDisplayInfoEntry const* display = sItemDisplayInfoStore.LookupEntry(look->DisplayInfoID))
+            if (display->ItemVisual > 0)
+                return false;
         switch (proto->InventoryType)
         {
             case INVTYPE_WEAPON: case INVTYPE_2HWEAPON: case INVTYPE_WEAPONMAINHAND: case INVTYPE_WEAPONOFFHAND:
