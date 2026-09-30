@@ -29,7 +29,7 @@ ITEM_UPGRADE_DROPDOWN_LEVEL_FORMAT_STRING = ITEM_UPGRADE_DROPDOWN_LEVEL_FORMAT_S
 ITEM_UPGRADE_TOOLTIP_FORMAT_STRING = ITEM_UPGRADE_TOOLTIP_FORMAT_STRING or "Уровень улучшения: %s %d/%d";
 ITEM_UPGRADE_CONFIRM = ITEM_UPGRADE_CONFIRM or "Улучшить %s до %s %d/%d?\nСтоимость: %s";
 
-UIPanelWindows["ItemUpgradeFrame"] = { area = "left", pushable = 0, whileDead = 1 };
+UIPanelWindows["ItemUpgradeFrame"] = { area = "left", pushable = 0, whileDead = 1, xOffset = "15", yOffset = "-10" };
 
 ItemUpgradeUI = { items = {}, trackNames = {} };
 local items, trackNames = ItemUpgradeUI.items, ItemUpgradeUI.trackNames;   -- [bag][slot] = { itemId, track, level, max }
@@ -95,8 +95,15 @@ function ItemUpgradeFrame_OnLoad(self)
 		self.TitleContainer.TitleText:SetText(ITEM_UPGRADE);
 	end
 	if self.PortraitContainer and self.PortraitContainer.portrait then
-		SetPortraitToTexture(self.PortraitContainer.portrait, "Interface\\Icons\\UI_ItemUpgrade");
+		local portrait = self.PortraitContainer.portrait;
+		if not portrait:SetAtlas("ItemUpgrade_PortraitIcon", false) or not portrait:GetTexture() then
+			SetPortraitToTexture(portrait, "Interface\\Icons\\Trade_BlackSmithing");
+		end
 	end
+	if self.CloseButton then
+		self.CloseButton:SetFrameLevel(self:GetFrameLevel() + 20);
+	end
+	ItemUpgradeFrame_SetupDropdown(self);
 	self.Ring:SetPoint("CENTER", self.UpgradeButton, "CENTER", 0, 0);
 	self.anim = { arrow = 0, glow = 0 };
 end
@@ -352,7 +359,7 @@ end
 ---------------------------------------------------------------------------
 -- level dropdown (retail InitDropdown)
 ---------------------------------------------------------------------------
-local function SetupDropdown(self)
+function ItemUpgradeFrame_SetupDropdown(self)
 	local dropdown = self.ItemInfo.Dropdown;
 	dropdown:SetupMenu(function(owner, rootDescription)
 		local info = self.info;
@@ -399,7 +406,6 @@ end
 function ItemUpgradeSlot_OnLoad(self)
 	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
 	self:RegisterForDrag("LeftButton");
-	SetupDropdown(self:GetParent());
 end
 
 function ItemUpgradeSlot_OnReceiveDrag(self)

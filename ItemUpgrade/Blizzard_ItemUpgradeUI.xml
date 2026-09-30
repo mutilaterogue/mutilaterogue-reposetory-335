@@ -273,7 +273,7 @@
 			<Frame name="$parentPlayerCurrencies" parentKey="PlayerCurrencies" hidden="true">
 				<Size x="530" y="20"/>
 				<Anchors>
-					<Anchor point="BOTTOMRIGHT" x="-5" y="5"/>
+					<Anchor point="BOTTOMRIGHT" x="-14" y="10"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
