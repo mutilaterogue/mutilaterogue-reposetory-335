@@ -8,7 +8,7 @@ What it does:
   * unwraps MD21 -> MD20, version 264;
   * texture file IDs (TXID) -> file names: textures are copied next to the model
     (name from the .manifest.json, else <model>_<fileid>.blp) and referenced by path;
-  * drops particles / ribbons / lights / cameras (their retail layout differs);
+  * particles -> 3.3.5 layout; drops ribbons / lights / cameras (their retail layout differs);
   * fills the empty texture unit lookup (3.3.5 crashes without it);
   * clamps materials (flags, blend mode 7 -> add) and skin batch shaders to 3.3.5 values;
   * writes <model>00.skin only (one skin profile); sequences must be inline (flag 0x20).
@@ -34,6 +34,41 @@ def header_offsets():
     return offsets
 
 
+PARTICLE_335 = 476      # M2ParticleOld (3.3.5)
+PARTICLE_RETAIL = 492   # Cata+: + multiTextureParam0[2], multiTextureParam1[2]
+
+
+def convert_particles(md, H):
+    """retail emitters -> 3.3.5 layout (returns the new array, or b'' when there are none)."""
+    count, off = struct.unpack_from('<II', md, H['particles'])
+    out = bytearray()
+    for i in range(count):
+        p = bytearray(md[off + i * PARTICLE_RETAIL:off + i * PARTICLE_RETAIL + PARTICLE_335])
+        flags = struct.unpack_from('<I', p, 4)[0]
+        # multi texture: 3 texture ids packed by 5 bits -> the first one
+        if flags & 0x10000000:
+            struct.pack_into('<H', p, 22, struct.unpack_from('<H', p, 22)[0] & 0x1F)
+        # compressed gravity (vector in 4 bytes) is unknown to 3.3.5: plain downward gravity from its z
+        if flags & 0x800000:
+            n, o = struct.unpack_from('<II', p, 132 + 12)
+            for k in range(n):
+                cnt, arr = struct.unpack_from('<II', md, o + k * 8)
+                for j in range(cnt):
+                    x, y, z = struct.unpack_from('<bbh', md, arr + j * 4)
+                    struct.pack_into('<f', md, arr + j * 4, -z / 64.0)
+        struct.pack_into('<I', p, 4, flags & 0x007FFFFF)
+        # blend 0..4
+        if p[40] > 4:
+            p[40] = 4
+        # 44/45: retail multiTextureParamX -> particleType / headOrTail (head, tail, both by the cell tracks)
+        head = struct.unpack_from('<I', p, 308 + 8)[0]
+        tail = struct.unpack_from('<I', p, 324 + 8)[0]
+        p[44] = 0
+        p[45] = 2 if head and tail else 1 if tail else 0
+        out += p
+    return bytes(out)
+
+
 def read_chunks(data):
     chunks, o = {}, 0
     while o + 8 <= len(data):
@@ -56,6 +91,7 @@ def convert(src, out_dir, client_dir, manifest=None):
     struct.pack_into('<I', md, 4, 264)
     flags = struct.unpack_from('<I', md, H['flags'])[0]
     struct.pack_into('<I', md, H['flags'], flags & 0x7)
+    particles = convert_particles(md, H)
     for n in ('lights', 'cameras', 'camLookup', 'ribbons', 'particles'):
         struct.pack_into('<II', md, H[n], 0, 0)
     struct.pack_into('<I', md, H['nskin'], 1)
@@ -110,6 +146,11 @@ def convert(src, out_dir, client_dir, manifest=None):
         dst_blp = os.path.join(out_dir, os.path.basename(src_blp))
         if os.path.exists(src_blp) and not os.path.exists(dst_blp):
             shutil.copyfile(src_blp, dst_blp)
+    if particles:
+        while (len(md) + len(tail)) % 16:
+            tail += b'\0'
+        struct.pack_into('<II', md, H['particles'], len(particles) // PARTICLE_335, len(md) + len(tail))
+        tail += particles
     md += tail
     while len(md) % 16:
         md += b'\0'
