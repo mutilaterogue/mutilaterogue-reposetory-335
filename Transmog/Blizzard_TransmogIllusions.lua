@@ -276,6 +276,11 @@ if Comm_Register then
 		end);
 		TransmogUI.illusions = list;
 
+		-- «Коллекции» → «Внешний вид» → «Иллюзии» (Collections\Wardrobe\Blizzard_Wardrobe.lua)
+		if WardrobeIllusions_BuildPage then
+			WardrobeIllusions_BuildPage();
+		end
+
 		local frame = TransmogFrame;
 		frame.requestElapsed = nil;
 		if frame:IsShown() then

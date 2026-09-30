@@ -14,6 +14,11 @@ local OP_PAGE, OP_SOURCES, OP_ADDED = "APPEAR_PAGE", "APPEAR_SOURCES", "APPEAR_A
 local OP_GET_PAGE, OP_GET_SOURCES = "APPEAR_GET_PAGE", "APPEAR_GET_SOURCES";
 local NUM_MODELS = 18;
 
+-- иллюзии оружия (ретейл: WardrobeCollectionFrame, слот «Иллюзии»): список и коллекция - с сервера
+-- (server/transmog_illusions.cpp, "TMOG_ILLUSIONS_GET" -> "TMOG_ILLUSIONS"), данные - TransmogUI.illusions
+local ILLUSION_CATEGORY = 100;
+local ILLUSION_FALLBACK_WEAPON = 25;   -- Изношенный короткий меч: карточка, если в руке нет оружия ближнего боя
+
 -- categories: same numbers as on the server
 local ARMOR_SLOTS = {
 	{ category = 1,  slot = "HeadSlot",      atlas = "transmog-nav-slot-head",     name = "Голова" },
@@ -151,7 +156,11 @@ local function DressModel(model)
 		model.unitSet = true;
 	end
 	model:Undress();
-	model:TryOn("item:" .. entry.itemId);
+	if entry.illusion then
+		model:TryOn("item:" .. entry.itemId .. ":" .. entry.illusion.id);
+	else
+		model:TryOn("item:" .. entry.itemId);
+	end
 	ApplyCamera(model);
 end
 
@@ -213,6 +222,13 @@ function WardrobeItemsModel_OnMouseDown(self, button)
 	if not entry then
 		return;
 	end
+	if entry.illusion then
+		local link = GetSpellLink and GetSpellLink(entry.illusion.spell);
+		if IsModifiedClick("CHATLINK") and link then
+			ChatEdit_InsertLink(link);
+		end
+		return;
+	end
 	local itemId = WardrobeCollectionFrame.tooltipItemId or entry.itemId;
 	local _, link = GetItemInfo(itemId);
 	if IsModifiedClick("CHATLINK") and link then
@@ -236,10 +252,35 @@ local function ItemNameAndColor(itemId)
 	return name, ITEM_QUALITY_COLORS[quality or 1] or HIGHLIGHT_FONT_COLOR;
 end
 
+local function ShowIllusionTooltip(model, entry)
+	local illusion = entry.illusion;
+	GameTooltip:SetOwner(model, "ANCHOR_RIGHT", -15, 0);
+	GameTooltip:SetText(illusion.name, 1, 0.82, 0);
+	GameTooltip:AddLine(TRANSMOG_ENCHANT_SLOT or "Иллюзия", 1, 1, 1);
+	if entry.collected then
+		GameTooltip:AddLine("Собрано", GREEN_FONT_COLOR.r, GREEN_FONT_COLOR.g, GREEN_FONT_COLOR.b);
+	else
+		GameTooltip:AddLine("Не собрано", 0.6, 0.6, 0.6);
+	end
+	local spellName = GetSpellInfo(illusion.spell);
+	if spellName then
+		GameTooltip:AddLine(" ");
+		GameTooltip:AddLine("Источник: " .. spellName, 1, 1, 1, true);
+	end
+	if not entry.collected then
+		GameTooltip:AddLine("Откроется, когда вы изучите эти чары или наденете оружие с ними.", 0.5, 0.5, 0.5, true);
+	end
+	GameTooltip:Show();
+end
+
 local function ShowAppearanceTooltip(model)
 	local frame = WardrobeCollectionFrame;
 	local entry = model.entry;
 	if not entry then
+		return;
+	end
+	if entry.illusion then
+		ShowIllusionTooltip(model, entry);
 		return;
 	end
 	local sources = sourcesCache[frame.category .. ":" .. entry.displayId] or { { itemId = entry.itemId, collected = entry.collected } };
@@ -276,7 +317,7 @@ function WardrobeItemsModel_OnEnter(self)
 	frame.tooltipModel = self;
 	frame.tooltipIndex = 1;
 	local entry = self.entry;
-	if entry then
+	if entry and not entry.illusion then
 		local key = frame.category .. ":" .. entry.displayId;
 		if not sourcesCache[key] and Comm_Send then
 			Comm_Send(OP_GET_SOURCES, frame.category, entry.displayId);
@@ -309,6 +350,9 @@ local function GetWeaponInfo(key)
 end
 
 local function GetCategoryName(category)
+	if category == ILLUSION_CATEGORY then
+		return TRANSMOG_ILLUSIONS or "Иллюзии";
+	end
 	for _, info in ipairs(ARMOR_SLOTS) do
 		if info.category == category then
 			return info.name;
@@ -335,8 +379,61 @@ end
 ---------------------------------------------------------------------------
 -- server requests
 ---------------------------------------------------------------------------
+local UpdatePage;   -- ниже
+
+-- оружие для карточек иллюзий: своё ближнего боя в правой руке, иначе запасной меч
+local function IllusionWeapon()
+	if TransmogUI and TransmogUI.CanHaveIllusion and TransmogUI.CanHaveIllusion(16) then
+		return GetInventoryItemID("player", 16);
+	end
+	return ILLUSION_FALLBACK_WEAPON;
+end
+
+-- страница иллюзий из TransmogUI.illusions: фильтр «собранные/не собранные», поиск по названию
+function WardrobeIllusions_BuildPage(self)
+	self = self or WardrobeCollectionFrame;
+	if not self or not self.filters or self.category ~= ILLUSION_CATEGORY then
+		return;
+	end
+	local list, collected = {}, 0;
+	local search = strlower(self.searchText or "");
+	local all = TransmogUI and TransmogUI.illusions;
+	for _, illusion in ipairs(all or {}) do
+		if illusion.collected then
+			collected = collected + 1;
+		end
+		local shown = (illusion.collected and self.filters.collected) or (not illusion.collected and self.filters.notCollected);
+		if shown and (search == "" or strlower(illusion.name):find(search, 1, true)) then
+			table.insert(list, illusion);
+		end
+	end
+	local weapon = IllusionWeapon();
+	self.total, self.collected = all and #all or 0, collected;
+	self.numPages = math.max(1, math.ceil(#list / NUM_MODELS));
+	self.page = math.min(self.page or 1, self.numPages);
+	self.entries = {};
+	for index = (self.page - 1) * NUM_MODELS + 1, math.min(#list, self.page * NUM_MODELS) do
+		table.insert(self.entries, { itemId = weapon, illusion = list[index], collected = list[index].collected, displayId = 0 });
+	end
+	self.waiting = all == nil;
+	self.noAnswer = nil;
+	self.requestElapsed = self.waiting and self.requestElapsed or nil;
+	if self:IsShown() then
+		UpdatePage(self);
+	end
+end
+
 function WardrobeCollectionFrame_Request(self)
 	self = self or WardrobeCollectionFrame;
+	if self.category == ILLUSION_CATEGORY then
+		if Comm_Send then
+			self.waiting = TransmogUI == nil or TransmogUI.illusions == nil;
+			self.requestElapsed = 0;
+			Comm_Send("TMOG_ILLUSIONS_GET");   -- ответ перестроит страницу (Blizzard_TransmogIllusions.lua)
+		end
+		WardrobeIllusions_BuildPage(self);
+		return;
+	end
 	if not Comm_Send then
 		return;
 	end
@@ -347,7 +444,7 @@ function WardrobeCollectionFrame_Request(self)
 	Comm_Send(OP_GET_PAGE, self.category, self.classId or 0, flags, self.page or 1, search, "W");
 end
 
-local function UpdatePage(self)
+function UpdatePage(self)
 	for index, model in ipairs(self.models) do
 		model.entry = self.entries[index];
 		UpdateModel(model);
@@ -498,6 +595,8 @@ function WardrobeCollectionFrame_OnLoad(self)
 				submenu:CreateRadio(cat[2], IsCategory, SetCategory, cat[1]);
 			end
 		end
+		-- ретейл: слот «Иллюзии» после оружия
+		rootDescription:CreateRadio(TRANSMOG_ILLUSIONS or "Иллюзии", IsCategory, SetCategory, ILLUSION_CATEGORY);
 	end);
 
 	-- search: ask the server after a short pause in typing
