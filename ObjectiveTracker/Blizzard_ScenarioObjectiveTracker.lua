@@ -327,6 +327,7 @@ function ScenarioObjectiveTrackerChallengeModeMixin:SetUpAffixes(affixes)
 		local affixFrame = self.affixFrames[i];
 		if not affixFrame then
 			affixFrame = CreateFrame("Frame", self:GetName() .. "Affix" .. i, self, "ScenarioChallengeModeAffixTemplate");
+			affixFrame:SetFrameLevel(self.Border:GetFrameLevel() + 1);	-- above the frame art
 			self.affixFrames[i] = affixFrame;
 		end
 		affixFrame:ClearAllPoints();
