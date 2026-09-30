@@ -891,7 +891,7 @@ namespace
 
         // retail: everybody goes to the entrance and waits behind the barrier until the countdown ends
         run.StartPos = run.FontPos;
-        if (AreaTrigger const* entrance = sObjectMgr->GetMapEntranceTrigger(run.MapId))
+        if (AreaTriggerTeleport const* entrance = sObjectMgr->GetMapEntranceTrigger(run.MapId))
             run.StartPos.Relocate(entrance->target_X, entrance->target_Y, entrance->target_Z, entrance->target_Orientation);
         if (GameObject* barrier = SpawnGameObject(map, BARRIER_ENTRY, run.StartPos, COUNTDOWN_MS / IN_MILLISECONDS + 5))
             run.BarrierGuid = barrier->GetGUID();
