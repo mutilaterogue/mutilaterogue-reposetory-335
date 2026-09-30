@@ -247,6 +247,7 @@ namespace
     std::unordered_map<uint32, Run> s_runs;                  // instanceId -> run
     std::unordered_map<ObjectGuid, ObjectGuid> s_fontUser;   // player -> font
     std::unordered_set<ObjectGuid> s_slotted;                // players with the key in the font
+    std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> s_lastInstance;   // player -> mythic map, instance
 
     // ---------------------------------------------------------------- strings (UTF-8)
     char const* const MSG_NOT_IN_DUNGEON = "\xd0\x9a\xd1\x83\xd0\xbf\xd0\xb5\xd0\xbb\xd1\x8c \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b \xd1\x80\xd0\xb0\xd0\xb1\xd0\xbe\xd1\x82\xd0\xb0\xd0\xb5\xd1\x82 \xd1\x82\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xba\xd0\xbe \xd0\xb2 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xbc \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5.";
@@ -259,6 +260,7 @@ namespace
     char const* const MSG_IN_COMBAT = "\xd0\x9d\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbd\xd0\xb0\xd1\x87\xd0\xb0\xd1\x82\xd1\x8c \xd0\xb8\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xb2\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb1\xd0\xbe\xd1\x8f.";
     char const* const MSG_TOO_FAR = "\xd0\x92\xd1\x8b \xd1\x81\xd0\xbb\xd0\xb8\xd1\x88\xd0\xba\xd0\xbe\xd0\xbc \xd0\xb4\xd0\xb0\xd0\xbb\xd0\xb5\xd0\xba\xd0\xbe \xd0\xbe\xd1\x82 \xd0\xba\xd1\x83\xd0\xbf\xd0\xb5\xd0\xbb\xd0\xb8 \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b.";
     char const* const MSG_STARTED = "\xd0\x98\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xbd\xd0\xb0\xd1\x87\xd0\xbd\xd0\xb5\xd1\x82\xd1\x81\xd1\x8f \xd1\x87\xd0\xb5\xd1\x80\xd0\xb5\xd0\xb7 10 \xd1\x81\xd0\xb5\xd0\xba\xd1\x83\xd0\xbd\xd0\xb4.";
+    char const* const MSG_NO_LEAVE = "\xd0\x9d\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbf\xd0\xbe\xd0\xba\xd0\xb8\xd0\xbd\xd1\x83\xd1\x82\xd1\x8c \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5 \xd0\xb2\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb8\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd1\x8f.";
     char const* const MSG_GO = "\xd0\x98\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xbd\xd0\xb0\xd1\x87\xd0\xb0\xd0\xbb\xd0\xbe\xd1\x81\xd1\x8c!";
     char const* const MSG_TIME_UP = "\xd0\x92\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb2\xd1\x8b\xd1\x88\xd0\xbb\xd0\xbe! \xd0\x9a\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xbf\xd0\xbe\xd1\x82\xd0\xb5\xd1\x80\xd1\x8f\xd0\xbb \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c.";
     char const* const MSG_NEW_KEY = "\xd0\x92\xd1\x8b \xd0\xbf\xd0\xbe\xd0\xbb\xd1\x83\xd1\x87\xd0\xb8\xd0\xbb\xd0\xb8 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87: %s (%u).";
@@ -1424,6 +1426,7 @@ public:
     {
         s_fontUser.erase(player->GetGUID());
         s_slotted.erase(player->GetGUID());
+        s_lastInstance.erase(player->GetGUID());
         s_keys.erase(player->GetGUID().GetCounter());
     }
 
@@ -1433,12 +1436,54 @@ public:
         if (!IsMythicMap(map))
         {
             player->SetControlled(false, UNIT_STATE_ROOT);
+            if (LeftMythicInstance(player))
+                return;
             sAddonComm->Send(player, "MPLUS_RUN", 0, 0, 0, "", 0, 0, 0, DEATH_PENALTY, 0, 0, 0, 0);
             return;
         }
+        s_lastInstance[player->GetGUID()] = { map->GetId(), map->GetInstanceId() };
         Run& run = GetOrCreateRun(map);
         SendBosses(player, run);
         SendRun(player, run);
+    }
+
+    // left a mythic instance:
+    //  - keystone run in progress: back inside (no leaving, no hearthstone / portals out) - returns true;
+    //  - otherwise the instance is not kept: the next entry is a new, full instance (retail: every run is fresh)
+    static bool LeftMythicInstance(Player* player)
+    {
+        auto last = s_lastInstance.find(player->GetGUID());
+        if (last == s_lastInstance.end())
+            return false;
+        uint32 mapId = last->second.first;
+        uint32 instanceId = last->second.second;
+
+        auto run = s_runs.find(instanceId);
+        Map* instance = sMapMgr->FindMap(mapId, instanceId);
+        if (run != s_runs.end() && instance && player->IsAlive()
+            && (run->second.State == RUN_COUNTDOWN || run->second.State == RUN_ACTIVE))
+        {
+            Position const& back = run->second.HasLastBoss ? run->second.LastBossPos : run->second.StartPos;
+            Message(player, MSG_NO_LEAVE);
+            player->TeleportTo(mapId, back.GetPositionX(), back.GetPositionY(), back.GetPositionZ(), back.GetOrientation());
+            return true;
+        }
+
+        s_lastInstance.erase(last);
+        player->UnbindInstance(mapId, DUNGEON_DIFFICULTY_EPIC);
+
+        // the group bind goes when nobody of the group is inside any more
+        if (Group* group = player->GetGroup())
+        {
+            bool inside = false;
+            for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+                if (Player* member = ref->GetSource())
+                    if (member->GetMapId() == mapId && member->GetInstanceId() == instanceId)
+                        inside = true;
+            if (!inside)
+                group->UnbindInstance(mapId, DUNGEON_DIFFICULTY_EPIC);
+        }
+        return false;
     }
 
     void OnPlayerKilledByCreature(Creature* killer, Player* killed) override
