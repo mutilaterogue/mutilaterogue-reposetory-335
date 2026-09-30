@@ -99,6 +99,13 @@ function ItemUpgradeFrame_OnLoad(self)
 		SetPortraitToTexture(portrait, "Interface\\Icons\\Trade_BlackSmithing");
 	end
 	ItemUpgradeFrame_SetupDropdown(self);
+	-- retail art (TopBG / BottomBG) replaces the template background
+	if self.Bg then
+		self.Bg:Hide();
+	end
+	if self.CloseButton and self.NineSlice then
+		self.CloseButton:SetFrameLevel(self.NineSlice:GetFrameLevel() + 2);
+	end
 	self.Ring:SetPoint("CENTER", self.UpgradeButton, "CENTER", 0, 0);
 	self.anim = { arrow = 0, glow = 0 };
 end
