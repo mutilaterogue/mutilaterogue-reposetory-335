@@ -96,9 +96,7 @@ function ItemUpgradeFrame_OnLoad(self)
 	end
 	if self.PortraitContainer and self.PortraitContainer.portrait then
 		local portrait = self.PortraitContainer.portrait;
-		if not portrait:SetAtlas("ItemUpgrade_PortraitIcon", false) or not portrait:GetTexture() then
-			SetPortraitToTexture(portrait, "Interface\\Icons\\Trade_BlackSmithing");
-		end
+		SetPortraitToTexture(portrait, "Interface\\Icons\\Trade_BlackSmithing");
 	end
 	if self.CloseButton then
 		self.CloseButton:SetFrameLevel(self:GetFrameLevel() + 20);
@@ -547,21 +545,12 @@ local function AddUpgradeLine(tooltip, bag, slot)
 	local data = items[bag] and items[bag][slot];
 	if data then
 		local text = ITEM_UPGRADE_TOOLTIP_FORMAT_STRING:format(trackNames[data.track] or "", data.level, data.max);
-		local name = tooltip:GetName();
-		tooltip:AddLine(" ");
-		for i = tooltip:NumLines(), 3, -1 do
-			for _, side in ipairs({ "TextLeft", "TextRight" }) do
-				local dst, src = _G[name .. side .. i], _G[name .. side .. (i - 1)];
-				dst:SetText(src:GetText());
-				dst:SetTextColor(src:GetTextColor());
-				if src:IsShown() and src:GetText() then dst:Show(); else dst:Hide(); end
-			end
+		-- append to the name line: shifting lines would break gem icons and the sell price frame
+		local line = _G[tooltip:GetName() .. "TextLeft1"];
+		local current = line and line:GetText();
+		if current and not current:find("\n", 1, true) then
+			line:SetText(current .. "\n|cffffd100" .. text .. "|r");
 		end
-		local line = _G[name .. "TextLeft2"];
-		line:SetText(text);
-		line:SetTextColor(1, 0.82, 0);
-		line:Show();
-		_G[name .. "TextRight2"]:Hide();
 		tooltip:Show();
 	end
 end
