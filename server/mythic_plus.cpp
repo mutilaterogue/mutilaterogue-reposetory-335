@@ -370,7 +370,9 @@ namespace
     {
         Creature const* creature = unit ? unit->ToCreature() : nullptr;
         return creature && !creature->IsControlledByPlayer() && !creature->IsCritter() && !creature->IsTrigger()
-            && !creature->IsCivilian() && creature->IsHostileToPlayers();
+            && !creature->IsCivilian() && creature->IsHostileToPlayers()
+            // invisible helpers and event dummies cannot be killed: they must not raise the forces total
+            && !creature->HasUnitFlag(UNIT_FLAG_NOT_SELECTABLE) && creature->GetMaxHealth() > 1;
     }
 
     bool IsBoss(Creature const* creature)
