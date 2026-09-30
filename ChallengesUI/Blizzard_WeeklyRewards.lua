@@ -151,11 +151,14 @@ function WeeklyRewardsMixin:OnLoad()
 
 	-- retail red close button (RedButton-Exit atlases)
 	local close = self.CloseButton;
+	close:SetNormalTexture("Interface\\Buttons\\redbutton2x");
 	close:GetNormalTexture():SetAtlas("RedButton-Exit");
+	close:SetPushedTexture("Interface\\Buttons\\redbutton2x");
 	close:GetPushedTexture():SetAtlas("RedButton-exit-pressed");
+	close:SetDisabledTexture("Interface\\Buttons\\redbutton2x");
 	close:GetDisabledTexture():SetAtlas("RedButton-Exit-Disabled");
+	close:SetHighlightTexture("Interface\\Buttons\\redbutton2x", "ADD");
 	close:GetHighlightTexture():SetAtlas("RedButton-Highlight");
-	close:GetHighlightTexture():SetBlendMode("ADD");
 	self.PreviousRewardNotification:SetText(S("WEEKLY_REWARDS_UNCLAIMED_REWARDS_FROM_PREVIOUS_TIME"));
 
 	MythicPlus_RegisterCallback(function(event)
