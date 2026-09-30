@@ -252,8 +252,9 @@ end
 ---------------------------------------------------------------------------
 local function ClearItem(self)
 	self.UpgradeItemButton.Icon:SetTexture(nil);
-	self.UpgradeItemButton:SetNormalTexture(self.UpgradeItemButton.NormalTex);
-	self.UpgradeItemButton.NormalTex:SetAtlas("itemupgrade_greenplusicon");
+	-- 3.3.5: SetNormalTexture(nil) drops the texture anchors, so only toggle alpha
+	self.UpgradeItemButton.NormalTex:SetAlpha(1);
+	self.UpgradeItemButton.PushedTex:SetAlpha(1);
 	self.UpgradeItemButton.EmptySlotGlow:Show();
 	self.UpgradeButton:Disable();
 	self.MissingDescription:Show();
@@ -365,7 +366,8 @@ function ItemUpgradeFrame_Update(self)
 		return;
 	end
 	local button = self.UpgradeItemButton;
-	button:SetNormalTexture(nil);
+	button.NormalTex:SetAlpha(0);
+	button.PushedTex:SetAlpha(0);
 	button.Icon:SetTexture(GetItemIcon(info.itemId));
 	button.EmptySlotGlow:Hide();
 	self.MissingDescription:Hide();
