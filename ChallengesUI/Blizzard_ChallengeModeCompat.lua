@@ -394,3 +394,77 @@ if deathDialog then
 		end
 	end
 end
+
+---------------------------------------------------------------------------
+-- items from the Mythic+ chest: "Эпохальный +N" instead of the "Героический" line
+-- (the server sends "bag/slot/level,...": bag 255 - equipment and bank, 0 - backpack, 1..4, 5..11 - bank bags)
+---------------------------------------------------------------------------
+local mythicItems = {};
+
+if Comm_Register then
+	Comm_Register("MPLUS_ITEMS", function(list)
+		wipe(mythicItems);
+		for entry in string.gmatch(list or "", "[^,]+") do
+			local bag, slot, level = strsplit("/", entry);
+			bag, slot, level = tonumber(bag), tonumber(slot), tonumber(level);
+			if bag and slot and level then
+				mythicItems[bag] = mythicItems[bag] or {};
+				mythicItems[bag][slot] = level;
+			end
+		end
+	end);
+end
+
+local function MythicLine(tooltip, bag, slot)
+	local level = mythicItems[bag] and mythicItems[bag][slot];
+	if not level then
+		return;
+	end
+	local text = ITEM_MYTHIC .. " +" .. level;
+	local name = tooltip:GetName();
+	for i = 2, tooltip:NumLines() do
+		local line = _G[name .. "TextLeft" .. i];
+		if line and line:GetText() == ITEM_HEROIC then
+			line:SetText(text);
+			tooltip:Show();
+			return;
+		end
+	end
+	-- no heroic line: under the name
+	local line = _G[name .. "TextLeft1"];
+	local current = line and line:GetText();
+	if current and not current:find("\n", 1, true) then
+		line:SetText(current .. "\n|cff1eff00" .. text .. "|r");
+		tooltip:Show();
+	end
+end
+
+local mythicTooltips = CreateFrame("Frame");
+mythicTooltips:RegisterEvent("PLAYER_LOGIN");
+mythicTooltips:RegisterEvent("BAG_UPDATE");
+mythicTooltips:RegisterEvent("PLAYERBANKSLOTS_CHANGED");
+mythicTooltips:RegisterEvent("UNIT_INVENTORY_CHANGED");
+mythicTooltips:SetScript("OnEvent", function(self, event)
+	if event == "PLAYER_LOGIN" then
+		hooksecurefunc(GameTooltip, "SetInventoryItem", function(tooltip, unit, slot)
+			if unit == "player" then
+				MythicLine(tooltip, 255, slot);
+			end
+		end);
+		hooksecurefunc(GameTooltip, "SetBagItem", function(tooltip, bag, slot)
+			MythicLine(tooltip, bag, slot);
+		end);
+		return;
+	end
+	-- items moved: ask again once the burst of events is over
+	self.pending = 0.5;
+end);
+mythicTooltips:SetScript("OnUpdate", function(self, elapsed)
+	if self.pending then
+		self.pending = self.pending - elapsed;
+		if self.pending <= 0 then
+			self.pending = nil;
+			Send("MPLUS_ITEMS_GET");
+		end
+	end
+end);

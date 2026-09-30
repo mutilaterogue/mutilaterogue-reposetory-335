@@ -52,8 +52,10 @@
  * Setup: sql/world_mythic_plus.sql, sql/characters_mythic_plus.sql, AddSC_mythic_plus() in custom_script_loader.cpp.
  */
 
+#include "item_scaling.h"
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
+#include "Bag.h"
 #include "Chat.h"
 #include "ChatCommand.h"
 #include "Creature.h"
@@ -96,7 +98,9 @@ namespace
     constexpr uint32 KEYSTONE_ITEM = 138019;
     constexpr uint32 FONT_ENTRY = 246779;           // Font of Power (ScriptName go_mythic_plus_font)
     constexpr uint32 CHEST_ENTRY = 252665;          // Challenger's Cache, also its gameobject_loot_template entry
-    constexpr float FONT_RANGE = 10.0f;             // the keystone frame closes farther away than this
+    constexpr float FONT_RANGE = 10.0f;
+    constexpr int32 MYTHIC_ILVL_PER_LEVEL = 3;      // chest items: item level +3 per keystone level
+    constexpr uint32 MYTHIC_ILVL_MAX_LEVEL = 20;    // ... up to this keystone level             // the keystone frame closes farther away than this
 
     constexpr uint32 MIN_KEY_LEVEL = 1;
     constexpr uint32 MAX_KEY_LEVEL = 30;
@@ -247,7 +251,8 @@ namespace
     std::unordered_map<uint32, Run> s_runs;                  // instanceId -> run
     std::unordered_map<ObjectGuid, ObjectGuid> s_fontUser;   // player -> font
     std::unordered_set<ObjectGuid> s_slotted;                // players with the key in the font
-    std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> s_lastInstance;   // player -> mythic map, instance
+    std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> s_lastInstance;
+    std::unordered_map<ObjectGuid::LowType, uint32> s_mythicItems;    // item guid -> keystone level it dropped from   // player -> mythic map, instance
 
     // ---------------------------------------------------------------- strings (UTF-8)
     char const* const MSG_NOT_IN_DUNGEON = "\xd0\x9a\xd1\x83\xd0\xbf\xd0\xb5\xd0\xbb\xd1\x8c \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b \xd1\x80\xd0\xb0\xd0\xb1\xd0\xbe\xd1\x82\xd0\xb0\xd0\xb5\xd1\x82 \xd1\x82\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xba\xd0\xbe \xd0\xb2 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xbc \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5.";
@@ -660,6 +665,67 @@ namespace
 
     // ---------------------------------------------------------------- completion
     // the chest belongs to the map, not to a player: it stays when anybody leaves
+    // ---------------------------------------------------------------- mythic items (chest loot)
+    // weapons and armor from the chest: item level by the keystone level (ItemScaling), tooltip "Эпохальный +N"
+    void SendMythicItems(Player* player)
+    {
+        std::ostringstream list;
+        bool first = true;
+        auto add = [&](uint32 bag, uint32 slot, Item* item)
+        {
+            if (!item)
+                return;
+            auto itr = s_mythicItems.find(item->GetGUID().GetCounter());
+            if (itr == s_mythicItems.end())
+                return;
+            list << (first ? "" : ",") << bag << '/' << slot << '/' << itr->second;
+            first = false;
+        };
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+            add(255, slot + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+        for (uint8 slot = INVENTORY_SLOT_ITEM_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
+            add(0, slot - INVENTORY_SLOT_ITEM_START + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+        for (uint8 bagSlot = INVENTORY_SLOT_BAG_START; bagSlot < INVENTORY_SLOT_BAG_END; ++bagSlot)
+            if (Bag* bag = player->GetBagByPos(bagSlot))
+                for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                    add(bagSlot - INVENTORY_SLOT_BAG_START + 1, i + 1, bag->GetItemByPos(uint8(i)));
+        for (uint8 slot = BANK_SLOT_ITEM_START; slot < BANK_SLOT_ITEM_END; ++slot)
+            add(255, slot + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+        for (uint8 bagSlot = BANK_SLOT_BAG_START; bagSlot < BANK_SLOT_BAG_END; ++bagSlot)
+            if (Bag* bag = player->GetBagByPos(bagSlot))
+                for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                    add(bagSlot - BANK_SLOT_BAG_START + 5, i + 1, bag->GetItemByPos(uint8(i)));
+        sAddonComm->Send(player, "MPLUS_ITEMS", list.str());
+    }
+
+    void MarkMythicItem(Player* player, Item* item, uint32 level)
+    {
+        ItemTemplate const* proto = item ? item->GetTemplate() : nullptr;
+        if (!proto || !level || (proto->Class != ITEM_CLASS_WEAPON && proto->Class != ITEM_CLASS_ARMOR))
+            return;
+        ObjectGuid::LowType guid = item->GetGUID().GetCounter();
+        s_mythicItems[guid] = level;
+        CharacterDatabase.Execute(Trinity::StringFormat("REPLACE INTO item_mythic (item_guid, level) VALUES ({}, {})", guid, level).c_str());
+        ItemScaling::SetBonus(player, item, int32(std::min(level, MYTHIC_ILVL_MAX_LEVEL)) * MYTHIC_ILVL_PER_LEVEL);
+    }
+
+    void LoadMythicItems(Player* player)
+    {
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(m.item_guid AS SIGNED), CAST(m.level AS SIGNED) FROM item_mythic m JOIN item_instance i ON i.guid = m.item_guid WHERE i.owner_guid = {}",
+            player->GetGUID().GetCounter()).c_str()))
+            do
+            {
+                Field* f = result->Fetch();
+                s_mythicItems[ObjectGuid::LowType(f[0].GetInt64())] = uint32(f[1].GetInt64());
+            } while (result->NextRow());
+    }
+
+    void HandleItemsGet(Player* player, std::vector<std::string> const& /*args*/)
+    {
+        SendMythicItems(player);
+    }
+
     GameObject* SpawnGameObject(Map* map, uint32 entry, Position const& pos, uint32 despawnSec)
     {
         if (!sObjectMgr->GetGameObjectTemplate(entry))
@@ -1312,7 +1378,10 @@ struct go_mythic_plus_chest : public GameObjectAI
             if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, lootItem.itemid, lootItem.count) == EQUIP_ERR_OK)
             {
                 if (Item* item = player->StoreNewItem(dest, lootItem.itemid, true, lootItem.randomPropertyId))
+                {
                     player->SendNewItem(item, lootItem.count, true, false);
+                    MarkMythicItem(player, item, run->Level);
+                }
             }
             else
                 mailItems.emplace_back(lootItem.itemid, lootItem.count);
@@ -1327,6 +1396,7 @@ struct go_mythic_plus_chest : public GameObjectAI
             for (auto const& entry : mailItems)
                 if (Item* item = Item::CreateItem(entry.first, entry.second, player))
                 {
+                    MarkMythicItem(player, item, run->Level);
                     item->SaveToDB(trans);
                     draft.AddItem(item);
                 }
@@ -1371,6 +1441,7 @@ public:
     void OnStartup() override
     {
         LoadData();
+        CharacterDatabase.Execute("DELETE FROM item_mythic WHERE item_guid NOT IN (SELECT guid FROM item_instance)");
     }
 
     void OnUpdate(uint32 diff) override
@@ -1420,12 +1491,15 @@ public:
         sAddonComm->Register(std::string("MPLUS_START"), &HandleStart);
         sAddonComm->Register(std::string("MPLUS_CLOSE"), &HandleClose);
         sAddonComm->Register(std::string("MPLUS_RELEASE"), &HandleRelease);
+        sAddonComm->Register(std::string("MPLUS_ITEMS_GET"), &HandleItemsGet);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
     {
         LoadKey(player);
+        LoadMythicItems(player);
         SendAll(player);
+        SendMythicItems(player);
     }
 
     void OnLogout(Player* player) override
