@@ -61,7 +61,7 @@ def convert(src, out_dir, client_dir, manifest=None):
     # sequences: 3.3.5 would look for .anim files without 0x20
     count, off = struct.unpack_from('<II', md, H['seqs'])
     for i in range(count):
-        seq_flags = struct.unpack_from('<I', md, off + i * 64 + 16)[0]
+        seq_flags = struct.unpack_from('<I', md, off + i * 64 + 12)[0]
         if not seq_flags & 0x20:
             print('warning: sequence %d is not inline (needs .anim)' % i)
 
