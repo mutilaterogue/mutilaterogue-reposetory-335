@@ -229,7 +229,7 @@
 					<Layer level="OVERLAY" textureSubLevel="5">
 						<Texture parentKey="TopDecor" atlas="evergreen-weeklyrewards-frame-topdecor" useAtlasSize="true">
 							<Anchors>
-								<Anchor point="CENTER" relativePoint="TOP" x="0" y="-16"/>
+								<Anchor point="CENTER" relativePoint="TOP" x="0" y="10"/>
 							</Anchors>
 						</Texture>
 					</Layer>
@@ -244,7 +244,7 @@
 					<Layer level="ARTWORK">
 						<FontString name="$parentText" parentKey="Text" inherits="GameFontHighlightLarge" justifyH="CENTER">
 							<Anchors>
-								<Anchor point="CENTER" x="0" y="12"/>
+								<Anchor point="CENTER" x="0" y="-16"/>
 							</Anchors>
 						</FontString>
 						<Texture parentKey="HeaderDivider" atlas="evergreen-weeklyrewards-header" useAtlasSize="true">
