@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -60,16 +60,16 @@ enum RogueSpells
     SPELL_ROGUE_MASTER_OF_SUBTLETY_BUFF         = 31665,
     SPELL_ROGUE_OVERKILL_BUFF                   = 58427,
     SPELL_ROGUE_STEALTH                         =  1784,
-    SPELL_ROGUE_FANGS_OF_THE_FATHER             = 109939,   // m1 - порог стаков
-    SPELL_ROGUE_SHADOWS_DESTROYER               = 109941,   // «Тени Разрушителя»
-    SPELL_ROGUE_FURY_DESTROYER                  = 109949,   // «Ярость Разрушителя»: s1 приёмов в серию, аура на d
-    SPELL_ROGUE_FURY_FINISHER_BONUS             = 109950    // s1 приёмов в серию после завершающего приёма
+    SPELL_ROGUE_FANGS_OF_THE_FATHER             = 109939,   // m1 - stack threshold
+    SPELL_ROGUE_SHADOWS_DESTROYER               = 109941,   // Shadows of the Destroyer
+    SPELL_ROGUE_FURY_DESTROYER                  = 109949,   // Fury of the Destroyer: s1 combo points, aura for d
+    SPELL_ROGUE_FURY_FINISHER_BONUS             = 109950    // s1 combo points after a finishing move
 };
 
-// 109939 - Fangs of the Father («Клыки Отца», легендарные кинжалы Cata 4.3):
-// атаки ближнего боя дают 109941 «Тени Разрушителя» (ловкость, до StackAmount). С 109939 m1 стаков каждый следующий
-// с нарастающим шансом (на последнем - 100%) вызывает 109949 «Ярость Разрушителя»: «Тени» снимаются, серия +109949 s1.
-// Во время «Ярости» завершающие приёмы добавляют 109950 s1 приёмов в серию.
+// 109939 - Fangs of the Father (Cata 4.3 legendary daggers):
+// melee attacks give 109941 Shadows of the Destroyer (agility, up to StackAmount). From 109939 m1 stacks every next one
+// has a growing chance (100% on the last) to trigger 109949 Fury of the Destroyer: Shadows are removed, +109949 s1 combo points.
+// During Fury finishing moves add 109950 s1 combo points.
 class spell_rog_fangs_of_the_father : public AuraScript
 {
     PrepareAuraScript(spell_rog_fangs_of_the_father);
@@ -81,7 +81,7 @@ class spell_rog_fangs_of_the_father : public AuraScript
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
-        // только атаки ближнего боя, и не во время «Ярости»
+        // melee attacks only, and not during Fury
         Unit* actor = eventInfo.GetActor();
         return actor && actor->GetTypeId() == TYPEID_PLAYER && !actor->HasAura(SPELL_ROGUE_FURY_DESTROYER);
     }
@@ -108,13 +108,13 @@ class spell_rog_fangs_of_the_father : public AuraScript
         if (stacks < threshold)
             return;
 
-        // нарастающий шанс: 1 из (оставшихся до максимума + 1), на последнем стаке - всегда
+        // growing chance: 1 in (stacks left to max + 1), always on the last stack
         float chance = 100.0f / float(maxStacks - stacks + 1);
         if (!roll_chance_f(chance))
             return;
 
         caster->RemoveAurasDueToSpell(SPELL_ROGUE_SHADOWS_DESTROYER);
-        // 109949: приёмы в серию на цель атаки + аура «Ярости» на разбойнике
+        // 109949: combo points on the attacked target + Fury aura on the rogue
         caster->CastSpell(target, SPELL_ROGUE_FURY_DESTROYER, true);
     }
 
@@ -125,7 +125,7 @@ class spell_rog_fangs_of_the_father : public AuraScript
     }
 };
 
-// 109949 - Ярость Разрушителя: завершающие приёмы увеличивают серию на 109950 s1
+// 109949 - Fury of the Destroyer: finishing moves add 109950 s1 combo points
 class spell_rog_fury_of_the_destroyer : public AuraScript
 {
     PrepareAuraScript(spell_rog_fury_of_the_destroyer);
@@ -150,7 +150,7 @@ class spell_rog_fury_of_the_destroyer : public AuraScript
         if (!caster || !target)
             return;
 
-        // завершающий приём снимает серию в конце применения - добавляем приёмы уже после него
+        // the finishing move clears combo points at the end of the cast - add them after it
         ObjectGuid casterGuid = caster->GetGUID();
         ObjectGuid targetGuid = target->GetGUID();
         caster->m_Events.AddEventAtOffset([caster, casterGuid, targetGuid]()

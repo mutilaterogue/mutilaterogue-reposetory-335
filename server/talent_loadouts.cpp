@@ -1,17 +1,17 @@
-﻿/*
- * Наборы талантов (ретейл: ClassTalents loadouts, C_ClassTalents.SaveConfig / LoadConfig) для 3.3.5.
+/*
+ * Talent loadouts (retail: ClassTalents loadouts, C_ClassTalents.SaveConfig / LoadConfig) for 3.3.5.
  *
- * Набор - сохранённая раскладка талантов для специализации (talent group 0/1). Применение: бесплатный
- * сброс талантов активной специализации и изучение сохранённых рангов по рядам (Player::LearnTalent
- * сам проверяет очки, ряды и требования). Только вне боя. Наборов на специализацию - MAX_LOADOUTS.
+ * A loadout is a saved talent build of a specialization (talent group 0/1). Applying it: free reset of
+ * the active specialization talents and learning the saved ranks tier by tier (Player::LearnTalent
+ * checks points, tiers and prerequisites itself). Out of combat only. MAX_LOADOUTS per specialization.
  *
- * AddonComm (клиент: PlayerSpells\Blizzard_PlayerSpellsLoadouts.lua):
+ * AddonComm (client: PlayerSpells\Blizzard_PlayerSpellsLoadouts.lua):
  *   "TLOAD_GET"                          -> "TLOAD" : id : name (xN), "TLOAD_END" : activeId : max
- *   "TLOAD_SAVE" : id (0 - новый) : name -> сохранить текущие таланты активной специализации, затем список
- *   "TLOAD_RENAME" : id : name, "TLOAD_DEL" : id  -> список
- *   "TLOAD_APPLY" : id                   -> "TLOAD_RESULT" : ok(1/0) : код ошибки (глобальная строка клиента), затем список
+ *   "TLOAD_SAVE" : id (0 - new) : name -> save the current talents of the active specialization, then the list
+ *   "TLOAD_RENAME" : id : name, "TLOAD_DEL" : id  -> list
+ *   "TLOAD_APPLY" : id                   -> "TLOAD_RESULT" : ok(1/0) : error code (client global string), then the list
  *
- * Установка: sql/characters_talent_loadouts.sql, AddSC_talent_loadouts() в custom_script_loader.cpp.
+ * Setup: sql/characters_talent_loadouts.sql, AddSC_talent_loadouts() in custom_script_loader.cpp.
  */
 
 #include "ScriptMgr.h"
@@ -58,7 +58,7 @@ namespace
         return tab && (tab->ClassMask & player->GetClassMask()) != 0;
     }
 
-    // текущие таланты специализации: "talentId/rank,..."
+    // current talents of the specialization: "talentId/rank,..."
     std::string CurrentTalents(Player* player, uint8 spec)
     {
         std::ostringstream text;
@@ -100,7 +100,7 @@ namespace
                 continue;
             list.push_back({ talentId, rank, talent->TierID });
         }
-        // сначала верхние ряды: нижним нужны очки в ветке и требования
+        // upper tiers first: lower ones need points in the tree and prerequisites
         std::stable_sort(list.begin(), list.end(), [](TalentRank const& a, TalentRank const& b) { return a.Tier < b.Tier; });
         return list;
     }
@@ -209,7 +209,7 @@ namespace
             player->LearnTalent(talent.TalentId, talent.Rank - 1);
         player->SendTalentsInfoData(false);
 
-        // что не выучилось (не хватило очков на этом уровне) - не ошибка: ретейл тоже учит, что может
+        // not learned (not enough points at this level) is not an error: retail also learns what it can
         SetActive(player, spec, id);
         sAddonComm->Send(player, "TLOAD_RESULT", 1, "TALENT_LOADOUT_APPLIED");
         SendList(player);

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Appearance collection (retail "Appearances" / Wardrobe) for 3.3.5.
  *
  * 3.3.5 has no appearance ids: an appearance = item_template.displayid inside one
@@ -174,7 +174,7 @@ namespace
 
     constexpr uint32 ITEM_FLAG_DEPRECATED_MASK = 0x00000010;
 
-    // тестовые/служебные предметы: TEST, Тест, [PH], Deprecated, OLD, Monster и т.п. (без учёта регистра)
+    // test / service items: TEST, [PH], Deprecated, OLD, Monster etc. (case-insensitive)
     bool IsJunkName(std::string const& name)
     {
         if (name.empty())

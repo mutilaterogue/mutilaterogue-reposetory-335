@@ -1,6 +1,6 @@
--- world DB: какие предметы считаются игрушками (toy_collection.cpp).
--- Предмет должен существовать в item_template и иметь заклинание "при использовании",
--- иначе сервер пропустит его и напишет об этом в лог при старте.
+-- world DB: which items are toys (toy_collection.cpp).
+-- The item must exist in item_template and have an "on use" spell,
+-- otherwise the server skips it and logs it at startup.
 CREATE TABLE IF NOT EXISTS `custom_toys` (
   `itemId` INT UNSIGNED NOT NULL,
   `comment` VARCHAR(100) NOT NULL DEFAULT '',

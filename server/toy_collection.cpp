@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Toy collection for 3.3.5 (modeled after retail ToyBox).
  *
  * World DB custom_toys: which items are toys (see sql/world_custom_toys.sql).
@@ -98,7 +98,7 @@ namespace
         toyInfo.clear();
 
         std::ostringstream list;
-        // заклинания берём прямо из item_template: поля ItemTemplate в разных форках называются по-разному
+        // spells are read straight from item_template: ItemTemplate field names differ between forks
         std::ostringstream query;
         query << "SELECT t.itemId, i.entry";
         for (uint32 n = 1; n <= ITEM_SPELLS; ++n)

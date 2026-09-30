@@ -1,23 +1,23 @@
-﻿/*
- * Скейлинг предметов (ретейл: уровень предмета экземпляра - ItemBonus) для 3.3.5.
+/*
+ * Item scaling (retail: per-instance item level - ItemBonus) for 3.3.5.
  *
- * Бонус к уровню хранится на экземпляре предмета (characters.item_scaling), предмет его не теряет при
- * передаче, в банке и т.д. Характеристики пересчитывает ядро через Player::s_itemScaleHook
- * (core/Player_itemscale.patch): статы, броня и урон оружия шаблона умножаются на множитель от бонуса.
- *   множитель = STEP ^ бонус (ретейл: ~0.94% характеристик на уровень предмета)
+ * The item level bonus is stored on the item instance (characters.item_scaling), the item keeps it when
+ * traded, banked etc. Stats are recalculated by the core through Player::s_itemScaleHook
+ * (core/Player_itemscale.patch): template stats, armor and weapon damage are multiplied by the bonus multiplier.
+ *   multiplier = STEP ^ bonus (retail: ~0.94% stats per item level)
  *
- * Подсказки - как у Reforger (Rochet2): клиенту шлётся кэш предмета (SMSG_ITEM_QUERY_SINGLE_RESPONSE) с
- * пересчитанными значениями и уровнем, родная подсказка показывает их сама. Кэш клиента - по номеру
- * предмета, поэтому при наведении на экземпляр с другим бонусом клиент просит кэш именно для него.
+ * Tooltips - like Reforger (Rochet2): the client gets an item cache (SMSG_ITEM_QUERY_SINGLE_RESPONSE) with
+ * recalculated values and item level, the native tooltip shows them. The client cache is per item entry,
+ * so when hovering an instance with a different bonus the client asks for the cache of that instance.
  *
- * AddonComm (клиент: ItemScaling\ItemScaling.lua):
+ * AddonComm (client: ItemScaling\ItemScaling.lua):
  *   "ISCALE_CONFIG" : statStep : armorStep : damageStep (x1000000)
- *   "ISCALE_ITEMS_GET" -> "ISCALE_ITEMS" : "bag/slot/bonus,..." (ячейки как у трансмога: 255 - экипировка и банк,
- *                                             0 - рюкзак, 1..4 - сумки, 5..11 - сумки банка)
- *   "ISCALE_SHOW" : bag : slot                -> кэш предмета с бонусом этого экземпляра
- * GM: .itemscale <ячейка 1..19> <бонус>  - бонус надетому предмету (0 - убрать)
+ *   "ISCALE_ITEMS_GET" -> "ISCALE_ITEMS" : "bag/slot/bonus,..." (slots as in transmog: 255 - equipment and bank,
+ *                                             0 - backpack, 1..4 - bags, 5..11 - bank bags)
+ *   "ISCALE_SHOW" : bag : slot                -> item cache with the bonus of this instance
+ * GM: .itemscale <slot 1..19> <bonus>  - bonus for an equipped item (0 - remove)
  *
- * Установка: sql/characters_item_scaling.sql, core/Player_itemscale.patch, AddSC_item_scaling().
+ * Setup: sql/characters_item_scaling.sql, core/Player_itemscale.patch, AddSC_item_scaling().
  */
 
 #include "item_scaling.h"
@@ -46,15 +46,15 @@ using namespace Trinity::ChatCommands;
 
 namespace
 {
-    // рост за 1 уровень предмета (ретейл Legion+: 1.00936 на характеристики)
+    // growth per item level (retail Legion+: 1.00936 for stats)
     constexpr double STAT_STEP = 1.00936;
     constexpr double ARMOR_STEP = 1.00936;
     constexpr double DAMAGE_STEP = 1.00936;
     constexpr int32 MAX_BONUS = 200;
 
-    std::unordered_map<uint32, int32> bonuses;   // item guid -> бонус
+    std::unordered_map<uint32, int32> bonuses;   // item guid -> bonus
 
-    // ячейка клиента -> предмет (как в Transmog::SendItems)
+    // client slot -> item (as in Transmog::SendItems)
     Item* GetClientItem(Player* player, uint32 bag, uint32 slot)
     {
         if (!slot)
@@ -188,7 +188,7 @@ namespace ItemScaling
         bonus = std::max(-MAX_BONUS, std::min(MAX_BONUS, bonus));
         uint32 guid = item->GetGUID().GetCounter();
 
-        // характеристики надетого предмета: снять со старым бонусом, наложить с новым
+        // stats of an equipped item: remove with the old bonus, apply with the new one
         bool equipped = item->IsEquipped() && item->GetOwnerGUID() == player->GetGUID();
         if (equipped)
             player->_ApplyItemMods(item, item->GetSlot(), false);
@@ -240,8 +240,8 @@ public:
         sAddonComm->Register(std::string("ISCALE_SHOW"), &HandleShow);
     }
 
-    // как SendReforgePackets у Reforger: через секунду после входа - кэш всех предметов с бонусом,
-    // чтобы окно персонажа и GetItemInfo сразу видели новые значения, а не только после наведения
+    // like SendReforgePackets in Reforger: one second after login - caches of all items with a bonus,
+    // so the character frame and GetItemInfo see the new values right away, not only after hovering
     class SendCachesEvent : public BasicEvent
     {
     public:
@@ -249,7 +249,7 @@ public:
 
         bool Execute(uint64, uint32) override
         {
-            std::unordered_map<uint32, int32> sent;   // entry -> бонус (кэш клиента - по номеру предмета)
+            std::unordered_map<uint32, int32> sent;   // entry -> bonus (client cache is per item entry)
             auto send = [&](Item* item)
             {
                 if (!item)
@@ -260,7 +260,7 @@ public:
                 sent[item->GetEntry()] = bonus;
                 ItemScaling::SendItemCache(_player, item->GetTemplate(), bonus);
             };
-            // надетые - первыми: у одинаковых предметов в кэше будет бонус надетого
+            // equipped items first: for identical items the cache gets the bonus of the equipped one
             for (uint8 slot = EQUIPMENT_SLOT_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
                 send(_player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
             for (uint8 slot = BANK_SLOT_ITEM_START; slot < BANK_SLOT_ITEM_END; ++slot)
@@ -302,7 +302,7 @@ public:
         return commandTable;
     }
 
-    // .itemscale <ячейка 1..19> <бонус>
+    // .itemscale <slot 1..19> <bonus>
     static bool HandleItemScale(ChatHandler* handler, uint8 slot, int32 bonus)
     {
         Player* player = handler->GetSession()->GetPlayer();

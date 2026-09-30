@@ -1,4 +1,4 @@
--- characters DB: собранные облики (предметы) на аккаунт (appearance_collection.cpp)
+-- characters DB: collected appearances (items) per account (appearance_collection.cpp)
 CREATE TABLE IF NOT EXISTS `account_appearances` (
   `accountId` INT UNSIGNED NOT NULL,
   `itemId` INT UNSIGNED NOT NULL,

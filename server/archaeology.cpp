@@ -1,30 +1,30 @@
-﻿/*
- * Археология (Cataclysm 4.3.4) для 3.3.5.
+/*
+ * Archaeology (Cataclysm 4.3.4) for 3.3.5.
  *
- * Данные - world: archaeology_branch / archaeology_project / archaeology_site / archaeology_site_point
- * (tools/archaeology/convert_research_dbc.py из Research*.dbc и QuestPOIPoint.dbc).
- * Персонаж - characters: character_archaeology (фрагменты и текущий проект расы), character_archaeology_history,
- * character_archaeology_digsite (4 активных места раскопок на континент).
+ * Data - world: archaeology_branch / archaeology_project / archaeology_site / archaeology_site_point
+ * (tools/archaeology/convert_research_dbc.py from Research*.dbc and QuestPOIPoint.dbc).
+ * Character - characters: character_archaeology (fragments and current project per race), character_archaeology_history,
+ * character_archaeology_digsite (4 active dig sites per continent).
  *
- * Раскопки: «Исследовать» (80451, кнопка на полосе раскопок или /cast Исследовать) внутри места раскопок
- * ставит телескоп в сторону находки: красный > 80 ярдов, жёлтый > 40, зелёный ближе. В 8 ярдах появляется находка;
- * её использование даёт фрагменты расы места и навык. После 3 находок место заменяется новым на том же континенте.
+ * Digging: Survey (80451, button on the dig site bar or /cast) inside a dig site
+ * places a telescope towards the find: red > 80 yards, yellow > 40, green closer. Within 8 yards the find appears;
+ * using it gives fragments of the site race and skill. After FINDS_PER_SITE finds the site is replaced on the same continent.
  *
- * Решение (ARCH_SOLVE): фрагменты + 12 за каждый краеугольный камень >= стоимости проекта; камни забираются,
- * проект попадает в историю, выдаётся reward_item, для расы выбирается новый проект.
+ * Solving (ARCH_SOLVE): fragments + 12 per keystone >= project cost; keystones are taken,
+ * the project goes into history, reward_item is given, a new project is picked for the race.
  *
- * AddonComm (клиент: Interface\FrameXML\Archaeology\Blizzard_ArchaeologyAPI.lua):
+ * AddonComm (client: Interface\FrameXML\Archaeology\Blizzard_ArchaeologyAPI.lua):
  *   "ARCH_GET"                     -> "ARCH_STATE" : "branch/fragments/project,..."  + "ARCH_HISTORY" : "project/count/firstTime,..."
- *   "ARCH_SOLVE" : branch : keystones -> "ARCH_COMPLETE" : project, "ARCH_STATE", "ARCH_HISTORY"   (ошибка: "ARCH_ERROR" : текст)
- *   "ARCH_SITES_GET"               -> "ARCH_SITE" : site : zoneName : x : y : finds (x, y - 0..10000 на карте зоны) x N, "ARCH_SITES_END"
- *   «Исследовать» (80451, spell_archaeology_survey) -> телескоп / находка, "ARCH_DIGSITE" : site : finds : max
- *   сервер сам: "ARCH_ENTER" : site : finds : max / "ARCH_LEAVE" - вход и выход из места раскопок
+ *   "ARCH_SOLVE" : branch : keystones -> "ARCH_COMPLETE" : project, "ARCH_STATE", "ARCH_HISTORY"   (error: "ARCH_ERROR" : text)
+ *   "ARCH_SITES_GET"               -> "ARCH_SITE" : site : zoneName : x : y : finds (x, y - 0..10000 on the zone map) x N, "ARCH_SITES_END"
+ *   Survey (80451, spell_archaeology_survey) -> telescope / find, "ARCH_DIGSITE" : site : finds : max
+ *   server pushes: "ARCH_ENTER" : site : finds : max / "ARCH_LEAVE" - entering and leaving a dig site
  *
- * Регистрация: AddSC_archaeology(); SQL: sql/characters_archaeology.sql, sql/world_archaeology_gameobjects.sql,
+ * Setup: AddSC_archaeology(); SQL: sql/characters_archaeology.sql, sql/world_archaeology_gameobjects.sql,
  * tools/archaeology/world_archaeology.sql.
  */
 
-// Русские строки в кавычках записаны байтами UTF-8 (\xNN): иначе компилятор перекодирует их в кодировку системы («?????» в игре).
+// Russian strings in quotes are written as UTF-8 bytes (\xNN): otherwise the compiler converts them to the system code page ("?????" in game).
 #include "ScriptMgr.h"
 #include "Creature.h"
 #include "SpellScript.h"
@@ -57,12 +57,12 @@
 namespace
 {
     constexpr uint32 SKILL_ARCHAEOLOGY = 794;
-    constexpr uint32 SPELL_SURVEY = 80451;                        // «Исследовать»
+    constexpr uint32 SPELL_SURVEY = 80451;                        // Survey
     constexpr uint32 SITES_PER_CONTINENT = 4;
-    constexpr uint32 FINDS_PER_SITE = 6;                        // Cata 4.3: 6 находок на место
+    constexpr uint32 FINDS_PER_SITE = 6;                        // Cata 4.3: 6 finds per site
     constexpr uint32 KEYSTONE_FRAGMENTS = 12;
-    constexpr uint32 FRAGMENTS_MIN = 5, FRAGMENTS_MAX = 9;        // за находку
-    constexpr uint32 RARE_CHANCE = 10;                            // % редкого проекта
+    constexpr uint32 FRAGMENTS_MIN = 5, FRAGMENTS_MAX = 9;        // per find
+    constexpr uint32 RARE_CHANCE = 10;                            // % rare project
     constexpr float FIND_DISTANCE = 8.0f;
     constexpr float FAR_DISTANCE = 80.0f, MID_DISTANCE = 40.0f;
     constexpr uint32 ZONE_CHECK_MS = 1000;
@@ -71,13 +71,13 @@ namespace
     constexpr uint32 GO_SURVEY_RED = 207000, GO_SURVEY_YELLOW = 207001, GO_SURVEY_GREEN = 207002, GO_FIND = 207003;
 
     constexpr uint32 BRANCH_FOSSIL = 3;
-    // расы континента для мест без своей расы (как в Cata: по континенту)
+    // continent races for sites without their own race (as in Cata: by continent)
     std::map<uint32, std::vector<uint32>> const CONTINENT_BRANCHES =
     {
-        { 0,   { 1, 4, 8, 3 } },      // Восточные королевства: дворфы, ночные эльфы, тролли, окаменелости
-        { 1,   { 1, 4, 8, 3 } },      // Калимдор
-        { 530, { 2, 6 } },            // Запределье: дренеи, орки
-        { 571, { 5, 7, 4, 8 } },      // Нордскол: нерубы, врайкулы, ночные эльфы, тролли
+        { 0,   { 1, 4, 8, 3 } },      // Eastern Kingdoms: dwarf, night elf, troll, fossil
+        { 1,   { 1, 4, 8, 3 } },      // Kalimdor
+        { 530, { 2, 6 } },            // Outland: draenei, orc
+        { 571, { 5, 7, 4, 8 } },      // Northrend: nerubian, vrykul, night elf, troll
     };
 
     struct Branch { uint32 Id = 0; uint32 Keystone = 0; };
@@ -155,7 +155,7 @@ namespace
                     itr->second.Points.push_back({ f[1].GetFloat(), f[2].GetFloat() });
             } while (result->NextRow());
 
-        // только места с контуром можно копать
+        // only sites with an outline can be dug
         for (auto itr = sites.begin(); itr != sites.end();)
         {
             Site& s = itr->second;
@@ -210,7 +210,7 @@ namespace
             Project const& p = projects.at(id);
             if (!p.Rare)
                 common.push_back(id);
-            else if (!data.History.count(id))   // редкий - только один раз
+            else if (!data.History.count(id))   // rare - only once
                 rare.push_back(id);
         }
         if (!rare.empty() && (common.empty() || urand(1, 100) <= RARE_CHANCE))
@@ -242,7 +242,7 @@ namespace
         CharacterDatabase.CommitTransaction(trans);
     }
 
-    // 4 активных места на каждом континенте (новые выбираются из незанятых)
+    // 4 active sites on every continent (new ones are picked from free sites)
     void FillDigsites(Player* player, PlayerData& data)
     {
         bool changed = false;
@@ -298,7 +298,7 @@ namespace
                     data.Digsites[uint32(f[0].GetInt64())].push_back({ siteId, uint32(f[2].GetInt64()), false, {} });
             } while (result->NextRow());
 
-        // у каждой расы с проектами есть текущий проект
+        // every race with projects has a current project
         for (auto const& [branchId, list] : projectsByBranch)
         {
             BranchState& s = data.Branches[branchId];
@@ -338,7 +338,7 @@ namespace
         sAddonComm->Send(player, "ARCH_HISTORY", history.str());
     }
 
-    // места раскопок для карты мира: по одному сообщению на место (название зоны + координаты 0..100 на карте зоны)
+    // dig sites for the world map: one message per site (zone name + coordinates 0..100 on the zone map)
     void SendSites(Player* player)
     {
         PlayerData& data = Data(player);
@@ -361,7 +361,7 @@ namespace
                 if (!area)
                     continue;
                 float x = cx, y = cy;
-                Map2ZoneCoordinates(x, y, zone);   // проценты карты зоны
+                Map2ZoneCoordinates(x, y, zone);   // zone map percent
                 sAddonComm->Send(player, "ARCH_SITE", d.Site, std::string(area->AreaName[locale]), uint32(x * 100), uint32(y * 100), d.Finds);
             }
         }
@@ -454,7 +454,7 @@ namespace
         SendState(player);
     }
 
-    // можно ли сейчас исследовать (для CheckCast заклинания 80451)
+    // can survey now (for CheckCast of spell 80451)
     bool CanSurvey(Player* player)
     {
         auto itr = players.find(player->GetGUID().GetCounter());
@@ -500,12 +500,12 @@ namespace
         float angle = std::atan2(dy, dx);
         Position pos(px + std::cos(angle) * 1.5f, py + std::sin(angle) * 1.5f, pz, angle);
         player->SummonGameObject(entry, pos, QuaternionData::fromEulerAnglesZYX(angle, 0.0f, 0.0f), Seconds(8));
-        // направление к находке на полосе раскопок: 1 - далеко, 2 - ближе, 3 - рядом; угол мира в тысячных радиана
+        // direction to the find on the dig site bar: 1 - far, 2 - closer, 3 - near; world angle in milliradians
         sAddonComm->Send(player, "ARCH_SURVEY", entry == GO_SURVEY_RED ? 1 : entry == GO_SURVEY_YELLOW ? 2 : 3, int32(angle * 1000.0f));
         sAddonComm->Send(player, "ARCH_DIGSITE", dig->Site, dig->Finds, FINDS_PER_SITE);
     }
 
-    // находка использована: фрагменты расы места, навык, счётчик места
+    // find used: fragments of the site race, skill, site counter
     void CollectFind(Player* player, GameObject* go)
     {
         PlayerData& data = Data(player);
@@ -538,7 +538,7 @@ namespace
         uint32 siteId = dig->Site;
         if (finds >= FINDS_PER_SITE)
         {
-            // место исчерпано - на континенте появится другое
+            // site exhausted - another one appears on the continent
             std::vector<DigSite>& list = data.Digsites[site.Map];
             list.erase(std::remove_if(list.begin(), list.end(), [siteId](DigSite const& d) { return d.Site == siteId; }), list.end());
             FillDigsites(player, data);
@@ -569,7 +569,7 @@ namespace
     }
 }
 
-// находка (sql/world_archaeology_gameobjects.sql: ScriptName go_archaeology_find)
+// find (sql/world_archaeology_gameobjects.sql: ScriptName go_archaeology_find)
 struct go_archaeology_find : public GameObjectAI
 {
     go_archaeology_find(GameObject* go) : GameObjectAI(go) { }
@@ -627,7 +627,7 @@ public:
     }
 };
 
-// 80451 - Исследовать: вне места раскопок не применяется, после применения - телескоп / находка
+// 80451 - Survey: cannot be cast outside a dig site, after casting - telescope / find
 class spell_archaeology_survey : public SpellScript
 {
     PrepareSpellScript(spell_archaeology_survey);
@@ -646,8 +646,8 @@ class spell_archaeology_survey : public SpellScript
             HandleSurvey(player, {});
     }
 
-    // эффекты из Spell.dbc (например, призыв объекта с MiscValue 1 -> «Gameobject Entry: 1 not created») не нужны:
-    // исследование целиком делает HandleSurvey
+    // Spell.dbc effects (e.g. summoning an object with MiscValue 1 -> "Gameobject Entry: 1 not created") are not needed:
+    // the survey is done entirely by HandleSurvey
     void PreventEffects(SpellEffIndex effIndex)
     {
         PreventHitDefaultEffect(effIndex);
@@ -662,16 +662,16 @@ class spell_archaeology_survey : public SpellScript
     }
 };
 
-// Тренер археологии (sql/world_archaeology_trainer.sql): ранги навыка 794 через диалог, без заклинаний рангов в Spell.dbc.
-// Изучение ранга: навык с потолком ранга + «Исследовать» (80451). Как в Cata: следующий ранг - по уровню и навыку.
+// Archaeology trainer (sql/world_archaeology_trainer.sql): ranks of skill 794 through gossip, no rank spells in Spell.dbc.
+// Learning a rank: skill with the rank cap + Survey (80451). As in Cata: next rank by level and skill.
 namespace
 {
     struct ArchaeologyRank { char const* Name; uint8 Level; uint16 RequiredSkill; uint16 MaxSkill; uint32 Cost; };
     ArchaeologyRank const ARCHAEOLOGY_RANKS[] =
     {
-        { "\xd0\xa3\xd1\x87\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xba",          5,   0,  75,     100 },   //  1 серебро
+        { "\xd0\xa3\xd1\x87\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xba",          5,   0,  75,     100 },   //  1 silver
         { "\xd0\x9f\xd0\xbe\xd0\xb4\xd0\xbc\xd0\xb0\xd1\x81\xd1\x82\xd0\xb5\xd1\x80\xd1\x8c\xd0\xb5",    10,  50, 150,     500 },
-        { "\xd0\xa3\xd0\xbc\xd0\xb5\xd0\xbb\xd0\xb5\xd1\x86",         20, 125, 225,   10000 },   //  1 золото
+        { "\xd0\xa3\xd0\xbc\xd0\xb5\xd0\xbb\xd0\xb5\xd1\x86",         20, 125, 225,   10000 },   //  1 gold
         { "\xd0\x98\xd1\x81\xd0\xba\xd1\x83\xd1\x81\xd0\xbd\xd0\xb8\xd0\xba",       35, 200, 300,   50000 },
         { "\xd0\x9c\xd0\xb0\xd1\x81\xd1\x82\xd0\xb5\xd1\x80",         50, 275, 375,  100000 },
         { "\xd0\x92\xd0\xb5\xd0\xbb\xd0\xb8\xd0\xba\xd0\xb8\xd0\xb9 \xd0\xbc\xd0\xb0\xd1\x81\xd1\x82\xd0\xb5\xd1\x80", 65, 350, 450,  250000 },
@@ -689,7 +689,7 @@ namespace
         return text.str();
     }
 
-    // следующий ранг, который можно изучить сейчас (или nullptr)
+    // next rank that can be learned now (or nullptr)
     int NextRank(Player* player)
     {
         uint16 max = player->HasSkill(SKILL_ARCHAEOLOGY) ? player->GetMaxSkillValue(SKILL_ARCHAEOLOGY) : 0;
@@ -749,7 +749,7 @@ struct npc_archaeology_trainer : public ScriptedAI
         player->SetSkill(SKILL_ARCHAEOLOGY, uint16(rank + 1), std::max<uint16>(value, 1), r.MaxSkill);
         if (!player->HasSpell(SPELL_SURVEY))
             player->LearnSpell(SPELL_SURVEY, false);
-        me->CastSpell(player, 483, true);   // визуал изучения (Learning)
+        me->CastSpell(player, 483, true);   // learning visual (Learning)
         return true;
     }
 };

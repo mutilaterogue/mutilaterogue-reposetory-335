@@ -1,24 +1,24 @@
-﻿/*
- * Иллюзии оружия (ретейл: TransmogIllusion, Enum.TransmogType.Illusion) для 3.3.5.
+/*
+ * Weapon illusions (retail: TransmogIllusion, Enum.TransmogType.Illusion) for 3.3.5.
  *
- * Иллюзия - это вид постоянного зачарования оружия (SpellItemEnchantment.ItemVisual). Сервер подменяет
- * PLAYER_VISIBLE_ITEM_n_ENCHANTMENT через Player::s_visibleItemHook (transmog.cpp), само зачарование
- * предмета не меняется. Хранится на предмете: characters.character_transmog.illusion.
+ * An illusion is the look of a permanent weapon enchant (SpellItemEnchantment.ItemVisual). The server replaces
+ * PLAYER_VISIBLE_ITEM_n_ENCHANTMENT through Player::s_visibleItemHook (transmog.cpp), the item enchant itself
+ * does not change. Stored on the item: characters.character_transmog.illusion.
  *
- * Список иллюзий: чары для оружия профессии «Наложение чар» (SkillLineAbility 333, эффект ENCHANT_ITEM,
- * предмет - оружие) с видимым эффектом; одинаковые по ItemVisual - одна иллюзия.
- * Коллекция на аккаунт (characters.account_illusions), иллюзия открывается, когда персонаж:
- *   - знает рецепт этих чар;
- *   - носит оружие (или держит в сумках) с чарами того же вида.
+ * Illusion list: weapon enchants of Enchanting (SkillLineAbility 333) and Runeforging (776) with effect ENCHANT_ITEM
+ * and a visible effect, plus world.transmog_illusion_extra; enchants with the same ItemVisual are one illusion.
+ * Account collection (characters.account_illusions), an illusion is unlocked when the character:
+ *   - knows the recipe of the enchant;
+ *   - wears (or carries in bags) a weapon with an enchant of the same look.
  *
- * AddonComm (клиент: Transmog\Blizzard_TransmogIllusions.lua):
- *   "TMOG_ILLUSIONS_GET" -> "TMOG_ILLUSIONS" : цена (медь) : "enchantId/spellId/collected,..."
- *   применение - вместе с обликами: "TMOG_APPLY" : облики : "slot/enchantId,..." (transmog.cpp)
- *   "TMOG_STATE" : облики : "slot/enchantId,..." - текущие иллюзии
+ * AddonComm (client: Transmog\Blizzard_TransmogIllusions.lua):
+ *   "TMOG_ILLUSIONS_GET" -> "TMOG_ILLUSIONS" : cost (copper) : "enchantId/spellId/collected,..." : "16/1,17/0" (allowed hands)
+ *   applying - together with looks: "TMOG_APPLY" : looks : "slot/enchantId,..." (transmog.cpp)
+ *   "TMOG_STATE" : looks : "slot/enchantId,..." - current illusions
  *
- * Оружие со своим эффектом в модели (ItemDisplayInfo.ItemVisual) иллюзию не получает - core/DBC_itemdisplayinfo.patch.
+ * Weapons with their own model effect (ItemDisplayInfo.ItemVisual) cannot get an illusion - core/DBC_itemdisplayinfo.patch.
  *
- * Установка: sql/characters_transmog_illusions.sql, core/DBC_itemdisplayinfo.patch, AddSC_transmog_illusions() в custom_script_loader.cpp.
+ * Setup: sql/characters_transmog_illusions.sql, core/DBC_itemdisplayinfo.patch, AddSC_transmog_illusions() in custom_script_loader.cpp.
  */
 
 #include "transmog.h"
@@ -42,7 +42,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// transmog.cpp (объявлено и в transmog.h; здесь - чтобы собиралось и со старым заголовком)
+// transmog.cpp (also declared in transmog.h; here so it builds with an older header)
 namespace Transmog
 {
     uint32 GetFakeEntry(Player* player, Item* item);
@@ -50,19 +50,19 @@ namespace Transmog
 
 namespace
 {
-    constexpr uint32 ILLUSION_COST = 10000;   // 1 золото за слот (снять иллюзию - бесплатно)
+    constexpr uint32 ILLUSION_COST = 10000;   // 1 gold per slot (removing an illusion is free)
     constexpr uint32 SKILL_ENCHANTING_ID = 333;
-    constexpr uint32 SKILL_RUNEFORGING_ID = 776;   // рунная ковка рыцарей смерти - тоже иллюзии
+    constexpr uint32 SKILL_RUNEFORGING_ID = 776;   // death knight runeforging - illusions too
 
     struct Illusion
     {
-        uint32 Enchant = 0;   // SpellItemEnchantment id, который ставится в видимый слот
-        uint32 Spell = 0;     // рецепт чар (название и иконка в клиенте)
+        uint32 Enchant = 0;   // SpellItemEnchantment id put into the visible slot
+        uint32 Spell = 0;     // enchant recipe (name and icon in the client)
     };
 
-    std::map<uint32, Illusion> illusionsByVisual;            // ItemVisual -> иллюзия (по порядку для списка)
-    std::unordered_map<uint32, uint32> visualByEnchant;      // любые чары с видом -> ItemVisual
-    std::unordered_map<uint32, uint32> visualBySpell;        // рецепт -> ItemVisual
+    std::map<uint32, Illusion> illusionsByVisual;            // ItemVisual -> illusion (ordered for the list)
+    std::unordered_map<uint32, uint32> visualByEnchant;      // any enchant with a look -> ItemVisual
+    std::unordered_map<uint32, uint32> visualBySpell;        // recipe -> ItemVisual
 
     uint32 GetVisual(uint32 enchantId)
     {
@@ -109,7 +109,7 @@ namespace
             }
         }
 
-        // свои иллюзии: world.transmog_illusion_extra (enchant_id - чары со свечением, spell_id - название и иконка в клиенте)
+        // custom illusions: world.transmog_illusion_extra (enchant_id - glowing enchant, spell_id - name and icon in the client)
         if (QueryResult result = WorldDatabase.Query("SELECT CAST(enchant_id AS SIGNED), CAST(spell_id AS SIGNED) FROM transmog_illusion_extra"))
         {
             do
@@ -135,7 +135,7 @@ namespace
             } while (result->NextRow());
         }
 
-        // любые другие чары с тем же видом (например, с предметов) - тоже открывают иллюзию
+        // any other enchants with the same look (e.g. from items) also unlock the illusion
         for (uint32 enchantId = 0; enchantId < sSpellItemEnchantmentStore.GetNumRows(); ++enchantId)
             if (uint32 visual = GetVisual(enchantId))
                 if (illusionsByVisual.count(visual))
@@ -168,7 +168,7 @@ namespace
         return visuals;
     }
 
-    // открыть иллюзии по рецептам и чарам на оружии персонажа; вернуть все открытые виды
+    // unlock illusions from recipes and enchants on the character's weapons; return all unlocked looks
     std::unordered_set<uint32> UpdateCollection(Player* player)
     {
         std::unordered_set<uint32> visuals = LoadCollectedVisuals(player);
@@ -210,7 +210,7 @@ namespace
         return visuals;
     }
 
-    // ретейл: иллюзия только на оружие ближнего боя в правой и левой руке (щиты, реликвии, дальний бой - нет)
+    // retail: illusions only on melee weapons in main and off hand (no shields, off-hand frills, ranged)
     bool CanHaveIllusion(Player* player, Item* item)
     {
         if (!item)
@@ -218,12 +218,12 @@ namespace
         ItemTemplate const* proto = item->GetTemplate();
         if (proto->Class != ITEM_CLASS_WEAPON)
             return false;
-        // показанный облик (с трансмогом - чужой) со своим эффектом в модели - иллюзия не ложится
+        // the shown look (a transmog look if transmogrified) with its own model effect - no illusion
         ItemTemplate const* look = proto;
         if (uint32 fake = Transmog::GetFakeEntry(player, item))
             if (ItemTemplate const* fakeProto = sObjectMgr->GetItemTemplate(fake))
                 look = fakeProto;
-        // ItemDisplayInfo.ItemVisual - эффект, встроенный в модель (ядро грузит его: core/DBC_itemdisplayinfo.patch)
+        // ItemDisplayInfo.ItemVisual - effect built into the model (loaded by the core: core/DBC_itemdisplayinfo.patch)
         if (ItemDisplayInfoEntry const* display = sItemDisplayInfoStore.LookupEntry(look->DisplayInfoID))
             if (display->ItemVisual > 0)
                 return false;
@@ -278,7 +278,7 @@ namespace Transmog
                 return fail;
             }
             if (!enchantId)
-                continue;   // снять иллюзию
+                continue;   // remove the illusion
             if (!CanHaveIllusion(player, item))
             {
                 fail.Error = "ERR_TRANSMOGRIFY_INVALID_DESTINATION";

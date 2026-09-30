@@ -1,4 +1,4 @@
--- characters DB: трансмогрификация (transmog.cpp). Облик хранится на предмете (guid), как в ретейле.
+-- characters DB: transmogrification (transmog.cpp). The look is stored on the item (guid), like in retail.
 CREATE TABLE IF NOT EXISTS `character_transmog` (
   `item_guid` INT UNSIGNED NOT NULL,
   `owner` INT UNSIGNED NOT NULL,

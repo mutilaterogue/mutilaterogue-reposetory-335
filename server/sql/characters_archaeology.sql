@@ -1,9 +1,9 @@
--- characters DB: археология (archaeology.cpp)
+-- characters DB: archaeology (archaeology.cpp)
 CREATE TABLE IF NOT EXISTS `character_archaeology` (
   `guid` INT UNSIGNED NOT NULL,
   `branch` INT UNSIGNED NOT NULL,              -- ResearchBranch.ID
   `fragments` INT UNSIGNED NOT NULL DEFAULT 0,
-  `project` INT UNSIGNED NOT NULL DEFAULT 0,   -- текущий ResearchProject.ID расы
+  `project` INT UNSIGNED NOT NULL DEFAULT 0,   -- current ResearchProject.ID of the race
   PRIMARY KEY (`guid`, `branch`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

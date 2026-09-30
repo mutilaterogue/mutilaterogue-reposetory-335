@@ -5,7 +5,7 @@
  };
  
 -/*
-+// загружается ради ItemVisual - эффект, встроенный в модель оружия (иллюзии трансмога, transmog_illusions.cpp)
++// loaded for ItemVisual - effect built into the weapon model (transmog illusions, transmog_illusions.cpp)
  struct ItemDisplayInfoEntry
  {
      uint32 ID;                                              // 0
@@ -53,7 +53,7 @@
  DBCStorage <ItemBagFamilyEntry>           sItemBagFamilyStore(ItemBagFamilyfmt);
  //DBCStorage <ItemCondExtCostsEntry> sItemCondExtCostsStore(ItemCondExtCostsEntryfmt);
 -//DBCStorage <ItemDisplayInfoEntry> sItemDisplayInfoStore(ItemDisplayTemplateEntryfmt); -- not used currently
-+DBCStorage <ItemDisplayInfoEntry> sItemDisplayInfoStore(ItemDisplayTemplateEntryfmt);   // ItemVisual - иллюзии трансмога
++DBCStorage <ItemDisplayInfoEntry> sItemDisplayInfoStore(ItemDisplayTemplateEntryfmt);   // ItemVisual - transmog illusions
  DBCStorage <ItemExtendedCostEntry> sItemExtendedCostStore(ItemExtendedCostEntryfmt);
  DBCStorage <ItemLimitCategoryEntry> sItemLimitCategoryStore(ItemLimitCategoryEntryfmt);
  DBCStorage <ItemRandomPropertiesEntry> sItemRandomPropertiesStore(ItemRandomPropertiesfmt);

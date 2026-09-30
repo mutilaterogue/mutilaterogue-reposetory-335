@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Transmogrification shared part (retail TransmogMgr) for 3.3.5: item data, collection checks and
  * applying looks. Used by transmog.cpp (window, NPC), transmog_outfits.cpp (outfits, situations,
  * custom sets) and transmog_sets.cpp (item sets).
@@ -72,17 +72,17 @@ namespace Transmog
     // current transmogrified looks of the equipped items
     SlotList GetCurrentLooks(Player* player);
 
-    // иллюзии (transmog_illusions.cpp). Иллюзия хранится на предмете вместе с обликом (character_transmog.illusion)
+    // illusions (transmog_illusions.cpp). The illusion is stored on the item together with the look (character_transmog.illusion)
     uint32 GetIllusion(Player* player, uint8 slot);
-    // enchant 0 - убрать; пишет в transaction, обновляет вид слота
+    // enchant 0 - remove; writes into the transaction, updates the visible slot
     void SetIllusion(Player* player, uint8 slot, uint32 enchant, CharacterDatabaseTransaction trans);
-    // "slot/enchant,..." (клиентские ячейки) - проверка всего списка; cost - цена; на ошибке Error
+    // "slot/enchant,..." (client slots) - validates the whole list; cost - price; Error on failure
     ApplyResult CheckIllusions(Player* player, SlotList const& illusions, uint64& cost);
     void ApplyIllusions(Player* player, SlotList const& illusions);
     std::string FormatIllusions(Player* player);
-    // можно ли наложить иллюзию на правую/левую руку: "16/1,17/0" (у оружия со своим эффектом в модели - нельзя)
+    // can an illusion be put on main/off hand: "16/1,17/0" (weapons with their own model effect - no)
     std::string FormatIllusionAllowed(Player* player);
-    // облик трансмогрифицированного предмета этого персонажа (0 - свой)
+    // look of an item transmogrified by this character (0 - own)
     uint32 GetFakeEntry(Player* player, Item* item);
 
     void SendState(Player* player);

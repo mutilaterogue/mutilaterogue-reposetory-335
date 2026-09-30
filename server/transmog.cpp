@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Transmogrification (retail TransmogrificationHandler / TransmogMgr) for 3.3.5.
  *
  * Retail keeps the appearance on the item (ITEM_MODIFIER_TRANSMOG_APPEARANCE_*); 3.3.5 items have no
@@ -19,7 +19,7 @@
  *   "TMOG_GET_STATE"                         -> "TMOG_STATE"  : "slot/itemId,..." (slot = client inventory slot id, 1 = head)
  *   "TMOG_APPLY" : "slot/itemId,..." (0 = restore) -> "TMOG_RESULT" : ok(1/0) : error : errorItem, then "TMOG_STATE"
  *   "TMOG_OPEN" / "TMOG_CLOSE"               server opens / closes the window (npc_transmogrifier)
- *   "TMOG_ITEMS_GET"                         -> "TMOG_ITEMS" : "bag/slot/fakeEntry,..." (подсказки предметов, bag 255 - экипировка)
+ *   "TMOG_ITEMS_GET"                         -> "TMOG_ITEMS" : "bag/slot/fakeEntry,..." (item tooltips, bag 255 = equipment)
  *
  * Setup: sql/characters_transmog.sql, core/Player_transmog.patch, register AddSC_transmog().
  * NPC: creature_template.ScriptName = 'npc_transmogrifier', npcflag 1 (gossip).
@@ -51,7 +51,7 @@ namespace
     // false: the window works anywhere (/transmog); true: only next to npc_transmogrifier (like retail)
     constexpr bool REQUIRE_NPC = false;
     constexpr uint32 MIN_COST = 100;   // 1 silver
-    // true: легендарные предметы можно трансмогрифицировать и брать их облик (ретейл: false - ERR_TRANSMOGRIFY_LEGENDARY)
+    // true: legendary items can be transmogrified and used as a look (retail: false - ERR_TRANSMOGRIFY_LEGENDARY)
     constexpr bool ALLOW_LEGENDARY = true;
 
     struct TransmogData
@@ -167,11 +167,11 @@ namespace
             return;
         }
 
-        // args[0] - облики "slot/itemId,...", args[1] - иллюзии "slot/enchantId,..." (0 = убрать)
+        // args[0] - looks "slot/itemId,...", args[1] - illusions "slot/enchantId,..." (0 = remove)
         Transmog::SlotList looks = Transmog::ParseSlots(args.size() > 0 ? args[0] : std::string());
         Transmog::SlotList illusions = Transmog::ParseSlots(args.size() > 1 ? args[1] : std::string());
 
-        // сначала проверить всё (и хватит ли денег на облики и иллюзии вместе), потом менять
+        // check everything first (including money for looks and illusions together), then apply
         uint64 illusionCost = 0;
         Transmog::ApplyResult result = Transmog::CheckIllusions(player, illusions, illusionCost);
         if (!result.Error.empty())
@@ -223,7 +223,7 @@ namespace Transmog
             data.ItemSet = uint32(fields[8].GetInt64());
         } while (result->NextRow());
         TC_LOG_INFO("server.loading", ">> transmog: {} items", uint32(items.size()));
-        if (ItemData const* sample = GetItemData(2105))   // пример: Thug Shirt, должен быть class 4 inv 4
+        if (ItemData const* sample = GetItemData(2105))   // sample: Thug Shirt, must be class 4 inv 4
             TC_LOG_INFO("server.loading", ">> transmog: item 2105 class {} sub {} inv {} display {}",
                 uint32(sample->Class), uint32(sample->SubClass), uint32(sample->InventoryType), sample->DisplayId);
     }
@@ -481,7 +481,7 @@ namespace Transmog
             }
             else
             {
-                // облик предмета, но иллюзия остаётся
+                // item's own look, but the illusion stays
                 auto itr = transmogs.find(itemGuid);
                 if (itr != transmogs.end() && itr->second.Owner == owner && itr->second.Illusion)
                 {
@@ -518,7 +518,7 @@ namespace Transmog
         return looks;
     }
 
-    // облик предмета, если он трансмогрифицирован этим персонажем
+    // the look of the item if this character transmogrified it
     uint32 GetFakeEntry(Player* player, Item* item)
     {
         auto itr = transmogs.find(item->GetGUID().GetCounter());
@@ -566,8 +566,8 @@ namespace Transmog
         player->SetVisibleItemSlot(slot, item);
     }
 
-    // для подсказок: "bag/slot/fakeEntry,..." в номерах клиента
-    // bag 255 - экипировка (slot = GetInventorySlotInfo), 0 - рюкзак, 1..4 - сумки (slot с 1)
+    // for tooltips: "bag/slot/fakeEntry,..." in client numbering
+    // bag 255 - equipment (slot = GetInventorySlotInfo), 0 - backpack, 1..4 - bags (slot from 1)
     void SendItems(Player* player)
     {
         std::ostringstream list;
@@ -594,8 +594,8 @@ namespace Transmog
                 for (uint32 i = 0; i < bag->GetBagSize(); ++i)
                     add(bagSlot - INVENTORY_SLOT_BAG_START + 1, i + 1, bag->GetItemByPos(uint8(i)));
 
-        // банк: ячейки банка - как экипировка (клиентский inventory slot = серверный + 1),
-        // банковские сумки - клиентские bag 5..11
+        // bank: bank slots like equipment (client inventory slot = server + 1),
+        // bank bags - client bags 5..11
         for (uint8 slot = BANK_SLOT_ITEM_START; slot < BANK_SLOT_ITEM_END; ++slot)
             add(255, slot + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
         for (uint8 bagSlot = BANK_SLOT_BAG_START; bagSlot < BANK_SLOT_BAG_END; ++bagSlot)

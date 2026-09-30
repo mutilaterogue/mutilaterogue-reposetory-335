@@ -1,4 +1,4 @@
--- characters DB: игрушки, выученные на аккаунте (toy_collection.cpp)
+-- characters DB: toys learned on the account (toy_collection.cpp)
 CREATE TABLE IF NOT EXISTS `account_toys` (
   `accountId` INT UNSIGNED NOT NULL,
   `itemId` INT UNSIGNED NOT NULL,

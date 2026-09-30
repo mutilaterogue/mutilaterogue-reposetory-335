@@ -1,4 +1,4 @@
--- characters DB: наряды трансмогрификации (transmog_outfits.cpp)
+-- characters DB: transmog outfits (transmog_outfits.cpp)
 CREATE TABLE IF NOT EXISTS `character_transmog_outfits` (
   `guid` INT UNSIGNED NOT NULL,
   `id` INT UNSIGNED NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `character_transmog_outfits` (
   PRIMARY KEY (`guid`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- купленные ячейки нарядов и текущий наряд
+-- bought outfit slots and the current outfit
 CREATE TABLE IF NOT EXISTS `character_transmog_outfit_slots` (
   `guid` INT UNSIGNED NOT NULL,
   `unlocked` INT UNSIGNED NOT NULL DEFAULT 5,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS `character_transmog_outfit_slots` (
   PRIMARY KEY (`guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- свои комплекты (на аккаунт)
+-- custom sets (per account)
 CREATE TABLE IF NOT EXISTS `account_transmog_custom_sets` (
   `accountId` INT UNSIGNED NOT NULL,
   `id` INT UNSIGNED NOT NULL,
@@ -29,5 +29,5 @@ CREATE TABLE IF NOT EXISTS `account_transmog_custom_sets` (
   PRIMARY KEY (`accountId`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- иллюзии оружия в наряде (transmog_illusions.cpp): "slot/enchantId,..." - для уже созданной таблицы
+-- weapon illusions in an outfit (transmog_illusions.cpp): "slot/enchantId,..." - for an already created table
 ALTER TABLE `character_transmog_outfits` ADD COLUMN `illusions` TEXT NULL AFTER `sit_combat`;

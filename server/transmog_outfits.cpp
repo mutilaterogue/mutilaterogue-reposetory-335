@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Transmog outfits, situations and custom sets (retail TransmogOutfit* / TransmogSituation* / custom sets) for 3.3.5.
  *
  * Outfits (per character, characters.character_transmog_outfits):
@@ -65,7 +65,7 @@ namespace
         std::string Name;
         uint32 Icon = 0;
         Transmog::SlotList Slots;
-        Transmog::SlotList Illusions;   // правая/левая рука -> иллюзия (transmog_illusions.cpp)
+        Transmog::SlotList Illusions;   // main/off hand -> illusion (transmog_illusions.cpp)
         bool SituationsEnabled = false;
         uint8 Location = LOC_ANY;
         uint8 Movement = MOVE_ANY;
@@ -82,7 +82,7 @@ namespace
     };
 
     std::unordered_map<ObjectGuid::LowType, PlayerOutfits> outfitsByPlayer;
-    // окно трансмогрификации открыто - ситуации не переодевают (клиент: "TMOG_WINDOW" : 1/0)
+    // transmog window is open - situations do not switch outfits (client: "TMOG_WINDOW" : 1/0)
     std::unordered_set<ObjectGuid::LowType> windowOpen;
     uint32 situationTimer = SITUATION_INTERVAL_MS;
 
@@ -212,7 +212,7 @@ namespace
         Transmog::ApplyResult result = Transmog::ApplyLooks(player, looks, false, true);
         if (result.Ok)
         {
-            // иллюзии наряда (без иллюзии - снять); что нельзя наложить на надетое оружие - пропустить
+            // outfit illusions (no illusion - remove); skip what cannot be put on the equipped weapon
             Transmog::SlotList illusions;
             for (uint8 slot : { uint8(EQUIPMENT_SLOT_MAINHAND), uint8(EQUIPMENT_SLOT_OFFHAND) })
             {
@@ -255,7 +255,7 @@ namespace
         if (slots.empty() && removed)
             return SendError(player, "TRANSMOG_OUTFIT_ALL_INVALID_APPEARANCES");
 
-        // иллюзии: только открытые и подходящие к надетому оружию
+        // illusions: only collected ones that fit the equipped weapon
         Transmog::SlotList illusions;
         uint64 illusionCost = 0;
         for (auto const& [slot, enchant] : Transmog::ParseSlots(Arg(args, 4)))

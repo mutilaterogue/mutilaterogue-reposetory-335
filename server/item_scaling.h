@@ -1,7 +1,7 @@
-﻿/*
- * Скейлинг предметов: у каждого экземпляра предмета - свой бонус к уровню (ретейл: ItemBonus / item level),
- * характеристики, броня и урон оружия пересчитываются от шаблона (item_scaling.cpp, core/Player_itemscale.patch).
- * Используется улучшением снаряжения и наградами (M+, треки) - всё через SetBonus.
+/*
+ * Item scaling: every item instance has its own item level bonus (retail: ItemBonus / item level),
+ * stats, armor and weapon damage are recalculated from the template (item_scaling.cpp, core/Player_itemscale.patch).
+ * Used by gear upgrades and rewards (M+, tracks) - everything goes through SetBonus.
  */
 
 #ifndef CUSTOM_ITEM_SCALING_H
@@ -15,19 +15,19 @@ struct ItemTemplate;
 
 namespace ItemScaling
 {
-    // бонус к уровню предмета (0 - как в item_template)
+    // item level bonus (0 - as in item_template)
     int32 GetBonus(Item const* item);
-    // уровень предмета с бонусом
+    // item level including the bonus
     uint32 GetItemLevel(Item const* item);
-    // поставить бонус: если предмет надет - характеристики пересчитываются сразу; клиенту - новая подсказка
+    // set the bonus: stats of an equipped item are recalculated at once; the client gets a new tooltip
     void SetBonus(Player* player, Item* item, int32 bonus);
 
-    // множители от бонуса (одинаковые формулы у сервера и клиента - клиент получает их в "ISCALE_CONFIG")
+    // multipliers from the bonus (same formulas on server and client - the client gets them in "ISCALE_CONFIG")
     float StatScale(int32 bonus);
     float ArmorScale(int32 bonus);
     float DamageScale(int32 bonus);
 
-    // подсказка клиента: кэш предмета (SMSG_ITEM_QUERY_SINGLE_RESPONSE) с пересчитанными значениями
+    // client tooltip: item cache (SMSG_ITEM_QUERY_SINGLE_RESPONSE) with recalculated values
     void SendItemCache(Player* player, ItemTemplate const* proto, int32 bonus);
 }
 

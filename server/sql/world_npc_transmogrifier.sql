@@ -1,4 +1,4 @@
--- world DB: трансмогрификатор (пример, подставьте свой entry/модель)
+-- world DB: transmogrifier (example, put your own entry/model)
 SET @ENTRY := 190010;
 DELETE FROM `creature_template` WHERE `entry` = @ENTRY;
 INSERT INTO `creature_template` (`entry`, `modelid1`, `name`, `subname`, `minlevel`, `maxlevel`, `faction`, `npcflag`, `unit_class`, `ScriptName`)
