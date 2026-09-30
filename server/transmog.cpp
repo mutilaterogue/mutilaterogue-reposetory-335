@@ -83,6 +83,21 @@ namespace
         }
     }
 
+    bool IsMeleeWeapon(uint8 subClass)
+    {
+        switch (subClass)
+        {
+            case ITEM_SUBCLASS_WEAPON_AXE: case ITEM_SUBCLASS_WEAPON_AXE2:
+            case ITEM_SUBCLASS_WEAPON_MACE: case ITEM_SUBCLASS_WEAPON_MACE2:
+            case ITEM_SUBCLASS_WEAPON_SWORD: case ITEM_SUBCLASS_WEAPON_SWORD2:
+            case ITEM_SUBCLASS_WEAPON_POLEARM: case ITEM_SUBCLASS_WEAPON_STAFF:
+            case ITEM_SUBCLASS_WEAPON_FIST_WEAPON: case ITEM_SUBCLASS_WEAPON_DAGGER:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     bool IsBowGunCrossbow(uint8 subClass)
     {
         return subClass == ITEM_SUBCLASS_WEAPON_BOW || subClass == ITEM_SUBCLASS_WEAPON_GUN || subClass == ITEM_SUBCLASS_WEAPON_CROSSBOW;
@@ -257,7 +272,10 @@ namespace Transmog
     // retail Item::CanTransmogrifyItemWithItem, rules of 3.3.5 item types
     bool CanTransmogrifyItemWithItem(ItemData const& target, ItemData const& source)
     {
-        if (target.Class != source.Class || SlotGroup(target.InventoryType) != SlotGroup(source.InventoryType))
+        // melee weapons: any one-hand or two-hand look on any melee weapon
+        bool meleeWeapons = target.Class == ITEM_CLASS_WEAPON && source.Class == ITEM_CLASS_WEAPON
+            && IsMeleeWeapon(target.SubClass) && IsMeleeWeapon(source.SubClass);
+        if (target.Class != source.Class || (!meleeWeapons && SlotGroup(target.InventoryType) != SlotGroup(source.InventoryType)))
             return false;
 
         if (target.Class == ITEM_CLASS_ARMOR)
@@ -272,7 +290,8 @@ namespace Transmog
         }
 
         if (target.Class == ITEM_CLASS_WEAPON)
-            return target.SubClass == source.SubClass || (IsBowGunCrossbow(target.SubClass) && IsBowGunCrossbow(source.SubClass));
+            return target.SubClass == source.SubClass || (IsBowGunCrossbow(target.SubClass) && IsBowGunCrossbow(source.SubClass))
+                || (IsMeleeWeapon(target.SubClass) && IsMeleeWeapon(source.SubClass));
 
         return false;
     }

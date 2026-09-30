@@ -245,6 +245,7 @@ function TransmogFrame_SelectSlot(self, slotId)
 	self.category = TransmogUI.GetItemCategory(info, link);
 	self.page = 1;
 	self.SlotTitle:SetText(info.name);
+	TransmogFrame_UpdateWeaponDropdown(self);
 	TransmogUI.UpdateSlots(self);
 	TransmogUI.RequestPage(self);
 end
@@ -498,6 +499,7 @@ function TransmogFrame_OnLoad(self)
 	TransmogUI.SetNineSliceAtlas(wardrobe.TabContent.Border, "transmog-tabs-frame");
 	TransmogUI.SetNineSliceAtlas(wardrobe.TabContent.SituationsFrame.Situations.Background, "transmog-situations-containerbg");
 	self.SlotTitle = items.SlotTitle;
+	TransmogFrame_CreateWeaponDropdown(self, items);
 	self.GridMessage = items.GridMessageFrame.Text;
 	local paging = items.PagingControls;
 	paging.Prev, paging.Next = paging.PrevPageButton, paging.NextPageButton;
@@ -728,5 +730,63 @@ SlashCmdList["TRANSMOG"] = function()
 		TransmogFrame:Hide();
 	else
 		TransmogFrame:Show();
+	end
+end
+
+---------------------------------------------------------------------------
+-- weapon type (retail: the weapon category dropdown): melee weapons take any melee look,
+-- one-hand and two-hand (server/transmog.cpp IsMeleeWeapon)
+---------------------------------------------------------------------------
+local MELEE_SUBCLASSES = { 0, 4, 7, 13, 15, 1, 5, 8, 6, 10 };	-- axe, mace, sword, fist, dagger, 2h axe, 2h mace, 2h sword, polearm, staff
+
+local function IsMeleeCategory(category)
+	for _, subclass in ipairs(MELEE_SUBCLASSES) do
+		if category == 20 + subclass then
+			return true;
+		end
+	end
+	return false;
+end
+
+local function WeaponCategoryName(category)
+	local names = { GetAuctionItemSubClasses(1) };
+	for index, subclass in ipairs(TransmogUI.WEAPON_SUBCLASS_ORDER) do
+		if 20 + subclass == category then
+			return names[index];
+		end
+	end
+	return tostring(category);
+end
+
+function TransmogFrame_CreateWeaponDropdown(self, parent)
+	local dropdown = CreateFrame("Button", "TransmogFrameWeaponDropdown", parent, "WowStyle1DropdownTemplate");
+	dropdown:SetWidth(150);
+	dropdown:SetPoint("LEFT", self.SlotTitle, "RIGHT", 12, 0);
+	dropdown:Hide();
+	dropdown:SetupMenu(function(owner, rootDescription)
+		for _, subclass in ipairs(MELEE_SUBCLASSES) do
+			local category = 20 + subclass;
+			rootDescription:CreateRadio(WeaponCategoryName(category), function()
+				return self.category == category;
+			end, function()
+				self.category = category;
+				self.page = 1;
+				TransmogUI.RequestPage(self);
+			end);
+		end
+	end);
+	self.WeaponDropdown = dropdown;
+end
+
+function TransmogFrame_UpdateWeaponDropdown(self)
+	local dropdown = self.WeaponDropdown;
+	if not dropdown then
+		return;
+	end
+	if IsMeleeCategory(self.category) then
+		dropdown:Show();
+		dropdown:GenerateMenu();
+	else
+		dropdown:Hide();
 	end
 end
