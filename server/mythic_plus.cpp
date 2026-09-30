@@ -12,8 +12,8 @@
  * Use -> the client opens the keystone frame; the key is slotted and the run is started from there:
  *   - the key must be for this dungeon, the instance untouched (no boss killed, no run started);
  *   - every group member must be inside and alive, nobody in combat;
- *   - everybody is moved to the instance entrance, 10 s countdown behind the barrier (BARRIER_RADIUS,
- *     walls of world.mythic_plus_barrier as the visual), then the timer starts.
+ *   - everybody is moved to the instance entrance, 10 s countdown behind the walls of
+ *     world.mythic_plus_barrier (their models block the way), then the timer starts.
  *
  * Run:
  *   - creatures: health and damage x LEVEL_SCALE ^ (level - 1), plus Fortified / Tyrannical;
@@ -97,7 +97,6 @@ namespace
     constexpr uint32 FONT_ENTRY = 246779;           // Font of Power (ScriptName go_mythic_plus_font)
     constexpr uint32 CHEST_ENTRY = 252665;          // Challenger's Cache, also its gameobject_loot_template entry
     constexpr float FONT_RANGE = 10.0f;             // the keystone frame closes farther away than this
-    constexpr float BARRIER_RADIUS = 12.0f;         // during the countdown players stay this close to the entrance
 
     constexpr uint32 MIN_KEY_LEVEL = 1;
     constexpr uint32 MAX_KEY_LEVEL = 30;
@@ -1133,12 +1132,7 @@ namespace
             if (run.CountdownLeft > diff)
             {
                 run.CountdownLeft -= diff;
-                // the barrier: nobody leaves the entrance before the start
-                ForEachPlayer(map, [&](Player* player)
-                {
-                    if (player->IsAlive() && !player->IsBeingTeleported() && player->GetExactDist2d(&run.StartPos) > BARRIER_RADIUS)
-                        player->NearTeleportTo(run.StartPos.GetPositionX(), run.StartPos.GetPositionY(), run.StartPos.GetPositionZ(), player->GetOrientation());
-                });
+                // the walls (mythic_plus_barrier) keep everybody at the entrance
             }
             else
             {
