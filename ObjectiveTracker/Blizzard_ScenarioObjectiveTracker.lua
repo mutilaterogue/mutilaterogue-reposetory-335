@@ -11,6 +11,8 @@ local settings = {
 	lineSpacing = 12,
 	fromBlockOffsetY = -2,
 	lineTemplate = "ObjectiveTrackerAnimLineTemplate",
+	progressBarTemplate = "ScenarioProgressBarTemplate",
+	progressBarLineSpacing = 2,
 	showCriteria = true,
 	leftMargin = -20,
 };
@@ -28,7 +30,8 @@ function ScenarioObjectiveTrackerMixin:InitModule()
 	self.ChallengeModeBlock.height = 87;
 	self.ChallengeModeBlock.fixedHeight = true;
 	self.ChallengeModeBlock.fixedWidth = true;
-	ScenarioChallengeModeBlock_Init(self.ChallengeModeBlock);
+	Mixin(self.ChallengeModeBlock, ScenarioObjectiveTrackerChallengeModeMixin);
+	self.ChallengeModeBlock:OnLoad();
 	self.StageBlock.height = 83;
 	self.StageBlock.fixedHeight = true;
 	self.StageBlock.fixedWidth = true;
@@ -106,8 +109,10 @@ function ScenarioObjectiveTrackerMixin:LayoutContents()
 
 	-- keystone run: the timer block instead of the stage block (retail ScenarioChallengeModeBlock)
 	if scenarioType == LE_SCENARIO_TYPE_CHALLENGE_MODE then
-		ScenarioChallengeModeBlock_Update(self.ChallengeModeBlock);
-		self:LayoutBlock(self.ChallengeModeBlock);
+		self.ChallengeModeBlock:CheckActivate();
+		if self.ChallengeModeBlock:IsActive() then
+			self:LayoutBlock(self.ChallengeModeBlock);
+		end
 		self.currentStage = nil;
 	else
 		self:LayoutBlock(stageBlock);
@@ -166,121 +171,193 @@ function ScenarioObjectiveTrackerMixin:UpdateCriteria(numCriteria)
 				line.Icon:Show();
 				line.Icon:SetAtlas("ui-questtracker-objective-nub", false);
 			end
-		end
-	end
-end
 
--- *****************************************************************************************************
--- ***** CHALLENGE MODE BLOCK (keystone level, affixes, time left, timer bar, deaths)
--- *****************************************************************************************************
-
-function ScenarioChallengeModeBlock_Init(block)
-	block.Affixes = {};
-	for i = 1, 3 do
-		local affix = CreateFrame("Frame", nil, block);
-		affix:SetWidth(22);
-		affix:SetHeight(22);
-		affix:EnableMouse(true);
-		affix.Portrait = affix:CreateTexture(nil, "ARTWORK");
-		affix.Portrait:SetWidth(20);
-		affix.Portrait:SetHeight(20);
-		affix.Portrait:SetPoint("CENTER");
-		affix.Border = affix:CreateTexture(nil, "OVERLAY");
-		affix.Border:SetAtlas("ChallengeMode-AffixRing-Sm", true);
-		affix.Border:SetPoint("CENTER");
-		affix:SetScript("OnEnter", function(self)
-			local name, description = C_ChallengeMode.GetAffixInfo(self.affixID);
-			if name then
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-				GameTooltip:SetText(name, 1, 1, 1, 1, true);
-				GameTooltip:AddLine(description, nil, nil, nil, true);
-				GameTooltip:Show();
+			-- progress bar (enemy forces)
+			if criteriaInfo.isWeightedProgress and not criteriaInfo.completed then
+				objectivesBlock:AddProgressBar(criteriaIndex, self.progressBarLineSpacing);
 			end
-		end);
-		affix:SetScript("OnLeave", GameTooltip_Hide);
-		affix:Hide();
-		block.Affixes[i] = affix;
-	end
-	block.StatusBar:SetMinMaxValues(0, 1);
-end
-
-function ScenarioChallengeModeBlock_Update(block)
-	local level, affixes = C_ChallengeMode.GetActiveKeystoneInfo();
-	block.Level:SetText(CHALLENGE_MODE_POWER_LEVEL:format(level));
-
-	-- affixes right-aligned in the top row (retail)
-	local count = #affixes;
-	for i, affix in ipairs(block.Affixes) do
-		local affixID = affixes[i];
-		if affixID then
-			local _, _, icon = C_ChallengeMode.GetAffixInfo(affixID);
-			affix.affixID = affixID;
-			affix.Portrait:SetTexture(icon);
-			affix:ClearAllPoints();
-			affix:SetPoint("TOPRIGHT", block, "TOPRIGHT", -28 - (count - i) * 24, -14);
-			affix:Show();
-		else
-			affix:Hide();
 		end
 	end
-
-	local run = MythicPlus.run;
-	local limit = run and run.timeLimit or 0;
-	block.ChestTimes:SetText(limit > 0 and string.format("+2 %s   +3 %s", MythicPlus_FormatTime(limit * 0.8), MythicPlus_FormatTime(limit * 0.6)) or "");
-	ScenarioChallengeModeBlock_UpdateTime(block);
 end
 
-function ScenarioChallengeModeBlock_UpdateTime(block)
-	local run = MythicPlus.run;
-	if not run then
-		return;
-	end
-	local deaths, timeLost = C_ChallengeMode.GetDeathCount();
-	local elapsed = MythicPlus_GetElapsedMs() / 1000 + timeLost;
-	local limit = run.timeLimit;
+-- *****************************************************************************************************
+-- ***** CHALLENGE MODE BLOCK (retail ScenarioObjectiveTrackerChallengeModeMixin)
+-- 3.3.5: no world elapsed timers - the run time comes from MythicPlus (server), the block ticks itself
+-- *****************************************************************************************************
 
-	if run.state == MYTHIC_RUN_COUNTDOWN then
-		block.TimeLeft:SetText(MythicPlus_FormatTime(limit));
-		block.TimeLeft:SetTextColor(1, 1, 1);
-		block.StatusBar:SetValue(1);
-	elseif elapsed <= limit then
-		block.TimeLeft:SetText(MythicPlus_FormatTime(limit - elapsed));
-		if run.state == MYTHIC_RUN_DONE_TIMED then
-			block.TimeLeft:SetTextColor(0.1, 1, 0.1);
+ScenarioObjectiveTrackerChallengeModeMixin = { };
+
+function ScenarioObjectiveTrackerChallengeModeMixin:OnLoad()
+	self.StartedDepleted:SetScript("OnEnter", function()
+		GameTooltip:SetOwner(self.StartedDepleted, "ANCHOR_RIGHT");
+		GameTooltip:SetText(CHALLENGE_MODE_DEPLETED_KEYSTONE, 1, 1, 1);
+		GameTooltip:AddLine(CHALLENGE_MODE_KEYSTONE_DEPLETED_AT_START, nil, nil, nil, true);
+		GameTooltip:Show();
+	end);
+
+	self.TimesUpLootStatus:SetScript("OnEnter", function()
+		GameTooltip:SetOwner(self.TimesUpLootStatus, "ANCHOR_RIGHT");
+		GameTooltip:SetText(CHALLENGE_MODE_TIMES_UP, 1, 1, 1);
+		local line;
+		if self.wasDepleted then
+			if IsPartyLeader() then
+				line = CHALLENGE_MODE_TIMES_UP_NO_LOOT_LEADER;
+			else
+				line = CHALLENGE_MODE_TIMES_UP_NO_LOOT;
+			end
 		else
-			block.TimeLeft:SetTextColor(1, 1, 1);
+			line = CHALLENGE_MODE_TIMES_UP_LOOT;
 		end
-		block.StatusBar:SetValue(limit > 0 and (limit - elapsed) / limit or 0);
-	else
-		-- over time: how much over, red, empty bar
-		block.TimeLeft:SetText("+" .. MythicPlus_FormatTime(elapsed - limit));
-		block.TimeLeft:SetTextColor(1, 0.1, 0.1);
-		block.StatusBar:SetValue(0);
-	end
+		GameTooltip:AddLine(line, nil, nil, nil, true);
+		GameTooltip:Show();
+	end);
 
-	if deaths > 0 then
-		block.DeathCount.Count:SetText(deaths);
-		block.DeathCount:Show();
-	else
-		block.DeathCount:Hide();
-	end
+	self.DeathCount:SetScript("OnEnter", function()
+		GameTooltip:SetOwner(self.DeathCount, "ANCHOR_LEFT");
+		GameTooltip:SetText(CHALLENGE_MODE_DEATH_COUNT_TITLE:format(self.deathCount), 1, 1, 1);
+		GameTooltip:AddLine(CHALLENGE_MODE_DEATH_COUNT_DESCRIPTION:format(SecondsToClock(self.timeLost)));
+		GameTooltip:Show();
+	end);
+
+	self.affixFrames = {};
+	self:SetScript("OnUpdate", self.OnUpdate);
 end
 
-function ScenarioChallengeModeBlock_OnUpdate(self, elapsed)
-	self.elapsed = (self.elapsed or 0) + elapsed;
-	if self.elapsed < 0.1 then
+-- retail ScenarioTimerMixin:CheckTimers: activates the block when a keystone run is on
+function ScenarioObjectiveTrackerChallengeModeMixin:CheckActivate()
+	local run = MythicPlus.run;
+	local mapID = C_ChallengeMode.GetActiveChallengeMapID();
+	if not mapID or not run then
+		self.active = nil;
 		return;
 	end
-	self.elapsed = 0;
-	ScenarioChallengeModeBlock_UpdateTime(self);
+	local key = run.mapID .. ":" .. run.level;
+	if self.active ~= key then
+		self:Activate(run.timeLimit);
+		self.active = key;
+	end
+	self:UpdateDeathCount();
+	self:UpdateTime(math.floor(MythicPlus_GetElapsedMs() / 1000));
 end
 
-function ScenarioChallengeDeathCount_OnEnter(self)
-	local deaths, timeLost = C_ChallengeMode.GetDeathCount();
-	GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-	GameTooltip:SetText(CHALLENGE_MODE_DEATH_COUNT_TITLE:format(deaths), 1, 1, 1);
-	GameTooltip:AddLine(CHALLENGE_MODE_DEATH_COUNT_DESCRIPTION:format(MythicPlus_FormatTime(timeLost)));
-	GameTooltip:Show();
+function ScenarioObjectiveTrackerChallengeModeMixin:IsActive()
+	return self.active ~= nil;
+end
+
+function ScenarioObjectiveTrackerChallengeModeMixin:OnUpdate(elapsed)
+	if not self.active then
+		return;
+	end
+	self.sinceUpdate = (self.sinceUpdate or 0) + elapsed;
+	if self.sinceUpdate < 0.2 then
+		return;
+	end
+	self.sinceUpdate = 0;
+	self:UpdateDeathCount();
+	self:UpdateTime(math.floor(MythicPlus_GetElapsedMs() / 1000));
+end
+
+function ScenarioObjectiveTrackerChallengeModeMixin:UpdateTime(elapsedTime)
+	-- deaths add their penalty to the run time (retail: the server adds it to the world timer)
+	local _, timeLost = C_ChallengeMode.GetDeathCount();
+	elapsedTime = elapsedTime + (timeLost or 0);
+	local timeLeft = math.max(0, self.timeLimit - elapsedTime);
+	local statusBar = self.StatusBar;
+	statusBar:SetValue(timeLeft);
+	if timeLeft == 0 then
+		self.TimeLeft:SetTextColor(RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
+		self.StartedDepleted:Hide();
+		self.TimesUpLootStatus:Show();
+		self.TimesUpLootStatus.NoLoot:SetShown(self.wasDepleted);
+	else
+		self.TimeLeft:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b);
+	end
+	self.TimeLeft:SetText(SecondsToClock(timeLeft));
+end
+
+function ScenarioObjectiveTrackerChallengeModeMixin:Activate(timeLimit)
+	self.timeLimit = timeLimit;
+	local level, affixes, wasEnergized = C_ChallengeMode.GetActiveKeystoneInfo();
+	self.Level:SetText(CHALLENGE_MODE_POWER_LEVEL:format(level));
+	if not wasEnergized then
+		self.wasDepleted = true;
+		self.StartedDepleted:Show();
+	else
+		self.wasDepleted = false;
+		self.StartedDepleted:Hide();
+	end
+	self.TimesUpLootStatus:Hide();
+	self:SetUpAffixes(affixes);
+	self:UpdateDeathCount();
+
+	self.StatusBar:SetMinMaxValues(0, self.timeLimit);
+	if ScenarioObjectiveTracker.ForceExpand then
+		ScenarioObjectiveTracker:ForceExpand();
+	end
+end
+
+function ScenarioObjectiveTrackerChallengeModeMixin:UpdateDeathCount()
+	local deathCount = self.DeathCount;
+	local count, timeLost = C_ChallengeMode.GetDeathCount();
+	self.deathCount = count;
+	self.timeLost = timeLost;
+	if timeLost and timeLost > 0 and count and count > 0 then
+		deathCount:Show();
+		deathCount.Count:SetText(count);
+	else
+		deathCount:Hide();
+	end
+end
+
+function ScenarioObjectiveTrackerChallengeModeMixin:SetUpAffixes(affixes)
+	for _, frame in ipairs(self.affixFrames) do
+		frame:Hide();
+	end
+
+	local frameWidth, spacing, distance = 22, 4, -18;
+	local prevAffixFrame;
+	for i, affixID in ipairs(affixes) do
+		local affixFrame = self.affixFrames[i];
+		if not affixFrame then
+			affixFrame = CreateFrame("Frame", self:GetName() .. "Affix" .. i, self, "ScenarioChallengeModeAffixTemplate");
+			self.affixFrames[i] = affixFrame;
+		end
+		affixFrame:ClearAllPoints();
+		if prevAffixFrame then
+			affixFrame:SetPoint("LEFT", prevAffixFrame, "RIGHT", spacing, 0);
+		else
+			local num = #affixes;
+			local leftPoint = 28 + (spacing * (num - 1)) + (frameWidth * num);
+			affixFrame:SetPoint("TOPLEFT", self, "TOPRIGHT", -leftPoint, distance);
+		end
+		local _, _, filedataid = C_ChallengeMode.GetAffixInfo(affixID);
+		affixFrame.Portrait:SetTexture(filedataid);
+		affixFrame.affixID = affixID;
+		affixFrame:Show();
+		prevAffixFrame = affixFrame;
+	end
+end
+
+function ScenarioChallengeModeAffix_OnEnter(self)
+	if self.affixID then
+		local name, description = C_ChallengeMode.GetAffixInfo(self.affixID);
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetText(name, 1, 1, 1, 1, true);
+		GameTooltip:AddLine(description, nil, nil, nil, true);
+		GameTooltip:Show();
+	end
+end
+
+-- *****************************************************************************************************
+-- ***** PROGRESS BARS (retail ScenarioTrackerProgressBarMixin:OnGet / SetValue, no flares)
+-- *****************************************************************************************************
+
+function ScenarioTrackerProgressBar_OnGet(self, isNew, criteriaIndex)
+	local criteriaInfo = criteriaIndex and C_ScenarioInfo.GetCriteriaInfo(criteriaIndex);
+	local percentage = criteriaInfo and criteriaInfo.quantity or 0;
+	self.Bar:SetValue(percentage);
+	self.Bar.Label:SetFormattedText(PERCENTAGE_STRING, percentage);
+	self.percentage = percentage;
 end
 
 -- *****************************************************************************************************

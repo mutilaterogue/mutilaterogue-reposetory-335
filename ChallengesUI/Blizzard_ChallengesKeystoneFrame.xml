@@ -1,24 +1,26 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-	<!-- Font of Power (retail ChallengesKeystoneFrame, Blizzard_ChallengesUI) for 3.3.5.
-	     FrameXML.toc: ChallengesUI\Blizzard_ChallengesUI.xml. Server: server/mythic_plus.cpp. -->
+	<!-- Font of Power: retail ChallengesKeystoneFrame (Blizzard_ChallengesUI.xml) 1:1 for 3.3.5.
+	     relativeKey -> $parent names, no MaskTexture, the XML AnimationGroups (fromAlpha/toAlpha) are
+	     played in Lua (Blizzard_ChallengesKeystoneFrame.lua). Server: server/mythic_plus.cpp. -->
 	<Script file="Blizzard_ChallengesKeystoneFrame.lua"/>
 
-	<!-- affix icon with the round border (retail ChallengesKeystoneFrameAffixTemplate) -->
+	<!-- retail ChallengesKeystoneFrameAffixTemplate -->
 	<Frame name="ChallengesKeystoneFrameAffixTemplate" enableMouse="true" virtual="true">
 		<Size x="52" y="52"/>
 		<Layers>
-			<Layer level="ARTWORK">
-				<Texture name="$parentPortrait" parentKey="Portrait">
-					<Size x="46" y="46"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
 			<Layer level="OVERLAY">
-				<Texture parentKey="Border" atlas="ChallengeMode-AffixRing-Lg" useAtlasSize="true">
+				<Texture name="$parentBorder" parentKey="Border" atlas="ChallengeMode-AffixRing-Lg" setAllPoints="true"/>
+				<FontString parentKey="Percent" inherits="GameFontNormalLarge" hidden="true">
 					<Anchors>
-						<Anchor point="CENTER"/>
+						<Anchor point="BOTTOM" relativeTo="$parentBorder" x="0" y="-4"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Portrait">
+					<Size x="50" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentBorder"/>
 					</Anchors>
 				</Texture>
 			</Layer>
@@ -29,114 +31,254 @@
 		</Scripts>
 	</Frame>
 
-	<Frame name="ChallengesKeystoneFrame" toplevel="true" parent="UIParent" enableMouse="true" hidden="true">
+	<Frame name="ChallengesKeystoneFrame" hidden="true" parent="UIParent" frameStrata="HIGH" enableMouse="true">
 		<Size x="398" y="548"/>
 		<Anchors>
-			<Anchor point="CENTER"/>
+			<Anchor point="CENTER" x="0" y="40"/>
 		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentBackground" parentKey="Background" atlas="ChallengeMode-KeystoneFrame" useAtlasSize="true">
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="BORDER">
-				<Texture name="$parentRuneBG" parentKey="RuneBG" atlas="ChallengeMode-RuneBG" useAtlasSize="true">
-					<Anchors>
-						<Anchor point="CENTER" relativePoint="TOP" y="-173"/>
-					</Anchors>
-				</Texture>
+				<Texture atlas="ChallengeMode-KeystoneFrame" setAllPoints="true"/>
 			</Layer>
 			<Layer level="ARTWORK">
-				<Texture name="$parentGlow" parentKey="InsertedGlow" atlas="ChallengeMode-KeystoneSlotFrameGlow" useAtlasSize="true" alphaMode="ADD" alpha="0">
+				<Texture name="$parentRuneBG" parentKey="RuneBG" atlas="ChallengeMode-RuneBG">
+					<Size x="360" y="360"/>
 					<Anchors>
-						<Anchor point="CENTER" relativeTo="$parentRuneBG"/>
+						<Anchor point="CENTER" x="0" y="60"/>
 					</Anchors>
 				</Texture>
-				<Texture parentKey="Divider" atlas="ChallengeMode-ThinDivider" useAtlasSize="true">
+				<Texture name="$parentInstructionBackground" parentKey="InstructionBackground">
+					<Size x="374" y="60"/>
 					<Anchors>
-						<Anchor point="CENTER" relativePoint="TOP" y="-356"/>
+						<Anchor point="BOTTOM" x="0" y="80"/>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.8"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture parentKey="BgBurst2" alpha="0" alphaMode="ADD" atlas="ChallengeMode-Runes-BackgroundBurst" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
 					</Anchors>
 				</Texture>
-				<FontString name="$parentDungeonName" parentKey="DungeonName" inherits="GameFontNormalHuge" justifyH="CENTER" hidden="true">
+				<Texture name="$parentDivider" parentKey="Divider" atlas="ChallengeMode-ThinDivider" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="BOTTOM" relativeTo="$parentInstructionBackground" relativePoint="TOP"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentDungeonName" parentKey="DungeonName" inherits="GameFontNormalHuge" hidden="true">
 					<Size x="350" y="0"/>
 					<Anchors>
-						<Anchor point="BOTTOM" relativePoint="TOP" y="-320"/>
+						<Anchor point="BOTTOM" relativeTo="$parentDivider" relativePoint="TOP" x="0" y="4"/>
 					</Anchors>
-					<Color r="1" g="0.82" b="0"/>
 				</FontString>
-				<FontString name="$parentPowerLevel" parentKey="PowerLevel" inherits="GameFontHighlightHuge" justifyH="CENTER" hidden="true">
+				<FontString parentKey="PowerLevel" inherits="GameFontNormalHuge" hidden="true">
 					<Anchors>
-						<Anchor point="TOP" relativeTo="$parentDungeonName" relativePoint="BOTTOM" y="-4"/>
+						<Anchor point="TOP" x="0" y="-30"/>
 					</Anchors>
-					<Color r="1" g="1" b="1"/>
 				</FontString>
-				<FontString name="$parentTimeLimit" parentKey="TimeLimit" inherits="GameFontHighlightLarge" justifyH="CENTER" hidden="true">
+				<FontString parentKey="TimeLimit" inherits="GameFontHighlightLarge" hidden="true">
 					<Anchors>
-						<Anchor point="TOP" relativePoint="TOP" y="-368"/>
+						<Anchor point="TOP" relativeTo="$parentDivider" relativePoint="TOP" x="0" y="-6"/>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentInstructions" parentKey="Instructions" inherits="GameFontHighlightLarge" justifyH="CENTER" text="CHALLENGE_MODE_INSERT_KEYSTONE">
-					<Size x="300" y="0"/>
+				<FontString parentKey="Instructions" inherits="GameFontHighlightLarge" text="CHALLENGE_MODE_INSERT_KEYSTONE">
 					<Anchors>
-						<Anchor point="TOP" relativePoint="TOP" y="-330"/>
+						<Anchor point="CENTER" relativeTo="$parentInstructionBackground"/>
 					</Anchors>
 				</FontString>
+				<Texture parentKey="PentagonLines" alpha="0" atlas="ChallengeMode-Runes-LineGlow" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="0" y="6"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="LargeCircleGlow" alpha="0" atlas="ChallengeMode-Runes-InnerCircleGlow" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="0" y="5"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="SmallCircleGlow" alpha="0" atlas="ChallengeMode-Runes-SmallCircleGlow">
+					<Size x="130" y="130"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Shockwave" alpha="0" alphaMode="ADD" atlas="ChallengeMode-Runes-Shockwave" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="60"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Shockwave2" alpha="0" alphaMode="ADD" atlas="ChallengeMode-Runes-Shockwave" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="60"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRunesLarge" parentKey="RunesLarge" alpha="0.15" atlas="ChallengeMode-Runes-Large">
+					<Size x="196" y="196"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="GlowBurstLarge" alpha="0" alphaMode="ADD" atlas="ChallengeMode-Runes-GlowBurstLarge" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRunesLarge" x="-1" y="-3"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RunesSmall" alpha="0.15" atlas="ChallengeMode-Runes-Small">
+					<Size x="125" y="125"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="GlowBurstSmall" alpha="0" atlas="ChallengeMode-Runes-GlowBurstLarge" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="60"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<Texture name="$parentSlotBG" parentKey="SlotBG" atlas="ChallengeMode-KeystoneSlotBG" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRuneCircleT" parentKey="RuneCircleT" alpha="0" atlas="ChallengeMode-Runes-CircleGlow">
+					<Size x="48" y="48"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="0" y="126"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRuneCircleR" parentKey="RuneCircleR" alpha="0" atlas="ChallengeMode-Runes-CircleGlow">
+					<Size x="48" y="48"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="118" y="40"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRuneCircleBR" parentKey="RuneCircleBR" alpha="0" atlas="ChallengeMode-Runes-CircleGlow">
+					<Size x="48" y="48"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="73" y="-98"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRuneCircleBL" parentKey="RuneCircleBL" alpha="0" atlas="ChallengeMode-Runes-CircleGlow">
+					<Size x="48" y="48"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="-73" y="-98"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRuneCircleL" parentKey="RuneCircleL" alpha="0" atlas="ChallengeMode-Runes-CircleGlow">
+					<Size x="48" y="48"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG" x="-118" y="40"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="3">
+				<Texture parentKey="KeystoneFrame" atlas="ChallengeMode-KeystoneSlotFrame" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RuneT" alpha="0" atlas="ChallengeMode-Runes-T-Glow">
+					<Size x="40" y="40"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneCircleT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RuneR" alpha="0" atlas="ChallengeMode-Runes-R-Glow">
+					<Size x="40" y="40"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneCircleR" x="-1" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RuneBR" alpha="0" atlas="ChallengeMode-Runes-BR-Glow">
+					<Size x="40" y="40"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneCircleBR" x="-1" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RuneBL" alpha="0" atlas="ChallengeMode-Runes-BL-Glow">
+					<Size x="40" y="40"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneCircleBL" x="-1" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RuneL" alpha="0" atlas="ChallengeMode-Runes-L-Glow">
+					<Size x="40" y="40"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneCircleL"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="LargeRuneGlow" alpha="0" alphaMode="ADD" atlas="ChallengeMode-Runes-GlowLarge">
+					<Size x="198" y="199"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="SmallRuneGlow" alpha="0" alphaMode="ADD" atlas="ChallengeMode-Runes-GlowSmall">
+					<Size x="129" y="129"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="61"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="4">
+				<Texture parentKey="KeystoneSlotGlow" alpha="0" alphaMode="ADD" atlas="ChallengeMode-KeystoneSlotFrameGlow" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="60"/>
+					</Anchors>
+				</Texture>
 			</Layer>
 		</Layers>
 		<Frames>
 			<Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButton">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-4" y="-4"/>
+					<Anchor point="TOPRIGHT" x="-8" y="-9"/>
 				</Anchors>
+				<Scripts>
+					<OnClick>
+						self:GetParent():Hide();
+					</OnClick>
+				</Scripts>
 			</Button>
-
-			<Button name="$parentKeystoneSlot" parentKey="KeystoneSlot">
+			<Button name="$parentStartButton" parentKey="StartButton" inherits="UIPanelButtonTemplate" text="CHALLENGE_MODE_START_CHALLENGE">
+				<Size x="120" y="24"/>
+				<Anchors>
+					<Anchor point="BOTTOM" x="0" y="20"/>
+				</Anchors>
+				<Scripts>
+					<OnShow>
+						self:SetWidth(self:GetTextWidth() + 60);
+					</OnShow>
+					<OnClick>
+						ChallengesKeystoneFrame_StartChallengeMode(self:GetParent());
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentKeystoneSlot" parentKey="KeystoneSlot" enableMouse="true">
 				<Size x="48" y="48"/>
 				<Anchors>
-					<Anchor point="CENTER" relativeTo="$parentRuneBG"/>
+					<Anchor point="CENTER" relativeTo="$parentSlotBG"/>
 				</Anchors>
 				<Layers>
-					<Layer level="BACKGROUND">
-						<Texture name="$parentIcon" parentKey="Icon">
-							<Size x="48" y="48"/>
+					<Layer level="OVERLAY" textureSubLevel="2">
+						<Texture parentKey="Texture">
 							<Anchors>
-								<Anchor point="CENTER"/>
-							</Anchors>
-						</Texture>
-					</Layer>
-					<Layer level="OVERLAY">
-						<Texture parentKey="Frame" atlas="ChallengeMode-KeystoneSlotFrame" useAtlasSize="true">
-							<Anchors>
-								<Anchor point="CENTER"/>
+								<Anchor point="TOPLEFT" x="4" y="-4"/>
+								<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
 							</Anchors>
 						</Texture>
 					</Layer>
 				</Layers>
-				<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
 				<Scripts>
 					<OnLoad function="ChallengesKeystoneSlot_OnLoad"/>
-					<OnClick function="ChallengesKeystoneSlot_OnClick"/>
-					<OnReceiveDrag function="ChallengesKeystoneSlot_OnReceiveDrag"/>
-					<OnDragStart function="ChallengesKeystoneSlot_OnDragStart"/>
 					<OnEnter function="ChallengesKeystoneSlot_OnEnter"/>
 					<OnLeave function="GameTooltip_Hide"/>
-				</Scripts>
-			</Button>
-
-			<Frame name="$parentAffix1" inherits="ChallengesKeystoneFrameAffixTemplate" hidden="true"/>
-			<Frame name="$parentAffix2" inherits="ChallengesKeystoneFrameAffixTemplate" hidden="true"/>
-			<Frame name="$parentAffix3" inherits="ChallengesKeystoneFrameAffixTemplate" hidden="true"/>
-
-			<Button name="$parentStartButton" parentKey="StartButton" inherits="UIPanelButtonTemplate" text="ACTIVATE">
-				<Size x="120" y="24"/>
-				<Anchors>
-					<Anchor point="BOTTOM" y="20"/>
-				</Anchors>
-				<Scripts>
-					<OnClick function="ChallengesKeystoneStartButton_OnClick"/>
+					<OnReceiveDrag function="ChallengesKeystoneSlot_OnReceiveDrag"/>
+					<OnDragStart function="ChallengesKeystoneSlot_OnDragStart"/>
+					<OnClick function="ChallengesKeystoneSlot_OnClick"/>
 				</Scripts>
 			</Button>
 		</Frames>
@@ -144,6 +286,7 @@
 			<OnLoad function="ChallengesKeystoneFrame_OnLoad"/>
 			<OnShow function="ChallengesKeystoneFrame_OnShow"/>
 			<OnHide function="ChallengesKeystoneFrame_OnHide"/>
+			<OnMouseUp function="ChallengesKeystoneFrame_OnMouseUp"/>
 			<OnUpdate function="ChallengesKeystoneFrame_OnUpdate"/>
 		</Scripts>
 	</Frame>
