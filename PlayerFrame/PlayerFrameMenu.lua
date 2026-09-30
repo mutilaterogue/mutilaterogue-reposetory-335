@@ -12,7 +12,6 @@ local L = {
 	CONVERT_TO_PARTY = CONVERT_TO_PARTY or "Преобразовать в группу",
 };
 
-L.MYTHIC = PLAYER_DIFFICULTY6 or "Эпохальный";
 
 local LOOT_METHODS = {
 	{ "freeforall", LOOT_FREE_FOR_ALL },
@@ -128,8 +127,7 @@ local function AddInstanceSection(root)
 	if showDungeon then
 		local dungeon = root:CreateSubmenu(DUNGEON_DIFFICULTY);
 		for index = 1, 3 do
-			local text = index == 3 and ("|cffa335ee" .. L.MYTHIC .. "|r") or _G["DUNGEON_DIFFICULTY" .. index];
-			dungeon:CreateRadio(text, function()
+			dungeon:CreateRadio(_G["DUNGEON_DIFFICULTY" .. index], function()
 				return GetDungeonDifficulty() == index;
 			end, function()
 				SetDungeonDifficulty(index);
