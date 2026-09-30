@@ -28,7 +28,7 @@
 	</GameTooltip>
 
 	<Frame name="ItemUpgradeFrame" inherits="RetailPortraitFrameTemplate" toplevel="true" parent="UIParent" enableMouse="true" movable="true" hidden="true">
-		<Size x="538" y="540"/>
+		<Size x="538" y="518"/>
 		<Anchors>
 			<Anchor point="TOPLEFT" x="16" y="-116"/>
 		</Anchors>
