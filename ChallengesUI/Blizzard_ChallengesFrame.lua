@@ -1,6 +1,11 @@
 -- retail ChallengesFrameMixin / ChallengesDungeonIconMixin / ChallengeModeWeeklyChestMixin for 3.3.5.
 -- Data: Blizzard_ChallengeModeCompat.lua (maps, best runs, rating, weekly affixes, Great Vault).
 
+-- global string or its key, so a missing string never breaks a tooltip
+local function S(key)
+	return _G[key] or key;
+end
+
 UIPanelWindows["ChallengesFrame"] = { area = "left", pushable = 1, whileDead = 1, xOffset = "15", yOffset = "-10" };
 
 local CHEST_STATE_WALL_OF_TEXT = 1;
@@ -27,7 +32,7 @@ function ChallengesFrame_OnLoad(self)
 	self.DungeonIcons = {};
 	self.AffixFrames = {};
 	if self.TitleContainer and self.TitleContainer.TitleText then
-		self.TitleContainer.TitleText:SetText(CHALLENGES);
+		self.TitleContainer.TitleText:SetText(S("CHALLENGES"));
 	end
 	if self.PortraitContainer and self.PortraitContainer.portrait then
 		SetPortraitToTexture(self.PortraitContainer.portrait, DEFAULT_ICON);
@@ -166,7 +171,7 @@ function ChallengesFrame_Update(self)
 	local iconState = state == CHEST_STATE_COLLECT and "collect" or state == CHEST_STATE_COMPLETE and "complete" or "incomplete";
 	chest.Icon:SetAtlas("gficon-chest-evergreen-greatvault-" .. iconState, false);
 	chest.Highlight:SetAtlas("gficon-chest-evergreen-greatvault-" .. iconState, false);
-	chest.RunStatus:SetText(state == CHEST_STATE_COLLECT and MYTHIC_PLUS_COLLECT_GREAT_VAULT or MYTHIC_PLUS_COMPLETE_MYTHIC_DUNGEONS);
+	chest.RunStatus:SetText(state == CHEST_STATE_COLLECT and S("MYTHIC_PLUS_COLLECT_GREAT_VAULT") or S("MYTHIC_PLUS_COMPLETE_MYTHIC_DUNGEONS"));
 	chest.state = state;
 	chest:SetShown(state ~= CHEST_STATE_WALL_OF_TEXT);
 
@@ -205,16 +210,16 @@ function ChallengesDungeonIcon_OnEnter(self)
 	GameTooltip:SetText(name or "", 1, 1, 1);
 	local best = MythicPlus.best[self.mapID];
 	if best then
-		GameTooltip:AddLine(DUNGEON_SCORE_TOTAL_SCORE:format(best.score), 0.1, 1, 0.1);
+		GameTooltip:AddLine(S("DUNGEON_SCORE_TOTAL_SCORE"):format(best.score), 0.1, 1, 0.1);
 		GameTooltip:AddLine(" ");
-		GameTooltip:AddLine(LFG_LIST_BEST_RUN);
-		GameTooltip:AddLine(MYTHIC_PLUS_POWER_LEVEL:format(best.level), 1, 1, 1);
+		GameTooltip:AddLine(S("LFG_LIST_BEST_RUN"));
+		GameTooltip:AddLine(S("MYTHIC_PLUS_POWER_LEVEL"):format(best.level), 1, 1, 1);
 		local seconds = math.floor(best.timeMs / 1000);
 		local durationText = SecondsToClock(seconds, seconds >= 3600);
 		if best.timed then
 			GameTooltip:AddLine(durationText, 1, 1, 1);
 		else
-			GameTooltip:AddLine(DUNGEON_SCORE_OVERTIME_TIME:format(durationText), 0.6, 0.6, 0.6);
+			GameTooltip:AddLine(S("DUNGEON_SCORE_OVERTIME_TIME"):format(durationText), 0.6, 0.6, 0.6);
 		end
 	end
 	GameTooltip:Show();
@@ -222,8 +227,8 @@ end
 
 function ChallengesDungeonScore_OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	GameTooltip:SetText(DUNGEON_SCORE, 1, 1, 1);
-	GameTooltip:AddLine(DUNGEON_SCORE_DESC, nil, nil, nil, true);
+	GameTooltip:SetText(S("DUNGEON_SCORE"), 1, 1, 1);
+	GameTooltip:AddLine(S("DUNGEON_SCORE_DESC"), nil, nil, nil, true);
 	GameTooltip:Show();
 end
 
@@ -232,22 +237,22 @@ end
 ---------------------------------------------------------------------------
 function ChallengesWeeklyChest_OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-	GameTooltip:SetText(GREAT_VAULT_REWARDS, 1, 1, 1);
+	GameTooltip:SetText(S("GREAT_VAULT_REWARDS"), 1, 1, 1);
 	if self.state == CHEST_STATE_COLLECT then
-		GameTooltip:AddLine(GREAT_VAULT_REWARDS_WAITING, 0.1, 1, 0.1, true);
+		GameTooltip:AddLine(S("GREAT_VAULT_REWARDS_WAITING"), 0.1, 1, 0.1, true);
 		GameTooltip:AddLine(" ");
 	end
 	local runs = MythicPlus.vault and MythicPlus.vault.runs or 0;
 	if runs == 0 then
-		GameTooltip:AddLine(GREAT_VAULT_REWARDS_MYTHIC_INCOMPLETE, nil, nil, nil, true);
+		GameTooltip:AddLine(S("GREAT_VAULT_REWARDS_MYTHIC_INCOMPLETE"), nil, nil, nil, true);
 	elseif runs < 4 then
-		GameTooltip:AddLine(GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_FIRST:format(4 - runs), nil, nil, nil, true);
+		GameTooltip:AddLine(S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_FIRST"):format(4 - runs), nil, nil, nil, true);
 	elseif runs < 8 then
-		GameTooltip:AddLine(GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_SECOND:format(8 - runs), nil, nil, nil, true);
+		GameTooltip:AddLine(S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_SECOND"):format(8 - runs), nil, nil, nil, true);
 	else
-		GameTooltip:AddLine(GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_THIRD, nil, nil, nil, true);
+		GameTooltip:AddLine(S("GREAT_VAULT_REWARDS_MYTHIC_COMPLETED_THIRD"), nil, nil, nil, true);
 	end
-	GameTooltip:AddLine(WEEKLY_REWARDS_CLICK_TO_PREVIEW_INSTRUCTIONS, 0.1, 1, 0.1, true);
+	GameTooltip:AddLine(S("WEEKLY_REWARDS_CLICK_TO_PREVIEW_INSTRUCTIONS"), 0.1, 1, 0.1, true);
 	GameTooltip:Show();
 end
 
