@@ -64,6 +64,8 @@
 #include "Group.h"
 #include "Item.h"
 #include "Log.h"
+#include "LootMgr.h"
+#include "Mail.h"
 #include "Map.h"
 #include "ObjectMgr.h"
 #include "MapManager.h"
@@ -212,6 +214,8 @@ namespace
         uint32 ForcesMax = 0;
         bool Depleted = false;
         bool Rewarded = false;
+        std::unordered_set<ObjectGuid::LowType> ChestAllowed;   // in the dungeon at completion
+        std::unordered_set<ObjectGuid::LowType> ChestLooted;
         bool Started = false;                   // a keystone run was started (or a boss died - no key any more)
         std::vector<Boss> Bosses;
         std::unordered_set<ObjectGuid> Counted; // dead creatures already counted
@@ -257,6 +261,9 @@ namespace
     char const* const MSG_DONE_TIMED = "\xd0\xad\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 +%u \xd0\xbf\xd1\x80\xd0\xbe\xd0\xb9\xd0\xb4\xd0\xb5\xd0\xbd \xd0\xb2 \xd1\x81\xd1\x80\xd0\xbe\xd0\xba! \xd0\x92\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f: %s (+%u)";
     char const* const MSG_DONE_LATE = "\xd0\xad\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 +%u \xd0\xbf\xd1\x80\xd0\xbe\xd0\xb9\xd0\xb4\xd0\xb5\xd0\xbd. \xd0\x92\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f: %s (\xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xbd\xd0\xb5 \xd1\x83\xd0\xbb\xd1\x83\xd1\x87\xd1\x88\xd0\xb5\xd0\xbd)";
     char const* const MSG_DONE_ZERO = "\xd0\xad\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xb5 \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5 \xd0\xbf\xd1\x80\xd0\xbe\xd0\xb9\xd0\xb4\xd0\xb5\xd0\xbd\xd0\xbe!";
+    char const* const MSG_CHEST_NOT_YOURS = "\xd0\xad\xd1\x82\xd0\xbe\xd1\x82 \xd1\x81\xd1\x83\xd0\xbd\xd0\xb4\xd1\x83\xd0\xba \xd0\xbd\xd0\xb5 \xd0\xb4\xd0\xbb\xd1\x8f \xd0\xb2\xd0\xb0\xd1\x81.";
+    char const* const MSG_CHEST_LOOTED = "\xd0\x92\xd1\x8b \xd1\x83\xd0\xb6\xd0\xb5 \xd0\xb7\xd0\xb0\xd0\xb1\xd1\x80\xd0\xb0\xd0\xbb\xd0\xb8 \xd1\x81\xd0\xb2\xd0\xbe\xd1\x8e \xd0\xbd\xd0\xb0\xd0\xb3\xd1\x80\xd0\xb0\xd0\xb4\xd1\x83.";
+    char const* const MSG_CHEST_MAIL = "\xd0\x9d\xd0\xb0\xd0\xb3\xd1\x80\xd0\xb0\xd0\xb4\xd0\xb0 \xd0\xbf\xd1\x80\xd0\xb5\xd1\x82\xd0\xb5\xd0\xbd\xd0\xb4\xd0\xb5\xd0\xbd\xd1\x82\xd0\xb0";
     char const* const FORCES_NAME = "\xd0\x92\xd1\x80\xd0\xb0\xd0\xb6\xd0\xb5\xd1\x81\xd0\xba\xd0\xb8\xd0\xb5 \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b";
 
     // ---------------------------------------------------------------- helpers
@@ -707,6 +714,7 @@ namespace
 
         ForEachPlayer(map, [&](Player* player)
         {
+            run.ChestAllowed.insert(player->GetGUID().GetCounter());
             Message(player, text);
             SaveBest(player, run, timed, timeMs, score);
             sAddonComm->Send(player, "MPLUS_COMPLETE", timed ? 1 : 0, upgrade, timeMs, run.Level, newLevel, score);
@@ -1248,6 +1256,63 @@ namespace
 }
 
 // ---------------------------------------------------------------- Font of Power
+// ---------------------------------------------------------------- completion chest: personal loot
+// every player of the run opens it once and gets their own roll of gameobject_loot_template CHEST_ENTRY
+// (items straight into the bags, by mail when the bags are full)
+struct go_mythic_plus_chest : public GameObjectAI
+{
+    go_mythic_plus_chest(GameObject* go) : GameObjectAI(go) { }
+
+    bool OnGossipHello(Player* player) override
+    {
+        Run* run = FindRun(player->GetMap());
+        ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+        if (!run || !run->ChestAllowed.count(guid))
+        {
+            Result(player, MSG_CHEST_NOT_YOURS);
+            return true;
+        }
+        if (!run->ChestLooted.insert(guid).second)
+        {
+            Result(player, MSG_CHEST_LOOTED);
+            return true;
+        }
+
+        Loot loot;
+        loot.FillLoot(CHEST_ENTRY, LootTemplates_Gameobject, player, true);
+
+        std::vector<std::pair<uint32, uint32>> mailItems;
+        for (LootItem const& lootItem : loot.items)
+        {
+            ItemPosCountVec dest;
+            if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, lootItem.itemid, lootItem.count) == EQUIP_ERR_OK)
+            {
+                if (Item* item = player->StoreNewItem(dest, lootItem.itemid, true, lootItem.randomPropertyId))
+                    player->SendNewItem(item, lootItem.count, true, false);
+            }
+            else
+                mailItems.emplace_back(lootItem.itemid, lootItem.count);
+        }
+        if (loot.gold)
+            player->ModifyMoney(int64(loot.gold));
+
+        if (!mailItems.empty())
+        {
+            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+            MailDraft draft(MSG_CHEST_MAIL, "");
+            for (auto const& entry : mailItems)
+                if (Item* item = Item::CreateItem(entry.first, entry.second, player))
+                {
+                    item->SaveToDB(trans);
+                    draft.AddItem(item);
+                }
+            draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+            CharacterDatabase.CommitTransaction(trans);
+        }
+        return true;
+    }
+};
+
 struct go_mythic_plus_font : public GameObjectAI
 {
     go_mythic_plus_font(GameObject* go) : GameObjectAI(go) { }
@@ -1519,4 +1584,5 @@ void AddSC_mythic_plus()
     new mythic_plus_unit();
     new mythic_plus_commands();
     RegisterGameObjectAI(go_mythic_plus_font);
+    RegisterGameObjectAI(go_mythic_plus_chest);
 }

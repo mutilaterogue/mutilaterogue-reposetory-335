@@ -100,14 +100,14 @@ INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconNa
   `Data13`, `Data14`, `Data15`, `Data16`, `Data17`, `Data18`, `Data19`, `Data20`, `Data21`, `Data22`, `Data23`, `AIName`, `ScriptName`, `VerifiedBuild`) VALUES
 (700010, 10, @FONT_DISPLAY, 'Купель силы', '', '', '', 1.5,
   0, 0, 0, 3000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 'go_mythic_plus_font', 0),
-(700011, 3, IFNULL(@CHEST_DISPLAY, 259), 'Сундук претендента', '', '', '', 1.5,
-  0, 700011, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0),
+-- chest: goober with personal loot (go_mythic_plus_chest rolls gameobject_loot_template 700011 for every player)
+(700011, 10, IFNULL(@CHEST_DISPLAY, 259), 'Сундук претендента', '', '', '', 1.5,
+  0, 0, 0, 3000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 'go_mythic_plus_chest', 0),
 -- countdown barrier at the entrance (visual only, the server keeps players inside BARRIER_RADIUS): set @BARRIER_DISPLAY
 (700012, 5, @BARRIER_DISPLAY, 'Барьер претендента', '', '', '', 1,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0);
 
 -- chest loot: gameobject_loot_template entry 700011 (fill with the rewards)
-DELETE FROM `gameobject_loot_template` WHERE `Entry` = 700011;
 
 -- ---------------------------------------------------------------- Font of Power spawns
 -- inside each dungeon, in the mythic difficulty (GM in the mythic instance: .gobject add 700010 - spawnMask 4),
