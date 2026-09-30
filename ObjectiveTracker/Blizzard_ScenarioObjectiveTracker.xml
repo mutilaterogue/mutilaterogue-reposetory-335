@@ -9,6 +9,80 @@
 		<Frames>
 			<Frame name="$parentObjectivesBlock" parentKey="ObjectivesBlock" inherits="ObjectiveTrackerBlockTemplate" hidden="true"/>
 
+			<!-- retail ScenarioChallengeModeBlock: keystone level, affixes, time left, timer bar, deaths -->
+			<Frame name="$parentChallengeModeBlock" parentKey="ChallengeModeBlock" hidden="true" enableMouse="true">
+				<Size x="251" y="87"/>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="TimerBGBack" atlas="ChallengeMode-TimerBG-back" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture parentKey="TimerBG" atlas="ChallengeMode-TimerBG" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString name="$parentLevel" parentKey="Level" inherits="GameFontNormalLarge" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="28" y="-18"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentTimeLeft" parentKey="TimeLeft" inherits="GameFontHighlightHuge" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentLevel" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentChestTimes" parentKey="ChestTimes" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="-28" y="-42"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<StatusBar name="$parentStatusBar" parentKey="StatusBar" minValue="0" maxValue="1" defaultValue="0">
+						<Size x="207" y="13"/>
+						<Anchors>
+							<Anchor point="BOTTOM" x="0" y="11"/>
+						</Anchors>
+						<BarTexture atlas="ChallengeMode-TimerFill"/>
+					</StatusBar>
+					<Button name="$parentDeathCount" parentKey="DeathCount" hidden="true">
+						<Size x="40" y="20"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentTimeLeft" relativePoint="TOPRIGHT" x="6" y="0"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture parentKey="Icon" atlas="poi-graveyard-neutral" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="LEFT"/>
+									</Anchors>
+								</Texture>
+								<FontString name="$parentCount" parentKey="Count" inherits="GameFontHighlightSmall" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="LEFT" x="20" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnEnter function="ScenarioChallengeDeathCount_OnEnter"/>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Button>
+				</Frames>
+				<Scripts>
+					<OnUpdate function="ScenarioChallengeModeBlock_OnUpdate"/>
+				</Scripts>
+			</Frame>
+
 			<Frame name="$parentStageBlock" parentKey="StageBlock" hidden="true" enableMouse="true">
 				<Size x="201" y="83"/>
 				<Layers>

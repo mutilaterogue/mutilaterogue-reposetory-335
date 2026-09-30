@@ -31,6 +31,7 @@ void AddSC_transmog_illusions();
 void AddSC_talent_loadouts();
 void AddSC_item_scaling();
 void AddSC_item_upgrade();
+void AddSC_mythic_plus();
 void AddSC_archaeology();
 
 void AddCustomScripts()
@@ -47,5 +48,6 @@ void AddCustomScripts()
     AddSC_talent_loadouts();
     AddSC_item_scaling();
     AddSC_item_upgrade();
+    AddSC_mythic_plus();
     AddSC_archaeology();
 }

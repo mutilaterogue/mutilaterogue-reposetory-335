@@ -1,0 +1,150 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- Font of Power (retail ChallengesKeystoneFrame, Blizzard_ChallengesUI) for 3.3.5.
+	     FrameXML.toc: ChallengesUI\Blizzard_ChallengesUI.xml. Server: server/mythic_plus.cpp. -->
+	<Script file="Blizzard_ChallengesKeystoneFrame.lua"/>
+
+	<!-- affix icon with the round border (retail ChallengesKeystoneFrameAffixTemplate) -->
+	<Frame name="ChallengesKeystoneFrameAffixTemplate" enableMouse="true" virtual="true">
+		<Size x="52" y="52"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentPortrait" parentKey="Portrait">
+					<Size x="46" y="46"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Border" atlas="ChallengeMode-AffixRing-Lg" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnEnter function="ChallengesKeystoneFrameAffix_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Frame>
+
+	<Frame name="ChallengesKeystoneFrame" toplevel="true" parent="UIParent" enableMouse="true" hidden="true">
+		<Size x="398" y="548"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="Background" atlas="ChallengeMode-KeystoneFrame" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentRuneBG" parentKey="RuneBG" atlas="ChallengeMode-RuneBG" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativePoint="TOP" y="-173"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentGlow" parentKey="InsertedGlow" atlas="ChallengeMode-KeystoneSlotFrameGlow" useAtlasSize="true" alphaMode="ADD" alpha="0">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentRuneBG"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Divider" atlas="ChallengeMode-ThinDivider" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativePoint="TOP" y="-356"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentDungeonName" parentKey="DungeonName" inherits="GameFontNormalHuge" justifyH="CENTER" hidden="true">
+					<Size x="350" y="0"/>
+					<Anchors>
+						<Anchor point="BOTTOM" relativePoint="TOP" y="-320"/>
+					</Anchors>
+					<Color r="1" g="0.82" b="0"/>
+				</FontString>
+				<FontString name="$parentPowerLevel" parentKey="PowerLevel" inherits="GameFontHighlightHuge" justifyH="CENTER" hidden="true">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentDungeonName" relativePoint="BOTTOM" y="-4"/>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+				<FontString name="$parentTimeLimit" parentKey="TimeLimit" inherits="GameFontHighlightLarge" justifyH="CENTER" hidden="true">
+					<Anchors>
+						<Anchor point="TOP" relativePoint="TOP" y="-368"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentInstructions" parentKey="Instructions" inherits="GameFontHighlightLarge" justifyH="CENTER" text="CHALLENGE_MODE_INSERT_KEYSTONE">
+					<Size x="300" y="0"/>
+					<Anchors>
+						<Anchor point="TOP" relativePoint="TOP" y="-330"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButton">
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-4" y="-4"/>
+				</Anchors>
+			</Button>
+
+			<Button name="$parentKeystoneSlot" parentKey="KeystoneSlot">
+				<Size x="48" y="48"/>
+				<Anchors>
+					<Anchor point="CENTER" relativeTo="$parentRuneBG"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture name="$parentIcon" parentKey="Icon">
+							<Size x="48" y="48"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Frame" atlas="ChallengeMode-KeystoneSlotFrame" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+				<Scripts>
+					<OnLoad function="ChallengesKeystoneSlot_OnLoad"/>
+					<OnClick function="ChallengesKeystoneSlot_OnClick"/>
+					<OnReceiveDrag function="ChallengesKeystoneSlot_OnReceiveDrag"/>
+					<OnDragStart function="ChallengesKeystoneSlot_OnDragStart"/>
+					<OnEnter function="ChallengesKeystoneSlot_OnEnter"/>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Button>
+
+			<Frame name="$parentAffix1" inherits="ChallengesKeystoneFrameAffixTemplate" hidden="true"/>
+			<Frame name="$parentAffix2" inherits="ChallengesKeystoneFrameAffixTemplate" hidden="true"/>
+			<Frame name="$parentAffix3" inherits="ChallengesKeystoneFrameAffixTemplate" hidden="true"/>
+
+			<Button name="$parentStartButton" parentKey="StartButton" inherits="UIPanelButtonTemplate" text="ACTIVATE">
+				<Size x="120" y="24"/>
+				<Anchors>
+					<Anchor point="BOTTOM" y="20"/>
+				</Anchors>
+				<Scripts>
+					<OnClick function="ChallengesKeystoneStartButton_OnClick"/>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad function="ChallengesKeystoneFrame_OnLoad"/>
+			<OnShow function="ChallengesKeystoneFrame_OnShow"/>
+			<OnHide function="ChallengesKeystoneFrame_OnHide"/>
+			<OnUpdate function="ChallengesKeystoneFrame_OnUpdate"/>
+		</Scripts>
+	</Frame>
+</Ui>

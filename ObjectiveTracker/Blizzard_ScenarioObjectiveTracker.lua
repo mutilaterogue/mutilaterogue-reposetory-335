@@ -19,12 +19,16 @@ ScenarioObjectiveTrackerMixin = CreateFromMixins(ObjectiveTrackerModuleMixin, se
 
 function ScenarioObjectiveTrackerMixin:InitModule()
 	-- 3.3.5: no parentArray - the fixed blocks are listed here
-	self.FixedBlocks = { self.StageBlock, self.ObjectivesBlock };
+	self.FixedBlocks = { self.ChallengeModeBlock, self.StageBlock, self.ObjectivesBlock };
 	Mixin(self.StageBlock, ScenarioObjectiveTrackerStageMixin);
 	for _, block in ipairs(self.FixedBlocks) do
 		block.parentModule = self;
 		block:SetParent(self.ContentsFrame);
 	end
+	self.ChallengeModeBlock.height = 87;
+	self.ChallengeModeBlock.fixedHeight = true;
+	self.ChallengeModeBlock.fixedWidth = true;
+	ScenarioChallengeModeBlock_Init(self.ChallengeModeBlock);
 	self.StageBlock.height = 83;
 	self.StageBlock.fixedHeight = true;
 	self.StageBlock.fixedWidth = true;
@@ -100,8 +104,15 @@ function ScenarioObjectiveTrackerMixin:LayoutContents()
 	local scenarioCompleted = currentStage > numStages;
 	local stageBlock = self.StageBlock;
 
-	self:LayoutBlock(stageBlock);
-	if self.currentStage ~= currentStage or self.scenarioID ~= scenarioID then
+	-- keystone run: the timer block instead of the stage block (retail ScenarioChallengeModeBlock)
+	if scenarioType == LE_SCENARIO_TYPE_CHALLENGE_MODE then
+		ScenarioChallengeModeBlock_Update(self.ChallengeModeBlock);
+		self:LayoutBlock(self.ChallengeModeBlock);
+		self.currentStage = nil;
+	else
+		self:LayoutBlock(stageBlock);
+	end
+	if scenarioType ~= LE_SCENARIO_TYPE_CHALLENGE_MODE and (self.currentStage ~= currentStage or self.scenarioID ~= scenarioID) then
 		self.currentStage = currentStage;
 		self.scenarioID = scenarioID;
 		stageBlock:UpdateStageBlock(flags, currentStage, stageName, numStages, scenarioCompleted);
@@ -157,6 +168,119 @@ function ScenarioObjectiveTrackerMixin:UpdateCriteria(numCriteria)
 			end
 		end
 	end
+end
+
+-- *****************************************************************************************************
+-- ***** CHALLENGE MODE BLOCK (keystone level, affixes, time left, timer bar, deaths)
+-- *****************************************************************************************************
+
+function ScenarioChallengeModeBlock_Init(block)
+	block.Affixes = {};
+	for i = 1, 3 do
+		local affix = CreateFrame("Frame", nil, block);
+		affix:SetWidth(22);
+		affix:SetHeight(22);
+		affix:EnableMouse(true);
+		affix.Portrait = affix:CreateTexture(nil, "ARTWORK");
+		affix.Portrait:SetWidth(20);
+		affix.Portrait:SetHeight(20);
+		affix.Portrait:SetPoint("CENTER");
+		affix.Border = affix:CreateTexture(nil, "OVERLAY");
+		affix.Border:SetAtlas("ChallengeMode-AffixRing-Sm", true);
+		affix.Border:SetPoint("CENTER");
+		affix:SetScript("OnEnter", function(self)
+			local name, description = C_ChallengeMode.GetAffixInfo(self.affixID);
+			if name then
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				GameTooltip:SetText(name, 1, 1, 1, 1, true);
+				GameTooltip:AddLine(description, nil, nil, nil, true);
+				GameTooltip:Show();
+			end
+		end);
+		affix:SetScript("OnLeave", GameTooltip_Hide);
+		affix:Hide();
+		block.Affixes[i] = affix;
+	end
+	block.StatusBar:SetMinMaxValues(0, 1);
+end
+
+function ScenarioChallengeModeBlock_Update(block)
+	local level, affixes = C_ChallengeMode.GetActiveKeystoneInfo();
+	block.Level:SetText(CHALLENGE_MODE_POWER_LEVEL:format(level));
+
+	-- affixes right-aligned in the top row (retail)
+	local count = #affixes;
+	for i, affix in ipairs(block.Affixes) do
+		local affixID = affixes[i];
+		if affixID then
+			local _, _, icon = C_ChallengeMode.GetAffixInfo(affixID);
+			affix.affixID = affixID;
+			affix.Portrait:SetTexture(icon);
+			affix:ClearAllPoints();
+			affix:SetPoint("TOPRIGHT", block, "TOPRIGHT", -28 - (count - i) * 24, -14);
+			affix:Show();
+		else
+			affix:Hide();
+		end
+	end
+
+	local run = MythicPlus.run;
+	local limit = run and run.timeLimit or 0;
+	block.ChestTimes:SetText(limit > 0 and string.format("+2 %s   +3 %s", MythicPlus_FormatTime(limit * 0.8), MythicPlus_FormatTime(limit * 0.6)) or "");
+	ScenarioChallengeModeBlock_UpdateTime(block);
+end
+
+function ScenarioChallengeModeBlock_UpdateTime(block)
+	local run = MythicPlus.run;
+	if not run then
+		return;
+	end
+	local deaths, timeLost = C_ChallengeMode.GetDeathCount();
+	local elapsed = MythicPlus_GetElapsedMs() / 1000 + timeLost;
+	local limit = run.timeLimit;
+
+	if run.state == MYTHIC_RUN_COUNTDOWN then
+		block.TimeLeft:SetText(MythicPlus_FormatTime(limit));
+		block.TimeLeft:SetTextColor(1, 1, 1);
+		block.StatusBar:SetValue(1);
+	elseif elapsed <= limit then
+		block.TimeLeft:SetText(MythicPlus_FormatTime(limit - elapsed));
+		if run.state == MYTHIC_RUN_DONE_TIMED then
+			block.TimeLeft:SetTextColor(0.1, 1, 0.1);
+		else
+			block.TimeLeft:SetTextColor(1, 1, 1);
+		end
+		block.StatusBar:SetValue(limit > 0 and (limit - elapsed) / limit or 0);
+	else
+		-- over time: how much over, red, empty bar
+		block.TimeLeft:SetText("+" .. MythicPlus_FormatTime(elapsed - limit));
+		block.TimeLeft:SetTextColor(1, 0.1, 0.1);
+		block.StatusBar:SetValue(0);
+	end
+
+	if deaths > 0 then
+		block.DeathCount.Count:SetText(deaths);
+		block.DeathCount:Show();
+	else
+		block.DeathCount:Hide();
+	end
+end
+
+function ScenarioChallengeModeBlock_OnUpdate(self, elapsed)
+	self.elapsed = (self.elapsed or 0) + elapsed;
+	if self.elapsed < 0.1 then
+		return;
+	end
+	self.elapsed = 0;
+	ScenarioChallengeModeBlock_UpdateTime(self);
+end
+
+function ScenarioChallengeDeathCount_OnEnter(self)
+	local deaths, timeLost = C_ChallengeMode.GetDeathCount();
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+	GameTooltip:SetText(CHALLENGE_MODE_DEATH_COUNT_TITLE:format(deaths), 1, 1, 1);
+	GameTooltip:AddLine(CHALLENGE_MODE_DEATH_COUNT_DESCRIPTION:format(MythicPlus_FormatTime(timeLost)));
+	GameTooltip:Show();
 end
 
 -- *****************************************************************************************************

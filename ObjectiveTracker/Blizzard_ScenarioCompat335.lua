@@ -355,3 +355,123 @@ end
 function C_ScenarioInfo.IsTieredEntranceScenario()
 	return false;
 end
+
+---------------------------------------------------------------------------
+-- mythic instances: the server run (server/mythic_plus.cpp, ChallengesUI\Blizzard_ChallengeModeCompat.lua)
+-- replaces the journal data - bosses, kills, enemy forces and completion come from the server
+---------------------------------------------------------------------------
+local journalGetInfo = C_Scenario.GetInfo;
+local journalGetStepInfo = C_Scenario.GetStepInfo;
+local journalIsInScenario = C_Scenario.IsInScenario;
+local journalGetCriteriaInfo = C_ScenarioInfo.GetCriteriaInfo;
+local journalGetStepInfoTable = C_ScenarioInfo.GetScenarioStepInfo;
+
+local function ServerRun()
+	if MythicPlus and MythicPlus_IsInMythicInstance() and #MythicPlus.bosses > 0 then
+		return MythicPlus.run;
+	end
+	return nil;
+end
+
+local function ServerName()
+	if current then
+		return current.name, current.description;
+	end
+	local name = GetInstanceInfo();
+	return name or GetRealZoneText(), "";
+end
+
+local function ServerNumCriteria(run)
+	return #MythicPlus.bosses + (run.level > 0 and 1 or 0);
+end
+
+local function ServerCompleted(run)
+	return run.state == MYTHIC_RUN_DONE_TIMED or run.state == MYTHIC_RUN_DONE_LATE;
+end
+
+function C_Scenario.GetInfo()
+	local run = ServerRun();
+	if not run then
+		return journalGetInfo();
+	end
+	local name = ServerName();
+	local completed = ServerCompleted(run);
+	local scenarioType = run.level > 0 and LE_SCENARIO_TYPE_CHALLENGE_MODE or LE_SCENARIO_TYPE_USE_DUNGEON_DISPLAY;
+	return name, completed and 2 or 1, 1, SCENARIO_FLAG_SUPRESS_STAGE_TEXT, false, false, completed,
+		0, 0, scenarioType, name, "evergreen-scenario", run.mapID;
+end
+
+function C_Scenario.GetStepInfo()
+	local run = ServerRun();
+	if not run then
+		return journalGetStepInfo();
+	end
+	local name, description = ServerName();
+	return name, description or "", ServerNumCriteria(run), false, false, false, false, 0, nil, nil, 0, nil;
+end
+
+function C_Scenario.IsInScenario()
+	return ServerRun() ~= nil or journalIsInScenario();
+end
+
+function C_Scenario.IsMythic()
+	return ServerRun() ~= nil or (current and current.isMythic) or false;
+end
+
+function C_ScenarioInfo.GetScenarioStepInfo()
+	local run = ServerRun();
+	if not run then
+		return journalGetStepInfoTable();
+	end
+	local name, description = ServerName();
+	return {
+		title = name, description = description or "", numCriteria = ServerNumCriteria(run),
+		stepFailed = false, isBonusStep = false, isForCurrentStepOnly = false,
+		shouldShowBonusObjective = false, spells = {}, weightedProgress = nil,
+		rewardQuestID = 0, widgetSetID = nil, stepID = run.mapID,
+	};
+end
+
+function C_ScenarioInfo.GetCriteriaInfo(criteriaIndex)
+	local run = ServerRun();
+	if not run then
+		return journalGetCriteriaInfo(criteriaIndex);
+	end
+
+	local bossName = MythicPlus.bosses[criteriaIndex];
+	if bossName then
+		local completed = bit.band(run.bossMask, 2 ^ (criteriaIndex - 1)) ~= 0;
+		return {
+			description = SCENARIO_BOSS_DEFEATED:format(bossName), criteriaType = 0, completed = completed,
+			quantity = completed and 1 or 0, totalQuantity = 1, flags = 0, assetID = criteriaIndex,
+			criteriaID = criteriaIndex, duration = 0, elapsed = 0, failed = false,
+			isWeightedProgress = false, isFormatted = false, quantityString = completed and "1" or "0",
+		};
+	end
+
+	if criteriaIndex == #MythicPlus.bosses + 1 and run.level > 0 then
+		local max = math.max(1, run.forcesMax);
+		local pct = math.min(100, run.forces / max * 100);
+		local completed = run.forces >= run.forcesMax;
+		return {
+			description = string.format("%.2f%% %s", pct, MythicPlus.forcesName), criteriaType = 0, completed = completed,
+			quantity = pct, totalQuantity = 100, flags = 0, assetID = 0, criteriaID = 0, duration = 0, elapsed = 0,
+			failed = false, isWeightedProgress = true, isFormatted = true, quantityString = string.format("%d", pct),
+		};
+	end
+	return nil;
+end
+
+if MythicPlus_RegisterCallback then
+	MythicPlus_RegisterCallback(function(event, ...)
+		if event == "RUN" then
+			local newStage = ...;
+			Fire("SCENARIO_UPDATE", newStage);
+			Fire("SCENARIO_CRITERIA_UPDATE", 0);
+		elseif event == "BOSSES" then
+			Fire("SCENARIO_UPDATE", true);
+		elseif event == "COMPLETE" then
+			Fire("SCENARIO_COMPLETED");
+		end
+	end);
+end
