@@ -367,7 +367,8 @@ local journalGetCriteriaInfo = C_ScenarioInfo.GetCriteriaInfo;
 local journalGetStepInfoTable = C_ScenarioInfo.GetScenarioStepInfo;
 
 local function ServerRun()
-	if MythicPlus and MythicPlus_IsInMythicInstance() and #MythicPlus.bosses > 0 then
+	-- keystone run: always the server (even with no bosses found); Mythic 0: when the server found bosses
+	if MythicPlus and MythicPlus_IsInMythicInstance() and (#MythicPlus.bosses > 0 or MythicPlus_IsKeystoneRun()) then
 		return MythicPlus.run;
 	end
 	return nil;
