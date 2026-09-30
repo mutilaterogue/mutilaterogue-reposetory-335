@@ -42,6 +42,12 @@
 #include <unordered_map>
 #include <unordered_set>
 
+// transmog.cpp (объявлено и в transmog.h; здесь - чтобы собиралось и со старым заголовком)
+namespace Transmog
+{
+    uint32 GetFakeEntry(Player* player, Item* item);
+}
+
 namespace
 {
     constexpr uint32 ILLUSION_COST = 10000;   // 1 золото за слот (снять иллюзию - бесплатно)
