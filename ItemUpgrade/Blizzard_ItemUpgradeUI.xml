@@ -169,7 +169,7 @@
 			</GameTooltip>
 			<GameTooltip name="$parentRightItemPreviewFrame" parentKey="RightItemPreviewFrame" inherits="ItemUpgradePreviewTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-15" y="-180"/>
+					<Anchor point="TOPLEFT" relativePoint="TOP" x="8" y="-180"/>
 				</Anchors>
 			</GameTooltip>
 

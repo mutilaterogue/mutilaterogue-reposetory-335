@@ -193,6 +193,17 @@ local function QualityColor(itemId)
 	return color.r, color.g, color.b, color.hex or "|cffffffff";
 end
 
+-- keep both previews in their half of the frame: same width, scaled down if a line is too long
+local PREVIEW_WIDTH = 252;
+local function FitPreviews(left, right)
+	local width = math.max(left:GetWidth(), right:GetWidth());
+	local scale = math.min(1, PREVIEW_WIDTH / width);
+	for _, tooltip in ipairs({ left, right }) do
+		tooltip:SetScale(scale);
+		tooltip:SetWidth(width);
+	end
+end
+
 local function GeneratePreview(tooltip, info, levelInfo, baseInfo, isUpgrade)
 	tooltip:SetOwner(ItemUpgradeFrame, "ANCHOR_PRESERVE");
 	tooltip:ClearLines();
@@ -268,6 +279,8 @@ function ItemUpgradeFrame_ApplyTargetLevel(self, level)
 	local failure = info.error ~= "" and (_G[info.error] or info.error) or (maxed and ITEM_UPGRADE_NO_MORE_UPGRADES) or nil;
 	local showRight = not failure and target ~= nil;
 
+	self.LeftItemPreviewFrame:SetScale(1);
+	self.RightItemPreviewFrame:SetScale(1);
 	GeneratePreview(self.LeftItemPreviewFrame, info, base, base, false);
 	if showRight then
 		GeneratePreview(self.RightItemPreviewFrame, info, target, base, true);
@@ -276,6 +289,7 @@ function ItemUpgradeFrame_ApplyTargetLevel(self, level)
 		end
 		self.Arrow:Show();
 		self.FrameErrorText:Hide();
+		FitPreviews(self.LeftItemPreviewFrame, self.RightItemPreviewFrame);
 	else
 		self.RightItemPreviewFrame:Hide();
 		self.Arrow:Hide();
@@ -532,7 +546,22 @@ end
 local function AddUpgradeLine(tooltip, bag, slot)
 	local data = items[bag] and items[bag][slot];
 	if data then
-		tooltip:AddLine(ITEM_UPGRADE_TOOLTIP_FORMAT_STRING:format(trackNames[data.track] or "", data.level, data.max), 1, 0.82, 0);
+		local text = ITEM_UPGRADE_TOOLTIP_FORMAT_STRING:format(trackNames[data.track] or "", data.level, data.max);
+		local name = tooltip:GetName();
+		tooltip:AddLine(" ");
+		for i = tooltip:NumLines(), 3, -1 do
+			for _, side in ipairs({ "TextLeft", "TextRight" }) do
+				local dst, src = _G[name .. side .. i], _G[name .. side .. (i - 1)];
+				dst:SetText(src:GetText());
+				dst:SetTextColor(src:GetTextColor());
+				if src:IsShown() and src:GetText() then dst:Show(); else dst:Hide(); end
+			end
+		end
+		local line = _G[name .. "TextLeft2"];
+		line:SetText(text);
+		line:SetTextColor(1, 0.82, 0);
+		line:Show();
+		_G[name .. "TextRight2"]:Hide();
 		tooltip:Show();
 	end
 end
