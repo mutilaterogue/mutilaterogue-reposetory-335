@@ -23,17 +23,20 @@
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Bag.h"
+#include "Config.h"
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
 #include "Item.h"
 #include "ItemTemplate.h"
 #include "Log.h"
+#include "ObjectMgr.h"
 #include "Player.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 #include "StringFormat.h"
 #include "WorldSession.h"
 
+#include <fstream>
 #include <map>
 #include <sstream>
 #include <unordered_map>
@@ -51,6 +54,7 @@ namespace
         uint32 Spell = 0;     // рецепт чар (название и иконка в клиенте)
     };
 
+    std::unordered_set<uint32> displaysWithEffect;           // облики оружия со своим эффектом в модели (ItemDisplayInfo.ItemVisual)
     std::map<uint32, Illusion> illusionsByVisual;            // ItemVisual -> иллюзия (по порядку для списка)
     std::unordered_map<uint32, uint32> visualByEnchant;      // любые чары с видом -> ItemVisual
     std::unordered_map<uint32, uint32> visualBySpell;        // рецепт -> ItemVisual
@@ -61,8 +65,36 @@ namespace
         return enchant ? enchant->ItemVisual : 0;
     }
 
+    // ядро ItemDisplayInfo.dbc не грузит ("not used currently") - читаем сами: поле 23 ItemVisual - эффект,
+    // встроенный в модель оружия (ретейл: на такие предметы иллюзию наложить нельзя)
+    void LoadDisplayEffects()
+    {
+        displaysWithEffect.clear();
+        std::string path = sConfigMgr->GetStringDefault("DataDir", "./") + "/dbc/ItemDisplayInfo.dbc";
+        std::ifstream file(path, std::ios::binary);
+        uint32 header[5] = { };
+        if (!file || !file.read(reinterpret_cast<char*>(header), sizeof(header)) || header[0] != 0x43424457)   // 'WDBC'
+        {
+            TC_LOG_ERROR("server.loading", ">> transmog: cannot read {}, weapons with own effects are not excluded from illusions", path);
+            return;
+        }
+        uint32 records = header[1], fields = header[2], recordSize = header[3];
+        if (fields <= 23 || recordSize < 24 * 4)
+            return;
+        std::vector<char> record(recordSize);
+        for (uint32 i = 0; i < records && file.read(record.data(), recordSize); ++i)
+        {
+            uint32 id = *reinterpret_cast<uint32 const*>(&record[0]);
+            int32 itemVisual = *reinterpret_cast<int32 const*>(&record[23 * 4]);
+            if (itemVisual > 0)
+                displaysWithEffect.insert(id);
+        }
+        TC_LOG_INFO("server.loading", ">> transmog: {} weapon looks with own effects (no illusions)", uint32(displaysWithEffect.size()));
+    }
+
     void LoadIllusions()
     {
+        LoadDisplayEffects();
         illusionsByVisual.clear();
         visualByEnchant.clear();
         visualBySpell.clear();
@@ -202,12 +234,19 @@ namespace
     }
 
     // ретейл: иллюзия только на оружие ближнего боя в правой и левой руке (щиты, реликвии, дальний бой - нет)
-    bool CanHaveIllusion(Item* item)
+    bool CanHaveIllusion(Player* player, Item* item)
     {
         if (!item)
             return false;
         ItemTemplate const* proto = item->GetTemplate();
         if (proto->Class != ITEM_CLASS_WEAPON)
+            return false;
+        // показанный облик (с трансмогом - чужой) со своим эффектом в модели - иллюзия не ложится
+        ItemTemplate const* look = proto;
+        if (uint32 fake = Transmog::GetFakeEntry(player, item))
+            if (ItemTemplate const* fakeProto = sObjectMgr->GetItemTemplate(fake))
+                look = fakeProto;
+        if (displaysWithEffect.count(look->DisplayInfoID))
             return false;
         switch (proto->InventoryType)
         {
@@ -230,7 +269,7 @@ namespace
             list << illusion.Enchant << '/' << illusion.Spell << '/' << (collected.count(visual) ? 1 : 0);
             first = false;
         }
-        sAddonComm->Send(player, "TMOG_ILLUSIONS", ILLUSION_COST, list.str());
+        sAddonComm->Send(player, "TMOG_ILLUSIONS", ILLUSION_COST, list.str(), Transmog::FormatIllusionAllowed(player));
     }
 }
 
@@ -261,7 +300,7 @@ namespace Transmog
             }
             if (!enchantId)
                 continue;   // снять иллюзию
-            if (!CanHaveIllusion(item))
+            if (!CanHaveIllusion(player, item))
             {
                 fail.Error = "ERR_TRANSMOGRIFY_INVALID_DESTINATION";
                 fail.ErrorItem = item->GetEntry();
@@ -295,6 +334,14 @@ namespace Transmog
         for (auto const& [slot, enchantId] : illusions)
             SetIllusion(player, slot, enchantId, trans);
         CharacterDatabase.CommitTransaction(trans);
+    }
+
+    std::string FormatIllusionAllowed(Player* player)
+    {
+        SlotList list;
+        for (uint8 slot : { uint8(EQUIPMENT_SLOT_MAINHAND), uint8(EQUIPMENT_SLOT_OFFHAND) })
+            list.emplace_back(slot, CanHaveIllusion(player, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot)) ? 1 : 0);
+        return FormatSlots(list);
     }
 
     std::string FormatIllusions(Player* player)

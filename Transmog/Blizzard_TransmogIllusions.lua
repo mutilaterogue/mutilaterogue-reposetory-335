@@ -38,8 +38,25 @@ function TransmogUI.GetDisplayedIllusion(frame, slotId)
 	return frame.appliedIllusion[slotId] or 0, false;
 end
 
--- можно ли наложить иллюзию на то, что надето (ретейл: только оружие ближнего боя в руках)
-function TransmogUI.CanHaveIllusion(slotId)
+TRANSMOG_ILLUSION_NO_EFFECT_ITEM = TRANSMOG_ILLUSION_NO_EFFECT_ITEM or "Этот предмет не может получить иллюзию.";
+
+-- сервер: на какую руку иллюзия ложится (оружие со своим эффектом в модели - нет); nil - ещё не знаем
+TransmogUI.illusionAllowed = nil;
+
+function TransmogUI.SetIllusionAllowed(text)
+	if text and text ~= "" then
+		TransmogUI.illusionAllowed = TransmogUI.ParseSlots(text);   -- [16]/[17] = 1, запрещённые - нет в таблице
+	end
+end
+
+-- у оружия свой эффект в модели (сервер запретил)
+function TransmogUI.HasOwnEffect(slotId)
+	local allowed = TransmogUI.illusionAllowed;
+	return allowed ~= nil and GetInventoryItemLink("player", slotId) ~= nil and TransmogUI.IsMeleeWeapon(slotId) and not allowed[slotId];
+end
+
+-- оружие ближнего боя в руке (ретейл: только на него иллюзия)
+function TransmogUI.IsMeleeWeapon(slotId)
 	local link = GetInventoryItemLink("player", slotId);
 	if not link then
 		return false;
@@ -48,6 +65,11 @@ function TransmogUI.CanHaveIllusion(slotId)
 	local weaponType = GetAuctionItemClasses();   -- первый класс аукциона - «Оружие»
 	return itemType == weaponType and (equipLoc == "INVTYPE_WEAPON" or equipLoc == "INVTYPE_2HWEAPON"
 		or equipLoc == "INVTYPE_WEAPONMAINHAND" or equipLoc == "INVTYPE_WEAPONOFFHAND");
+end
+
+-- можно ли наложить иллюзию на то, что надето
+function TransmogUI.CanHaveIllusion(slotId)
+	return TransmogUI.IsMeleeWeapon(slotId) and not TransmogUI.HasOwnEffect(slotId);
 end
 
 -- строка предмета для примерки: оружие с иллюзией - "item:id:enchant"
@@ -156,7 +178,9 @@ function TransmogIllusionSlot_OnEnter(self)
 	local slotId = self:GetID();
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 	GameTooltip:SetText(TRANSMOG_ENCHANT_SLOT or "Иллюзия");
-	if not TransmogUI.CanHaveIllusion(slotId) then
+	if TransmogUI.HasOwnEffect(slotId) then
+		GameTooltip:AddLine(TRANSMOG_ILLUSION_NO_EFFECT_ITEM, 1, 0.1, 0.1, true);
+	elseif not TransmogUI.CanHaveIllusion(slotId) then
 		GameTooltip:AddLine(TRANSMOG_ILLUSION_UNAVAILABLE or "Иллюзию можно наложить только на оружие ближнего боя.", 1, 0.1, 0.1, true);
 	else
 		local enchant = TransmogUI.GetDisplayedIllusion(frame, slotId);
@@ -260,7 +284,8 @@ end
 -- сервер
 ---------------------------------------------------------------------------
 if Comm_Register then
-	Comm_Register(OP_ILLUSIONS, function(cost, text)
+	Comm_Register(OP_ILLUSIONS, function(cost, text, allowedText)
+		TransmogUI.SetIllusionAllowed(allowedText);
 		TransmogUI.illusionCost = tonumber(cost) or 0;
 		local list = {};
 		for enchant, spell, collected in (text or ""):gmatch("(%d+)/(%d+)/(%d)") do

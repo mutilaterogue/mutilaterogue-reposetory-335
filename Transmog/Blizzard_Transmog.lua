@@ -589,6 +589,9 @@ end
 
 function TransmogFrame_OnEvent(self, event, unit)
 	if event == "UNIT_INVENTORY_CHANGED" and unit == "player" and self:IsShown() then
+		if Comm_Send then
+			Comm_Send(OP_GET_STATE);
+		end
 		TransmogUI.UpdateSlots(self);
 		TransmogUI.UpdatePreview(self);
 	end
@@ -632,7 +635,8 @@ function TransmogUI.ParseSlots(text)
 end
 
 if Comm_Register then
-	Comm_Register(OP_STATE, function(text, illusionsText)
+	Comm_Register(OP_STATE, function(text, illusionsText, allowedText)
+		TransmogUI.SetIllusionAllowed(allowedText);
 		TransmogFrame.applied = TransmogUI.ParseSlots(text);
 		TransmogFrame.appliedIllusion = TransmogUI.ParseSlots(illusionsText);
 		if TransmogFrame:IsShown() then

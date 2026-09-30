@@ -608,7 +608,7 @@ namespace Transmog
 
     void SendState(Player* player)
     {
-        sAddonComm->Send(player, "TMOG_STATE", FormatSlots(GetCurrentLooks(player)), FormatIllusions(player));
+        sAddonComm->Send(player, "TMOG_STATE", FormatSlots(GetCurrentLooks(player)), FormatIllusions(player), FormatIllusionAllowed(player));
         SendItems(player);
     }
 

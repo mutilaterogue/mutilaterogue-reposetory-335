@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+class Item;
 class Player;
 
 namespace Transmog
@@ -79,6 +80,10 @@ namespace Transmog
     ApplyResult CheckIllusions(Player* player, SlotList const& illusions, uint64& cost);
     void ApplyIllusions(Player* player, SlotList const& illusions);
     std::string FormatIllusions(Player* player);
+    // можно ли наложить иллюзию на правую/левую руку: "16/1,17/0" (у оружия со своим эффектом в модели - нельзя)
+    std::string FormatIllusionAllowed(Player* player);
+    // облик трансмогрифицированного предмета этого персонажа (0 - свой)
+    uint32 GetFakeEntry(Player* player, Item* item);
 
     void SendState(Player* player);
     void SendItems(Player* player);
