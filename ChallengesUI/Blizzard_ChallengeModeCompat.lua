@@ -377,3 +377,20 @@ MythicPlus_RegisterCallback(function(event)
 		PlaySound("LevelUp");
 	end
 end);
+
+---------------------------------------------------------------------------
+-- release spirit in a mythic dungeon (retail): back alive at the entrance or the last killed boss
+---------------------------------------------------------------------------
+local deathDialog = StaticPopupDialogs and StaticPopupDialogs["DEATH"];
+if deathDialog then
+	local repop = deathDialog.OnAccept;
+	deathDialog.OnAccept = function(self, ...)
+		if MythicPlus_IsInMythicInstance() then
+			Send("MPLUS_RELEASE");
+			return;
+		end
+		if repop then
+			return repop(self, ...);
+		end
+	end
+end

@@ -44,7 +44,8 @@
  *       "MPLUS_BOSSES" : name#name#...
  *       "MPLUS_COMPLETE" : timed : upgrade : timeMs : level : newLevel : score
  *       "MPLUS_RESULT" : message
- *  C->S "MPLUS_GET", "MPLUS_INSERT", "MPLUS_REMOVE", "MPLUS_START", "MPLUS_CLOSE"
+ *  C->S "MPLUS_GET", "MPLUS_INSERT", "MPLUS_REMOVE", "MPLUS_START", "MPLUS_CLOSE",
+ *       "MPLUS_RELEASE" (release spirit: alive at the entrance or the last killed boss)
  *
  * GM: .mplus key <level> [mapId], .mplus info, .mplus complete, .mplus reset
  *
@@ -953,6 +954,36 @@ namespace
         sAddonComm->Send(player, "MPLUS_SLOTTED", 0);
     }
 
+    // retail: releasing the spirit in a mythic dungeon brings you back alive at the last checkpoint -
+    // the entrance, or the room of the last killed boss (the client sends this instead of RepopMe)
+    void HandleRelease(Player* player, std::vector<std::string> const& /*args*/)
+    {
+        if (player->IsAlive())
+            return;
+        Run* run = FindRun(player->GetMap());
+        if (!run)
+        {
+            player->BuildPlayerRepop();
+            player->RepopAtGraveyard();
+            return;
+        }
+
+        Position checkpoint = run->StartPos;
+        if (run->HasLastBoss)
+            checkpoint = run->LastBossPos;
+        else if (run->StartPos.GetPositionX() == 0.0f && run->StartPos.GetPositionY() == 0.0f)
+        {
+            if (AreaTriggerTeleport const* entrance = sObjectMgr->GetMapEntranceTrigger(run->MapId))
+                checkpoint.Relocate(entrance->target_X, entrance->target_Y, entrance->target_Z, entrance->target_Orientation);
+            else
+                checkpoint = player->GetPosition();
+        }
+
+        player->ResurrectPlayer(1.0f);
+        player->SpawnCorpseBones();
+        player->NearTeleportTo(checkpoint.GetPositionX(), checkpoint.GetPositionY(), checkpoint.GetPositionZ(), checkpoint.GetOrientation());
+    }
+
     void HandleClose(Player* player, std::vector<std::string> const& /*args*/)
     {
         s_slotted.erase(player->GetGUID());
@@ -1267,6 +1298,7 @@ public:
         sAddonComm->Register(std::string("MPLUS_REMOVE"), &HandleRemove);
         sAddonComm->Register(std::string("MPLUS_START"), &HandleStart);
         sAddonComm->Register(std::string("MPLUS_CLOSE"), &HandleClose);
+        sAddonComm->Register(std::string("MPLUS_RELEASE"), &HandleRelease);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
