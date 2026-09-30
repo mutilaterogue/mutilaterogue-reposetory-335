@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Иллюзии оружия (ретейл: TransmogIllusion, Enum.TransmogType.Illusion) для 3.3.5.
  *
  * Иллюзия - это вид постоянного зачарования оружия (SpellItemEnchantment.ItemVisual). Сервер подменяет

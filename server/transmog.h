@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Transmogrification shared part (retail TransmogMgr) for 3.3.5: item data, collection checks and
  * applying looks. Used by transmog.cpp (window, NPC), transmog_outfits.cpp (outfits, situations,
  * custom sets) and transmog_sets.cpp (item sets).

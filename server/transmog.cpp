@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Transmogrification (retail TransmogrificationHandler / TransmogMgr) for 3.3.5.
  *
  * Retail keeps the appearance on the item (ITEM_MODIFIER_TRANSMOG_APPEARANCE_*); 3.3.5 items have no

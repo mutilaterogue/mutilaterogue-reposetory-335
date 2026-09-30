@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Археология (Cataclysm 4.3.4) для 3.3.5.
  *
  * Данные - world: archaeology_branch / archaeology_project / archaeology_site / archaeology_site_point

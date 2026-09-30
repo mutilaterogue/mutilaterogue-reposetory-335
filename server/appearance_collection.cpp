@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Appearance collection (retail "Appearances" / Wardrobe) for 3.3.5.
  *
  * 3.3.5 has no appearance ids: an appearance = item_template.displayid inside one

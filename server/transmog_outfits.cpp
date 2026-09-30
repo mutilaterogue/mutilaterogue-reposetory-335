@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Transmog outfits, situations and custom sets (retail TransmogOutfit* / TransmogSituation* / custom sets) for 3.3.5.
  *
  * Outfits (per character, characters.character_transmog_outfits):

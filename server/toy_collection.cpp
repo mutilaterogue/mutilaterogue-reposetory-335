@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Toy collection for 3.3.5 (modeled after retail ToyBox).
  *
  * World DB custom_toys: which items are toys (see sql/world_custom_toys.sql).

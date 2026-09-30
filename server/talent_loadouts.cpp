@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Наборы талантов (ретейл: ClassTalents loadouts, C_ClassTalents.SaveConfig / LoadConfig) для 3.3.5.
  *
  * Набор - сохранённая раскладка талантов для специализации (talent group 0/1). Применение: бесплатный
