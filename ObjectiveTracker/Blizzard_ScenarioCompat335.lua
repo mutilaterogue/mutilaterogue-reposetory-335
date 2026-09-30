@@ -20,7 +20,7 @@ DUNGEON_COMPLETED = DUNGEON_COMPLETED or "Подземелье пройдено!
 SCENARIO_BOSS_DEFEATED = SCENARIO_BOSS_DEFEATED or "%s: побежден";
 
 -- retail shows the dungeon display in dungeons only; true adds raids
-local SHOW_IN_RAIDS = false;
+local SHOW_IN_RAIDS = true;
 
 C_Scenario = C_Scenario or {};
 C_ScenarioInfo = C_ScenarioInfo or {};
@@ -140,6 +140,8 @@ local function UpdateCurrentInstance()
 				isRaid = isRaid,
 				bosses = BuildBosses(instanceID),
 				key = key,
+				-- dungeon difficulty 3 = mythic (patched client, DUNGEON_DIFFICULTY_EPIC on the server)
+				isMythic = not isRaid and difficultyIndex == 3,
 			};
 			local run = killedByRun[key];
 			if not run or (run.expires or 0) < time() then
@@ -285,6 +287,10 @@ end
 
 function C_Scenario.ShouldShowCriteria()
 	return true;
+end
+
+function C_Scenario.IsMythic()
+	return current and current.isMythic or false;
 end
 
 function C_Scenario.IsRaid()

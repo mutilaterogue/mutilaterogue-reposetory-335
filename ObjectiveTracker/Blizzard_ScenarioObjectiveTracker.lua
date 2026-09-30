@@ -185,7 +185,7 @@ function StageBlockMixin:UpdateStageBlock(flags, currentStage, stageName, numSta
 		self.Stage:SetHeight(36);
 		self.Stage:SetPoint("TOPLEFT", 15, -18);
 		self.FinalBG:Hide();
-		self.Name:SetText("");
+		self.Name:SetText(C_Scenario.IsMythic() and DUNGEON_DIFFICULTY3 or "");
 	else
 		if currentStage == numStages then
 			self.Stage:SetText(SCENARIO_STAGE_FINAL or "Последний этап");
