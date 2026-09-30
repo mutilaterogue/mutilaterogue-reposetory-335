@@ -42,7 +42,10 @@
  *       "MPLUS_RUN" : state : mapId : level : affixes : timeLimit : timeMs : deaths : penalty : forces : forcesMax : bossMask : bossCount
  *              state 0 none, 1 countdown (timeMs = remaining), 2 running, 3 done in time, 4 done late
  *       "MPLUS_BOSSES" : name#name#...
- *       "MPLUS_COMPLETE" : timed : upgrade : timeMs : level : newLevel : score
+ *       "MPLUS_COMPLETE" : timed : upgrade : timeMs : level : newLevel : score : oldRating : newRating : mapId : name
+ *       "MPLUS_MAPS" : id;name;timeLimit,...
+ *       "MPLUS_VAULT" : runs this week : their levels (best first) : last week options slot;item;level;claimed,...
+ *       "MPLUS_VAULT_OPEN" (Great Vault object used)
  *       "MPLUS_RESULT" : message
  *  C->S "MPLUS_GET", "MPLUS_INSERT", "MPLUS_REMOVE", "MPLUS_START", "MPLUS_CLOSE",
  *       "MPLUS_RELEASE" (release spirit: alive at the entrance or the last killed boss)
@@ -64,6 +67,8 @@
 #include "GameObjectAI.h"
 #include "GameTime.h"
 #include "Group.h"
+#include "SpellHistory.h"
+#include "SpellScript.h"
 #include "Item.h"
 #include "Log.h"
 #include "LootMgr.h"
@@ -99,6 +104,9 @@ namespace
     constexpr uint32 FONT_ENTRY = 246779;           // Font of Power (ScriptName go_mythic_plus_font)
     constexpr uint32 CHEST_ENTRY = 252665;          // Challenger's Cache, also its gameobject_loot_template entry
     constexpr float FONT_RANGE = 10.0f;
+    constexpr uint32 VAULT_LOOT = 252665;           // Great Vault options: rolled from this gameobject_loot_template
+    constexpr uint32 VAULT_THRESHOLDS[3] = { 1, 4, 8 };   // runs of the week for the 1st, 2nd, 3rd option
+    constexpr uint32 BATTLE_RES_INTERVAL = 10 * MINUTE * IN_MILLISECONDS;   // +1 battle res charge
     constexpr int32 MYTHIC_ILVL_PER_LEVEL = 3;      // chest items: item level +3 per keystone level
     constexpr uint32 MYTHIC_ILVL_MAX_LEVEL = 20;    // ... up to this keystone level             // the keystone frame closes farther away than this
 
@@ -235,6 +243,8 @@ namespace
         uint32 SyncTimer = 0;
         uint32 TickTimer = 0;
         uint32 GrievousTimer = 0;
+        uint32 BattleRes = 0;                   // charges (keystone run)
+        uint32 BattleResTimer = 0;
     };
 
     std::unordered_map<uint32, DungeonInfo> s_dungeons;
@@ -252,7 +262,8 @@ namespace
     std::unordered_map<ObjectGuid, ObjectGuid> s_fontUser;   // player -> font
     std::unordered_set<ObjectGuid> s_slotted;                // players with the key in the font
     std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> s_lastInstance;
-    std::unordered_map<ObjectGuid::LowType, uint32> s_mythicItems;    // item guid -> keystone level it dropped from   // player -> mythic map, instance
+    std::unordered_map<ObjectGuid::LowType, uint32> s_mythicItems;
+    std::vector<ObjectGuid> s_pendingKick;                    // joined a group in the middle of a run    // item guid -> keystone level it dropped from   // player -> mythic map, instance
 
     // ---------------------------------------------------------------- strings (UTF-8)
     char const* const MSG_NOT_IN_DUNGEON = "\xd0\x9a\xd1\x83\xd0\xbf\xd0\xb5\xd0\xbb\xd1\x8c \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b \xd1\x80\xd0\xb0\xd0\xb1\xd0\xbe\xd1\x82\xd0\xb0\xd0\xb5\xd1\x82 \xd1\x82\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xba\xd0\xbe \xd0\xb2 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xbc \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5.";
@@ -267,6 +278,11 @@ namespace
     char const* const MSG_STARTED = "\xd0\x98\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xbd\xd0\xb0\xd1\x87\xd0\xbd\xd0\xb5\xd1\x82\xd1\x81\xd1\x8f \xd1\x87\xd0\xb5\xd1\x80\xd0\xb5\xd0\xb7 10 \xd1\x81\xd0\xb5\xd0\xba\xd1\x83\xd0\xbd\xd0\xb4.";
     char const* const MSG_NO_LEAVE = "\xd0\x9d\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbf\xd0\xbe\xd0\xba\xd0\xb8\xd0\xbd\xd1\x83\xd1\x82\xd1\x8c \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5 \xd0\xb2\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb8\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd1\x8f.";
     char const* const MSG_HAS_KEY = "\xd0\xa3 \xd0\xb2\xd0\xb0\xd1\x81 \xd1\x83\xd0\xb6\xd0\xb5 \xd0\xb5\xd1\x81\xd1\x82\xd1\x8c \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87: %s (%u). \xd0\x9d\xd0\xbe\xd0\xb2\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xbd\xd0\xb5 \xd0\xb2\xd1\x8b\xd0\xb4\xd0\xb0\xd0\xbd.";
+    char const* const MSG_NO_BATTLE_RES = "\xd0\x9d\xd0\xb5\xd1\x82 \xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd1\x83\xd0\xbf\xd0\xbd\xd1\x8b\xd1\x85 \xd0\xb1\xd0\xbe\xd0\xb5\xd0\xb2\xd1\x8b\xd1\x85 \xd0\xb2\xd0\xbe\xd1\x81\xd0\xba\xd1\x80\xd0\xb5\xd1\x88\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xb9.";
+    char const* const MSG_BATTLE_RES = "\xd0\x91\xd0\xbe\xd0\xb5\xd0\xb2\xd0\xbe\xd0\xb5 \xd0\xb2\xd0\xbe\xd1\x81\xd0\xba\xd1\x80\xd0\xb5\xd1\x88\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xb8\xd1\x81\xd0\xbf\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xb7\xd0\xbe\xd0\xb2\xd0\xb0\xd0\xbd\xd0\xbe. \xd0\x9e\xd1\x81\xd1\x82\xd0\xb0\xd0\xbb\xd0\xbe\xd1\x81\xd1\x8c: %u.";
+    char const* const MSG_BATTLE_RES_GAIN = "\xd0\x9f\xd0\xbe\xd0\xbb\xd1\x83\xd1\x87\xd0\xb5\xd0\xbd \xd0\xb7\xd0\xb0\xd1\x80\xd1\x8f\xd0\xb4 \xd0\xb1\xd0\xbe\xd0\xb5\xd0\xb2\xd0\xbe\xd0\xb3\xd0\xbe \xd0\xb2\xd0\xbe\xd1\x81\xd0\xba\xd1\x80\xd0\xb5\xd1\x88\xd0\xb5\xd0\xbd\xd0\xb8\xd1\x8f. \xd0\x94\xd0\xbe\xd1\x81\xd1\x82\xd1\x83\xd0\xbf\xd0\xbd\xd0\xbe: %u.";
+    char const* const MSG_GROUP_LOCKED = "\xd0\x92\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb8\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd1\x8f \xd0\xbd\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbf\xd1\x80\xd0\xb8\xd1\x81\xd0\xbe\xd0\xb5\xd0\xb4\xd0\xb8\xd0\xbd\xd0\xb8\xd1\x82\xd1\x8c\xd1\x81\xd1\x8f \xd0\xba \xd0\xb3\xd1\x80\xd1\x83\xd0\xbf\xd0\xbf\xd0\xb5.";
+    char const* const MSG_VAULT_MAIL = "\xd0\x92\xd0\xb5\xd0\xbb\xd0\xb8\xd0\xba\xd0\xbe\xd0\xb5 \xd1\x85\xd1\x80\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xbb\xd0\xb8\xd1\x89\xd0\xb5";
     char const* const MSG_GO = "\xd0\x98\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xbd\xd0\xb0\xd1\x87\xd0\xb0\xd0\xbb\xd0\xbe\xd1\x81\xd1\x8c!";
     char const* const MSG_TIME_UP = "\xd0\x92\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb2\xd1\x8b\xd1\x88\xd0\xbb\xd0\xbe! \xd0\x9a\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xbf\xd0\xbe\xd1\x82\xd0\xb5\xd1\x80\xd1\x8f\xd0\xbb \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c.";
     char const* const MSG_NEW_KEY = "\xd0\x92\xd1\x8b \xd0\xbf\xd0\xbe\xd0\xbb\xd1\x83\xd1\x87\xd0\xb8\xd0\xbb\xd0\xb8 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87: %s (%u).";
@@ -530,6 +546,14 @@ namespace
         sAddonComm->Send(player, "MPLUS_RATING", rating, list.str());
     }
 
+    uint32 GetRating(ObjectGuid::LowType guid)
+    {
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(COALESCE(SUM(score), 0) AS SIGNED) FROM character_mythic_plus_best WHERE guid = {}", guid).c_str()))
+            return uint32(result->Fetch()[0].GetInt64());
+        return 0;
+    }
+
     void SaveBest(Player* player, Run const& run, bool timed, uint32 timeMs, uint32 score)
     {
         ObjectGuid::LowType guid = player->GetGUID().GetCounter();
@@ -666,7 +690,7 @@ namespace
     // ---------------------------------------------------------------- completion
     // the chest belongs to the map, not to a player: it stays when anybody leaves
     // ---------------------------------------------------------------- mythic items (chest loot)
-    // weapons and armor from the chest: item level by the keystone level (ItemScaling), tooltip "Эпохальный +N"
+    // weapons and armor from the chest: item level by the keystone level (ItemScaling), tooltip "\xd0\xad\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 +N"
     void SendMythicItems(Player* player)
     {
         std::ostringstream list;
@@ -795,8 +819,16 @@ namespace
         {
             run.ChestAllowed.insert(player->GetGUID().GetCounter());
             Message(player, text);
+            ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+            uint32 oldRating = GetRating(guid);
             SaveBest(player, run, timed, timeMs, score);
-            sAddonComm->Send(player, "MPLUS_COMPLETE", timed ? 1 : 0, upgrade, timeMs, run.Level, newLevel, score);
+            uint32 newRating = GetRating(guid);
+            // Great Vault: every completed keystone of the week counts
+            CharacterDatabase.Execute(Trinity::StringFormat(
+                "INSERT INTO character_mythic_plus_weekly (guid, week, map_id, level) VALUES ({}, {}, {}, {})",
+                guid, CurrentWeek(), run.MapId, run.Level).c_str());
+            sAddonComm->Send(player, "MPLUS_COMPLETE", timed ? 1 : 0, upgrade, timeMs, run.Level, newLevel, score,
+                oldRating, newRating, run.MapId, Sanitize(DungeonName(run.MapId)));
             if (player->GetGUID().GetCounter() != run.KeyOwner)
                 GrantNewKey(player, std::max(MIN_KEY_LEVEL, run.Level - 1));
             SendRating(player);
@@ -1008,12 +1040,158 @@ namespace
         SyncRun(run, true);
     }
 
+    // ---------------------------------------------------------------- Great Vault
+    // runs of a week (character_mythic_plus_weekly) -> up to 3 options for the next week:
+    // 1 run - the best level, 4 runs - the 4th best, 8 runs - the 8th best; one option is taken
+    std::vector<uint32> WeekLevels(ObjectGuid::LowType guid, uint32 week)
+    {
+        std::vector<uint32> levels;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(level AS SIGNED) FROM character_mythic_plus_weekly WHERE guid = {} AND week = {} ORDER BY level DESC", guid, week).c_str()))
+            do
+                levels.push_back(uint32(result->Fetch()[0].GetInt64()));
+            while (result->NextRow());
+        return levels;
+    }
+
+    uint32 RollVaultItem(Player* player)
+    {
+        Loot loot;
+        loot.FillLoot(VAULT_LOOT, LootTemplates_Gameobject, player, true, true);
+        for (LootItem const& lootItem : loot.items)
+            if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(lootItem.itemid))
+                if (proto->Class == ITEM_CLASS_WEAPON || proto->Class == ITEM_CLASS_ARMOR)
+                    return lootItem.itemid;
+        return loot.items.empty() ? 0 : loot.items.front().itemid;
+    }
+
+    void SendVault(Player* player)
+    {
+        ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+        uint32 week = CurrentWeek();
+        uint32 last = week ? week - 1 : 0;
+
+        // the options of last week's runs are rolled once
+        bool hasOptions = false;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT 1 FROM character_mythic_plus_vault WHERE guid = {} AND week = {} LIMIT 1", guid, last).c_str()))
+            hasOptions = true;
+        if (!hasOptions && week)
+        {
+            std::vector<uint32> levels = WeekLevels(guid, last);
+            for (uint32 slot = 0; slot < 3; ++slot)
+                if (levels.size() >= VAULT_THRESHOLDS[slot])
+                    if (uint32 itemId = RollVaultItem(player))
+                        CharacterDatabase.DirectExecute(Trinity::StringFormat(
+                            "INSERT INTO character_mythic_plus_vault (guid, week, slot, item_id, level, claimed) VALUES ({}, {}, {}, {}, {}, 0)",
+                            guid, last, slot + 1, itemId, levels[VAULT_THRESHOLDS[slot] - 1]).c_str());
+        }
+
+        std::ostringstream options;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(slot AS SIGNED), CAST(item_id AS SIGNED), CAST(level AS SIGNED), CAST(claimed AS SIGNED) FROM character_mythic_plus_vault WHERE guid = {} AND week = {} ORDER BY slot",
+            guid, last).c_str()))
+        {
+            bool first = true;
+            do
+            {
+                Field* f = result->Fetch();
+                options << (first ? "" : ",") << f[0].GetInt64() << ";" << f[1].GetInt64() << ";" << f[2].GetInt64() << ";" << f[3].GetInt64();
+                first = false;
+            } while (result->NextRow());
+        }
+
+        // this week's progress: levels of the runs, best first
+        std::vector<uint32> levels = WeekLevels(guid, week);
+        sAddonComm->Send(player, "MPLUS_VAULT", uint32(levels.size()), JoinIds(levels), options.str());
+    }
+
+    void HandleVaultGet(Player* player, std::vector<std::string> const& /*args*/)
+    {
+        SendVault(player);
+    }
+
+    void HandleVaultChoose(Player* player, std::vector<std::string> const& args)
+    {
+        uint32 slot = args.empty() ? 0 : CommToUInt32(args[0]);
+        ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+        uint32 week = CurrentWeek();
+        uint32 last = week ? week - 1 : 0;
+
+        uint32 itemId = 0, level = 0;
+        bool claimed = false;
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(slot AS SIGNED), CAST(item_id AS SIGNED), CAST(level AS SIGNED), CAST(claimed AS SIGNED) FROM character_mythic_plus_vault WHERE guid = {} AND week = {}",
+            guid, last).c_str()))
+            do
+            {
+                Field* f = result->Fetch();
+                if (f[3].GetInt64())
+                    claimed = true;
+                if (uint32(f[0].GetInt64()) == slot)
+                {
+                    itemId = uint32(f[1].GetInt64());
+                    level = uint32(f[2].GetInt64());
+                }
+            } while (result->NextRow());
+        if (claimed || !itemId)
+        {
+            SendVault(player);
+            return;
+        }
+
+        CharacterDatabase.DirectExecute(Trinity::StringFormat(
+            "UPDATE character_mythic_plus_vault SET claimed = 1 WHERE guid = {} AND week = {} AND slot = {}", guid, last, slot).c_str());
+
+        ItemPosCountVec dest;
+        if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, 1) == EQUIP_ERR_OK)
+        {
+            if (Item* item = player->StoreNewItem(dest, itemId, true))
+            {
+                player->SendNewItem(item, 1, true, false);
+                MarkMythicItem(player, item, level);
+            }
+        }
+        else if (Item* item = Item::CreateItem(itemId, 1, player))
+        {
+            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+            MarkMythicItem(player, item, level);
+            item->SaveToDB(trans);
+            MailDraft draft(MSG_VAULT_MAIL, "");
+            draft.AddItem(item);
+            draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+            CharacterDatabase.CommitTransaction(trans);
+        }
+        SendVault(player);
+        SendMythicItems(player);
+    }
+
+    // ---------------------------------------------------------------- battle res (retail: 1 charge, +1 every 10 min)
+    Run* ActiveKeystoneRun(Unit* unit)
+    {
+        Run* run = unit ? FindRun(unit->GetMap()) : nullptr;
+        return run && run->Level && run->State == RUN_ACTIVE ? run : nullptr;
+    }
+
     // ---------------------------------------------------------------- comm handlers
     void SendAll(Player* player)
     {
         for (auto const& pair : s_affixes)
             sAddonComm->Send(player, "MPLUS_AFFIX", pair.first, Sanitize(pair.second.Name), pair.second.Icon, Sanitize(pair.second.Description));
         sAddonComm->Send(player, "MPLUS_WEEK", JoinIds(WeekAffixes()));
+        {
+            std::ostringstream maps;
+            bool first = true;
+            for (auto const& pair : s_dungeons)
+            {
+                std::string name = Sanitize(pair.second.Name);
+                std::replace(name.begin(), name.end(), ';', ' ');
+                std::replace(name.begin(), name.end(), ',', ' ');
+                maps << (first ? "" : ",") << pair.first << ";" << name << ";" << pair.second.TimeLimit;
+                first = false;
+            }
+            sAddonComm->Send(player, "MPLUS_MAPS", maps.str());
+        }
         SendKey(player);
         SendRating(player);
         if (Run* run = FindRun(player->GetMap()))
@@ -1212,6 +1390,18 @@ namespace
             {
                 run.CountdownLeft = 0;
                 run.State = RUN_ACTIVE;
+                run.BattleRes = 1;
+                run.BattleResTimer = 0;
+                // retail: everybody starts fresh - cooldowns, health and power
+                ForEachPlayer(map, [&](Player* player)
+                {
+                    player->GetSpellHistory()->ResetAllCooldowns();
+                    if (player->IsAlive())
+                    {
+                        player->SetFullHealth();
+                        player->SetPower(player->GetPowerType(), player->GetMaxPower(player->GetPowerType()));
+                    }
+                });
                 for (ObjectGuid const& guid : run.BarrierGuids)
                     if (GameObject* barrier = map->GetGameObject(guid))
                         barrier->DespawnOrUnsummon();
@@ -1222,10 +1412,30 @@ namespace
             return;
         }
 
+        // keystone runs: no loot from creatures, the reward is the chest (retail)
+        if (run.Level && run.State != RUN_NONE)
+            for (auto const& pair : map->GetCreatureBySpawnIdStore())
+            {
+                Creature* creature = pair.second;
+                if (!creature->IsAlive() && !creature->loot.empty())
+                {
+                    creature->loot.clear();
+                    creature->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+                }
+            }
+
         if (run.State != RUN_ACTIVE)
             return;
 
         run.ElapsedMs += diff;
+
+        run.BattleResTimer += diff;
+        if (run.BattleResTimer >= BATTLE_RES_INTERVAL)
+        {
+            run.BattleResTimer -= BATTLE_RES_INTERVAL;
+            ++run.BattleRes;
+            ForEachPlayer(map, [&](Player* player) { Message(player, Fmt(MSG_BATTLE_RES_GAIN, run.BattleRes)); });
+        }
 
         // timer expired: the key goes down now (retail), the run can still be finished
         if (!run.Depleted && run.ElapsedMs + run.Deaths * DEATH_PENALTY * IN_MILLISECONDS > run.TimeLimit * IN_MILLISECONDS)
@@ -1446,6 +1656,16 @@ public:
 
     void OnUpdate(uint32 diff) override
     {
+        // joined a group in the middle of a run: out again (retail: the group is locked)
+        for (ObjectGuid const& guid : s_pendingKick)
+            if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
+                if (Group* group = player->GetGroup())
+                {
+                    Message(player, MSG_GROUP_LOCKED);
+                    group->RemoveMember(guid, GROUP_REMOVEMETHOD_KICK);
+                }
+        s_pendingKick.clear();
+
         // walked away from the Font of Power: close the keystone frame
         fontTimer += diff;
         if (fontTimer >= 500)
@@ -1492,6 +1712,8 @@ public:
         sAddonComm->Register(std::string("MPLUS_CLOSE"), &HandleClose);
         sAddonComm->Register(std::string("MPLUS_RELEASE"), &HandleRelease);
         sAddonComm->Register(std::string("MPLUS_ITEMS_GET"), &HandleItemsGet);
+        sAddonComm->Register(std::string("MPLUS_VAULT_GET"), &HandleVaultGet);
+        sAddonComm->Register(std::string("MPLUS_VAULT_CHOOSE"), &HandleVaultChoose);
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
@@ -1741,8 +1963,78 @@ public:
     }
 };
 
+// battle res spells (sql/world_mythic_plus_battle_res.sql): charges of the keystone run
+class spell_mythic_plus_battle_res : public SpellScript
+{
+    PrepareSpellScript(spell_mythic_plus_battle_res);
+
+    SpellCastResult CheckCast()
+    {
+        if (Run* run = ActiveKeystoneRun(GetCaster()))
+            if (!run->BattleRes)
+            {
+                if (Player* player = GetCaster()->ToPlayer())
+                    Result(player, MSG_NO_BATTLE_RES);
+                return SPELL_FAILED_DONT_REPORT;
+            }
+        return SPELL_CAST_OK;
+    }
+
+    void HandleAfterCast()
+    {
+        if (Run* run = ActiveKeystoneRun(GetCaster()))
+            if (run->BattleRes)
+            {
+                --run->BattleRes;
+                uint32 left = run->BattleRes;
+                ForEachPlayer(GetCaster()->GetMap(), [&](Player* player) { Message(player, Fmt(MSG_BATTLE_RES, left)); });
+            }
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_mythic_plus_battle_res::CheckCast);
+        AfterCast += SpellCastFn(spell_mythic_plus_battle_res::HandleAfterCast);
+    }
+};
+
+class mythic_plus_group : public GroupScript
+{
+public:
+    mythic_plus_group() : GroupScript("mythic_plus_group") { }
+
+    void OnAddMember(Group* group, ObjectGuid guid) override
+    {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->GetSource())
+                if (member->GetGUID() != guid)
+                    if (Run* run = FindRun(member->GetMap()))
+                        if (run->Level && (run->State == RUN_COUNTDOWN || run->State == RUN_ACTIVE))
+                        {
+                            s_pendingKick.push_back(guid);
+                            return;
+                        }
+    }
+};
+
+// Great Vault object (ScriptName go_mythic_plus_vault)
+struct go_mythic_plus_vault : public GameObjectAI
+{
+    go_mythic_plus_vault(GameObject* go) : GameObjectAI(go) { }
+
+    bool OnGossipHello(Player* player) override
+    {
+        sAddonComm->Send(player, "MPLUS_VAULT_OPEN");
+        SendVault(player);
+        return true;
+    }
+};
+
 void AddSC_mythic_plus()
 {
+    new mythic_plus_group();
+    RegisterSpellScript(spell_mythic_plus_battle_res);
+    RegisterGameObjectAI(go_mythic_plus_vault);
     new mythic_plus_world();
     new mythic_plus_player();
     new mythic_plus_unit();
