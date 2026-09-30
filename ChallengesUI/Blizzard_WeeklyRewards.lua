@@ -148,6 +148,14 @@ function WeeklyRewardsMixin:OnLoad()
 	self:SetUpActivity(self.MythicFrame, DUNGEONS, "evergreen-weeklyrewards-category-dungeons", TYPE_ACTIVITIES);
 	self:SetUpActivity(self.WorldFrame, S("DELVES_LABEL"), "evergreen-weeklyrewards-category-world", TYPE_WORLD);
 	self.SelectRewardButton:SetText(S("WEEKLY_REWARDS_SELECT_REWARD"));
+
+	-- retail red close button (RedButton-Exit atlases)
+	local close = self.CloseButton;
+	close:GetNormalTexture():SetAtlas("RedButton-Exit");
+	close:GetPushedTexture():SetAtlas("RedButton-exit-pressed");
+	close:GetDisabledTexture():SetAtlas("RedButton-Exit-Disabled");
+	close:GetHighlightTexture():SetAtlas("RedButton-Highlight");
+	close:GetHighlightTexture():SetBlendMode("ADD");
 	self.PreviousRewardNotification:SetText(S("WEEKLY_REWARDS_UNCLAIMED_REWARDS_FROM_PREVIOUS_TIME"));
 
 	MythicPlus_RegisterCallback(function(event)
