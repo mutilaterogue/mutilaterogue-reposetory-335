@@ -93,21 +93,21 @@ INSERT INTO `item_template` (`entry`, `class`, `subclass`, `SoundOverrideSubclas
 SET @FONT_DISPLAY := 7898;   -- font model: put the display you want here
 SET @CHEST_DISPLAY := (SELECT `displayId` FROM `gameobject_template` WHERE `entry` = 190663 LIMIT 1);  -- Dark Runed Chest
 
-DELETE FROM `gameobject_template` WHERE `entry` IN (190110, 190111);
+DELETE FROM `gameobject_template` WHERE `entry` IN (700010, 700011);
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `castBarCaption`, `unk1`, `size`,
   `Data0`, `Data1`, `Data2`, `Data3`, `Data4`, `Data5`, `Data6`, `Data7`, `Data8`, `Data9`, `Data10`, `Data11`, `Data12`,
   `Data13`, `Data14`, `Data15`, `Data16`, `Data17`, `Data18`, `Data19`, `Data20`, `Data21`, `Data22`, `Data23`, `AIName`, `ScriptName`, `VerifiedBuild`) VALUES
-(190110, 10, @FONT_DISPLAY, 'Купель силы', '', '', '', 1.5,
+(700010, 10, @FONT_DISPLAY, 'Купель силы', '', '', '', 1.5,
   0, 0, 0, 3000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 'go_mythic_plus_font', 0),
-(190111, 3, IFNULL(@CHEST_DISPLAY, 259), 'Сундук претендента', '', '', '', 1.5,
-  0, 190111, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0);
+(700011, 3, IFNULL(@CHEST_DISPLAY, 259), 'Сундук претендента', '', '', '', 1.5,
+  0, 700011, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '', 0);
 
--- chest loot: gameobject_loot_template entry 190111 (fill with the rewards)
-DELETE FROM `gameobject_loot_template` WHERE `Entry` = 190111;
+-- chest loot: gameobject_loot_template entry 700011 (fill with the rewards)
+DELETE FROM `gameobject_loot_template` WHERE `Entry` = 700011;
 
 -- ---------------------------------------------------------------- Font of Power spawns
--- inside each dungeon, in the mythic difficulty (GM in the mythic instance: .gobject add 190110 - spawnMask 4),
+-- inside each dungeon, in the mythic difficulty (GM in the mythic instance: .gobject add 700010 - spawnMask 4),
 -- or here: spawnMask 4 = DUNGEON_DIFFICULTY_EPIC.
 -- INSERT INTO `gameobject` (`id`, `map`, `spawnMask`, `phaseMask`, `position_x`, `position_y`, `position_z`, `orientation`,
 --   `rotation0`, `rotation1`, `rotation2`, `rotation3`, `spawntimesecs`, `animprogress`, `state`) VALUES
--- (190110, 574, 4, 1, X, Y, Z, O, 0, 0, 0, 1, 0, 0, 1);
+-- (700010, 574, 4, 1, X, Y, Z, O, 0, 0, 0, 1, 0, 0, 1);

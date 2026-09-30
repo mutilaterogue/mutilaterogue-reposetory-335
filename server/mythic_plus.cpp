@@ -89,8 +89,8 @@ namespace
 {
     // ---------------------------------------------------------------- config
     constexpr uint32 KEYSTONE_ITEM = 138019;
-    constexpr uint32 FONT_ENTRY = 190110;
-    constexpr uint32 CHEST_ENTRY = 190111;
+    constexpr uint32 FONT_ENTRY = 700010;
+    constexpr uint32 CHEST_ENTRY = 700011;
 
     constexpr uint32 MIN_KEY_LEVEL = 1;
     constexpr uint32 MAX_KEY_LEVEL = 30;
