@@ -62,6 +62,16 @@ local function AddItemLevel(tooltip, link)
 	end
 	local _, _, _, itemLevel, _, _, _, _, equipLoc = GetItemInfo(link);
 	if itemLevel and itemLevel > 1 and equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_BAG" then
+		-- the tooltip may already show the item level (client patch / other addon) - no duplicate
+		local prefix = ITEM_LEVEL:match("^(.-)%%d") or ITEM_LEVEL;
+		local name = tooltip:GetName();
+		for i = 2, tooltip:NumLines() do
+			local line = _G[name .. "TextLeft" .. i];
+			local text = line and line:GetText();
+			if text and text:find(prefix, 1, true) then
+				return;
+			end
+		end
 		tooltip:AddLine(ITEM_LEVEL:format(itemLevel), 1, 0.82, 0);
 		tooltip:Show();
 	end
