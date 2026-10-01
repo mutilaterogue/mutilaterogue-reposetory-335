@@ -50,10 +50,15 @@ function RadialWheel_SetRotatedAtlas(texture, atlas, angle)
 	texture:SetTexCoord(ulx, uly, llx, lly, urx, ury, lrx, lry);
 end
 
+-- retail SetAtlas quietly ignores a missing atlas (e.g. Radial_Wheel_Icon_Close_Glow), the 3.3.5 one raises an error
 local function SetAtlasSized(texture, atlas, scale)
-	texture:SetAtlas(atlas, true);
 	local info = C_Texture.GetAtlasInfo(atlas);
-	if info and scale then
+	if not info then
+		texture:SetTexture(nil);
+		return;
+	end
+	texture:SetAtlas(atlas, true);
+	if scale then
 		texture:SetWidth(info.width * scale);
 		texture:SetHeight(info.height * scale);
 	end
