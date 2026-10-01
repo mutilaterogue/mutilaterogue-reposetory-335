@@ -33,7 +33,9 @@ function RadialWheel_SetRotatedAtlas(texture, atlas, angle)
 	texture:SetTexture(info.file or info.filename);
 	texture:SetWidth(info.width);
 	texture:SetHeight(info.height);
-	local left, right, top, bottom = info.leftTexCoord, info.rightTexCoord, info.topTexCoord, info.bottomTexCoord;
+	-- this client's GetAtlasInfo: left / right / top / bottom (retail: leftTexCoord ...)
+	local left, right = info.left or info.leftTexCoord, info.right or info.rightTexCoord;
+	local top, bottom = info.top or info.topTexCoord, info.bottom or info.bottomTexCoord;
 	local cu, cv = (left + right) / 2, (top + bottom) / 2;
 	local du, dv = (right - left) / 2, (bottom - top) / 2;
 	-- corner of the quad (x, y in -1..1, y up) -> the texture point it shows: the corner turned by -angle
