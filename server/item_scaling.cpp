@@ -15,6 +15,7 @@
  *   "ISCALE_ITEMS_GET" -> "ISCALE_ITEMS" : "bag/slot/bonus,..." (slots as in transmog: 255 - equipment and bank,
  *                                             0 - backpack, 1..4 - bags, 5..11 - bank bags)
  *   "ISCALE_SHOW" : bag : slot                -> item cache with the bonus of this instance
+ *   S->C "ISCALE_CACHED" : itemId : bonus     (after every item cache sent: the bonus the client cache has now)
  * GM: .itemscale <slot 1..19> <bonus>  - bonus for an equipped item (0 - remove)
  *
  * Setup: sql/characters_item_scaling.sql, core/Player_itemscale.patch, AddSC_item_scaling().
@@ -181,6 +182,9 @@ namespace ItemScaling
         }
         WorldPacket packet = copy.BuildQueryData(player->GetSession()->GetSessionDbLocaleIndex());
         player->SendDirectMessage(&packet);
+        // the client cache is per item entry: tell the client which bonus it holds now
+        // (else another instance of the same item shows these stats until it is hovered twice)
+        sAddonComm->Send(player, "ISCALE_CACHED", proto->ItemId, bonus);
     }
 
     void SetBonus(Player* player, Item* item, int32 bonus)

@@ -141,6 +141,14 @@ watcher:SetScript("OnUpdate", function(self, elapsed)
 end);
 
 if Comm_Register then
+	-- the server sent an item cache: the bonus it was built with
+	Comm_Register("ISCALE_CACHED", function(itemId, bonus)
+		itemId = tonumber(itemId);
+		if itemId then
+			cached[itemId] = tonumber(bonus) or 0;
+		end
+	end);
+
 	Comm_Register("ISCALE_CONFIG", function(stat, armor, damage)
 		ItemScaling.config = {
 			stat = (tonumber(stat) or 1000000) / 1000000,
