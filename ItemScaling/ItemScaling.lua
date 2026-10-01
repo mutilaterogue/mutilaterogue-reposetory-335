@@ -77,6 +77,92 @@ local function AddItemLevel(tooltip, link)
 	end
 end
 
+---------------------------------------------------------------------------
+-- the client item cache is per item number, not per instance: when it holds another bonus than this
+-- instance (several copies of one item), the numbers of the tooltip are scaled to this instance here
+---------------------------------------------------------------------------
+local baseLevels = {};		-- [bag][slot] = item level without the bonus
+
+local function Round(value)
+	return math.floor(value + 0.5);
+end
+
+-- tooltip lines that hold a socket (the socket texture is anchored to them): gems are not scaled
+local function SocketLines(tooltip)
+	local lines = {};
+	local name = tooltip:GetName();
+	for i = 1, 10 do
+		local texture = _G[name .. "Texture" .. i];
+		if texture and texture:IsShown() then
+			local _, relativeTo = texture:GetPoint(1);
+			if relativeTo then
+				lines[relativeTo] = true;
+			end
+		end
+	end
+	return lines;
+end
+
+local function ScaleTooltip(tooltip, link, bag, slot)
+	local base = baseLevels[bag] and baseLevels[bag][slot];
+	local config = ItemScaling.config;
+	if not base or not config or not link then
+		return;
+	end
+	local _, _, _, cacheLevel = GetItemInfo(link);
+	if not cacheLevel then
+		return;
+	end
+	local diff = ItemScaling.GetBonus(bag, slot) - (cacheLevel - base);
+	if diff == 0 then
+		return;
+	end
+	local statF = config.stat ^ diff;
+	local damageF = config.damage ^ diff;
+	local armorF = config.armor ^ diff;
+	local itemLevelPrefix = ITEM_LEVEL:match("^(.-)%%d") or ITEM_LEVEL;
+	local armorPrefix = ARMOR_TEMPLATE and ARMOR_TEMPLATE:match("^(.-)%%") or ARMOR;
+	local sockets = SocketLines(tooltip);
+	local name = tooltip:GetName();
+	for i = 2, tooltip:NumLines() do
+		local line = _G[name .. "TextLeft" .. i];
+		local text = line and line:GetText();
+		if text and not sockets[line] then
+			local new = text;
+			if text:find(itemLevelPrefix, 1, true) == 1 then
+				new = ITEM_LEVEL:format(cacheLevel + diff);
+			elseif text:find("^[^%d]*%d+ %- %d+") then
+				-- damage "a - b"
+				new = text:gsub("(%d+) %- (%d+)", function(a, b)
+					return Round(a * damageF) .. " - " .. Round(b * damageF);
+				end, 1);
+			elseif text:find("^%([%d%.]+") then
+				-- damage per second
+				new = text:gsub("^%(([%d%.]+)", function(dps)
+					return "(" .. string.format("%.1f", dps * damageF);
+				end, 1);
+			elseif armorPrefix and armorPrefix ~= "" and text:find(armorPrefix, 1, true) == 1 then
+				new = text:gsub("(%d+)", function(n) return Round(n * armorF); end, 1);
+			elseif text:find("^%+%d+") then
+				-- white stats
+				new = text:gsub("^%+(%d+)", function(n) return "+" .. Round(n * statF); end, 1);
+			else
+				local r, g, b = line:GetTextColor();
+				local socketBonus = ITEM_SOCKET_BONUS and ITEM_SOCKET_BONUS:match("^(.-)%%") or "";
+				if g > 0.9 and r < 0.2 and b < 0.2 and not text:find("^<")
+					and (socketBonus == "" or text:find(socketBonus, 1, true) ~= 1) then
+					-- green equip ratings "...: ... +N."
+					new = text:gsub("%+(%d+)", function(n) return "+" .. Round(n * statF); end, 1);
+				end
+			end
+			if new ~= text then
+				line:SetText(new);
+			end
+		end
+	end
+	tooltip:Show();
+end
+
 local function OnInventoryItem(self, unit, slot)
 	if unit ~= "player" then
 		return;
@@ -84,12 +170,14 @@ local function OnInventoryItem(self, unit, slot)
 	local link = GetInventoryItemLink("player", slot);
 	EnsureCache(self, ItemIdFromLink(link), 255, slot, function() self:SetInventoryItem("player", slot); end);
 	AddItemLevel(self, link);
+	ScaleTooltip(self, link, 255, slot);
 end
 
 local function OnBagItem(self, bag, slot)
 	local link = GetContainerItemLink(bag, slot);
 	EnsureCache(self, ItemIdFromLink(link), bag, slot, function() self:SetBagItem(bag, slot); end);
 	AddItemLevel(self, link);
+	ScaleTooltip(self, link, bag, slot);
 end
 
 -- окно сравнения: надетый предмет находим по ссылке
@@ -159,10 +247,13 @@ if Comm_Register then
 
 	Comm_Register("ISCALE_ITEMS", function(text)
 		wipe(bonuses);
-		for bag, slot, bonus in (text or ""):gmatch("(%d+)/(%d+)/(%-?%d+)") do
-			bag = tonumber(bag);
+		wipe(baseLevels);
+		for bag, slot, bonus, base in (text or ""):gmatch("(%d+)/(%d+)/(%-?%d+)/?(%d*)") do
+			bag, slot = tonumber(bag), tonumber(slot);
 			bonuses[bag] = bonuses[bag] or {};
-			bonuses[bag][tonumber(slot)] = tonumber(bonus);
+			bonuses[bag][slot] = tonumber(bonus);
+			baseLevels[bag] = baseLevels[bag] or {};
+			baseLevels[bag][slot] = tonumber(base);
 		end
 	end);
 end

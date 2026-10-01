@@ -12,7 +12,7 @@
  *
  * AddonComm (client: ItemScaling\ItemScaling.lua):
  *   "ISCALE_CONFIG" : statStep : armorStep : damageStep (x1000000)
- *   "ISCALE_ITEMS_GET" -> "ISCALE_ITEMS" : "bag/slot/bonus,..." (slots as in transmog: 255 - equipment and bank,
+ *   "ISCALE_ITEMS_GET" -> "ISCALE_ITEMS" : "bag/slot/bonus/base item level,..." (slots as in transmog: 255 - equipment and bank,
  *                                             0 - backpack, 1..4 - bags, 5..11 - bank bags)
  *   "ISCALE_SHOW" : bag : slot                -> item cache with the bonus of this instance
  *   S->C "ISCALE_CACHED" : itemId : bonus     (after every item cache sent: the bonus the client cache has now)
@@ -84,7 +84,7 @@ namespace
                 return;
             if (!first)
                 list << ',';
-            list << bag << '/' << slot << '/' << bonus;
+            list << bag << '/' << slot << '/' << bonus << '/' << item->GetTemplate()->ItemLevel;
             first = false;
         };
         for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
