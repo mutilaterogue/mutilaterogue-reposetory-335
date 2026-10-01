@@ -228,7 +228,12 @@ watcher:SetScript("OnUpdate", function(self, elapsed)
 	end
 end);
 
-if Comm_Register then
+-- the handlers: Server.lua (Comm_Register) may load after this file - then on login
+local function RegisterComm()
+	if not Comm_Register or ItemScaling.commRegistered then
+		return;
+	end
+	ItemScaling.commRegistered = true;
 	-- the server sent an item cache: the bonus it was built with
 	Comm_Register("ISCALE_CACHED", function(itemId, bonus)
 		itemId = tonumber(itemId);
@@ -257,3 +262,13 @@ if Comm_Register then
 		end
 	end);
 end
+
+RegisterComm();
+local commLoader = CreateFrame("Frame");
+commLoader:RegisterEvent("PLAYER_LOGIN");
+commLoader:SetScript("OnEvent", function()
+	RegisterComm();
+	if Comm_Send then
+		Comm_Send("ISCALE_ITEMS_GET");
+	end
+end);
