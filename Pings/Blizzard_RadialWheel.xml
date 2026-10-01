@@ -1,0 +1,65 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- retail Blizzard_RadialWheel for 3.3.5 (no mixin attributes / animation groups: see the lua) -->
+	<Script file="Blizzard_RadialWheel.lua"/>
+
+	<Frame name="RadialWheelButtonTemplate" virtual="true">
+		<Size x="100" y="100"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="SelectedTexture" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Icon">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="IconGlow" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Text" inherits="GameFontNormalLarge" justifyH="CENTER"/>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="RadialWheelWedgeButtonTemplate" inherits="RadialWheelButtonTemplate" virtual="true"/>
+
+	<Frame name="RadialWheelFrameTemplate" virtual="true">
+		<Size x="375" y="375"/>
+		<Frames>
+			<Frame parentKey="CancelButton" inherits="RadialWheelButtonTemplate"/>
+		</Frames>
+		<Layers>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture parentKey="Background" atlas="Radial_Wheel_BG" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<Texture parentKey="Frame">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="2">
+				<Texture parentKey="Pointer" atlas="Radial_Wheel_Select_Pointer" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+</Ui>

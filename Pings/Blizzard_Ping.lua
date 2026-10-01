@@ -23,7 +23,6 @@ local PING_INFO = {
 
 -- wheel sectors: top, right, bottom, left
 local WHEEL = { PING_ATTACK, PING_WARNING, PING_ON_MY_WAY, PING_ASSIST };
-local WHEEL_RADIUS = 58;
 local MARKER_RADIUS = 170;
 local PING_TIME = 5;
 
@@ -40,46 +39,19 @@ local function ContextualType()
 end
 
 ---------------------------------------------------------------------------
--- wheel
+-- wheel (retail RadialWheel, Blizzard_RadialWheel.lua): hold - choose, release - ping; a short tap - by the target
 ---------------------------------------------------------------------------
-local function CursorOffset(frame)
-	local x, y = GetCursorPosition();
-	local scale = frame:GetEffectiveScale();
-	local cx, cy = frame:GetCenter();
-	return x / scale - cx, y / scale - cy;
-end
-
-local function WheelSector(frame)
-	local x, y = CursorOffset(frame);
-	if x * x + y * y < 20 * 20 then
-		return nil;
-	end
-	-- 0 top, 1 right, 2 bottom, 3 left
-	local angle = math.atan2(x, y);
-	local sector = math.floor((angle + math.pi / 4) / (math.pi / 2)) % 4;
-	return sector + 1;
-end
+local WHEEL_ICONS = {
+	[PING_ATTACK]    = "Ping_Wheel_Icon_Attack",
+	[PING_WARNING]   = "Ping_Wheel_Icon_Warning",
+	[PING_ON_MY_WAY] = "Ping_Wheel_Icon_OnMyWay",
+	[PING_ASSIST]    = "Ping_Wheel_Icon_Assist",
+};
+local TAP_TIME = 0.2;
 
 function PingWheel_OnLoad(self)
-	self.buttons = {};
-	local offsets = { { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } };
-	for i, pingType in ipairs(WHEEL) do
-		local info = PING_INFO[pingType];
-		local button = CreateFrame("Frame", nil, self, "PingWheelButtonTemplate");
-		button:SetPoint("CENTER", self, "CENTER", offsets[i][1] * WHEEL_RADIUS, offsets[i][2] * WHEEL_RADIUS);
-		button.Icon:SetAtlas(info.atlas);
-		button.Label:SetText(S(info.name));
-		button.Label:SetTextColor(info.r, info.g, info.b);
-		self.buttons[i] = button;
-	end
-end
-
-function PingWheel_OnUpdate(self)
-	local sector = WheelSector(self);
-	for i, button in ipairs(self.buttons) do
-		button.Highlight:SetShown(i == sector);
-		button:SetScale(i == sector and 1.15 or 1);
-	end
+	Mixin(self, RadialWheelFrameMixin);
+	self:OnLoad();
 end
 
 function PingWheel_Show()
@@ -88,17 +60,27 @@ function PingWheel_Show()
 	local scale = UIParent:GetEffectiveScale();
 	wheel:ClearAllPoints();
 	wheel:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale);
-	wheel:Show();
+	local wedges = {};
+	for _, pingType in ipairs(WHEEL) do
+		table.insert(wedges, { type = pingType, icon = WHEEL_ICONS[pingType], text = S(PING_INFO[pingType].name) });
+	end
+	wheel.pressedAt = GetTime();
+	wheel:SelectionStart(wedges, false);
 end
 
 function PingWheel_Release()
 	local wheel = PingWheelFrame;
-	if not wheel:IsShown() then
+	if not wheel:IsShown() or wheel.isWheelClosing then
 		return;
 	end
-	local sector = WheelSector(wheel);
-	wheel:Hide();
-	Ping_Send(sector and WHEEL[sector] or ContextualType());
+	local selected = wheel:SelectionEnd();
+	local tap = GetTime() - (wheel.pressedAt or 0) < TAP_TIME;
+	wheel:AnimateOutro();
+	if selected then
+		Ping_Send(selected.type);
+	elseif tap then
+		Ping_Send(ContextualType());
+	end
 end
 
 SLASH_PING1 = "/ping";

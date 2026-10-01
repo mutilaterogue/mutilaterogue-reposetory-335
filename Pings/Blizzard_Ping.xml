@@ -1,48 +1,13 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- Group pings (retail PingSystem). FrameXML.toc: Pings\Blizzard_Ping.xml after ChallengesUI (MythicPlus_Send).
 	     Bindings.xml: see Pings\Bindings_Ping.txt -->
+	<Include file="Blizzard_RadialWheel.xml"/>
 	<Script file="Blizzard_Ping.lua"/>
 
-	<Frame name="PingWheelButtonTemplate" virtual="true">
-		<Size x="44" y="44"/>
-		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture parentKey="Background" file="Interface\Minimap\UI-Minimap-Background">
-					<Size x="44" y="44"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="ARTWORK">
-				<Texture parentKey="Icon">
-					<Size x="30" y="30"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-			<Layer level="OVERLAY">
-				<Texture parentKey="Highlight" file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD" hidden="true">
-					<Size x="56" y="56"/>
-					<Anchors>
-						<Anchor point="CENTER"/>
-					</Anchors>
-				</Texture>
-				<FontString parentKey="Label" inherits="GameFontNormalSmall">
-					<Anchors>
-						<Anchor point="TOP" relativePoint="BOTTOM" x="0" y="-1"/>
-					</Anchors>
-				</FontString>
-			</Layer>
-		</Layers>
-	</Frame>
-
-	<Frame name="PingWheelFrame" parent="UIParent" frameStrata="DIALOG" hidden="true">
-		<Size x="180" y="180"/>
+	<!-- the wheel: retail RadialWheelFrameTemplate (Blizzard_RadialWheel.xml) -->
+	<Frame name="PingWheelFrame" inherits="RadialWheelFrameTemplate" parent="UIParent" frameStrata="DIALOG" hidden="true">
 		<Scripts>
 			<OnLoad>PingWheel_OnLoad(self);</OnLoad>
-			<OnUpdate>PingWheel_OnUpdate(self);</OnUpdate>
 		</Scripts>
 	</Frame>
 
