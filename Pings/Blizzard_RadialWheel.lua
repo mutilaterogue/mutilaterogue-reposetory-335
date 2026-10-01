@@ -31,8 +31,14 @@ function RadialWheel_SetRotatedAtlas(texture, atlas, angle)
 		return;
 	end
 	texture:SetTexture(info.file or info.filename);
-	texture:SetWidth(info.width);
-	texture:SetHeight(info.height);
+	-- a non-square atlas (the wedge 172x288) turned by about 90 degrees takes the swapped size
+	if math.abs(math.sin(angle)) > math.abs(math.cos(angle)) then
+		texture:SetWidth(info.height);
+		texture:SetHeight(info.width);
+	else
+		texture:SetWidth(info.width);
+		texture:SetHeight(info.height);
+	end
 	-- this client's GetAtlasInfo: left / right / top / bottom (retail: leftTexCoord ...)
 	local left, right = info.left or info.leftTexCoord, info.right or info.rightTexCoord;
 	local top, bottom = info.top or info.topTexCoord, info.bottom or info.bottomTexCoord;
