@@ -1919,9 +1919,8 @@ namespace
         std::string targetName;
         if (args.size() > 1 && !args[1].empty() && args[1] != "0")
         {
-            ObjectGuid targetGuid;
-            targetGuid.Set(std::strtoull(args[1].c_str(), nullptr, 16));
-            if (Unit* target = ObjectAccessor::GetUnit(*player, targetGuid))
+            // the client only says "at my target": the server knows the selection
+            if (Unit* target = ObjectAccessor::GetUnit(*player, player->GetTarget()))
                 if (target->IsInWorld() && target->GetMap() == player->GetMap() && player->IsWithinDist(target, 200.0f))
                 {
                     ping.Target = target->GetGUID();
