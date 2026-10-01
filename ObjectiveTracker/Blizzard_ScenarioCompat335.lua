@@ -463,7 +463,12 @@ function C_ScenarioInfo.GetCriteriaInfo(criteriaIndex)
 	return nil;
 end
 
-if MythicPlus_RegisterCallback then
+-- the run events of ChallengesUI: it may load after the tracker (FrameXML.toc order), then hook on login
+local function HookMythicPlus()
+	if not MythicPlus_RegisterCallback or ScenarioCompat_MythicHooked then
+		return;
+	end
+	ScenarioCompat_MythicHooked = true;
 	MythicPlus_RegisterCallback(function(event, ...)
 		if event == "RUN" then
 			local newStage = ...;
@@ -474,5 +479,15 @@ if MythicPlus_RegisterCallback then
 		elseif event == "COMPLETE" then
 			Fire("SCENARIO_COMPLETED");
 		end
+	end);
+end
+
+HookMythicPlus();
+if not ScenarioCompat_MythicHooked then
+	local hookFrame = CreateFrame("Frame");
+	hookFrame:RegisterEvent("PLAYER_LOGIN");
+	hookFrame:SetScript("OnEvent", function()
+		HookMythicPlus();
+		Fire("SCENARIO_UPDATE", true);
 	end);
 end
