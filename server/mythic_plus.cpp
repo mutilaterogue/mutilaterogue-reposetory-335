@@ -1470,6 +1470,8 @@ namespace
     }
 
     // ---------------------------------------------------------------- comm handlers
+    void SendSeason(Player* player);    // below, with the leaderboard
+
     void SendAll(Player* player)
     {
         for (auto const& pair : s_affixes)
