@@ -1919,8 +1919,9 @@ namespace
         std::string targetName;
         if (args.size() > 1 && !args[1].empty() && args[1] != "0")
         {
-            uint64 raw = std::strtoull(args[1].c_str(), nullptr, 16);
-            if (Unit* target = ObjectAccessor::GetUnit(*player, ObjectGuid(raw)))
+            ObjectGuid targetGuid;
+            targetGuid.Set(std::strtoull(args[1].c_str(), nullptr, 16));
+            if (Unit* target = ObjectAccessor::GetUnit(*player, targetGuid))
                 if (target->IsInWorld() && target->GetMap() == player->GetMap() && player->IsWithinDist(target, 200.0f))
                 {
                     ping.Target = target->GetGUID();
