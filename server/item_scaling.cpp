@@ -313,7 +313,7 @@ public:
             return false;
         }
         ItemScaling::SetBonus(player, item, bonus);
-        handler->PSendSysMessage("itemscale: item {} level {} (bonus {})", item->GetEntry(), ItemScaling::GetItemLevel(item), ItemScaling::GetBonus(item));
+        handler->SendSysMessage(Trinity::StringFormat("itemscale: item {} level {} (bonus {})", item->GetEntry(), ItemScaling::GetItemLevel(item), ItemScaling::GetBonus(item)));
         return true;
     }
 };

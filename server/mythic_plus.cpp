@@ -2585,11 +2585,11 @@ public:
         uint32 map = mapId ? *mapId : RandomDungeon(0);
         if (level && !s_dungeons.count(map))
         {
-            handler->PSendSysMessage("mplus: map {} is not in mythic_plus_dungeon", map);
+            handler->SendSysMessage(Trinity::StringFormat("mplus: map {} is not in mythic_plus_dungeon", map));
             return false;
         }
         SetKey(target->GetGUID().GetCounter(), level ? map : 0, level);
-        handler->PSendSysMessage("mplus: {} key {} +{}", target->GetName(), level ? DungeonName(map) : "-", level);
+        handler->SendSysMessage(Trinity::StringFormat("mplus: {} key {} +{}", target->GetName(), level ? DungeonName(map) : "-", level));
         return true;
     }
 
@@ -2602,9 +2602,9 @@ public:
             handler->SendSysMessage("mplus: not in a mythic instance");
             return true;
         }
-        handler->PSendSysMessage("mplus: map {} instance {} state {} level {} affixes {} time {}/{}s deaths {} forces {}/{} bosses {}/{}",
+        handler->SendSysMessage(Trinity::StringFormat("mplus: map {} instance {} state {} level {} affixes {} time {}/{}s deaths {} forces {}/{} bosses {}/{}",
             run->MapId, run->InstanceId, uint32(run->State), run->Level, JoinIds(run->Affixes), run->ElapsedMs / IN_MILLISECONDS, run->TimeLimit,
-            run->Deaths, run->Forces, run->ForcesMax, std::count_if(run->Bosses.begin(), run->Bosses.end(), [](Boss const& b) { return b.Killed; }), run->Bosses.size());
+            run->Deaths, run->Forces, run->ForcesMax, std::count_if(run->Bosses.begin(), run->Bosses.end(), [](Boss const& b) { return b.Killed; }), run->Bosses.size()));
         return true;
     }
 

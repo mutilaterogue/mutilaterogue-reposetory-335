@@ -55,17 +55,37 @@ function ScenarioObjectiveTrackerMixin:InitModule()
 	end);
 end
 
+-- the compat events come outside of the tracker's own update: mark dirty and update on the next frame
+-- (MarkDirty alone waited for the next tracker event - the timer block appeared only after a reload)
+local refreshFrame = CreateFrame("Frame");
+refreshFrame:Hide();
+refreshFrame:SetScript("OnUpdate", function(frame)
+	frame:Hide();
+	local module = frame.module;
+	if ObjectiveTrackerManager and ObjectiveTrackerManager.UpdateAll then
+		ObjectiveTrackerManager:UpdateAll();
+	elseif module and module.Update then
+		module:Update();
+	end
+end);
+
+function ScenarioObjectiveTrackerMixin:Refresh()
+	self:MarkDirty();
+	refreshFrame.module = self;
+	refreshFrame:Show();
+end
+
 function ScenarioObjectiveTrackerMixin:OnEvent(event, ...)
 	if event == "SCENARIO_UPDATE" then
 		local newStage = ...;
 		self:SetHasNewStage(newStage);
-		self:MarkDirty();
+		self:Refresh();
 	elseif event == "SCENARIO_CRITERIA_UPDATE" then
-		self:MarkDirty();
+		self:Refresh();
 	elseif event == "SCENARIO_COMPLETED" then
-		self:MarkDirty();
+		self:Refresh();
 	elseif event == "PLAYER_ENTERING_WORLD" then
-		self:MarkDirty();
+		self:Refresh();
 	end
 end
 
