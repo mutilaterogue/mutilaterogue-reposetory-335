@@ -15,17 +15,16 @@
 
 namespace
 {
-    // the tab id of the primary tree -> its index in the class tabs (1..3), 0 = none
+    // the tab id of the primary tree -> its index in the class tabs (1..3) by TalentTab.dbc OrderIndex, 0 = none
     uint32 PrimaryIndex(Player* player, uint8 spec)
     {
         uint32 tree = player->GetPrimaryTalentTree(spec);
-        uint32 const* talentTabs = GetTalentTabPages(player->GetClass());
-        if (!tree || !talentTabs)
+        if (!tree)
             return 0;
-        for (uint32 i = 0; i < MAX_TALENT_TABS; ++i)
-            if (talentTabs[i] == tree)
-                return i + 1;
-        return 0;
+        TalentTabEntry const* tab = sTalentTabStore.LookupEntry(tree);
+        if (!tab || !(tab->ClassMask & player->GetClassMask()))
+            return 0;
+        return tab->OrderIndex + 1;
     }
 
     void SendState(Player* player)
