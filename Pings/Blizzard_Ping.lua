@@ -131,7 +131,7 @@ local pool = {};
 -- world point -> UIParent coordinates (WorldToCamera of the client dll, dll\WorldToScreen); nil when it is behind
 -- the camera or the dll has no such function. Tuning: the vertical field of view = camera fov * PING_FOV_FACTOR
 -- (3.3.5: about 35 degrees per radian of the camera fov).
-PING_FOV_FACTOR = 0.6109;
+PING_FOV_FACTOR = 0.5;
 
 function Ping_WorldToScreen(x, y, z)
 	if not WorldToCamera then

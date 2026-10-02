@@ -25,5 +25,5 @@ client's TraceLine -> the world point under the cursor (`Ping_CursorWorldPositio
 /ping                                                         -- the marker should stand on the point
 ```
 If the marker drifts from the point when the camera turns (too close to / too far from the center), tune
-`PING_FOV_FACTOR` in `Pings\Blizzard_Ping.lua` (vertical field of view = camera fov * this, 0.6109 by default):
+`PING_FOV_FACTOR` in `Pings\Blizzard_Ping.lua` (vertical field of view = camera fov * this, 0.5 by default):
 `/run PING_FOV_FACTOR = 0.7` and ping again.
