@@ -10,6 +10,7 @@
 #include "Custom\AddonComm\AddonComm.h"
 #include "DBCStores.h"
 #include "Player.h"
+#include "SpellMgr.h"
 
 #include <cstdlib>
 
@@ -55,6 +56,19 @@ namespace
         player->SendTalentsInfoData(false);
     }
 
+    // LearnPrimaryTalentSpecialization only casts the mastery when CanUseMastery() (the class "Mastery" spell
+    // is known) and never adds it to the spellbook: learn it as a spell (passive -> the aura is applied)
+    void LearnMastery(Player* player)
+    {
+        TalentTabEntry const* tab = sTalentTabStore.LookupEntry(player->GetPrimaryTalentTree(player->GetActiveSpec()));
+        if (!tab)
+            return;
+        for (uint32 i = 0; i < MAX_MASTERY_SPELLS; ++i)
+            if (uint32 mastery = tab->MasterySpellID[i])
+                if (sSpellMgr->GetSpellInfo(mastery) && !player->HasSpell(mastery))
+                    player->LearnSpell(mastery, false);
+    }
+
     void HandleGet(Player* player, std::vector<std::string> const& /*args*/)
     {
         SendState(player);
@@ -73,7 +87,8 @@ namespace
             return;
         }
         ClearPrimary(player);
-        player->LearnPrimaryTalentSpecialization(uint8(index - 1));
+        if (player->LearnPrimaryTalentSpecialization(uint8(index - 1)))
+            LearnMastery(player);
         SendState(player);
     }
 }
