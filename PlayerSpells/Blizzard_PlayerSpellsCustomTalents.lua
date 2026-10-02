@@ -39,10 +39,19 @@ end
 ---------------------------------------------------------------------------
 -- data
 ---------------------------------------------------------------------------
+-- hero trees of the primary talent tree (specialization tab); specMask 0 = any
+local function SpecAllowed(tree)
+	if tree.kind ~= 1 or tree.specMask == 0 then
+		return true;
+	end
+	local primary = PlayerSpellsSpecializations and PlayerSpellsSpecializations.GetPrimaryTree() or 0;
+	return primary > 0 and bit.band(tree.specMask, bit.lshift(1, primary - 1)) ~= 0;
+end
+
 local function TreesOfKind(kind)
 	local list = {};
 	for _, tree in pairs(CT.trees) do
-		if tree.kind == kind then
+		if tree.kind == kind and SpecAllowed(tree) then
 			table.insert(list, tree);
 		end
 	end
@@ -544,6 +553,9 @@ function CT.Refresh(frame)
 	-- hero tree: the chosen one, or the "choose" ring with blank nodes
 	local hero = frame.HeroColumn;
 	local heroTree = CT.trees[CT.hero];
+	if heroTree and not SpecAllowed(heroTree) then
+		heroTree = nil; -- the hero tree of another specialization: choose again
+	end
 	local hasChoice = #TreesOfKind(1) > 0;
 	hero:SetShown(hasChoice or heroTree ~= nil);
 	if heroTree then
@@ -592,10 +604,10 @@ local function RegisterComm()
 		wipe(CT.nodes);
 		CT.loaded = false;
 	end);
-	Comm_Register("CTAL_TREE", function(id, kind, name, icon, minLevel, description)
+	Comm_Register("CTAL_TREE", function(id, kind, name, icon, minLevel, description, specMask)
 		id = tonumber(id);
 		if id then
-			CT.trees[id] = { id = id, kind = tonumber(kind) or 0, name = name or "", icon = icon or "", minLevel = tonumber(minLevel) or 10, description = description or "" };
+			CT.trees[id] = { id = id, kind = tonumber(kind) or 0, name = name or "", icon = icon or "", minLevel = tonumber(minLevel) or 10, description = description or "", specMask = tonumber(specMask) or 0 };
 		end
 	end);
 	Comm_Register("CTAL_NODE", function(id, tree, row, col, maxRank, spells, requires, minPoints)

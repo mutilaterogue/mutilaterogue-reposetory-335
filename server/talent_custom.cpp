@@ -24,6 +24,7 @@
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "DatabaseEnv.h"
+#include "DBCStores.h"
 #include "Log.h"
 #include "Chat.h"
 #include "ChatCommand.h"
@@ -50,6 +51,7 @@ namespace
         std::string Description;
         uint32 MinLevel = 10;
         uint32 Sort = 0;
+        uint32 SpecMask = 0;        // hero trees: primary talent trees (1 << OrderIndex) they belong to, 0 = any
     };
 
     struct Node
@@ -104,7 +106,7 @@ namespace
     void LoadData()
     {
         s_trees.clear();
-        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(class_mask AS SIGNED), CAST(kind AS SIGNED), name, icon, description, CAST(min_level AS SIGNED), CAST(sort AS SIGNED) FROM custom_talent_tree"))
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(class_mask AS SIGNED), CAST(kind AS SIGNED), name, icon, description, CAST(min_level AS SIGNED), CAST(sort AS SIGNED), CAST(spec_mask AS SIGNED) FROM custom_talent_tree"))
             do
             {
                 Field* f = result->Fetch();
@@ -117,6 +119,7 @@ namespace
                 tree.Description = f[5].GetString();
                 tree.MinLevel = uint32(f[6].GetInt64());
                 tree.Sort = uint32(f[7].GetInt64());
+                tree.SpecMask = uint32(f[8].GetInt64());
                 s_trees[tree.Id] = tree;
             } while (result->NextRow());
 
@@ -138,6 +141,15 @@ namespace
             } while (result->NextRow());
 
         TC_LOG_INFO("server.loading", ">> custom talents: {} trees, {} nodes", s_trees.size(), s_nodes.size());
+    }
+
+    // hero tree of the player's primary talent tree (spec_primary.cpp)? spec_mask 0 = any
+    bool SpecTree(Player* player, Tree const& tree)
+    {
+        if (tree.Kind != 1 || !tree.SpecMask)
+            return true;
+        TalentTabEntry const* tab = sTalentTabStore.LookupEntry(player->GetPrimaryTalentTree(player->GetActiveSpec()));
+        return tab && (tree.SpecMask & (1u << tab->OrderIndex));
     }
 
     bool ClassTree(Player const* player, Tree const& tree)
@@ -190,7 +202,7 @@ namespace
             auto owned = state.Ranks.find(node.Id);
             uint32 rank = owned != state.Ranks.end() ? owned->second : 0;
             Tree const& tree = s_trees[node.TreeId];
-            if (!ClassTree(player, tree) || (tree.Kind == 1 && state.Hero != tree.Id))
+            if (!ClassTree(player, tree) || (tree.Kind == 1 && (state.Hero != tree.Id || !SpecTree(player, tree))))
                 rank = 0;
             for (uint32 i = 0; i < node.Spells.size(); ++i)
             {
@@ -241,7 +253,7 @@ namespace
             Tree const& tree = pair.second;
             if (!ClassTree(player, tree))
                 continue;
-            sAddonComm->Send(player, "CTAL_TREE", tree.Id, uint32(tree.Kind), Sanitize(tree.Name), Sanitize(tree.Icon), tree.MinLevel, Sanitize(tree.Description));
+            sAddonComm->Send(player, "CTAL_TREE", tree.Id, uint32(tree.Kind), Sanitize(tree.Name), Sanitize(tree.Icon), tree.MinLevel, Sanitize(tree.Description), tree.SpecMask);
             for (auto const& nodePair : s_nodes)
             {
                 Node const& node = nodePair.second;
@@ -352,7 +364,7 @@ namespace
     {
         uint32 treeId = args.empty() ? 0 : CommToUInt32(args[0]);
         auto itr = s_trees.find(treeId);
-        if (itr == s_trees.end() || itr->second.Kind != 1 || !ClassTree(player, itr->second) || player->GetLevel() < itr->second.MinLevel)
+        if (itr == s_trees.end() || itr->second.Kind != 1 || !ClassTree(player, itr->second) || !SpecTree(player, itr->second) || player->GetLevel() < itr->second.MinLevel)
             return;
         uint8 spec = player->GetActiveSpec();
         SpecState& state = State(player, spec);

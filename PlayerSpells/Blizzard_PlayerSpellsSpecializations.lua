@@ -73,6 +73,10 @@ local function RegisterComm()
 		PS.primary[1] = tonumber(primary1) or 0;
 		PS.primary[2] = tonumber(primary2) or 0;
 		PS.loaded = true;
+		-- the hero trees depend on the primary tree: the server re-applies their spells
+		if Comm_Send then
+			Comm_Send("CTAL_SPEC");
+		end
 		if PS.frame then
 			PS.OnStateChanged(PS.frame);
 		end
