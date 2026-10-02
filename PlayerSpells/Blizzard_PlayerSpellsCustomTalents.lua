@@ -4,9 +4,10 @@
 PlayerSpellsCustomTalents = { trees = {}, nodes = {}, ranks = {}, hero = 0, loaded = false };
 local CT = PlayerSpellsCustomTalents;
 
-local NODE_SPACING = 64;
-local NODE_SIZE = 50;
-local ICON_SIZE = 44;
+-- retail node scale (ClassTalentsFrame): ~40 px nodes, ~56 px apart
+local NODE_SPACING = 58;
+local NODE_SIZE = 40;
+local ICON_SIZE = 34;
 local LINE_THICKNESS = 6;
 local NODE_RADIUS = 20;
 local HEADER_HEIGHT = 80;
@@ -451,10 +452,10 @@ function CT.Setup(frame)
 	hero:SetHeight(757);
 	hero.buttons = {};
 	hero.lines = {};
-	hero.spacing = 56;
-	hero.top = 90; -- below the ring and the points badge
-	hero.Name = hero:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-	hero.Name:SetPoint("TOP", 0, -50);
+	hero.spacing = 52;
+	hero.top = 46;
+	hero.Name = hero:CreateFontString(nil, "ARTWORK", _G.GameFontNormalHuge2 and "GameFontNormalHuge2" or "GameFontNormalLarge");
+	hero.Name:SetPoint("TOP", 0, -30);
 	hero.SubName = hero:CreateFontString(nil, "ARTWORK", "GameFontNormal");
 	hero.SubName:SetPoint("BOTTOM", hero.Name, "TOP", 0, 2);
 	hero.SubName:SetTextColor(0.12, 1, 0);
@@ -462,7 +463,7 @@ function CT.Setup(frame)
 	local ring = CreateFrame("Button", nil, hero);
 	ring:SetWidth(108);
 	ring:SetHeight(108);
-	ring:SetPoint("TOP", 0, -88);
+	ring:SetPoint("TOP", 0, -64);
 	ring:SetFrameLevel(hero:GetFrameLevel() + 10);
 	ring.Icon = ring:CreateTexture(nil, "ARTWORK");
 	ring.Icon:SetAllPoints();
@@ -547,13 +548,12 @@ function CT.Refresh(frame)
 	hero:SetShown(hasChoice or heroTree ~= nil);
 	if heroTree then
 		hero.SubName:SetText("");
-		hero.Name:SetText(string.upper(heroTree.name));
+		hero.Name:SetText(heroTree.name);
 		RoundIcon(hero.Ring.Icon, heroTree.icon);
 		SetAtlasIfExists(hero.Ring.Border, "talents-heroclass-ring-mainpane");
 		SetAtlasIfExists(hero.Ring.Highlight, "talents-heroclass-ring-mainpane");
 		hero.BlankNodes:Hide();
-		hero.Badge.Text:SetText(SpentInTree(heroTree.id));
-		hero.Badge:Show();
+		hero.Badge:Hide();
 		LayoutTree(hero, heroTree.id);
 	else
 		hero.SubName:SetText(string.upper(CHOOSE or "Выберите"));
