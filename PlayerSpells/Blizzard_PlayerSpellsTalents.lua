@@ -57,15 +57,35 @@ function PlayerSpellsTalentsMixin:OnLoad()
 	PlayerSpellsLoadouts.SetupDropdown(self, bar.LoadoutDropdown);
 
 	-- retail layout: class tree (left), hero tree (middle), one 3.3.5 tree (right)
+	self.SpecBackground = self:CreateTexture(nil, "BACKGROUND", nil, -1);
+	self.SpecBackground:SetPoint("TOPLEFT", 4, -4);
+	self.SpecBackground:SetPoint("BOTTOMRIGHT", -4, 52);
+	self.SpecShade = self:CreateTexture(nil, "BACKGROUND");
+	self.SpecShade:SetAllPoints(self.SpecBackground);
+	self.SpecShade:SetTexture(0, 0, 0, 0.35);
 	for _, tree in ipairs(self.playerTrees) do
 		tree:ClearAllPoints();
-		tree:SetPoint("TOPRIGHT", self, "TOPRIGHT", -30, -14);
+		tree:SetPoint("TOP", self, "TOPRIGHT", -245, -14);
+		local name = tree:GetName();
+		for _, part in ipairs({ "HeaderBg", "BackgroundTopLeft", "BackgroundTopRight", "BackgroundBottomLeft", "BackgroundBottomRight", "Icon" }) do
+			local texture = _G[name .. part];
+			if texture then
+				texture:SetAlpha(0);
+			end
+		end
+		tree.Name:ClearAllPoints();
+		tree.Name:SetPoint("TOP", tree, "TOP", 0, -12);
+		tree.Name:SetFontObject("GameFontHighlightLarge");
+		tree.Points:ClearAllPoints();
+		tree.Points:SetPoint("TOP", tree.Name, "BOTTOM", 0, -6);
+		tree.Points:SetFontObject("GameFontNormalHuge");
+		tree.Points:SetTextColor(0.6, 0.6, 0.6);
 	end
 	self.treeTabs = {};
 	for i = 1, 3 do
 		local tab = CreateFrame("Button", nil, self, "UIPanelButtonTemplate");
-		tab:SetSize(110, 22);
-		tab:SetPoint("BOTTOMRIGHT", self.Tree1, "TOPRIGHT", -(3 - i) * 112, 2);
+		tab:SetSize(120, 22);
+		tab:SetPoint("BOTTOM", self, "BOTTOMRIGHT", -245 + (i - 2) * 124, 60);
 		tab:SetScript("OnClick", function() self.selectedTab = i; self:Refresh(); end);
 		self.treeTabs[i] = tab;
 	end
@@ -73,6 +93,34 @@ function PlayerSpellsTalentsMixin:OnLoad()
 end
 
 -- default: the tree with the most points
+-- retail spec art: talents-background-<class>-<spec>, by the 3.3.5 tab order
+local SPEC_ART = {
+	WARRIOR = { "arms", "fury", "protection" },
+	PALADIN = { "holy", "protection", "retribution" },
+	HUNTER = { "beastmastery", "marksmanship", "survival" },
+	ROGUE = { "assassination", "outlaw", "subtlety" },
+	PRIEST = { "discipline", "holy", "shadow" },
+	DEATHKNIGHT = { "blood", "frost", "unholy" },
+	SHAMAN = { "elemental", "enhancement", "restoration" },
+	MAGE = { "arcane", "fire", "frost" },
+	WARLOCK = { "affliction", "demonology", "destruction" },
+	DRUID = { "balance", "feral", "restoration" },
+};
+
+local function SetSpecBackground(texture, tab, pet, group)
+	local _, classFile = UnitClass("player");
+	local spec = not pet and SPEC_ART[classFile] and SPEC_ART[classFile][tab];
+	local atlas = spec and ("talents-background-" .. classFile:lower() .. "-" .. spec);
+	if atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+		texture:SetAtlas(atlas);
+		return;
+	end
+	-- no retail art: the 3.3.5 one stretched
+	local _, _, _, background = GetTalentTabInfo(tab, false, pet, group);
+	texture:SetTexture("Interface\\TalentFrame\\" .. (background or "Rogue") .. "-TopLeft");
+	texture:SetTexCoord(0, 1, 0, 1);
+end
+
 local function MostSpentTab(group)
 	local best, bestPoints = 1, -1;
 	for i = 1, GetNumTalentTabs(false, false) or 0 do
@@ -192,6 +240,9 @@ function PlayerSpellsTalentsMixin:Refresh()
 	for _, tab in ipairs(self.treeTabs) do
 		if pet then tab:Hide(); end
 	end
+	SetSpecBackground(self.SpecBackground, pet and 1 or self.selectedTab or 1, pet, group);
+	self.ClassColumn:SetShown(not pet);
+	self.HeroColumn:SetShown(not pet);
 	PlayerSpellsCustomTalents.Refresh(self);
 
 	local bar = self.Bar;

@@ -9,7 +9,7 @@ local NODE_SIZE = 50;
 local ICON_SIZE = 44;
 local LINE_THICKNESS = 6;
 local NODE_RADIUS = 20;
-local HEADER_HEIGHT = 44;
+local HEADER_HEIGHT = 80;
 
 local ATLAS = {
 	circle = { yellow = "talents-node-circle-yellow", green = "talents-node-circle-green", gray = "talents-node-circle-gray" },
@@ -96,19 +96,13 @@ end
 -- columns
 ---------------------------------------------------------------------------
 local function CreateColumn(parent, name)
+	-- retail: no panels, the spec art of the frame shows through; centered name and points
 	local column = CreateFrame("Frame", name, parent);
-	local bg = column:CreateTexture(nil, "BACKGROUND");
-	bg:SetAllPoints();
-	bg:SetTexture(0, 0, 0, 0.35);
-	local header = column:CreateTexture(nil, "BORDER");
-	header:SetPoint("TOPLEFT");
-	header:SetPoint("TOPRIGHT");
-	header:SetHeight(HEADER_HEIGHT);
-	header:SetTexture(0, 0, 0, 0.6);
-	column.Name = column:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-	column.Name:SetPoint("TOPLEFT", 12, -13);
-	column.Points = column:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
-	column.Points:SetPoint("TOPRIGHT", -10, -13);
+	column.Name = column:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
+	column.Name:SetPoint("TOP", 0, -12);
+	column.Points = column:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge");
+	column.Points:SetPoint("TOP", column.Name, "BOTTOM", 0, -6);
+	column.Points:SetTextColor(0.6, 0.6, 0.6);
 	column.Content = CreateFrame("Frame", nil, column);
 	column.Content:SetPoint("TOPLEFT", 0, -HEADER_HEIGHT);
 	column.Content:SetPoint("BOTTOMRIGHT");
@@ -323,7 +317,7 @@ local function HeroChoice(column, show)
 			card.Button:SetPoint("BOTTOMRIGHT", -10, 10);
 			local bg = card:CreateTexture(nil, "BACKGROUND");
 			bg:SetAllPoints();
-			bg:SetTexture(1, 1, 1, 0.05);
+			bg:SetTexture(0, 0, 0, 0.45);
 			column.choices[i] = card;
 		end
 		card:ClearAllPoints();
@@ -375,8 +369,8 @@ function CT.Setup(frame)
 		return;
 	end
 	frame.ClassColumn = CreateColumn(frame, "PlayerSpellsClassTalents");
-	frame.ClassColumn:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -14);
-	frame.ClassColumn:SetWidth(680);
+	frame.ClassColumn:SetPoint("TOPLEFT", frame, "TOPLEFT", 40, -14);
+	frame.ClassColumn:SetWidth(660);
 	frame.ClassColumn:SetHeight(757);
 
 	frame.HeroColumn = CreateColumn(frame, "PlayerSpellsHeroTalents");
@@ -386,7 +380,7 @@ function CT.Setup(frame)
 	local change = CreateFrame("Button", nil, frame.HeroColumn, "UIPanelButtonTemplate");
 	change:SetWidth(110);
 	change:SetHeight(22);
-	change:SetPoint("TOPRIGHT", frame.HeroColumn, "TOPRIGHT", -50, -11);
+	change:SetPoint("TOP", frame.HeroColumn, "TOP", 0, -HEADER_HEIGHT + 10);
 	change:SetText(CHANGE or "Сменить");
 	change:SetScript("OnClick", function()
 		frame.HeroColumn.choosing = not frame.HeroColumn.choosing;
@@ -404,12 +398,12 @@ function CT.Refresh(frame)
 	local classTree = TreesOfKind(0)[1];
 	local class = frame.ClassColumn;
 	if classTree then
-		class.Name:SetText(classTree.name ~= "" and classTree.name or (UnitClass("player")));
+		class.Name:SetText(string.upper(classTree.name ~= "" and classTree.name or (UnitClass("player"))));
 		class.Points:SetText(SpentInTree(classTree.id));
 		LayoutTree(class, classTree.id);
 	else
-		class.Name:SetText((UnitClass("player")));
-		class.Points:SetText("");
+		class.Name:SetText(string.upper((UnitClass("player"))));
+		class.Points:SetText("0");
 		class.lineCount = 0;
 		for _, button in ipairs(class.buttons) do button:Hide(); end
 		for _, line in ipairs(class.lines) do line:Hide(); end
@@ -422,7 +416,7 @@ function CT.Refresh(frame)
 	hero.ChangeButton:SetShown(heroTree ~= nil and #TreesOfKind(1) > 1);
 	hero.ChangeButton:SetText(choosing and CANCEL or (CHANGE or "Сменить"));
 	if choosing then
-		hero.Name:SetText(heroTree and heroTree.name or "");
+		hero.Name:SetText("|cff1eff00" .. string.upper(HERO_TALENTS_CHOOSE or "Выберите геройские таланты") .. "|r");
 		hero.Points:SetText("");
 		hero.lineCount = 0;
 		for _, button in ipairs(hero.buttons) do button:Hide(); end
@@ -430,7 +424,7 @@ function CT.Refresh(frame)
 		HeroChoice(hero, true);
 	else
 		HeroChoice(hero, false);
-		hero.Name:SetText(heroTree.name);
+		hero.Name:SetText(string.upper(heroTree.name));
 		hero.Points:SetText(SpentInTree(heroTree.id));
 		LayoutTree(hero, heroTree.id);
 	end
