@@ -169,6 +169,14 @@ function Menu.OpenSubmenu(button, description)
 
 	submenuFrame:ClearAllPoints();
 	submenuFrame:SetPoint("TOPLEFT", button, "TOPRIGHT", 12, 6);
+	-- no room on the right: to the left of the menu
+	local right = button:GetRight();
+	if right and (right + 12 + submenuFrame:GetWidth()) * button:GetEffectiveScale() > UIParent:GetRight() * UIParent:GetEffectiveScale() then
+		submenuFrame:ClearAllPoints();
+		submenuFrame:SetPoint("TOPRIGHT", button, "TOPLEFT", -12, 6);
+	end
+	-- the screen edges move it inside (low frames, a long submenu)
+	submenuFrame:SetClampedToScreen(true);
 	submenuFrame:Show();
 end
 
@@ -195,6 +203,8 @@ local function OpenMenuInternal(owner, description, anchorFunc)
 
 	BuildMenu(menuFrame, description);
 	anchorFunc(menuFrame);
+	-- a menu opened near the screen edge (a frame low on the screen, a long raid menu) stays inside it
+	menuFrame:SetClampedToScreen(true);
 	menuFrame:Show();
 
 	return menuFrame;
