@@ -51,7 +51,7 @@ namespace
     constexpr double STAT_STEP = 1.00936;
     constexpr double ARMOR_STEP = 1.00936;
     constexpr double DAMAGE_STEP = 1.00936;
-    constexpr int32 MAX_BONUS = 200;
+    constexpr int32 MAX_BONUS = 2000;              // stats grow x1.00936 per level: above ~2000 they overflow int32
 
     std::unordered_map<uint32, int32> bonuses;   // item guid -> bonus
 

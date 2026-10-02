@@ -67,7 +67,7 @@
  * Setup: sql/world_mythic_plus.sql, sql/characters_mythic_plus.sql, AddSC_mythic_plus() in custom_script_loader.cpp.
  */
 
-#include "item_scaling.h"
+#include "Custom\ItemScalling\item_scaling.h"
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Bag.h"
@@ -128,16 +128,16 @@ namespace
     // slots 7..9 - world row (delves), no progress source yet
     constexpr uint32 BATTLE_RES_INTERVAL = 10 * MINUTE * IN_MILLISECONDS;   // +1 battle res charge
     constexpr int32 MYTHIC_ILVL_PER_LEVEL = 3;      // chest items: item level +3 per keystone level
-    constexpr uint32 MYTHIC_ILVL_MAX_LEVEL = 20;    // ... up to this keystone level             // the keystone frame closes farther away than this
+    constexpr uint32 MYTHIC_ILVL_MAX_LEVEL = 0xFFFFFFF;   // no cap: every keystone level adds MYTHIC_ILVL_PER_LEVEL    // ... up to this keystone level             // the keystone frame closes farther away than this
 
     constexpr uint32 MIN_KEY_LEVEL = 1;
-    constexpr uint32 MAX_KEY_LEVEL = 30;
+    constexpr uint32 MAX_KEY_LEVEL = 0xFFFFFFF;          // no real cap: the scaling makes high keys impossible
     constexpr uint32 FIRST_AFFIX_LEVEL = 2;
     constexpr uint32 SECOND_AFFIX_LEVEL = 4;
     constexpr uint32 THIRD_AFFIX_LEVEL = 7;
 
     constexpr float LEVEL_SCALE = 1.08f;            // health and damage per level above 1
-    constexpr float FORCES_AUTO_PCT = 0.9f;         // required forces when the dungeon row has 0
+    constexpr float FORCES_AUTO_PCT = 0.75f;         // required forces when the dungeon row has 0
     constexpr uint32 COUNTDOWN_MS = 10 * IN_MILLISECONDS;
     constexpr uint32 DEATH_PENALTY = 5;             // seconds
     constexpr uint32 DEFAULT_TIME_LIMIT = 30 * MINUTE;
@@ -755,7 +755,7 @@ namespace
             "SELECT CAST(rating AS SIGNED) FROM character_mythic_plus_season_reward WHERE guid = {} AND season = {}", guid, season).c_str()))
             do
                 given.insert(uint32(result->Fetch()[0].GetInt64()));
-            while (result->NextRow());
+        while (result->NextRow());
 
         for (SeasonReward const& reward : s_seasonRewards)
         {
@@ -812,11 +812,11 @@ namespace
     void SyncRun(Run const& run, bool withBosses = false)
     {
         ForEachPlayer(RunMap(run), [&](Player* player)
-        {
-            if (withBosses)
-                SendBosses(player, run);
-            SendRun(player, run);
-        });
+            {
+                if (withBosses)
+                    SendBosses(player, run);
+                SendRun(player, run);
+            });
     }
 
     // ---------------------------------------------------------------- creature scaling
@@ -857,7 +857,8 @@ namespace
             return;
         // through the health modifier: UpdateMaxHealth (auras, evade) keeps the scaled value
         float pct = creature->GetHealthPct();
-        creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, itr->second.BaseHealth * mult);
+        // keys have no cap: the health stays within uint32 (about 2 billion)
+        creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, std::min(itr->second.BaseHealth * mult, 2000000000.0f));
         creature->UpdateMaxHealth();
         creature->SetHealth(std::max<uint32>(1, uint32(creature->GetMaxHealth() * pct / 100.0f)));
         itr->second.Applied = mult;
@@ -916,15 +917,15 @@ namespace
         std::ostringstream list;
         bool first = true;
         auto add = [&](uint32 bag, uint32 slot, Item* item)
-        {
-            if (!item)
-                return;
-            auto itr = s_mythicItems.find(item->GetGUID().GetCounter());
-            if (itr == s_mythicItems.end())
-                return;
-            list << (first ? "" : ",") << bag << '/' << slot << '/' << itr->second;
-            first = false;
-        };
+            {
+                if (!item)
+                    return;
+                auto itr = s_mythicItems.find(item->GetGUID().GetCounter());
+                if (itr == s_mythicItems.end())
+                    return;
+                list << (first ? "" : ",") << bag << '/' << slot << '/' << itr->second;
+                first = false;
+            };
         for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
             add(255, slot + 1, player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
         for (uint8 slot = INVENTORY_SLOT_ITEM_START; slot < INVENTORY_SLOT_ITEM_END; ++slot)
@@ -976,13 +977,13 @@ namespace
             if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
                 func(item);
         auto bags = [&](uint8 first, uint8 last)
-        {
-            for (uint8 bagSlot = first; bagSlot < last; ++bagSlot)
-                if (Bag* bag = player->GetBagByPos(bagSlot))
-                    for (uint32 i = 0; i < bag->GetBagSize(); ++i)
-                        if (Item* item = bag->GetItemByPos(uint8(i)))
-                            func(item);
-        };
+            {
+                for (uint8 bagSlot = first; bagSlot < last; ++bagSlot)
+                    if (Bag* bag = player->GetBagByPos(bagSlot))
+                        for (uint32 i = 0; i < bag->GetBagSize(); ++i)
+                            if (Item* item = bag->GetItemByPos(uint8(i)))
+                                func(item);
+            };
         bags(INVENTORY_SLOT_BAG_START, INVENTORY_SLOT_BAG_END);
         bags(BANK_SLOT_BAG_START, BANK_SLOT_BAG_END);
     }
@@ -992,14 +993,14 @@ namespace
     void ReconcileMythicItems(Player* player)
     {
         ForEachPlayerItem(player, [&](Item* item)
-        {
-            auto itr = s_mythicItems.find(item->GetGUID().GetCounter());
-            if (itr == s_mythicItems.end())
-                return;
-            int32 bonus = int32(std::min(itr->second, MYTHIC_ILVL_MAX_LEVEL)) * MYTHIC_ILVL_PER_LEVEL;
-            if (ItemScaling::GetBonus(item) < bonus)
-                ItemScaling::SetBonus(player, item, bonus);
-        });
+            {
+                auto itr = s_mythicItems.find(item->GetGUID().GetCounter());
+                if (itr == s_mythicItems.end())
+                    return;
+                int32 bonus = int32(std::min(itr->second, MYTHIC_ILVL_MAX_LEVEL)) * MYTHIC_ILVL_PER_LEVEL;
+                if (ItemScaling::GetBonus(item) < bonus)
+                    ItemScaling::SetBonus(player, item, bonus);
+            });
     }
 
     void HandleItemsGet(Player* player, std::vector<std::string> const& /*args*/)
@@ -1040,10 +1041,10 @@ namespace
         {
             run.State = RUN_DONE_TIMED;
             ForEachPlayer(map, [&](Player* player)
-            {
-                Message(player, MSG_DONE_ZERO);
-                GrantNewKey(player, MIN_KEY_LEVEL);
-            });
+                {
+                    Message(player, MSG_DONE_ZERO);
+                    GrantNewKey(player, MIN_KEY_LEVEL);
+                });
             SyncRun(run);
             return;
         }
@@ -1070,27 +1071,27 @@ namespace
 
         uint32 score = CalcScore(run.Level, uint32(run.Affixes.size()), timed, timeMs, run.TimeLimit);
         std::string text = timed ? Fmt(MSG_DONE_TIMED, run.Level, TimeText(timeMs).c_str(), upgrade)
-                                 : Fmt(MSG_DONE_LATE, run.Level, TimeText(timeMs).c_str());
+            : Fmt(MSG_DONE_LATE, run.Level, TimeText(timeMs).c_str());
 
         ForEachPlayer(map, [&](Player* player)
-        {
-            run.ChestAllowed.insert(player->GetGUID().GetCounter());
-            Message(player, text);
-            ObjectGuid::LowType guid = player->GetGUID().GetCounter();
-            uint32 oldRating = GetRating(guid);
-            SaveBest(player, run, timed, timeMs, score);
-            uint32 newRating = GetRating(guid);
-            // Great Vault: every completed keystone of the week counts
-            CharacterDatabase.Execute(Trinity::StringFormat(
-                "INSERT INTO character_mythic_plus_weekly (guid, week, map_id, level) VALUES ({}, {}, {}, {})",
-                guid, CurrentWeek(), run.MapId, run.Level).c_str());
-            sAddonComm->Send(player, "MPLUS_COMPLETE", timed ? 1 : 0, upgrade, timeMs, run.Level, newLevel, score,
-                oldRating, newRating, run.MapId, Sanitize(DungeonName(run.MapId)));
-            if (player->GetGUID().GetCounter() != run.KeyOwner)
-                GrantNewKey(player, std::max(MIN_KEY_LEVEL, run.Level - 1));
-            SendRating(player);
-            CheckSeasonRewards(player);
-        });
+            {
+                run.ChestAllowed.insert(player->GetGUID().GetCounter());
+                Message(player, text);
+                ObjectGuid::LowType guid = player->GetGUID().GetCounter();
+                uint32 oldRating = GetRating(guid);
+                SaveBest(player, run, timed, timeMs, score);
+                uint32 newRating = GetRating(guid);
+                // Great Vault: every completed keystone of the week counts
+                CharacterDatabase.Execute(Trinity::StringFormat(
+                    "INSERT INTO character_mythic_plus_weekly (guid, week, map_id, level) VALUES ({}, {}, {}, {})",
+                    guid, CurrentWeek(), run.MapId, run.Level).c_str());
+                sAddonComm->Send(player, "MPLUS_COMPLETE", timed ? 1 : 0, upgrade, timeMs, run.Level, newLevel, score,
+                    oldRating, newRating, run.MapId, Sanitize(DungeonName(run.MapId)));
+                if (player->GetGUID().GetCounter() != run.KeyOwner)
+                    GrantNewKey(player, std::max(MIN_KEY_LEVEL, run.Level - 1));
+                SendRating(player);
+                CheckSeasonRewards(player);
+            });
 
         // chest: the dungeon row position, else where the last boss died, else the Font of Power
         if (map)
@@ -1177,11 +1178,11 @@ namespace
             run.Pools.push_back({ creature->GetPosition(), SANGUINE_DURATION });
         if (HasAffix(run, AFFIX_BURSTING))
             ForEachPlayer(map, [&](Player* player)
-            {
-                PlayerDebuffs& d = run.Debuffs[player->GetGUID()];
-                ++d.Bursting;
-                d.BurstingTimer = 4 * IN_MILLISECONDS;
-            });
+                {
+                    PlayerDebuffs& d = run.Debuffs[player->GetGUID()];
+                    ++d.Bursting;
+                    d.BurstingTimer = 4 * IN_MILLISECONDS;
+                });
 
         SyncRun(run);
         CheckComplete(run);
@@ -1290,13 +1291,13 @@ namespace
                     run.BarrierGuids.push_back(barrier->GetGUID());
 
         ForEachPlayer(map, [&](Player* member)
-        {
-            member->NearTeleportTo(run.StartPos.GetPositionX(), run.StartPos.GetPositionY(), run.StartPos.GetPositionZ(), run.StartPos.GetOrientation());
-            Message(member, MSG_STARTED);
-            sAddonComm->Send(member, "MPLUS_FONT_CLOSE");
-            s_slotted.erase(member->GetGUID());
-            s_fontUser.erase(member->GetGUID());
-        });
+            {
+                member->NearTeleportTo(run.StartPos.GetPositionX(), run.StartPos.GetPositionY(), run.StartPos.GetPositionZ(), run.StartPos.GetOrientation());
+                Message(member, MSG_STARTED);
+                sAddonComm->Send(member, "MPLUS_FONT_CLOSE");
+                s_slotted.erase(member->GetGUID());
+                s_fontUser.erase(member->GetGUID());
+            });
         SyncRun(run, true);
     }
 
@@ -1310,7 +1311,7 @@ namespace
             "SELECT CAST(level AS SIGNED) FROM character_mythic_plus_weekly WHERE guid = {} AND week = {} ORDER BY level DESC", guid, week).c_str()))
             do
                 levels.push_back(uint32(result->Fetch()[0].GetInt64()));
-            while (result->NextRow());
+        while (result->NextRow());
         return levels;
     }
 
@@ -1322,7 +1323,7 @@ namespace
             "SELECT CAST(difficulty AS SIGNED) FROM character_vault_raid WHERE guid = {} AND week = {} ORDER BY difficulty DESC", guid, week).c_str()))
             do
                 levels.push_back(uint32(result->Fetch()[0].GetInt64()));
-            while (result->NextRow());
+        while (result->NextRow());
         return levels;
     }
 
@@ -1334,13 +1335,13 @@ namespace
         uint32 week = CurrentWeek();
         uint32 difficulty = uint32(map->GetDifficultyID());
         ForEachPlayer(map, [&](Player* member)
-        {
-            // one row per boss and week; a kill on a higher difficulty replaces the lower one
-            CharacterDatabase.Execute(Trinity::StringFormat(
-                "INSERT INTO character_vault_raid (guid, week, entry, map_id, difficulty) VALUES ({}, {}, {}, {}, {}) "
-                "ON DUPLICATE KEY UPDATE difficulty = GREATEST(difficulty, VALUES(difficulty))",
-                member->GetGUID().GetCounter(), week, boss->GetEntry(), map->GetId(), difficulty).c_str());
-        });
+            {
+                // one row per boss and week; a kill on a higher difficulty replaces the lower one
+                CharacterDatabase.Execute(Trinity::StringFormat(
+                    "INSERT INTO character_vault_raid (guid, week, entry, map_id, difficulty) VALUES ({}, {}, {}, {}, {}) "
+                    "ON DUPLICATE KEY UPDATE difficulty = GREATEST(difficulty, VALUES(difficulty))",
+                    member->GetGUID().GetCounter(), week, boss->GetEntry(), map->GetId(), difficulty).c_str());
+            });
     }
 
     uint32 ChestLoot(uint32 mapId)
@@ -1363,7 +1364,7 @@ namespace
             "SELECT CAST(map_id AS SIGNED) FROM character_mythic_plus_weekly WHERE guid = {} AND week = {} ORDER BY level DESC", guid, week).c_str()))
             do
                 maps.push_back(uint32(result->Fetch()[0].GetInt64()));
-            while (result->NextRow());
+        while (result->NextRow());
         return maps;
     }
 
@@ -1826,10 +1827,10 @@ namespace
             }
             itr->TimeLeft -= tick;
             ForEachPlayer(map, [&](Player* player)
-            {
-                if (player->IsWithinDist(storm, 4.0f))
-                    AffixDamage(run, player, player->CountPctFromMaxHealth(8), DAMAGE_FALL);
-            });
+                {
+                    if (player->IsWithinDist(storm, 4.0f))
+                        AffixDamage(run, player, player->CountPctFromMaxHealth(8), DAMAGE_FALL);
+                });
             ++itr;
         }
 
@@ -1841,18 +1842,18 @@ namespace
                 run.QuakeWarn = run.QuakeWarn > tick ? run.QuakeWarn - tick : 0;
                 if (!run.QuakeWarn)
                     ForEachPlayer(map, [&](Player* player)
-                    {
-                        if (!player->IsAlive())
-                            return;
-                        uint32 near = 0;
-                        ForEachPlayer(map, [&](Player* other)
                         {
-                            if (other != player && other->IsAlive() && player->IsWithinDist(other, 8.0f))
-                                ++near;
+                            if (!player->IsAlive())
+                                return;
+                            uint32 near = 0;
+                            ForEachPlayer(map, [&](Player* other)
+                                {
+                                    if (other != player && other->IsAlive() && player->IsWithinDist(other, 8.0f))
+                                        ++near;
+                                });
+                            player->InterruptNonMeleeSpells(false);
+                            AffixDamage(run, player, player->CountPctFromMaxHealth(15) * (1 + near), DAMAGE_FALL);
                         });
-                        player->InterruptNonMeleeSpells(false);
-                        AffixDamage(run, player, player->CountPctFromMaxHealth(15) * (1 + near), DAMAGE_FALL);
-                    });
             }
             run.QuakeTimer += tick;
             if (run.QuakeTimer >= 20 * IN_MILLISECONDS)
@@ -1915,8 +1916,8 @@ namespace
                     continue;
                 run.Inspired.insert(creature->GetGUID());
                 for (Mechanics mechanic : { MECHANIC_STUN, MECHANIC_FEAR, MECHANIC_ROOT, MECHANIC_SILENCE, MECHANIC_SLEEP,
-                                            MECHANIC_CHARM, MECHANIC_POLYMORPH, MECHANIC_HORROR, MECHANIC_DISORIENTED, MECHANIC_KNOCKOUT,
-                                            MECHANIC_SNARE, MECHANIC_FREEZE, MECHANIC_BANISH, MECHANIC_SAPPED })
+                    MECHANIC_CHARM, MECHANIC_POLYMORPH, MECHANIC_HORROR, MECHANIC_DISORIENTED, MECHANIC_KNOCKOUT,
+                    MECHANIC_SNARE, MECHANIC_FREEZE, MECHANIC_BANISH, MECHANIC_SAPPED })
                     creature->ApplySpellImmune(0, IMMUNITY_MECHANIC, mechanic, true);
             }
     }
@@ -2051,7 +2052,7 @@ namespace
             {
                 Field* f = result->Fetch();
                 list << (first ? "" : ",") << f[0].GetString() << ";" << f[1].GetInt64() << ";" << f[2].GetInt64() << ";"
-                     << f[3].GetInt64() << ";" << f[4].GetInt64() << ";" << f[5].GetInt64();
+                    << f[3].GetInt64() << ";" << f[4].GetInt64() << ";" << f[5].GetInt64();
                 first = false;
             } while (result->NextRow());
         }
@@ -2097,14 +2098,14 @@ namespace
                 run.BattleResTimer = 0;
                 // retail: everybody starts fresh - cooldowns, health and power
                 ForEachPlayer(map, [&](Player* player)
-                {
-                    player->GetSpellHistory()->ResetAllCooldowns();
-                    if (player->IsAlive())
                     {
-                        player->SetFullHealth();
-                        player->SetPower(player->GetPowerType(), player->GetMaxPower(player->GetPowerType()));
-                    }
-                });
+                        player->GetSpellHistory()->ResetAllCooldowns();
+                        if (player->IsAlive())
+                        {
+                            player->SetFullHealth();
+                            player->SetPower(player->GetPowerType(), player->GetMaxPower(player->GetPowerType()));
+                        }
+                    });
                 for (ObjectGuid const& guid : run.BarrierGuids)
                     if (GameObject* barrier = map->GetGameObject(guid))
                         barrier->DespawnOrUnsummon();
@@ -2184,10 +2185,10 @@ namespace
             {
                 SanguinePool& pool = *itr;
                 ForEachPlayer(map, [&](Player* player)
-                {
-                    if (player->GetExactDist(&pool.Pos) <= SANGUINE_RANGE)
-                        AffixDamage(run, player, player->CountPctFromMaxHealth(3), DAMAGE_SLIME);
-                });
+                    {
+                        if (player->GetExactDist(&pool.Pos) <= SANGUINE_RANGE)
+                            AffixDamage(run, player, player->CountPctFromMaxHealth(3), DAMAGE_SLIME);
+                    });
                 for (auto const& pair : map->GetCreatureBySpawnIdStore())
                 {
                     Creature* creature = pair.second;
@@ -2210,22 +2211,22 @@ namespace
                 run.GrievousTimer = 0;
 
             ForEachPlayer(map, [&](Player* player)
-            {
-                PlayerDebuffs& d = run.Debuffs[player->GetGUID()];
-                if (d.Bursting)
-                    AffixDamage(run, player, player->CountPctFromMaxHealth(2) * d.Bursting, DAMAGE_FIRE);
-
-                if (grievous && player->IsAlive())
                 {
-                    if (player->GetHealthPct() >= 90.0f)
-                        d.Grievous = 0;
-                    else if (grievousTick)
+                    PlayerDebuffs& d = run.Debuffs[player->GetGUID()];
+                    if (d.Bursting)
+                        AffixDamage(run, player, player->CountPctFromMaxHealth(2) * d.Bursting, DAMAGE_FIRE);
+
+                    if (grievous && player->IsAlive())
                     {
-                        d.Grievous = std::min<uint32>(d.Grievous + 1, 10);
-                        AffixDamage(run, player, uint32(player->GetMaxHealth() * 0.015f * d.Grievous), DAMAGE_DROWNING);
+                        if (player->GetHealthPct() >= 90.0f)
+                            d.Grievous = 0;
+                        else if (grievousTick)
+                        {
+                            d.Grievous = std::min<uint32>(d.Grievous + 1, 10);
+                            AffixDamage(run, player, uint32(player->GetMaxHealth() * 0.005f * d.Grievous), DAMAGE_DROWNING);
+                        }
                     }
-                }
-            });
+                });
 
             UpdateNewAffixes(run, map);
 
@@ -2266,7 +2267,7 @@ namespace
 // (items straight into the bags, by mail when the bags are full)
 struct go_mythic_plus_chest : public GameObjectAI
 {
-    go_mythic_plus_chest(GameObject* go) : GameObjectAI(go) { }
+    go_mythic_plus_chest(GameObject* go) : GameObjectAI(go) {}
 
     bool OnGossipHello(Player* player) override
     {
@@ -2324,7 +2325,7 @@ struct go_mythic_plus_chest : public GameObjectAI
 
 struct go_mythic_plus_font : public GameObjectAI
 {
-    go_mythic_plus_font(GameObject* go) : GameObjectAI(go) { }
+    go_mythic_plus_font(GameObject* go) : GameObjectAI(go) {}
 
     bool OnGossipHello(Player* player) override
     {
@@ -2351,7 +2352,7 @@ class mythic_plus_world : public WorldScript
     uint32 fontTimer = 0;
 
 public:
-    mythic_plus_world() : WorldScript("mythic_plus_world") { }
+    mythic_plus_world() : WorldScript("mythic_plus_world") {}
 
     void OnStartup() override
     {
@@ -2515,7 +2516,7 @@ public:
 class mythic_plus_unit : public UnitScript
 {
 public:
-    mythic_plus_unit() : UnitScript("mythic_plus_unit") { }
+    mythic_plus_unit() : UnitScript("mythic_plus_unit") {}
 
     template <typename T>
     static void Modify(Unit* target, Unit* attacker, T& damage)
@@ -2533,7 +2534,7 @@ public:
             float mult = CreatureMult(*run, creature, false);
             if (HasAffix(*run, AFFIX_RAGING) && !IsBoss(creature) && creature->GetHealthPct() < 30.0f)
                 mult *= 1.5f;
-            damage = T(damage * mult);
+            damage = T(std::min(float(damage) * mult, 2000000000.0f));   // no overflow on very high keys
         }
         else if (IsEnemyCreature(target))
             ScaleCreature(*run, target->ToCreature());
@@ -2590,7 +2591,7 @@ public:
 class mythic_plus_commands : public CommandScript
 {
 public:
-    mythic_plus_commands() : CommandScript("mythic_plus_commands") { }
+    mythic_plus_commands() : CommandScript("mythic_plus_commands") {}
 
     ChatCommandTable GetCommands() const override
     {
@@ -2716,7 +2717,7 @@ class spell_mythic_plus_battle_res : public SpellScript
 class mythic_plus_group : public GroupScript
 {
 public:
-    mythic_plus_group() : GroupScript("mythic_plus_group") { }
+    mythic_plus_group() : GroupScript("mythic_plus_group") {}
 
     void OnAddMember(Group* group, ObjectGuid guid) override
     {
@@ -2735,7 +2736,7 @@ public:
 // Great Vault object (ScriptName go_mythic_plus_vault)
 struct go_mythic_plus_vault : public GameObjectAI
 {
-    go_mythic_plus_vault(GameObject* go) : GameObjectAI(go) { }
+    go_mythic_plus_vault(GameObject* go) : GameObjectAI(go) {}
 
     bool OnGossipHello(Player* player) override
     {
@@ -2748,7 +2749,7 @@ struct go_mythic_plus_vault : public GameObjectAI
 // keystone NPC: another dungeon for the key once a week (gold), or the key one level lower
 struct npc_mythic_plus_keystone : public ScriptedAI
 {
-    npc_mythic_plus_keystone(Creature* creature) : ScriptedAI(creature) { }
+    npc_mythic_plus_keystone(Creature* creature) : ScriptedAI(creature) {}
 
     enum
     {
