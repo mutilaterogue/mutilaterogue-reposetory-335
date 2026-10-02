@@ -549,7 +549,7 @@ namespace
         std::set<uint32>& entries = cache[mapId];
         for (uint32 difficulty = 0; difficulty < 2; ++difficulty)
             if (DungeonEncounterList const* encounters = sObjectMgr->GetDungeonEncounterList(mapId, Difficulty(difficulty)))
-                for (DungeonEncounter const* encounter : *encounters)
+                for (auto const& encounter : *encounters)
                     if (encounter->creditType == ENCOUNTER_CREDIT_KILL_CREATURE && encounter->creditEntry)
                         entries.insert(encounter->creditEntry);
         return entries;
