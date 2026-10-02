@@ -13,6 +13,15 @@ local L = {
 };
 
 
+-- 3.3.5 has no ConvertToParty: the server does it (server/group_convert.cpp, "GROUP_TO_PARTY")
+if not ConvertToParty then
+	function ConvertToParty()
+		if Comm_Send then
+			Comm_Send("GROUP_TO_PARTY");
+		end
+	end
+end
+
 local LOOT_METHODS = {
 	{ "freeforall", LOOT_FREE_FOR_ALL },
 	{ "roundrobin", LOOT_ROUND_ROBIN },

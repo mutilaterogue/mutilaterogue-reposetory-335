@@ -1,0 +1,36 @@
+Group::ConvertToParty for 3.3.5 (server/group_convert.cpp, client ConvertToParty in PlayerFrameMenu.lua).
+Apply by hand (the context lines are from TrinityCore 3.3.5, they may differ a little in your tree).
+
+--- a/src/server/game/Groups/Group.h
++++ b/src/server/game/Groups/Group.h
+@@ class TC_GAME_API Group
+         void   ConvertToLFG();
+         void   ConvertToRaid();
++        // custom: back to a party (raid of up to 5 members): subgroups to 0, raid flag off
++        void   ConvertToParty();
+
+--- a/src/server/game/Groups/Group.cpp
++++ b/src/server/game/Groups/Group.cpp
+@@ after void Group::ConvertToRaid() { ... }
++void Group::ConvertToParty()
++{
++    if (!isRaidGroup() || isBGGroup() || GetMembersCount() > MAX_GROUP_SIZE)
++        return;
++
++    m_groupType = GroupType(m_groupType & ~GROUPTYPE_RAID);
++    for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
++        itr->group = 0;
++
++    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GROUP_TYPE);
++    stmt->setUInt8(0, uint8(m_groupType));
++    stmt->setUInt32(1, m_dbStoreId);
++    CharacterDatabase.Execute(stmt);
++    CharacterDatabase.Execute(Trinity::StringFormat("UPDATE group_member SET subgroup = 0 WHERE guid = {}", m_dbStoreId).c_str());
++
++    SendUpdate();
++
++    // quest related GO states depend on the raid membership (as in ConvertToRaid)
++    for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
++        if (Player* player = ObjectAccessor::FindPlayer(itr->guid))
++            player->UpdateForQuestWorldObjects();
++}

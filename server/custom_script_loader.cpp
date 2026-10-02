@@ -33,6 +33,7 @@ void AddSC_item_scaling();
 void AddSC_item_upgrade();
 void AddSC_mythic_plus();
 void AddSC_archaeology();
+void AddSC_group_convert();
 
 void AddCustomScripts()
 {
@@ -50,4 +51,5 @@ void AddCustomScripts()
     AddSC_item_upgrade();
     AddSC_mythic_plus();
     AddSC_archaeology();
+    AddSC_group_convert();
 }
