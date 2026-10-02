@@ -29,46 +29,31 @@ local HIGHLIGHT = "|cff3fc7eb";	-- the blue of the retail tutorial
 ---------------------------------------------------------------------------
 local tutorial;
 
-local function CreateCard(parent, text, x, y)
-	local label = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
-	label:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y);
-	label:SetWidth(360);
-	label:SetJustifyH("LEFT");
+-- retail layout: the art (Ping_Tutorial, 945x760, Interface/RadialWheel/UIPingSystemTutorial) holds the four
+-- pictures and the macro box; the texts are over it (positions as in retail)
+local TUTORIAL_TOP = 22;	-- the title bar of the frame above the art
+
+local function TutorialText(parent, text, x, y, width, font, justify)
+	local label = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlightLarge");
+	label:SetPoint(justify == "CENTER" and "TOP" or "TOPLEFT", parent, "TOPLEFT", x, -(TUTORIAL_TOP + y));
+	if width then
+		label:SetWidth(width);
+	end
+	label:SetJustifyH(justify or "LEFT");
 	label:SetText(text);
-
-	local card = CreateFrame("Frame", nil, parent);
-	card:SetWidth(360);
-	card:SetHeight(250);
-	card:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 60);
-	card:SetBackdrop({
-		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		tile = true, tileSize = 16, edgeSize = 16,
-		insets = { left = 4, right = 4, top = 4, bottom = 4 },
-	});
-	card:SetBackdropColor(0.05, 0.12, 0.16, 0.9);
-	card:SetBackdropBorderColor(0.6, 0.6, 0.6, 1);
-	return card;
-end
-
-local function CardIcon(card, atlas, x, y, size)
-	local texture = card:CreateTexture(nil, "ARTWORK");
-	texture:SetPoint("CENTER", card, "CENTER", x, y);
-	texture:SetAtlas(atlas, false);
-	texture:SetWidth(size);
-	texture:SetHeight(size);
-	return texture;
+	return label;
 end
 
 function Ping_ShowTutorial()
 	if not tutorial then
 		tutorial = CreateFrame("Frame", "PingSystemTutorial", UIParent, "RetailPortraitFrameTemplate");
-		tutorial:SetWidth(880);
-		tutorial:SetHeight(760);
+		tutorial:SetWidth(945);
+		tutorial:SetHeight(760 + TUTORIAL_TOP);
 		tutorial:SetPoint("CENTER", 0, 0);
 		tutorial:SetFrameStrata("DIALOG");
 		tutorial:EnableMouse(true);
 		tutorial:SetMovable(true);
+		tutorial:SetClampedToScreen(true);
 		tutorial:RegisterForDrag("LeftButton");
 		tutorial:SetScript("OnDragStart", tutorial.StartMoving);
 		tutorial:SetScript("OnDragStop", tutorial.StopMovingOrSizing);
@@ -78,46 +63,20 @@ function Ping_ShowTutorial()
 		if tutorial.PortraitContainer then
 			tutorial.PortraitContainer:Hide();
 		end
-		tutorial.Bg:SetTexture(0.04, 0.1, 0.12, 0.97);
 
-		-- 1: quick ping
-		local quick = CreateCard(tutorial, HIGHLIGHT .. "Нажмите|r клавишу отметки, чтобы быстро поставить отметку.", 60, -50);
-		CardIcon(quick, "Ping_Marker_Icon_Warning", -90, 40, 40);
-		CardIcon(quick, "Ping_Marker_Icon_Warning", 0, 0, 40);
-		CardIcon(quick, "Ping_Marker_Icon_Warning", 90, 40, 40);
+		local art = tutorial:CreateTexture(nil, "ARTWORK");
+		art:SetPoint("TOPLEFT", tutorial, "TOPLEFT", 0, -TUTORIAL_TOP);
+		art:SetAtlas("Ping_Tutorial", true);
 
-		-- 2: the wheel
-		local wheel = CreateCard(tutorial, HIGHLIGHT .. "Нажмите и удерживайте|r клавишу отметки, чтобы выбрать определенную отметку.", 460, -50);
-		CardIcon(wheel, "Radial_Wheel_BG", 0, 0, 200);
-		CardIcon(wheel, "Radial_Wheel_Frame_Count_4", 0, 0, 200);
-		CardIcon(wheel, "Ping_Wheel_Icon_Attack", 0, 60, 44);
-		CardIcon(wheel, "Ping_Wheel_Icon_Warning", -60, 0, 44);
-		CardIcon(wheel, "Ping_Wheel_Icon_OnMyWay", 0, -60, 44);
-		CardIcon(wheel, "Ping_Wheel_Icon_Assist", 60, 0, 44);
-		CardIcon(wheel, "Radial_Wheel_Icon_Close", 0, 0, 24);
+		TutorialText(tutorial, HIGHLIGHT .. "Нажмите|r клавишу отметки, чтобы быстро поставить отметку.", 70, 50, 360);
+		TutorialText(tutorial, HIGHLIGHT .. "Нажмите и удерживайте|r клавишу отметки, чтобы выбрать определенную отметку.", 513, 32, 360);
+		TutorialText(tutorial, HIGHLIGHT .. "Размещайте отметку|r прямо на существах, персонажах и на вашей цели.", 70, 397, 360);
+		TutorialText(tutorial, HIGHLIGHT .. "Создавайте макросы|r с отметками.", 513, 432, 360);
 
-		-- 3: on units
-		local units = CreateCard(tutorial, HIGHLIGHT .. "Размещайте отметку|r прямо на существах, персонажах и на вашей цели.", 60, -400);
-		CardIcon(units, "Ping_Marker_Icon_Attack", 0, 30, 64);
-		local unitText = units:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
-		unitText:SetPoint("BOTTOM", units, "BOTTOM", 0, 30);
-		unitText:SetWidth(320);
-		unitText:SetText("Наведите курсор на свою цель - отметка пойдет за ней.");
-
-		-- 4: macros
-		local macro = CreateCard(tutorial, HIGHLIGHT .. "Создавайте макросы|r с отметками.", 460, -400);
-		local macroLine = macro:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
-		macroLine:SetPoint("TOP", macro, "TOP", 0, -60);
-		macroLine:SetText("Наберите " .. HIGHLIGHT .. "/macro|r в чате");
-		local macroTitle = macro:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
-		macroTitle:SetPoint("TOP", macroLine, "BOTTOM", 0, -40);
-		macroTitle:SetText("Макрос:");
-		local macroText = macro:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-		macroText:SetPoint("TOP", macroTitle, "BOTTOM", 0, -10);
-		macroText:SetText("/отметка [@target] атака");
-		local macroTypes = macro:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall");
-		macroTypes:SetPoint("TOP", macroText, "BOTTOM", 0, -12);
-		macroTypes:SetText("атака, внимание, иду, помощь (или /ping attack, warning, onmyway, assist)");
+		-- the macro box of the art
+		TutorialText(tutorial, "Наберите " .. HIGHLIGHT .. "/macro|r в чате", 695, 528, nil, "GameFontHighlightLarge", "CENTER");
+		TutorialText(tutorial, "Макрос:", 695, 597, nil, "GameFontHighlightLarge", "CENTER");
+		TutorialText(tutorial, "|cffffd100/отметка [@target] атака|r", 695, 628, nil, "GameFontHighlightLarge", "CENTER");
 	end
 	SetCVar("pingTutorialSeen", "1");
 	tutorial:Show();
