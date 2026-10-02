@@ -88,8 +88,17 @@ function PingWheel_OnLoad(self)
 	self:OnLoad();
 end
 
+-- pingMode "1": a press opens the wheel, the next press pings (retail "toggle"); "0": hold and release
+local function ToggleMode()
+	return GetCVar("pingMode") == "1";
+end
+
 function PingWheel_Show()
 	local wheel = PingWheelFrame;
+	if ToggleMode() and wheel:IsShown() and not wheel.isWheelClosing then
+		PingWheel_Release(true);
+		return;
+	end
 	local x, y = GetCursorPosition();
 	local scale = UIParent:GetEffectiveScale();
 	wheel:ClearAllPoints();
@@ -103,8 +112,11 @@ function PingWheel_Show()
 	wheel:SelectionStart(wedges, false);
 end
 
-function PingWheel_Release()
+function PingWheel_Release(force)
 	local wheel = PingWheelFrame;
+	if ToggleMode() and not force then
+		return;
+	end
 	if not wheel:IsShown() or wheel.isWheelClosing then
 		return;
 	end
@@ -118,11 +130,26 @@ function PingWheel_Release()
 	end
 end
 
+-- /ping [@unit] type (retail macro): /ping attack, /ping [@target] warning; the unit - its ping (the target)
 SLASH_PING1 = "/ping";
+SLASH_PING2 = "/отметка";
+local PING_TYPE_NAMES = {
+	attack = PING_ATTACK, warning = PING_WARNING, onmyway = PING_ON_MY_WAY, assist = PING_ASSIST,
+	["атака"] = PING_ATTACK, ["внимание"] = PING_WARNING, ["иду"] = PING_ON_MY_WAY, ["помощь"] = PING_ASSIST,
+};
 SlashCmdList["PING"] = function(msg)
 	msg = strlower(msg or "");
-	local types = { attack = PING_ATTACK, warning = PING_WARNING, onmyway = PING_ON_MY_WAY, assist = PING_ASSIST };
-	Ping_Send(types[msg] or ContextualType(), CursorPoint());
+	local unit = msg:match("%[@([^%]]+)%]");
+	msg = strtrim(msg:gsub("%[[^%]]*%]", ""));
+	local pingType = PING_TYPE_NAMES[msg] or ContextualType();
+	if unit then
+		-- the server pings the selection: only the target (or a unit that is the target)
+		if UnitExists(unit) and UnitIsUnit(unit, "target") then
+			MythicPlus_Send("PING", pingType, "T");
+		end
+		return;
+	end
+	Ping_Send(pingType, CursorPoint());
 end
 
 ---------------------------------------------------------------------------
