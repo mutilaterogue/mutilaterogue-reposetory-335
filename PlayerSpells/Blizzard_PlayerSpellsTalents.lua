@@ -230,7 +230,7 @@ function PlayerSpellsTalentsMixin:Refresh()
 		self.PetTree:Hide();
 		local numTabs = GetNumTalentTabs(false, false) or 0;
 		-- the primary tree (specialization tab); without the API - the one with the most points
-		local primary = GetPrimaryTalentTree and GetPrimaryTalentTree(false, false, group);
+		local primary = PlayerSpellsSpecializations and PlayerSpellsSpecializations.GetPrimaryTree(group);
 		if primary and primary > 0 then
 			self.selectedTab = primary;
 		end

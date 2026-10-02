@@ -45,22 +45,24 @@ end
 PS.primary = {};
 PS.loaded = false;
 
-if not GetPrimaryTalentTree then
-	function GetPrimaryTalentTree(isInspect, isPet, talentGroup)
-		if isInspect or isPet then
-			return nil;
-		end
-		return PS.primary[talentGroup or GetActiveTalentGroup(false, false)] or 0;
+-- the client's own GetPrimaryTalentTree (if any) knows nothing of the server: always these
+function PS.GetPrimaryTree(talentGroup)
+	return PS.primary[talentGroup or GetActiveTalentGroup(false, false)] or 0;
+end
+
+function PS.SetPrimaryTree(index)
+	if Comm_Send then
+		Comm_Send("SPEC_SET", index);
 	end
 end
 
-if not SetPrimaryTalentTree then
-	function SetPrimaryTalentTree(index)
-		if Comm_Send then
-			Comm_Send("SPEC_SET", index);
-		end
+GetPrimaryTalentTree = function(isInspect, isPet, talentGroup)
+	if isInspect or isPet then
+		return nil;
 	end
+	return PS.GetPrimaryTree(talentGroup);
 end
+SetPrimaryTalentTree = PS.SetPrimaryTree;
 
 local function RegisterComm()
 	if not Comm_Register or PS.commRegistered then
@@ -92,7 +94,7 @@ end);
 
 -- primary tree of the active talent group (0 / nil = not chosen)
 function PS.GetPrimary()
-	local tree = GetPrimaryTalentTree(false, false, GetActiveTalentGroup(false, false));
+	local tree = PS.GetPrimaryTree();
 	if tree and tree > 0 then
 		return tree;
 	end
@@ -154,7 +156,7 @@ local function CreateSpecColumn(parent, index)
 	column.ActivateButton:SetPoint("BOTTOM", 0, 95);
 	column.ActivateButton:SetText(TALENT_SPEC_ACTIVATE);
 	column.ActivateButton:SetScript("OnClick", function()
-		SetPrimaryTalentTree(index);
+		PS.SetPrimaryTree(index);
 		PS.justChose = true;
 	end);
 

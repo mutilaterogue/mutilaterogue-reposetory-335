@@ -149,6 +149,12 @@ function PlayerSpellsFrameMixin:SetTab(tabID)
 	-- no primary tree yet: the talents open on the specialization choice
 	if tabID == self.talentTabID and PlayerSpellsSpecializations.loaded and not PlayerSpellsSpecializations.GetPrimary() then
 		tabID = self.specTabID;
+		-- the tab button marks itself after this call: mark the specialization tab next frame
+		C_Timer.After(0, function()
+			if self.TabSystem.SetTabVisuallySelected then
+				self.TabSystem:SetTabVisuallySelected(self.specTabID);
+			end
+		end);
 	end
 	TabSystemOwnerMixin.SetTab(self, tabID);
 
