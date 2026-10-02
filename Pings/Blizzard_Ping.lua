@@ -209,6 +209,9 @@ if Comm_Register then
 		if not id or not info then
 			return;
 		end
+		if Ping_IsOptionOn and not Ping_IsOptionOn("pingEnabled") then
+			return;
+		end
 		local marker = markers[id] or AcquireMarker();
 		markers[id] = marker;
 		marker.id = id;
@@ -228,8 +231,12 @@ if Comm_Register then
 		if target and target ~= "" then
 			text = text .. " - " .. target;
 		end
-		DEFAULT_CHAT_FRAME:AddMessage(text, info.r, info.g, info.b);
-		PlaySound(info.sound);
+		if not Ping_IsOptionOn or Ping_IsOptionOn("pingChat") then
+			DEFAULT_CHAT_FRAME:AddMessage(text, info.r, info.g, info.b);
+		end
+		if not Ping_IsOptionOn or Ping_IsOptionOn("pingSound") then
+			PlaySound(info.sound);
+		end
 	end);
 
 	Comm_Register("PING_POS", function(id, dx, dy, wx, wy, wz)

@@ -3,6 +3,7 @@
 	     Bindings.xml: see Pings\Bindings_Ping.txt -->
 	<Include file="Blizzard_RadialWheel.xml"/>
 	<Script file="Blizzard_Ping.lua"/>
+	<Script file="Blizzard_PingOptions.lua"/>
 
 	<!-- the wheel: retail RadialWheelFrameTemplate (Blizzard_RadialWheel.xml) -->
 	<Frame name="PingWheelFrame" inherits="RadialWheelFrameTemplate" parent="UIParent" frameStrata="DIALOG" hidden="true">
