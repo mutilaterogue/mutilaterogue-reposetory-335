@@ -452,7 +452,7 @@ function CT.Setup(frame)
 	hero.buttons = {};
 	hero.lines = {};
 	hero.spacing = 56;
-	hero.top = 50;
+	hero.top = 90; -- below the ring and the points badge
 	hero.Name = hero:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 	hero.Name:SetPoint("TOP", 0, -50);
 	hero.SubName = hero:CreateFontString(nil, "ARTWORK", "GameFontNormal");
