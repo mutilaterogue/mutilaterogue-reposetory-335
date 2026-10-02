@@ -353,6 +353,7 @@ namespace
         uint32 Id = 0;
         uint32 Type = 0;
         uint32 TimeLeft = PING_DURATION;
+        float Height = 0.0f;        // the marker over the target's head
         std::vector<ObjectGuid> Receivers;
     };
     std::vector<Ping> s_pings;
@@ -1924,15 +1925,20 @@ namespace
 
     // ---------------------------------------------------------------- pings (group, AddonComm)
     // C->S "PING" : type : target guid (0 - the sender's position)
-    // S->C "PING" : id : type : sender name : target name : dx : dy (yards, world, from the receiver) / "PING_POS" : id : dx : dy
+    // S->C "PING" : id : type : sender name : target name : dx : dy (yards, world, from the receiver) : x : y : z (tenths)
+    //      "PING_POS" : id : dx : dy : x : y : z
     void SendPingPos(Player* receiver, Ping const& ping, bool first, std::string const& senderName, std::string const& targetName)
     {
         float dx = ping.Pos.GetPositionX() - receiver->GetPositionX();
         float dy = ping.Pos.GetPositionY() - receiver->GetPositionY();
+        // + the world position in tenths of a yard (WorldToCamera in the client dll: the marker in the world)
+        int32 wx = int32(ping.Pos.GetPositionX() * 10.0f);
+        int32 wy = int32(ping.Pos.GetPositionY() * 10.0f);
+        int32 wz = int32((ping.Pos.GetPositionZ() + ping.Height) * 10.0f);
         if (first)
-            sAddonComm->Send(receiver, "PING", ping.Id, ping.Type, Sanitize(senderName), Sanitize(targetName), int32(dx), int32(dy));
+            sAddonComm->Send(receiver, "PING", ping.Id, ping.Type, Sanitize(senderName), Sanitize(targetName), int32(dx), int32(dy), wx, wy, wz);
         else
-            sAddonComm->Send(receiver, "PING_POS", ping.Id, int32(dx), int32(dy));
+            sAddonComm->Send(receiver, "PING_POS", ping.Id, int32(dx), int32(dy), wx, wy, wz);
     }
 
     void HandlePing(Player* player, std::vector<std::string> const& args)
@@ -1961,6 +1967,7 @@ namespace
                 {
                     ping.Target = target->GetGUID();
                     ping.Pos = target->GetPosition();
+                    ping.Height = target->GetCollisionHeight() + 0.5f;
                     targetName = target->GetName();
                     if (Creature* creature = target->ToCreature())
                         if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(creature->GetEntry()))

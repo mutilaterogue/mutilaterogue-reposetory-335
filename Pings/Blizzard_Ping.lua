@@ -96,8 +96,43 @@ end
 local markers = {};		-- [id] = frame
 local pool = {};
 
+-- world point -> UIParent coordinates (WorldToCamera of the client dll, dll\WorldToScreen); nil when it is behind
+-- the camera or the dll has no such function. Tuning: the vertical field of view = camera fov * PING_FOV_FACTOR
+-- (3.3.5: about 35 degrees per radian of the camera fov).
+PING_FOV_FACTOR = 0.6109;
+
+function Ping_WorldToScreen(x, y, z)
+	if not WorldToCamera then
+		return nil;
+	end
+	local right, up, forward, fov = WorldToCamera(x, y, z);
+	if not right or forward <= 0.5 then
+		return nil;
+	end
+	local width, height = UIParent:GetWidth(), UIParent:GetHeight();
+	local tanV = math.tan(fov * PING_FOV_FACTOR / 2);
+	local tanH = tanV * width / height;
+	local sx = (right / (forward * tanH)) * 0.5 + 0.5;
+	local sy = (up / (forward * tanV)) * 0.5 + 0.5;
+	if sx < 0 or sx > 1 or sy < 0 or sy > 1 then
+		return nil;
+	end
+	return sx * width, sy * height;
+end
+
 local function PlaceMarker(marker)
 	local dx, dy = marker.dx, marker.dy;
+	-- in the world: over the point itself
+	if marker.wx then
+		local sx, sy = Ping_WorldToScreen(marker.wx, marker.wy, marker.wz);
+		if sx then
+			marker:ClearAllPoints();
+			marker:SetPoint("BOTTOM", UIParent, "BOTTOMLEFT", sx, sy);
+			marker.Distance:SetFormattedText("%d", math.floor(math.sqrt(dx * dx + dy * dy) + 0.5));
+			return;
+		end
+	end
+	-- off screen / no dll: on the circle around the center, towards the point
 	local facing = GetPlayerFacing() or 0;
 	-- world: x north, y west; facing 0 = north, counter-clockwise
 	local rel = math.atan2(dy, dx) - facing;
@@ -133,7 +168,7 @@ function PingMarker_OnUpdate(self, elapsed)
 end
 
 if Comm_Register then
-	Comm_Register("PING", function(id, pingType, sender, target, dx, dy)
+	Comm_Register("PING", function(id, pingType, sender, target, dx, dy, wx, wy, wz)
 		id = tonumber(id);
 		local info = PING_INFO[tonumber(pingType) or 0];
 		if not id or not info then
@@ -144,6 +179,9 @@ if Comm_Register then
 		marker.id = id;
 		marker.dx = tonumber(dx) or 0;
 		marker.dy = tonumber(dy) or 0;
+		marker.wx = wx and tonumber(wx) and tonumber(wx) / 10;
+		marker.wy = wy and tonumber(wy) and tonumber(wy) / 10;
+		marker.wz = wz and tonumber(wz) and tonumber(wz) / 10;
 		marker.timeLeft = PING_TIME;
 		marker.Icon:SetAtlas(info.atlas);
 		marker.Name:SetText(sender or "");
@@ -159,11 +197,14 @@ if Comm_Register then
 		PlaySound(info.sound);
 	end);
 
-	Comm_Register("PING_POS", function(id, dx, dy)
+	Comm_Register("PING_POS", function(id, dx, dy, wx, wy, wz)
 		local marker = markers[tonumber(id) or 0];
 		if marker then
 			marker.dx = tonumber(dx) or marker.dx;
 			marker.dy = tonumber(dy) or marker.dy;
+			if tonumber(wx) then
+				marker.wx, marker.wy, marker.wz = tonumber(wx) / 10, tonumber(wy) / 10, tonumber(wz) / 10;
+			end
 		end
 	end);
 end
