@@ -2,6 +2,7 @@
 ..\UI.xsd">
 	<Script file="Blizzard_PlayerSpellsTalentsDF.lua"/>
 	<Script file="Blizzard_PlayerSpellsTalents.lua"/>
+	<Script file="Blizzard_PlayerSpellsCustomTalents.lua"/>
 	<Script file="Blizzard_PlayerSpellsLoadouts.lua"/>
 
 	<!-- узел в стиле Dragonflight: рамка ставится в Blizzard_PlayerSpellsTalentsDF.lua -->

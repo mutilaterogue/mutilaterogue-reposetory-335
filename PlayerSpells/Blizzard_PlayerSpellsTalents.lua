@@ -55,6 +55,33 @@ function PlayerSpellsTalentsMixin:OnLoad()
 		ResetGroupPreviewTalentPoints(self.showPet, self:GetGroup());
 	end);
 	PlayerSpellsLoadouts.SetupDropdown(self, bar.LoadoutDropdown);
+
+	-- retail layout: class tree (left), hero tree (middle), one 3.3.5 tree (right)
+	for _, tree in ipairs(self.playerTrees) do
+		tree:ClearAllPoints();
+		tree:SetPoint("TOPRIGHT", self, "TOPRIGHT", -30, -14);
+	end
+	self.treeTabs = {};
+	for i = 1, 3 do
+		local tab = CreateFrame("Button", nil, self, "UIPanelButtonTemplate");
+		tab:SetSize(110, 22);
+		tab:SetPoint("BOTTOMRIGHT", self.Tree1, "TOPRIGHT", -(3 - i) * 112, 2);
+		tab:SetScript("OnClick", function() self.selectedTab = i; self:Refresh(); end);
+		self.treeTabs[i] = tab;
+	end
+	PlayerSpellsCustomTalents.Setup(self);
+end
+
+-- default: the tree with the most points
+local function MostSpentTab(group)
+	local best, bestPoints = 1, -1;
+	for i = 1, GetNumTalentTabs(false, false) or 0 do
+		local _, _, points = GetTalentTabInfo(i, false, false, group);
+		if (points or 0) > bestPoints then
+			best, bestPoints = i, points or 0;
+		end
+	end
+	return best;
 end
 
 function PlayerSpellsTalentsMixin:OnShow()
@@ -146,14 +173,26 @@ function PlayerSpellsTalentsMixin:Refresh()
 	else
 		self.PetTree:Hide();
 		local numTabs = GetNumTalentTabs(false, false) or 0;
+		self.selectedTab = self.selectedTab or MostSpentTab(group);
+		for i, tab in ipairs(self.treeTabs) do
+			local name = GetTalentTabInfo(i, false, false, group);
+			tab:SetShown(i <= numTabs);
+			tab:SetText(name or "");
+			tab:SetEnabled(i ~= self.selectedTab);
+		end
 		for i, tree in ipairs(self.playerTrees) do
-			if i <= numTabs then
+			if i <= numTabs and i == self.selectedTab then
 				RefreshTree(tree, i, false, group);
 			else
 				tree:Hide();
 			end
 		end
 	end
+
+	for _, tab in ipairs(self.treeTabs) do
+		if pet then tab:Hide(); end
+	end
+	PlayerSpellsCustomTalents.Refresh(self);
 
 	local bar = self.Bar;
 	local unspent = GetUnspentTalentPoints(false, pet, group) - GetGroupPreviewTalentPointsSpent(pet, group);
