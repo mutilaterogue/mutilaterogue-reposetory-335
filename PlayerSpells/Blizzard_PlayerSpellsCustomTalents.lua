@@ -312,7 +312,13 @@ local function SetAtlasIfExists(texture, atlas)
 	return false;
 end
 
+-- icon: an atlas name (retail hero icons, e.g. talents-heroclass-rogue-deathstalker) or a file path
 local function RoundIcon(texture, icon)
+	if icon and icon ~= "" and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(icon) then
+		texture:SetTexCoord(0, 1, 0, 1);
+		texture:SetAtlas(icon);
+		return;
+	end
 	icon = icon ~= "" and icon or "Interface\\Icons\\INV_Misc_QuestionMark";
 	SetPortraitToTexture(texture, icon);
 end
