@@ -25,6 +25,9 @@
 #include "Custom\AddonComm\AddonComm.h"
 #include "DatabaseEnv.h"
 #include "Log.h"
+#include "Chat.h"
+#include "ChatCommand.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
 #include "StringFormat.h"
 #include "World.h"
@@ -232,6 +235,7 @@ namespace
 
     void SendDefinitions(Player* player)
     {
+        sAddonComm->Send(player, "CTAL_RESET");
         for (auto const& pair : s_trees)
         {
             Tree const& tree = pair.second;
@@ -370,6 +374,46 @@ namespace
     }
 }
 
+// .reload custom_talents - re-reads custom_talent_tree / custom_talent_node and resends them to everyone online
+class talent_custom_commands : public CommandScript
+{
+public:
+    talent_custom_commands() : CommandScript("talent_custom_commands") { }
+
+    ChatCommandTable GetCommands() const override
+    {
+        static ChatCommandTable reloadTable =
+        {
+            { "custom_talents", HandleReload, rbac::RBAC_PERM_COMMAND_RELOAD, Console::Yes },
+        };
+        static ChatCommandTable commandTable =
+        {
+            { "reload", reloadTable },
+        };
+        return commandTable;
+    }
+
+    static bool HandleReload(ChatHandler* handler)
+    {
+        LoadData();
+        uint32 count = 0;
+        for (auto const& pair : ObjectAccessor::GetPlayers())
+        {
+            Player* player = pair.second;
+            if (!player || !player->IsInWorld())
+                continue;
+            SendDefinitions(player);
+            ApplySpells(player);
+            player->InitTalentForLevel();
+            SendState(player);
+            ++count;
+        }
+        handler->SendSysMessage(Trinity::StringFormat("Custom talents reloaded: {} trees, {} nodes, {} players updated.",
+            s_trees.size(), s_nodes.size(), count));
+        return true;
+    }
+};
+
 class talent_custom_world : public WorldScript
 {
 public:
@@ -422,5 +466,6 @@ public:
 void AddSC_talent_custom()
 {
     new talent_custom_world();
+    new talent_custom_commands();
     new talent_custom_player();
 }

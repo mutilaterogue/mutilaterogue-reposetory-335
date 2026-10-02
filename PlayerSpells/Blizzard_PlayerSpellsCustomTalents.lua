@@ -586,6 +586,12 @@ local function RegisterComm()
 		return;
 	end
 	CT.commRegistered = true;
+	-- the definitions follow (login / .reload custom_talents): drop the old ones
+	Comm_Register("CTAL_RESET", function()
+		wipe(CT.trees);
+		wipe(CT.nodes);
+		CT.loaded = false;
+	end);
 	Comm_Register("CTAL_TREE", function(id, kind, name, icon, minLevel, description)
 		id = tonumber(id);
 		if id then
