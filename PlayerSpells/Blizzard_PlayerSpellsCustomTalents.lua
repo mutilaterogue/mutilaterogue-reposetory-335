@@ -237,14 +237,15 @@ local function LayoutTree(column, treeId)
 		end
 	end
 	table.sort(list, function(a, b) return a.id < b.id; end);
-	local width = column:GetWidth();
-	local offsetX = (width - maxCol * NODE_SPACING) / 2;
+	local spacing = column.spacing or NODE_SPACING;
+	local width = column.Content:GetWidth();
+	local offsetX = (width - maxCol * spacing) / 2;
 	local centers = {};
 	for i, node in ipairs(list) do
 		local button = NodeButton(column, i);
 		button.node = node;
-		local x = offsetX + node.col * NODE_SPACING;
-		local y = 40 + node.row * NODE_SPACING;
+		local x = offsetX + node.col * spacing;
+		local y = (column.top or 40) + node.row * spacing;
 		centers[node.id] = { x = x, y = y };
 		button:ClearAllPoints();
 		button:SetPoint("CENTER", column.Content, "TOPLEFT", x, -y);
@@ -291,43 +292,86 @@ local function LayoutTree(column, treeId)
 end
 
 ---------------------------------------------------------------------------
--- hero choice
+-- hero choice (retail: HeroTalentsSelectionDialog) - one card per hero tree
 ---------------------------------------------------------------------------
-local function HeroChoice(column, show)
-	column.choices = column.choices or {};
+local function SetAtlasIfExists(texture, atlas)
+	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+		texture:SetAtlas(atlas);
+		return true;
+	end
+	return false;
+end
+
+local function RoundIcon(texture, icon)
+	icon = icon ~= "" and icon or "Interface\\Icons\\INV_Misc_QuestionMark";
+	SetPortraitToTexture(texture, icon);
+end
+
+local function CreateChoiceDialog(frame)
+	local dialog = CreateFrame("Frame", nil, frame);
+	dialog:SetAllPoints(frame);
+	dialog:SetFrameLevel(frame:GetFrameLevel() + 50);
+	dialog:EnableMouse(true);
+	local shade = dialog:CreateTexture(nil, "BACKGROUND");
+	shade:SetAllPoints();
+	shade:SetTexture(0, 0, 0, 0.8);
+	dialog.Title = dialog:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge");
+	dialog.Title:SetPoint("TOP", 0, -60);
+	dialog.Title:SetTextColor(0.12, 1, 0);
+	dialog.Close = CreateFrame("Button", nil, dialog, "UIPanelCloseButton");
+	dialog.Close:SetPoint("TOPRIGHT", -10, -10);
+	dialog.Close:SetScript("OnClick", function() dialog:Hide(); end);
+	dialog.cards = {};
+	dialog:Hide();
+	return dialog;
+end
+
+local function ShowChoiceDialog(frame)
+	local dialog = frame.HeroChoiceDialog;
 	local trees = TreesOfKind(1);
+	dialog.Title:SetText(HERO_TALENTS_CHOOSE or "Выберите геройские таланты");
+	local cardWidth, gap = 320, 40;
+	local total = #trees * cardWidth + (#trees - 1) * gap;
 	for i, tree in ipairs(trees) do
-		local card = column.choices[i];
+		local card = dialog.cards[i];
 		if not card then
-			card = CreateFrame("Frame", nil, column.Content);
-			card:SetHeight(150);
+			card = CreateFrame("Frame", nil, dialog);
+			card:SetWidth(cardWidth);
+			card:SetHeight(520);
+			card.Background = card:CreateTexture(nil, "BACKGROUND");
+			card.Background:SetPoint("TOP", 0, -150);
+			card.Background:SetWidth(284);
+			card.Background:SetHeight(362);
+			if not SetAtlasIfExists(card.Background, "talents-heroclass-backplate-full-expanded") then
+				card.Background:SetTexture(0, 0, 0, 0.5);
+			end
 			card.Icon = card:CreateTexture(nil, "ARTWORK");
-			card.Icon:SetWidth(56);
-			card.Icon:SetHeight(56);
-			card.Icon:SetPoint("TOPLEFT", 10, -10);
+			card.Icon:SetPoint("TOP", 0, -40);
+			card.Icon:SetWidth(108);
+			card.Icon:SetHeight(108);
+			card.Border = card:CreateTexture(nil, "OVERLAY");
+			card.Border:SetPoint("CENTER", card.Icon, "CENTER", 0, -2);
+			card.Border:SetWidth(192);
+			card.Border:SetHeight(192);
+			SetAtlasIfExists(card.Border, "talents-heroclass-ring-mainpane");
 			card.Name = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-			card.Name:SetPoint("TOPLEFT", card.Icon, "TOPRIGHT", 10, -4);
-			card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall");
-			card.Description:SetPoint("TOPLEFT", card.Name, "BOTTOMLEFT", 0, -6);
-			card.Description:SetPoint("RIGHT", card, "RIGHT", -10, 0);
-			card.Description:SetJustifyH("LEFT");
+			card.Name:SetPoint("TOP", 0, -6);
+			card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
+			card.Description:SetPoint("TOPLEFT", card.Background, "TOPLEFT", 24, -40);
+			card.Description:SetPoint("TOPRIGHT", card.Background, "TOPRIGHT", -24, -40);
+			card.Description:SetJustifyH("CENTER");
 			card.Button = CreateFrame("Button", nil, card, "UIPanelButtonTemplate");
-			card.Button:SetWidth(140);
+			card.Button:SetWidth(164);
 			card.Button:SetHeight(22);
-			card.Button:SetPoint("BOTTOMRIGHT", -10, 10);
-			local bg = card:CreateTexture(nil, "BACKGROUND");
-			bg:SetAllPoints();
-			bg:SetTexture(0, 0, 0, 0.45);
-			column.choices[i] = card;
+			card.Button:SetPoint("BOTTOM", card.Background, "BOTTOM", 0, 24);
+			dialog.cards[i] = card;
 		end
 		card:ClearAllPoints();
-		card:SetPoint("TOPLEFT", column.Content, "TOPLEFT", 10, -10 - (i - 1) * 160);
-		card:SetPoint("RIGHT", column.Content, "RIGHT", -10, 0);
-		card.Icon:SetTexture(tree.icon ~= "" and tree.icon or "Interface\\Icons\\INV_Misc_QuestionMark");
-		card.Name:SetText(tree.name);
+		card:SetPoint("TOPLEFT", dialog, "TOP", -total / 2 + (i - 1) * (cardWidth + gap), -120);
+		RoundIcon(card.Icon, tree.icon);
+		card.Name:SetText(string.upper(tree.name));
 		card.Description:SetText(tree.description);
-		local level = UnitLevel("player");
-		if level < tree.minLevel then
+		if UnitLevel("player") < tree.minLevel then
 			card.Button:SetText(string.format(UNIT_LEVEL_TEMPLATE or "Level %d", tree.minLevel));
 			card.Button:Disable();
 		else
@@ -340,13 +384,14 @@ local function HeroChoice(column, show)
 			else
 				Send("CTAL_HERO", tree.id);
 			end
-			column.choosing = nil;
+			dialog:Hide();
 		end);
-		card:SetShown(show);
+		card:Show();
 	end
-	for i = #trees + 1, #column.choices do
-		column.choices[i]:Hide();
+	for i = #trees + 1, #dialog.cards do
+		dialog.cards[i]:Hide();
 	end
+	dialog:Show();
 end
 
 StaticPopupDialogs["CTAL_CHANGE_HERO"] = {
@@ -362,31 +407,118 @@ StaticPopupDialogs["CTAL_CHANGE_HERO"] = {
 };
 
 ---------------------------------------------------------------------------
--- layout in the talents frame
+-- layout in the talents frame (retail ClassTalentsFrame / HeroTalentsContainer)
 ---------------------------------------------------------------------------
+-- retail currency display: "NAME  0" centered on a point
+function CT.CreateCurrencyDisplay(parent)
+	local display = CreateFrame("Frame", nil, parent);
+	display:SetWidth(1);
+	display:SetHeight(1);
+	display.Label = display:CreateFontString(nil, "ARTWORK", _G.SystemFont_Shadow_Large2 and "SystemFont_Shadow_Large2" or "GameFontHighlightLarge");
+	display.Amount = display:CreateFontString(nil, "ARTWORK", _G.Game32Font_Shadow2 and "Game32Font_Shadow2" or "GameFontNormalHuge");
+	display.Amount:SetTextColor(0.5, 0.5, 0.5);
+	display.Set = function(self, label, amount)
+		self.Label:SetText(label);
+		self.Amount:SetText(amount);
+		self.Amount:SetTextColor(tonumber(amount) and tonumber(amount) > 0 and 1 or 0.5, tonumber(amount) and tonumber(amount) > 0 and 0.82 or 0.5, tonumber(amount) and tonumber(amount) > 0 and 0 or 0.5);
+		local width = self.Label:GetStringWidth() + 12 + self.Amount:GetStringWidth();
+		self.Label:ClearAllPoints();
+		self.Label:SetPoint("LEFT", self, "CENTER", -width / 2, 0);
+		self.Amount:ClearAllPoints();
+		self.Amount:SetPoint("LEFT", self.Label, "RIGHT", 12, 0);
+	end;
+	return display;
+end
+
 function CT.Setup(frame)
 	if frame.ClassColumn then
 		return;
 	end
-	frame.ClassColumn = CreateColumn(frame, "PlayerSpellsClassTalents");
-	frame.ClassColumn:SetPoint("TOPLEFT", frame, "TOPLEFT", 40, -14);
-	frame.ClassColumn:SetWidth(660);
-	frame.ClassColumn:SetHeight(757);
+	local class = CreateColumn(frame, "PlayerSpellsClassTalents");
+	class:SetPoint("TOPLEFT", frame, "TOPLEFT", 40, -14);
+	class:SetWidth(664);
+	class:SetHeight(757);
+	class.Name:Hide();
+	class.Points:Hide();
+	frame.ClassColumn = class;
+	frame.ClassCurrencyDisplay = CT.CreateCurrencyDisplay(frame);
+	frame.ClassCurrencyDisplay:SetPoint("CENTER", frame, "TOPLEFT", 372, -45);
 
-	frame.HeroColumn = CreateColumn(frame, "PlayerSpellsHeroTalents");
-	frame.HeroColumn:SetPoint("TOPLEFT", frame.ClassColumn, "TOPRIGHT", 20, 0);
-	frame.HeroColumn:SetWidth(400);
-	frame.HeroColumn:SetHeight(757);
-	local change = CreateFrame("Button", nil, frame.HeroColumn, "UIPanelButtonTemplate");
-	change:SetWidth(110);
-	change:SetHeight(22);
-	change:SetPoint("TOP", frame.HeroColumn, "TOP", 0, -HEADER_HEIGHT + 10);
-	change:SetText(CHANGE or "Сменить");
-	change:SetScript("OnClick", function()
-		frame.HeroColumn.choosing = not frame.HeroColumn.choosing;
-		CT.Refresh(frame);
+	-- hero: name, ring with the icon, points badge, backplate with the nodes
+	local hero = CreateFrame("Frame", "PlayerSpellsHeroTalents", frame);
+	hero:SetPoint("TOP", frame, "TOP", -10, -14);
+	hero:SetWidth(300);
+	hero:SetHeight(757);
+	hero.buttons = {};
+	hero.lines = {};
+	hero.spacing = 56;
+	hero.top = 50;
+	hero.Name = hero:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
+	hero.Name:SetPoint("TOP", 0, -50);
+	hero.SubName = hero:CreateFontString(nil, "ARTWORK", "GameFontNormal");
+	hero.SubName:SetPoint("BOTTOM", hero.Name, "TOP", 0, 2);
+	hero.SubName:SetTextColor(0.12, 1, 0);
+
+	local ring = CreateFrame("Button", nil, hero);
+	ring:SetWidth(108);
+	ring:SetHeight(108);
+	ring:SetPoint("TOP", 0, -88);
+	ring:SetFrameLevel(hero:GetFrameLevel() + 10);
+	ring.Icon = ring:CreateTexture(nil, "ARTWORK");
+	ring.Icon:SetAllPoints();
+	ring.Border = ring:CreateTexture(nil, "OVERLAY");
+	ring.Border:SetPoint("CENTER", 0, -2);
+	ring.Border:SetWidth(192);
+	ring.Border:SetHeight(192);
+	ring.Highlight = ring:CreateTexture(nil, "HIGHLIGHT");
+	ring.Highlight:SetAllPoints(ring.Border);
+	ring.Highlight:SetBlendMode("ADD");
+	ring.Highlight:SetAlpha(0.4);
+	ring:SetScript("OnClick", function() ShowChoiceDialog(frame); end);
+	ring:SetScript("OnEnter", function(self)
+		local tree = CT.trees[CT.hero];
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetText(tree and tree.name or (HERO_TALENTS_CHOOSE or "Выберите геройские таланты"));
+		if tree and tree.description ~= "" then
+			GameTooltip:AddLine(tree.description, 1, 1, 1, true);
+		end
+		GameTooltip:Show();
 	end);
-	frame.HeroColumn.ChangeButton = change;
+	ring:SetScript("OnLeave", GameTooltip_Hide);
+	hero.Ring = ring;
+
+	local badge = CreateFrame("Frame", nil, ring);
+	badge:SetWidth(30);
+	badge:SetHeight(30);
+	badge:SetPoint("CENTER", ring, "BOTTOM", 0, -3);
+	badge.Background = badge:CreateTexture(nil, "ARTWORK");
+	badge.Background:SetPoint("CENTER");
+	badge.Background:SetWidth(56);
+	badge.Background:SetHeight(56);
+	SetAtlasIfExists(badge.Background, "talents-heroclass-ring-pointsavailable");
+	badge.Text = badge:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge");
+	badge.Text:SetPoint("CENTER");
+	badge.Text:SetTextColor(0.12, 1, 0);
+	hero.Badge = badge;
+
+	hero.Content = CreateFrame("Frame", nil, hero);
+	hero.Content:SetWidth(284);
+	hero.Content:SetHeight(362);
+	hero.Content:SetPoint("TOP", ring, "BOTTOM", 0, 34);
+	hero.Backplate = hero.Content:CreateTexture(nil, "BACKGROUND");
+	hero.Backplate:SetAllPoints();
+	if not SetAtlasIfExists(hero.Backplate, "talents-heroclass-backplate-full-expanded") then
+		hero.Backplate:SetTexture(0, 0, 0, 0.5);
+	end
+	hero.BlankNodes = hero.Content:CreateTexture(nil, "BORDER");
+	hero.BlankNodes:SetPoint("CENTER", 0, -6);
+	if SetAtlasIfExists(hero.BlankNodes, "talents-heroclass-backplate-intro-expanded") then
+		local info = C_Texture.GetAtlasInfo("talents-heroclass-backplate-intro-expanded");
+		hero.BlankNodes:SetWidth(info.width or 200);
+		hero.BlankNodes:SetHeight(info.height or 300);
+	end
+	frame.HeroColumn = hero;
+	frame.HeroChoiceDialog = CreateChoiceDialog(frame);
 	Send("CTAL_GET");
 end
 
@@ -397,36 +529,46 @@ function CT.Refresh(frame)
 	-- class tree
 	local classTree = TreesOfKind(0)[1];
 	local class = frame.ClassColumn;
+	local className = string.upper(classTree and classTree.name ~= "" and classTree.name or (UnitClass("player")));
 	if classTree then
-		class.Name:SetText(string.upper(classTree.name ~= "" and classTree.name or (UnitClass("player"))));
-		class.Points:SetText(SpentInTree(classTree.id));
+		frame.ClassCurrencyDisplay:Set(className, SpentInTree(classTree.id));
 		LayoutTree(class, classTree.id);
 	else
-		class.Name:SetText(string.upper((UnitClass("player"))));
-		class.Points:SetText("0");
+		frame.ClassCurrencyDisplay:Set(className, 0);
 		class.lineCount = 0;
 		for _, button in ipairs(class.buttons) do button:Hide(); end
 		for _, line in ipairs(class.lines) do line:Hide(); end
 	end
 
-	-- hero tree: the choice, or the chosen one
+	-- hero tree: the chosen one, or the "choose" ring with blank nodes
 	local hero = frame.HeroColumn;
 	local heroTree = CT.trees[CT.hero];
-	local choosing = hero.choosing or not heroTree;
-	hero.ChangeButton:SetShown(heroTree ~= nil and #TreesOfKind(1) > 1);
-	hero.ChangeButton:SetText(choosing and CANCEL or (CHANGE or "Сменить"));
-	if choosing then
-		hero.Name:SetText("|cff1eff00" .. string.upper(HERO_TALENTS_CHOOSE or "Выберите геройские таланты") .. "|r");
-		hero.Points:SetText("");
+	local hasChoice = #TreesOfKind(1) > 0;
+	hero:SetShown(hasChoice or heroTree ~= nil);
+	if heroTree then
+		hero.SubName:SetText("");
+		hero.Name:SetText(string.upper(heroTree.name));
+		RoundIcon(hero.Ring.Icon, heroTree.icon);
+		SetAtlasIfExists(hero.Ring.Border, "talents-heroclass-ring-mainpane");
+		SetAtlasIfExists(hero.Ring.Highlight, "talents-heroclass-ring-mainpane");
+		hero.BlankNodes:Hide();
+		hero.Badge.Text:SetText(SpentInTree(heroTree.id));
+		hero.Badge:Show();
+		LayoutTree(hero, heroTree.id);
+	else
+		hero.SubName:SetText(string.upper(CHOOSE or "Выберите"));
+		hero.Name:SetText("|cff1eff00" .. string.upper(HERO_TALENTS or "Геройские таланты") .. "|r");
+		RoundIcon(hero.Ring.Icon, "Interface\\Icons\\INV_Misc_QuestionMark");
+		SetAtlasIfExists(hero.Ring.Border, "talents-heroclass-ring-intro");
+		SetAtlasIfExists(hero.Ring.Highlight, "talents-heroclass-ring-intro");
+		hero.BlankNodes:Show();
+		hero.Badge:Hide();
 		hero.lineCount = 0;
 		for _, button in ipairs(hero.buttons) do button:Hide(); end
 		for _, line in ipairs(hero.lines) do line:Hide(); end
-		HeroChoice(hero, true);
-	else
-		HeroChoice(hero, false);
-		hero.Name:SetText(string.upper(heroTree.name));
-		hero.Points:SetText(SpentInTree(heroTree.id));
-		LayoutTree(hero, heroTree.id);
+	end
+	if frame.HeroChoiceDialog:IsShown() then
+		ShowChoiceDialog(frame);
 	end
 end
 

@@ -57,15 +57,27 @@ function PlayerSpellsTalentsMixin:OnLoad()
 	PlayerSpellsLoadouts.SetupDropdown(self, bar.LoadoutDropdown);
 
 	-- retail layout: class tree (left), hero tree (middle), one 3.3.5 tree (right)
+	-- retail ClassTalentsFrame: black, the bottom bar, the spec art above it
+	self.BlackBG = self:CreateTexture(nil, "BACKGROUND", nil, -2);
+	self.BlackBG:SetAllPoints();
+	self.BlackBG:SetTexture(0, 0, 0, 1);
+	self.BottomBar = self:CreateTexture(nil, "BACKGROUND", nil, 0);
+	self.BottomBar:SetPoint("BOTTOMLEFT");
+	self.BottomBar:SetPoint("BOTTOMRIGHT");
+	self.BottomBar:SetHeight(52);
+	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("talents-background-bottombar") then
+		self.BottomBar:SetAtlas("talents-background-bottombar");
+	else
+		self.BottomBar:SetTexture(0.08, 0.07, 0.06, 1);
+	end
 	self.SpecBackground = self:CreateTexture(nil, "BACKGROUND", nil, -1);
-	self.SpecBackground:SetPoint("TOPLEFT", 4, -4);
-	self.SpecBackground:SetPoint("BOTTOMRIGHT", -4, 52);
-	self.SpecShade = self:CreateTexture(nil, "BACKGROUND");
-	self.SpecShade:SetAllPoints(self.SpecBackground);
-	self.SpecShade:SetTexture(0, 0, 0, 0.35);
+	self.SpecBackground:SetPoint("TOPLEFT");
+	self.SpecBackground:SetPoint("BOTTOMRIGHT", self.BottomBar, "TOPRIGHT");
+	self.SpecCurrencyDisplay = PlayerSpellsCustomTalents.CreateCurrencyDisplay(self);
+	self.SpecCurrencyDisplay:SetPoint("CENTER", self, "TOPRIGHT", -401, -45);
 	for _, tree in ipairs(self.playerTrees) do
 		tree:ClearAllPoints();
-		tree:SetPoint("TOP", self, "TOPRIGHT", -245, -14);
+		tree:SetPoint("TOP", self, "TOPRIGHT", -401, -14);
 		local name = tree:GetName();
 		for _, part in ipairs({ "HeaderBg", "BackgroundTopLeft", "BackgroundTopRight", "BackgroundBottomLeft", "BackgroundBottomRight", "Icon" }) do
 			local texture = _G[name .. part];
@@ -73,19 +85,15 @@ function PlayerSpellsTalentsMixin:OnLoad()
 				texture:SetAlpha(0);
 			end
 		end
-		tree.Name:ClearAllPoints();
-		tree.Name:SetPoint("TOP", tree, "TOP", 0, -12);
-		tree.Name:SetFontObject("GameFontHighlightLarge");
-		tree.Points:ClearAllPoints();
-		tree.Points:SetPoint("TOP", tree.Name, "BOTTOM", 0, -6);
-		tree.Points:SetFontObject("GameFontNormalHuge");
-		tree.Points:SetTextColor(0.6, 0.6, 0.6);
+		-- the name / points are shown by SpecCurrencyDisplay
+		tree.Name:SetAlpha(0);
+		tree.Points:SetAlpha(0);
 	end
 	self.treeTabs = {};
 	for i = 1, 3 do
 		local tab = CreateFrame("Button", nil, self, "UIPanelButtonTemplate");
 		tab:SetSize(120, 22);
-		tab:SetPoint("BOTTOM", self, "BOTTOMRIGHT", -245 + (i - 2) * 124, 60);
+		tab:SetPoint("BOTTOM", self, "BOTTOMRIGHT", -401 + (i - 2) * 124, 60);
 		tab:SetScript("OnClick", function() self.selectedTab = i; self:Refresh(); end);
 		self.treeTabs[i] = tab;
 	end
@@ -241,6 +249,10 @@ function PlayerSpellsTalentsMixin:Refresh()
 		if pet then tab:Hide(); end
 	end
 	SetSpecBackground(self.SpecBackground, pet and 1 or self.selectedTab or 1, pet, group);
+	local shownTree = pet and self.PetTree or self.playerTrees[self.selectedTab or 1];
+	if shownTree then
+		self.SpecCurrencyDisplay:Set(string.upper(shownTree.Name:GetText() or ""), shownTree.Points:GetText() or 0);
+	end
 	self.ClassColumn:SetShown(not pet);
 	self.HeroColumn:SetShown(not pet);
 	PlayerSpellsCustomTalents.Refresh(self);
