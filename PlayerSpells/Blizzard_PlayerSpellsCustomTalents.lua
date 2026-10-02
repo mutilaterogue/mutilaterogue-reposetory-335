@@ -141,47 +141,55 @@ local function AtlasFile(atlas)
 end
 
 -- a line between two node centers (content coordinates, y down), turned by its angle (texcoords)
+-- diagonal edges: the 3.3.5 TaxiFrame line technique (a square line texture turned by tex coords), tinted
+local LINE_TEXTURE = "Interface\\TaxiFrame\\UI-Taxi-Line";
+local LINE_WIDTH = 32;
+local LINE_FACTOR_2 = (128 / 126) / 2;
+local LINE_COLOR = { active = { 1, 0.82, 0, 1 }, locked = { 0.45, 0.45, 0.45, 0.9 } };
+
 local function DrawLine(column, x1, y1, x2, y2, atlas)
 	local dx, dy = x2 - x1, y2 - y1;
-	local length = math.sqrt(dx * dx + dy * dy) - 2 * NODE_RADIUS;
-	if length <= 1 then
+	local full = math.sqrt(dx * dx + dy * dy);
+	if full <= 2 * NODE_RADIUS + 1 then
 		return;
 	end
+	-- from edge to edge of the nodes; y up for the math
+	local ux, uy = dx / full, dy / full;
+	local sx, sy = x1 + ux * NODE_RADIUS, -(y1 + uy * NODE_RADIUS);
+	local ex, ey = x2 - ux * NODE_RADIUS, -(y2 - uy * NODE_RADIUS);
+
 	local line = AcquireLine(column);
-	local file, l, r, t, b = AtlasFile(atlas);
-	if file then
-		line:SetTexture(file);
-	else
-		line:SetTexture(1, 0.82, 0, 0.8);
-		l, r, t, b = 0, 1, 0, 1;
-	end
-	-- a square box around the middle, the line drawn turned inside it
-	local cx, cy = (x1 + x2) / 2, (y1 + y2) / 2;
-	local angle = math.atan2(-dy, dx);
-	local size = length;
+	line:SetTexture(LINE_TEXTURE);
+	local color = atlas == ATLAS.lineActive and LINE_COLOR.active or LINE_COLOR.locked;
+	line:SetVertexColor(color[1], color[2], color[3], color[4]);
 	line:ClearAllPoints();
-	line:SetPoint("CENTER", column.Content, "TOPLEFT", cx, -cy);
-	line:SetWidth(size);
-	line:SetHeight(size);
-	-- the atlas strip (length x thickness) in the middle of the square, turned: corners of the square in texture space
-	local c, s = math.cos(angle), math.sin(angle);
-	local half = 0.5;
-	local thick = LINE_THICKNESS / size / 2;
-	local function Corner(x, y)
-		-- square corner (x, y in -0.5..0.5, y up) -> along / across the line
-		local along = x * c + y * s;
-		local across = -x * s + y * c;
-		local u = l + (along + half) * (r - l);
-		local v = t + (0.5 - across / (thick * 2) * 0.5) * (b - t);
-		return u, v;
+
+	local w = LINE_WIDTH;
+	dx, dy = ex - sx, ey - sy;
+	local cx, cy = (sx + ex) / 2, (sy + ey) / 2;
+	if dx < 0 then
+		dx, dy = -dx, -dy;
 	end
-	local ulx, uly = Corner(-0.5, 0.5);
-	local llx, lly = Corner(-0.5, -0.5);
-	local urx, ury = Corner(0.5, 0.5);
-	local lrx, lry = Corner(0.5, -0.5);
-	line:SetTexCoord(ulx, uly, llx, lly, urx, ury, lrx, lry);
-	-- only the strip is visible: the rest of the square samples outside the line thickness (clamped edge)
-	line:SetHeight(size);
+	local l = math.sqrt(dx * dx + dy * dy);
+	local sn, cs = -dy / l, dx / l;
+	local sc = sn * cs;
+	local bwid, bhgt, BLx, BLy, TLx, TLy, TRx, TRy, BRx, BRy;
+	if dy >= 0 then
+		bwid = ((l * cs) - (w * sn)) * LINE_FACTOR_2;
+		bhgt = ((w * cs) - (l * sn)) * LINE_FACTOR_2;
+		BLx, BLy, BRy = (w / l) * sc, sn * sn, (l / w) * sc;
+		BRx, TLx, TLy, TRx = 1 - BLy, BLy, 1 - BRy, 1 - BLx;
+		TRy = BRx;
+	else
+		bwid = ((l * cs) + (w * sn)) * LINE_FACTOR_2;
+		bhgt = ((w * cs) + (l * sn)) * LINE_FACTOR_2;
+		BLx, BLy, BRx = sn * sn, -(l / w) * sc, 1 + (w / l) * sc;
+		BRy, TLx, TLy, TRy = BLx, 1 - BRx, 1 - BLx, 1 - BLy;
+		TRx = TLy;
+	end
+	line:SetTexCoord(TLx, TLy, BLx, BLy, TRx, TRy, BRx, BRy);
+	line:SetPoint("BOTTOMLEFT", column.Content, "TOPLEFT", cx - bwid, cy - bhgt);
+	line:SetPoint("TOPRIGHT", column.Content, "TOPLEFT", cx + bwid, cy + bhgt);
 end
 
 local function NodeButton(column, index)
