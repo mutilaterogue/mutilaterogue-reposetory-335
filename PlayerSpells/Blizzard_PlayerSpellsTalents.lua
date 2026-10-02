@@ -229,10 +229,15 @@ function PlayerSpellsTalentsMixin:Refresh()
 	else
 		self.PetTree:Hide();
 		local numTabs = GetNumTalentTabs(false, false) or 0;
+		-- the primary tree (specialization tab); without the API - the one with the most points
+		local primary = GetPrimaryTalentTree and GetPrimaryTalentTree(false, false, group);
+		if primary and primary > 0 then
+			self.selectedTab = primary;
+		end
 		self.selectedTab = self.selectedTab or MostSpentTab(group);
 		for i, tab in ipairs(self.treeTabs) do
 			local name = GetTalentTabInfo(i, false, false, group);
-			tab:SetShown(i <= numTabs);
+			tab:SetShown(i <= numTabs and not (primary and primary > 0));
 			tab:SetText(name or "");
 			tab:SetEnabled(i ~= self.selectedTab);
 		end

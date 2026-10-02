@@ -27,11 +27,19 @@ function PlayerSpellsFrameMixin:OnLoad()
 	self:UpdateScale();
 	TabSystemOwnerMixin.OnLoad(self);
 	self:SetTabSystem(self.TabSystem);
+	-- specialization tab: the primary 3.3.5 tree (Blizzard_PlayerSpellsSpecializations.lua)
+	self.SpecContainer = CreateFrame("Frame", nil, self);
+	self.SpecContainer:SetPoint("TOPLEFT", 4, -24);
+	self.SpecContainer:SetPoint("BOTTOMRIGHT", -4, 4);
+	self.SpecContainer:Hide();
+	PlayerSpellsSpecializations.Create(self.SpecContainer);
+	self.specTabID = self:AddNamedTab(SPECIALIZATION, self.SpecContainer);
 	self.talentTabID = self:AddNamedTab(TALENT_FRAME_TAB_LABEL_TALENTS, self.TalentsContainer);
 	self.glyphTabID = self:AddNamedTab(GLYPHS, self.GlyphContainer);
 	self.spellBookTabID = self:AddNamedTab(TALENT_FRAME_TAB_LABEL_SPELLBOOK, self.SpellBookFrame);
 
 	self.frameTabsToTabID = {
+		[PlayerSpellsUtil.FrameTabs.ClassSpecializations] = self.specTabID,
 		[PlayerSpellsUtil.FrameTabs.ClassTalents] = self.talentTabID,
 		[PlayerSpellsUtil.FrameTabs.Glyphs] = self.glyphTabID,
 		[PlayerSpellsUtil.FrameTabs.SpellBook] = self.spellBookTabID,
@@ -48,6 +56,7 @@ function PlayerSpellsFrameMixin:OnLoad()
 
 	self:SetFrameLevelsFromBaseLevel(self:GetFrameLevel());
 	self.SpellBookFrame:SetFrameLevel(self:GetFrameLevel() + 2);
+	self.SpecContainer:SetFrameLevel(self:GetFrameLevel() + 2);
 	self.TalentsContainer:SetFrameLevel(self:GetFrameLevel() + 2);
 	self.GlyphContainer:SetFrameLevel(self:GetFrameLevel() + 2);
 	self.TabSystem:SetFrameLevel(self:GetFrameLevel() + 25);
@@ -100,6 +109,7 @@ function PlayerSpellsFrameMixin:GetTalentsTabButton()
 end
 
 function PlayerSpellsFrameMixin:UpdateTabs()
+	self.TabSystem:SetTabShown(self.specTabID, self:IsTabAvailable(self.specTabID));
 	self.TabSystem:SetTabShown(self.talentTabID, self:IsTabAvailable(self.talentTabID));
 	self.TabSystem:SetTabShown(self.glyphTabID, self:IsTabAvailable(self.glyphTabID));
 	self.TabSystem:SetTabShown(self.spellBookTabID, true);
@@ -124,7 +134,9 @@ end
 
 function PlayerSpellsFrameMixin:UpdateFrameTitle()
 	local tab = self:GetTab();
-	if tab == self.talentTabID then
+	if tab == self.specTabID then
+		self:SetTitle(SPECIALIZATION);
+	elseif tab == self.talentTabID then
 		self:SetTitle(TALENTS or TALENT_FRAME_TAB_LABEL_TALENTS);
 	elseif tab == self.glyphTabID then
 		self:SetTitle(GLYPHS);
@@ -134,6 +146,10 @@ function PlayerSpellsFrameMixin:UpdateFrameTitle()
 end
 
 function PlayerSpellsFrameMixin:SetTab(tabID)
+	-- no primary tree yet: the talents open on the specialization choice
+	if tabID == self.talentTabID and GetPrimaryTalentTree and not PlayerSpellsSpecializations.GetPrimary() then
+		tabID = self.specTabID;
+	end
 	TabSystemOwnerMixin.SetTab(self, tabID);
 
 	if tabID == self.glyphTabID then
@@ -193,7 +209,7 @@ function PlayerSpellsFrameMixin:TrySetTab(frameTab)
 end
 
 function PlayerSpellsFrameMixin:IsTabAvailable(tabID)
-	if tabID == self.talentTabID then
+	if tabID == self.talentTabID or tabID == self.specTabID then
 		return UnitLevel("player") >= (SHOW_TALENT_LEVEL or 10);
 	elseif tabID == self.glyphTabID then
 		return UnitLevel("player") >= (SHOW_INSCRIPTION_LEVEL or 15);
@@ -372,7 +388,8 @@ end
 ---------------------------------------------------------------------------
 function PlayerSpellsFrame_ToggleTab(tabID)
 	local frame = PlayerSpellsFrame;
-	if frame:IsShown() and frame:GetTab() == tabID then
+	local shownTab = frame:GetTab();
+	if frame:IsShown() and (shownTab == tabID or (tabID == frame.talentTabID and shownTab == frame.specTabID)) then
 		HideUIPanel(frame);
 		return false;
 	end
