@@ -28,9 +28,5 @@ Apply by hand (the context lines are from TrinityCore 3.3.5, they may differ a l
 +    CharacterDatabase.Execute(Trinity::StringFormat("UPDATE group_member SET subgroup = 0 WHERE guid = {}", m_dbStoreId).c_str());
 +
 +    SendUpdate();
-+
-+    // quest related GO states depend on the raid membership (as in ConvertToRaid)
-+    for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
-+        if (Player* player = ObjectAccessor::FindPlayer(itr->guid))
-+            player->UpdateForQuestWorldObjects();
++    // (if your ConvertToRaid updates the quest objects of the members after SendUpdate, copy that loop here)
 +}
