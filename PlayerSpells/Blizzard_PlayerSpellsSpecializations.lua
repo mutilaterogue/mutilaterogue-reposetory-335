@@ -41,11 +41,57 @@ local function Font(name, fallback)
 	return _G[name] and name or fallback;
 end
 
+-- the client has no primary tree API: server/spec_primary.cpp (SPEC_GET / SPEC_SET -> SPEC_STATE)
+PS.primary = {};
+PS.loaded = false;
+
+if not GetPrimaryTalentTree then
+	function GetPrimaryTalentTree(isInspect, isPet, talentGroup)
+		if isInspect or isPet then
+			return nil;
+		end
+		return PS.primary[talentGroup or GetActiveTalentGroup(false, false)] or 0;
+	end
+end
+
+if not SetPrimaryTalentTree then
+	function SetPrimaryTalentTree(index)
+		if Comm_Send then
+			Comm_Send("SPEC_SET", index);
+		end
+	end
+end
+
+local function RegisterComm()
+	if not Comm_Register or PS.commRegistered then
+		return;
+	end
+	PS.commRegistered = true;
+	Comm_Register("SPEC_STATE", function(active, primary1, primary2)
+		PS.primary[1] = tonumber(primary1) or 0;
+		PS.primary[2] = tonumber(primary2) or 0;
+		PS.loaded = true;
+		if PS.frame then
+			PS.OnStateChanged(PS.frame);
+		end
+		if PlayerSpellsTalentsFrame and PlayerSpellsTalentsFrame:IsShown() then
+			PlayerSpellsTalentsFrame:Refresh();
+		end
+	end);
+end
+RegisterComm();
+
+local loader = CreateFrame("Frame");
+loader:RegisterEvent("PLAYER_LOGIN");
+loader:SetScript("OnEvent", function()
+	RegisterComm();
+	if Comm_Send then
+		Comm_Send("SPEC_GET");
+	end
+end);
+
 -- primary tree of the active talent group (0 / nil = not chosen)
 function PS.GetPrimary()
-	if not GetPrimaryTalentTree then
-		return nil;
-	end
 	local tree = GetPrimaryTalentTree(false, false, GetActiveTalentGroup(false, false));
 	if tree and tree > 0 then
 		return tree;
@@ -132,6 +178,19 @@ local function CreateSpecColumn(parent, index)
 	return column;
 end
 
+function PS.OnStateChanged(frame)
+	if frame:IsShown() then
+		PS.Refresh(frame);
+	end
+	-- the tree is chosen: on to the talents
+	if PS.justChose and PS.GetPrimary() then
+		PS.justChose = nil;
+		if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() then
+			PlayerSpellsFrame:SetTab(PlayerSpellsFrame.talentTabID);
+		end
+	end
+end
+
 function PS.Create(container)
 	local frame = CreateFrame("Frame", "PlayerSpellsSpecializationsFrame", container);
 	frame:SetAllPoints(container);
@@ -146,18 +205,7 @@ function PS.Create(container)
 	frame:RegisterEvent("PLAYER_TALENT_UPDATE");
 	frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED");
 	frame:RegisterEvent("CHARACTER_POINTS_CHANGED");
-	frame:SetScript("OnEvent", function(self)
-		if self:IsShown() then
-			PS.Refresh(self);
-		end
-		-- the tree is chosen: on to the talents
-		if PS.justChose and PS.GetPrimary() then
-			PS.justChose = nil;
-			if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() then
-				PlayerSpellsFrame:SetTab(PlayerSpellsFrame.talentTabID);
-			end
-		end
-	end);
+	frame:SetScript("OnEvent", PS.OnStateChanged);
 	PS.frame = frame;
 	return frame;
 end

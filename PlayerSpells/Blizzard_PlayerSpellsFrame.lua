@@ -147,7 +147,7 @@ end
 
 function PlayerSpellsFrameMixin:SetTab(tabID)
 	-- no primary tree yet: the talents open on the specialization choice
-	if tabID == self.talentTabID and GetPrimaryTalentTree and not PlayerSpellsSpecializations.GetPrimary() then
+	if tabID == self.talentTabID and PlayerSpellsSpecializations.loaded and not PlayerSpellsSpecializations.GetPrimary() then
 		tabID = self.specTabID;
 	end
 	TabSystemOwnerMixin.SetTab(self, tabID);

@@ -35,6 +35,7 @@ void AddSC_mythic_plus();
 void AddSC_archaeology();
 void AddSC_group_convert();
 void AddSC_talent_custom();
+void AddSC_spec_primary();
 
 void AddCustomScripts()
 {
@@ -54,4 +55,5 @@ void AddCustomScripts()
     AddSC_archaeology();
     AddSC_group_convert();
     AddSC_talent_custom();
+    AddSC_spec_primary();
 }
