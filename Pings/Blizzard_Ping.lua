@@ -1,5 +1,5 @@
 -- Group pings (retail PingSystem) for 3.3.5. Server: server/mythic_plus.cpp (HandlePing / UpdatePings).
--- Hold the PINGWHEEL key: the wheel opens at the cursor, release over a sector to ping (a short tap pings
+-- Hold the TOGGLEPINGLISTENER key: the wheel opens at the cursor, release over a sector to ping (a short tap pings
 -- by the target: an enemy - attack, else - warning). The ping goes to the target, or to your position.
 -- Receivers: a marker on a circle around the screen center pointing to the ping, its distance, the chat line.
 --   C->S "PING" : type : target guid     S->C "PING" : id : type : sender : target : dx : dy / "PING_POS" : id : dx : dy
@@ -9,8 +9,6 @@ local function S(key)
 	return _G[key] or key;
 end
 
-BINDING_HEADER_PINGSYSTEM = BINDING_HEADER_PINGSYSTEM or S("PING_SYSTEM_LABEL");
-BINDING_NAME_PINGWHEEL = BINDING_NAME_PINGWHEEL or S("PING_TYPE_CONTEXTUAL");
 
 PING_ATTACK, PING_WARNING, PING_ON_MY_WAY, PING_ASSIST = 1, 2, 3, 4;
 
@@ -60,6 +58,11 @@ end
 local function CursorPoint()
 	local x, y, z = Ping_CursorWorldPosition();
 	return x and { x, y, z } or nil;
+end
+
+-- the key bindings PINGATTACK / PINGWARNING / PINGONMYWAY / PINGASSIST (Bindings.xml)
+function Ping_SendAtCursor(pingType)
+	Ping_Send(pingType, CursorPoint());
 end
 
 local function ContextualType()
