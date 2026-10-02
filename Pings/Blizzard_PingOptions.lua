@@ -381,13 +381,3 @@ panel.default = function()
 end;
 
 InterfaceOptions_AddCategory(panel);
-
--- the tutorial once, on the first login with the ping system
-local tutorialLoader = CreateFrame("Frame");
-tutorialLoader:RegisterEvent("PLAYER_ENTERING_WORLD");
-tutorialLoader:SetScript("OnEvent", function(self)
-	self:UnregisterEvent("PLAYER_ENTERING_WORLD");
-	if GetCVar("pingTutorialSeen") ~= "1" then
-		Ping_ShowTutorial();
-	end
-end);
