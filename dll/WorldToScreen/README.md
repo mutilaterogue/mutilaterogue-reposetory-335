@@ -17,5 +17,6 @@ pinged point in the world; the projection to the screen is in Lua (`Ping_WorldTo
 /run print(WorldToCamera(0, 0, 0))                           -- four numbers: the function is there
 /ping                                                         -- the marker should stand on the point
 ```
-If the marker is off to a side or too far from the center, tune in `Pings\Blizzard_Ping.lua`:
-`PING_FOV_FACTOR` (vertical field of view = camera fov * this) and `PING_SWAP_AXES`.
+If the marker drifts from the point when the camera turns (too close to / too far from the center), tune
+`PING_FOV_FACTOR` in `Pings\Blizzard_Ping.lua` (vertical field of view = camera fov * this, 0.6109 by default):
+`/run PING_FOV_FACTOR = 0.7` and ping again.
