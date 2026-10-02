@@ -26,9 +26,40 @@ local WHEEL = { PING_ATTACK, PING_WARNING, PING_ON_MY_WAY, PING_ASSIST };
 local MARKER_RADIUS = 170;
 local PING_TIME = 5;
 
-function Ping_Send(pingType)
-	local guid = UnitExists("target") and UnitGUID("target") or "0";
-	MythicPlus_Send("PING", pingType, (guid:gsub("^0x", "")));
+-- the world point under the cursor (CameraTraceLine of the client dll): x, y, z or nil
+function Ping_CursorWorldPosition()
+	if not CameraTraceLine or not WorldToCamera then
+		return nil;
+	end
+	local _, _, _, fov = WorldToCamera(0, 0, 0);
+	if not fov then
+		return nil;
+	end
+	local x, y = GetCursorPosition();
+	local scale = UIParent:GetEffectiveScale();
+	local width, height = UIParent:GetWidth(), UIParent:GetHeight();
+	local sx, sy = x / scale / width, y / scale / height;
+	local tanV = math.tan(fov * PING_FOV_FACTOR / 2);
+	local tanH = tanV * width / height;
+	return CameraTraceLine((sx * 2 - 1) * tanH, (sy * 2 - 1) * tanV, 1, 200);
+end
+
+-- point: { x, y, z } under the cursor when the ping was started; the cursor over the target pings the target
+function Ping_Send(pingType, point)
+	if UnitExists("mouseover") and UnitIsUnit("mouseover", "target") then
+		MythicPlus_Send("PING", pingType, "T");
+	elseif point then
+		MythicPlus_Send("PING", pingType, "P", math.floor(point[1] * 10), math.floor(point[2] * 10), math.floor(point[3] * 10));
+	elseif UnitExists("target") then
+		MythicPlus_Send("PING", pingType, "T");
+	else
+		MythicPlus_Send("PING", pingType, "0");
+	end
+end
+
+local function CursorPoint()
+	local x, y, z = Ping_CursorWorldPosition();
+	return x and { x, y, z } or nil;
 end
 
 local function ContextualType()
@@ -65,6 +96,7 @@ function PingWheel_Show()
 		table.insert(wedges, { type = pingType, icon = WHEEL_ICONS[pingType], text = S(PING_INFO[pingType].name) });
 	end
 	wheel.pressedAt = GetTime();
+	wheel.point = CursorPoint();
 	wheel:SelectionStart(wedges, false);
 end
 
@@ -77,9 +109,9 @@ function PingWheel_Release()
 	local tap = GetTime() - (wheel.pressedAt or 0) < TAP_TIME;
 	wheel:AnimateOutro();
 	if selected then
-		Ping_Send(selected.type);
+		Ping_Send(selected.type, wheel.point);
 	elseif tap then
-		Ping_Send(ContextualType());
+		Ping_Send(ContextualType(), wheel.point);
 	end
 end
 
@@ -87,7 +119,7 @@ SLASH_PING1 = "/ping";
 SlashCmdList["PING"] = function(msg)
 	msg = strlower(msg or "");
 	local types = { attack = PING_ATTACK, warning = PING_WARNING, onmyway = PING_ON_MY_WAY, assist = PING_ASSIST };
-	Ping_Send(types[msg] or ContextualType());
+	Ping_Send(types[msg] or ContextualType(), CursorPoint());
 end
 
 ---------------------------------------------------------------------------

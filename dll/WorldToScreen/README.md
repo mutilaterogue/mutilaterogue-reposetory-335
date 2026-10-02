@@ -9,10 +9,17 @@ pinged point in the world; the projection to the screen is in Lua (`Ping_WorldTo
 2. `CustomLua.cpp`, `RegisterFunctions()`:
    ```cpp
    AddToFunctionMap("WorldToCamera", &WorldToScreen::WorldToCamera);
+   AddToFunctionMap("CameraTraceLine", &WorldToScreen::CameraTraceLine);
    ```
    (`#include <Client/WorldToScreen.hpp>` at the top.)
 
+`CameraTraceLine(right, up, forward, maxDistance)`: a ray from the camera (camera space direction) through the
+client's TraceLine -> the world point under the cursor (`Ping_CursorWorldPosition` in Blizzard_Ping.lua).
+
 ## Check
+```
+/run print(Ping_CursorWorldPosition())                        -- the point under the cursor (x, y, z)
+```
 ```
 /run print(WorldToCamera(0, 0, 0))                           -- four numbers: the function is there
 /ping                                                         -- the marker should stand on the point

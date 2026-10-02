@@ -1924,7 +1924,7 @@ namespace
     }
 
     // ---------------------------------------------------------------- pings (group, AddonComm)
-    // C->S "PING" : type : target guid (0 - the sender's position)
+    // C->S "PING" : type : "T" (at the selected target) / "0" (the sender's position) / "P" : x : y : z (the cursor point, tenths)
     // S->C "PING" : id : type : sender name : target name : dx : dy (yards, world, from the receiver) : x : y : z (tenths)
     //      "PING_POS" : id : dx : dy : x : y : z
     void SendPingPos(Player* receiver, Ping const& ping, bool first, std::string const& senderName, std::string const& targetName)
@@ -1959,7 +1959,17 @@ namespace
         ping.MapId = player->GetMapId();
         ping.Pos = player->GetPosition();
         std::string targetName;
-        if (args.size() > 1 && !args[1].empty() && args[1] != "0")
+        // "P" : x : y : z (tenths): the point under the client's cursor (CameraTraceLine of the client dll)
+        if (args.size() >= 5 && args[1] == "P")
+        {
+            float x = float(std::atoi(args[2].c_str())) / 10.0f;
+            float y = float(std::atoi(args[3].c_str())) / 10.0f;
+            float z = float(std::atoi(args[4].c_str())) / 10.0f;
+            Position point(x, y, z);
+            if (player->GetExactDist2d(x, y) <= 150.0f && std::fabs(z - player->GetPositionZ()) <= 100.0f)
+                ping.Pos = point;
+        }
+        else if (args.size() > 1 && !args[1].empty() && args[1] != "0")
         {
             // the client only says "at my target": the server knows the selection
             if (Unit* target = ObjectAccessor::GetUnit(*player, player->GetTarget()))
