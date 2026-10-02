@@ -538,9 +538,34 @@ namespace
             && creature->GetEntry() != EXPLOSIVE_ENTRY && creature->GetEntry() != STORM_ENTRY;
     }
 
+    // kill credit creatures of the dungeon encounters (DungeonEncounter.dbc + instance_encounters) of a map,
+    // normal and heroic: the boss flag is often missing on the difficulty templates (Skarvald, Ingvar in Utgarde Keep)
+    std::set<uint32> const& EncounterEntries(uint32 mapId)
+    {
+        static std::unordered_map<uint32, std::set<uint32>> cache;
+        auto itr = cache.find(mapId);
+        if (itr != cache.end())
+            return itr->second;
+        std::set<uint32>& entries = cache[mapId];
+        for (uint32 difficulty = 0; difficulty < 2; ++difficulty)
+            if (DungeonEncounterList const* encounters = sObjectMgr->GetDungeonEncounterList(mapId, Difficulty(difficulty)))
+                for (DungeonEncounter const* encounter : *encounters)
+                    if (encounter->creditType == ENCOUNTER_CREDIT_KILL_CREATURE && encounter->creditEntry)
+                        entries.insert(encounter->creditEntry);
+        return entries;
+    }
+
     bool IsBoss(Creature const* creature)
     {
-        return creature && (creature->IsDungeonBoss() || creature->isWorldBoss());
+        if (!creature)
+            return false;
+        if (creature->IsDungeonBoss() || creature->isWorldBoss())
+            return true;
+        // the base (normal) template of the creature
+        if (CreatureTemplate const* base = sObjectMgr->GetCreatureTemplate(creature->GetEntry()))
+            if (base->flags_extra & CREATURE_FLAG_EXTRA_DUNGEON_BOSS)
+                return true;
+        return EncounterEntries(creature->GetMapId()).count(creature->GetEntry()) != 0;
     }
 
     uint32 ForcesValue(Creature const* creature)
@@ -853,12 +878,18 @@ namespace
         map->LoadAllCells();
 
         std::set<uint32> bossEntries;
-        for (auto const& pair : map->GetCreatureBySpawnIdStore())
-        {
-            Creature* creature = pair.second;
-            if (IsBoss(creature) && bossEntries.insert(creature->GetEntry()).second)
-                run.Bosses.push_back({ creature->GetEntry(), creature->GetName(), !creature->IsAlive() });
-        }
+        for (uint32 entry : EncounterEntries(map->GetId()))
+            if (CreatureTemplate const* info = sObjectMgr->GetCreatureTemplate(entry))
+                if (bossEntries.insert(entry).second)
+                    run.Bosses.push_back({ entry, info->Name, false });
+        // no encounter data for this map: the creatures with the boss flag
+        if (bossEntries.empty())
+            for (auto const& pair : map->GetCreatureBySpawnIdStore())
+            {
+                Creature* creature = pair.second;
+                if (IsBoss(creature) && bossEntries.insert(creature->GetEntry()).second)
+                    run.Bosses.push_back({ creature->GetEntry(), creature->GetName(), !creature->IsAlive() });
+            }
         return run;
     }
 
@@ -1108,7 +1139,9 @@ namespace
                     found = true;
                     break;
                 }
-            if (!found && std::none_of(run.Bosses.begin(), run.Bosses.end(), [&](Boss const& b) { return b.Entry == creature->GetEntry(); }))
+            // a boss not in the list: added only when the map has no encounter data (else it is a helper of an encounter)
+            if (!found && EncounterEntries(run.MapId).empty()
+                && std::none_of(run.Bosses.begin(), run.Bosses.end(), [&](Boss const& b) { return b.Entry == creature->GetEntry(); }))
             {
                 run.Bosses.push_back({ creature->GetEntry(), creature->GetName(), true });
                 SyncRun(run, true);

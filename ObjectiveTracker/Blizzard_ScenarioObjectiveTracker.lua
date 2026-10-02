@@ -208,6 +208,17 @@ end
 ScenarioObjectiveTrackerChallengeModeMixin = { };
 
 function ScenarioObjectiveTrackerChallengeModeMixin:OnLoad()
+	-- deaths: on the timer line at the right edge, over the timer art; the skull when the atlas is missing
+	local deathCount = self.DeathCount;
+	deathCount:ClearAllPoints();
+	deathCount:SetPoint("RIGHT", self, "RIGHT", -16, 0);
+	deathCount:SetPoint("TOP", self.Border and self.Border.TimeLeft or self, "TOP", 0, 0);
+	if not (C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("poi-graveyard-neutral")) then
+		deathCount.Icon:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Skull");
+		deathCount.Icon:SetWidth(14);
+		deathCount.Icon:SetHeight(14);
+	end
+	deathCount:SetWidth(32);
 	self.StartedDepleted:SetScript("OnEnter", function()
 		GameTooltip:SetOwner(self.StartedDepleted, "ANCHOR_RIGHT");
 		GameTooltip:SetText(CHALLENGE_MODE_DEPLETED_KEYSTONE, 1, 1, 1);
