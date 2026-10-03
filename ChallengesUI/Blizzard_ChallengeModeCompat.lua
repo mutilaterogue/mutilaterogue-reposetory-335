@@ -380,6 +380,7 @@ end
 -- gets a local token in its uniqueId field (the 8th number after the item id, client side only) -> the sender;
 -- the key of the sender comes from the server (MPLUS_KEY_OF / MPLUS_KEY_INFO).
 local KEY_TOKEN_BASE = 900000000;
+local DecorateKeystone; -- below
 local keyTokens, keyTokenNames, keyCache, keyAsked = {}, {}, {}, {};
 
 local function LinkFields(link)
@@ -453,8 +454,10 @@ if Comm_Register then
 		keyCache[name] = { mapID = mapID, level = tonumber(level) or 0, name = dungeon ~= "" and dungeon or (C_ChallengeMode.GetMapUIInfo(mapID)) or "" };
 		-- the open link tooltip: again with the data
 		local _, link = ItemRefTooltip:GetItem();
+		-- not SetHyperlink: the same link again closes ItemRefTooltip
 		if ItemRefTooltip:IsShown() and link and ItemIDFromLink(link) == KEYSTONE_ITEM_ID then
-			ItemRefTooltip:SetHyperlink(link);
+			ItemRefTooltip.mplusDecorated = nil;
+			DecorateKeystone(ItemRefTooltip, false);
 		end
 	end);
 end
@@ -490,7 +493,7 @@ end
 
 -- retail order: name, Mythic Level, the item lines, Dungeon Modifiers + affixes, the description
 -- own: the item is the player's (bags, character, own trade slot) - else only a link with the key data
-local function DecorateKeystone(tooltip, own)
+function DecorateKeystone(tooltip, own)
 	if tooltip.mplusDecorated then
 		return;
 	end
