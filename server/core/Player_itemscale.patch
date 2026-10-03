@@ -1,0 +1,76 @@
+--- a/src/server/game/Entities/Player/Player.h
++++ b/src/server/game/Entities/Player/Player.h
+@@ -1921,6 +1921,11 @@
+         ScalingStatValuesEntry const* GetScalingStatValuesFor(ItemTemplate const& itemTemplate) const;
+         void _ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply, bool only_level_scale = false);
+         void _ApplyWeaponDamage(uint8 slot, ItemTemplate const* proto, bool apply);
++        // item level scaling (custom scripts, item_scaling.cpp): multiplier of stats / armor / weapon damage of an equipped item
++        enum ItemScaleKind : uint8 { ITEM_SCALE_STATS, ITEM_SCALE_ARMOR, ITEM_SCALE_DAMAGE };
++        typedef float (*ItemScaleHook)(Player const* player, Item const* item, ItemScaleKind kind);
++        static ItemScaleHook s_itemScaleHook;
++        float GetItemScale(uint8 slot, ItemTemplate const* proto, ItemScaleKind kind) const;
+         void _ApplyAmmoBonuses();
+         bool EnchantmentFitsRequirements(uint32 enchantmentcondition, int8 slot) const;
+         void ToggleMetaGemsActive(uint8 exceptslot, bool apply);
+--- a/src/server/game/Entities/Player/Player.cpp
++++ b/src/server/game/Entities/Player/Player.cpp
+@@ -7122,11 +7122,25 @@
+     return sScalingStatValuesStore.LookupEntry(ssd_level);
+ }
+ 
++Player::ItemScaleHook Player::s_itemScaleHook = nullptr;
++
++float Player::GetItemScale(uint8 slot, ItemTemplate const* proto, ItemScaleKind kind) const
++{
++    if (!s_itemScaleHook || slot >= EQUIPMENT_SLOT_END)
++        return 1.0f;
++    Item const* item = GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
++    if (!item || item->GetTemplate() != proto)
++        return 1.0f;
++    return s_itemScaleHook(this, item, kind);   // item level scaling
++}
++
+ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply, bool only_level_scale /*= false*/)
+ {
+     if (slot >= INVENTORY_SLOT_BAG_END || !proto)
+         return;
+ 
++    float const statScale = GetItemScale(slot, proto, ITEM_SCALE_STATS);
++
+     ScalingStatDistributionEntry const* ssd = GetScalingStatDistributionFor(*proto);
+     ScalingStatValuesEntry const* ssv = GetScalingStatValuesFor(*proto);
+     if (only_level_scale && (!ssd || !ssv))
+@@ -7152,6 +7166,9 @@
+             val = proto->GetStatValue(i);
+         }
+ 
++        if (statScale != 1.0f)
++            val = int32(std::lround(val * statScale));
++
+         if (val == 0)
+             continue;
+ 
+@@ -7324,6 +7341,9 @@
+         armor -= uint32(proto->GetArmorDamageModifier());
+ 
+     if (armor)
++        armor = uint32(std::lround(armor * GetItemScale(slot, proto, ITEM_SCALE_ARMOR)));
++
++    if (armor)
+     {
+         UnitModifierFlatType modType = TOTAL_VALUE;
+         if (proto->GetClass() == ITEM_CLASS_ARMOR)
+@@ -7395,10 +7415,13 @@
+         return;
+ 
+     ScalingStatValuesEntry const* ssv = GetScalingStatValuesFor(*proto);
++    float const damageScale = GetItemScale(slot, proto, ITEM_SCALE_DAMAGE);
+     for (uint8 i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+     {
+         float minDamage, maxDamage;
+         proto->GetDamage(i, minDamage, maxDamage);
++        minDamage *= damageScale;
++        maxDamage *= damageScale;
+ 
+         // If set dpsMod in ScalingStatValue use it for min (70% from average), max (130% from average) damage
+         if (ssv && i == 0) // scaling stats only for first damage

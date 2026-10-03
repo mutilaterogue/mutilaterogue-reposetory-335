@@ -1,0 +1,16 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- MaskTexture test (optional): the retail <MaskTexture> tag. Shown by /masktest (MaskTextureTest.lua). -->
+	<Frame name="MaskTextureXMLTest" hidden="true">
+		<Size x="64" y="64"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" file="Interface\Icons\INV_Misc_QuestionMark" setAllPoints="true"/>
+				<MaskTexture parentKey="CircleMask" atlas="UI-HUD-UnitFrame-Player-Portrait-Mask" setAllPoints="true">
+					<MaskedTextures>
+						<MaskedTexture childKey="Icon"/>
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+		</Layers>
+	</Frame>
+</Ui>

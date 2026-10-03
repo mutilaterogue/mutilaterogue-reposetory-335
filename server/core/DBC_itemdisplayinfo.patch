@@ -1,0 +1,79 @@
+--- a/src/server/shared/DataStores/DBCStructure.h
++++ b/src/server/shared/DataStores/DBCStructure.h
+@@ -878,23 +878,22 @@
+     //uint32 Name_lang_mask;                                // 17
+ };
+ 
+-/*
++// loaded for ItemVisual - effect built into the weapon model (transmog illusions, transmog_illusions.cpp)
+ struct ItemDisplayInfoEntry
+ {
+     uint32 ID;                                              // 0
+-    char const* ModelName[2];                               // 1-2
+-    char const* ModelTexture[2];                            // 3-4
+-    char const* InventoryIcon[2];                           // 5-6
+-    uint32 GeosetGroup[3];                                  // 7-9
+-    uint32 Flags;                                           // 10
+-    uint32 SpellVisualID;                                   // 11
+-    uint32 GroupSoundIndex;                                 // 12
+-    uint32 HelmetGeosetVisID[2];                            // 13-14
+-    char const* Texture[8];                                 // 15-22
++    //char const* ModelName[2];                             // 1-2
++    //char const* ModelTexture[2];                          // 3-4
++    //char const* InventoryIcon[2];                         // 5-6
++    //uint32 GeosetGroup[3];                                // 7-9
++    //uint32 Flags;                                         // 10
++    //uint32 SpellVisualID;                                 // 11
++    //uint32 GroupSoundIndex;                               // 12
++    //uint32 HelmetGeosetVisID[2];                          // 13-14
++    //char const* Texture[8];                               // 15-22
+     int32 ItemVisual;                                       // 23
+-    uint32 ParticleColorID;                                 // 24
++    //uint32 ParticleColorID;                               // 24
+ };
+-*/
+ 
+ /*
+ struct ItemCondExtCostsEntry
+--- a/src/server/shared/DataStores/DBCfmt.h
++++ b/src/server/shared/DataStores/DBCfmt.h
+@@ -75,7 +75,7 @@
+ char constexpr Holidaysfmt[] = "niiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiixxsiix";
+ char constexpr Itemfmt[] = "niiiiiii";
+ char constexpr ItemBagFamilyfmt[] = "nxxxxxxxxxxxxxxxxx";
+-//char constexpr ItemDisplayTemplateEntryfmt[] = "nxxxxxxxxxxixxxxxxxxxxx";
++char constexpr ItemDisplayTemplateEntryfmt[] = "nxxxxxxxxxxxxxxxxxxxxxxix";   // ID, ItemVisual (23)
+ //char constexpr ItemCondExtCostsEntryfmt[] = "xiii";
+ char constexpr ItemExtendedCostEntryfmt[] = "niiiiiiiiiiiiiix";
+ char constexpr ItemLimitCategoryEntryfmt[] = "nxxxxxxxxxxxxxxxxxii";
+--- a/src/server/game/DataStores/DBCStores.cpp
++++ b/src/server/game/DataStores/DBCStores.cpp
+@@ -114,7 +114,7 @@
+ DBCStorage <ItemEntry>                    sItemStore(Itemfmt);
+ DBCStorage <ItemBagFamilyEntry>           sItemBagFamilyStore(ItemBagFamilyfmt);
+ //DBCStorage <ItemCondExtCostsEntry> sItemCondExtCostsStore(ItemCondExtCostsEntryfmt);
+-//DBCStorage <ItemDisplayInfoEntry> sItemDisplayInfoStore(ItemDisplayTemplateEntryfmt); -- not used currently
++DBCStorage <ItemDisplayInfoEntry> sItemDisplayInfoStore(ItemDisplayTemplateEntryfmt);   // ItemVisual - transmog illusions
+ DBCStorage <ItemExtendedCostEntry> sItemExtendedCostStore(ItemExtendedCostEntryfmt);
+ DBCStorage <ItemLimitCategoryEntry> sItemLimitCategoryStore(ItemLimitCategoryEntryfmt);
+ DBCStorage <ItemRandomPropertiesEntry> sItemRandomPropertiesStore(ItemRandomPropertiesfmt);
+@@ -331,7 +331,7 @@
+     LOAD_DBC(sHolidaysStore,                      "Holidays.dbc");
+     LOAD_DBC(sItemStore,                          "Item.dbc");
+     LOAD_DBC(sItemBagFamilyStore,                 "ItemBagFamily.dbc");
+-    //LOAD_DBC(sItemDisplayInfoStore,               "ItemDisplayInfo.dbc");     -- not used currently
++    LOAD_DBC(sItemDisplayInfoStore,                "ItemDisplayInfo.dbc");
+     //LOAD_DBC(sItemCondExtCostsStore,              "ItemCondExtCosts.dbc");
+     LOAD_DBC(sItemExtendedCostStore,              "ItemExtendedCost.dbc");
+     LOAD_DBC(sItemLimitCategoryStore,             "ItemLimitCategory.dbc");
+--- a/src/server/game/DataStores/DBCStores.h
++++ b/src/server/game/DataStores/DBCStores.h
+@@ -143,7 +143,7 @@
+ TC_GAME_API extern DBCStorage <HolidaysEntry>                sHolidaysStore;
+ TC_GAME_API extern DBCStorage <ItemEntry>                    sItemStore;
+ TC_GAME_API extern DBCStorage <ItemBagFamilyEntry>           sItemBagFamilyStore;
+-//TC_GAME_API extern DBCStorage <ItemDisplayInfoEntry>      sItemDisplayInfoStore; -- not used currently
++TC_GAME_API extern DBCStorage <ItemDisplayInfoEntry>      sItemDisplayInfoStore;
+ TC_GAME_API extern DBCStorage <ItemExtendedCostEntry>        sItemExtendedCostStore;
+ TC_GAME_API extern DBCStorage <ItemLimitCategoryEntry>       sItemLimitCategoryStore;
+ TC_GAME_API extern DBCStorage <ItemRandomPropertiesEntry>    sItemRandomPropertiesStore;

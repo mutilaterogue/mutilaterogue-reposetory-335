@@ -1,0 +1,119 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- retail ChallengeModeCompleteBanner (Blizzard_ChallengesUI.xml) for 3.3.5:
+	     relativeKey -> $parent names, the AnimIn / AnimOut groups are played in Lua. -->
+	<Script file="Blizzard_ChallengeModeCompleteBanner.lua"/>
+
+	<Frame name="ChallengeModeBannerPartyMemberTemplate" alpha="0" virtual="true">
+		<Size x="61" y="61"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture name="$parentBorder" parentKey="Border" atlas="BossBanner-PortraitBorder" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Portrait">
+					<Size x="59" y="59"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentBorder"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Name" inherits="GameFontNormal">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentBorder" relativePoint="BOTTOM" x="0" y="-8"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="ChallengeModeCompleteBanner" parent="UIParent" hidden="true" frameStrata="HIGH" enableMouse="true">
+		<Size x="128" y="356"/>
+		<Anchors>
+			<Anchor point="TOP" x="0" y="-120"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BORDER">
+				<Texture name="$parentBannerTop" parentKey="BannerTop" alpha="0" atlas="BossBanner-BgBanner-Top" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-44"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentBannerBottom" parentKey="BannerBottom" alpha="0" atlas="BossBanner-BgBanner-Bottom" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="BannerMiddle" alpha="0" atlas="BossBanner-BgBanner-Mid">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentBannerTop" x="-100" y="-34"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentBannerBottom" x="100" y="25"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentSkullCircle" parentKey="SkullCircle" alpha="0" atlas="ChallengeMode-SpikeyStar">
+					<Size x="100" y="100"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentBannerTop" x="0" y="46"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Level" inherits="GameFontNormalHuge" alpha="0">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentSkullCircle"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="BottomFillagree" alpha="0" atlas="BossBanner-BottomFillagree" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="8"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RightFillagree" alpha="0" atlas="BossBanner-RightFillagree" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentSkullCircle" x="47" y="6"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="LeftFillagree" alpha="0" atlas="BossBanner-LeftFillagree" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentSkullCircle" x="-47" y="6"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentTitle" parentKey="Title" inherits="GameFontNormalHuge" justifyH="CENTER" alpha="0">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentBannerTop" x="0" y="-61"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentDescriptionLineOne" parentKey="DescriptionLineOne" inherits="GameFontHighlightLarge" justifyH="CENTER" alpha="0">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentTitle" relativePoint="BOTTOM" x="0" y="-8"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentDescriptionLineTwo" parentKey="DescriptionLineTwo" inherits="GameFontHighlightLarge" justifyH="CENTER" alpha="0">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentDescriptionLineOne" relativePoint="BOTTOM" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="DescriptionLineThree" inherits="GameFontHighlightLarge" justifyH="CENTER" alpha="0">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentDescriptionLineTwo" relativePoint="BOTTOM" x="0" y="-21"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="2">
+				<Texture parentKey="Glow" alpha="0" atlas="ChallengeMode-SoftYellowGlow">
+					<Size x="106" y="106"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentSkullCircle"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="ChallengeModeCompleteBanner_OnLoad"/>
+			<OnUpdate function="ChallengeModeCompleteBanner_OnUpdate"/>
+			<OnMouseDown function="ChallengeModeCompleteBanner_OnMouseDown"/>
+		</Scripts>
+	</Frame>
+</Ui>

@@ -1,0 +1,3 @@
+Interface\FrameXML\Bindings.xml (in the repository) has the ping bindings with the retail names:
+  TOGGLEPINGLISTENER (the wheel, header PING_SYSTEM), PINGATTACK, PINGWARNING, PINGONMYWAY, PINGASSIST.
+Their texts: BINDING_HEADER_PING_SYSTEM, BINDING_NAME_TOGGLEPINGLISTENER, BINDING_NAME_PING* (retail GlobalStrings).

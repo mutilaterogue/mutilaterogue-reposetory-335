@@ -1,0 +1,193 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- retail ChallengesFrame (Blizzard_ChallengesUI.xml, the Mythic+ tab of PVEFrame) for 3.3.5.
+	     3.3.5 has no PVEFrame: a window of its own (RetailPortraitFrameTemplate), /mplus or /keystone.
+	     No ScrollFrame child, no season change notice; relativeKey -> $parent names. -->
+	<Script file="Blizzard_ChallengesFrame.lua"/>
+
+	<!-- retail ChallengesDungeonIconFrameTemplate -->
+	<Frame name="ChallengesDungeonIconFrameTemplate" enableMouse="true" virtual="true">
+		<Size x="52" y="52"/>
+		<Layers>
+			<Layer level="BORDER">
+				<Texture atlas="ChallengeMode-DungeonIconFrame" setAllPoints="true"/>
+			</Layer>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Icon">
+					<Size x="50" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="2">
+				<FontString parentKey="HighestLevel" inherits="GameFontNormalHuge" justifyH="CENTER">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-4"/>
+					</Anchors>
+					<Color r="1.0" g="1.0" b="1.0"/>
+					<Shadow>
+						<Offset>
+							<AbsDimension x="1" y="-1"/>
+						</Offset>
+						<Color r="0" g="0" b="0"/>
+					</Shadow>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnEnter function="ChallengesDungeonIcon_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Frame>
+
+	<Frame name="ChallengesFrame" inherits="RetailPortraitFrameTemplate" toplevel="true" parent="UIParent" enableMouse="true" movable="true" hidden="true">
+		<Size x="563" y="440"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" x="16" y="-116"/>
+		</Anchors>
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-60"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture name="$parentBackground" parentKey="Background" setAllPoints="true">
+							<TexCoords left="0.057" right="0.705" top="0.092" bottom="0.564"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<!-- retail WeeklyInfo.Child -->
+			<Frame name="$parentWeeklyInfo" parentKey="WeeklyInfo">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="0" y="0"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="0" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture name="$parentRuneBG" parentKey="RuneBG" alpha="0.6" atlas="ChallengeMode-RuneBG" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="-100" y="50"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="RunesLarge" alpha="0.08" atlas="ChallengeMode-Runes-Large" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" relativeTo="$parentRuneBG"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="RunesSmall" alpha="0.08" atlas="ChallengeMode-Runes-Small" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" relativeTo="$parentRuneBG" x="-1" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString name="$parentThisWeekLabel" parentKey="ThisWeekLabel" inherits="GameFontNormalHuge" text="CHALLENGE_MODE_THIS_WEEK">
+							<Anchors>
+								<Anchor point="TOP" y="-25"/>
+							</Anchors>
+							<Color r="1.0" g="1.0" b="1.0"/>
+							<Shadow>
+								<Offset>
+									<AbsDimension x="1" y="-1"/>
+								</Offset>
+								<Color r="0" g="0" b="0"/>
+							</Shadow>
+						</FontString>
+						<FontString parentKey="Description" inherits="GameFontNormalLarge" justifyH="CENTER" hidden="true" text="MYTHIC_PLUS_MISSING_KEYSTONE_MESSAGE">
+							<Size x="430" y="0"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="0"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="SeasonBest" inherits="GameFontNormalLarge" text="MYTHIC_PLUS_SEASON_BEST">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" x="10" y="15"/>
+							</Anchors>
+							<Color r="1.0" g="1.0" b="1.0"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<!-- retail WeeklyChest (ChallengeModeWeeklyChestMixin) -->
+					<Button name="$parentWeeklyChest" parentKey="WeeklyChest" hidden="true">
+						<Size x="67" y="67"/>
+						<Anchors>
+							<Anchor point="CENTER" x="0" y="-5"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString parentKey="RunStatus" inherits="GameFontNormalLarge" justifyH="CENTER">
+									<Size x="430" y="0"/>
+									<Anchors>
+										<Anchor point="TOP" relativePoint="TOP" y="43"/>
+									</Anchors>
+								</FontString>
+								<Texture parentKey="Icon">
+									<Size x="154" y="135"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+							<Layer level="HIGHLIGHT">
+								<Texture parentKey="Highlight" alphaMode="ADD" alpha="0.2">
+									<Size x="154" y="135"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnEnter function="ChallengesWeeklyChest_OnEnter"/>
+							<OnLeave function="GameTooltip_Hide"/>
+							<OnClick function="ChallengesWeeklyChest_OnClick"/>
+						</Scripts>
+					</Button>
+					<!-- retail DungeonScoreInfo -->
+					<Button name="$parentDungeonScoreInfo" parentKey="DungeonScoreInfo">
+						<Size x="200" y="70"/>
+						<Anchors>
+							<Anchor point="TOP" relativeTo="$parentWeeklyChest" relativePoint="BOTTOM" x="0" y="-30"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString name="$parentTitle" parentKey="Title" justifyV="TOP" inherits="GameFontHighlightMedium" text="DUNGEON_SCORE">
+									<Size x="200" y="0"/>
+									<Anchors>
+										<Anchor point="TOP"/>
+									</Anchors>
+								</FontString>
+								<FontString parentKey="Score" justifyV="TOP" inherits="GameFontNormalHuge">
+									<Size x="200" y="0"/>
+									<Anchors>
+										<Anchor point="TOP" relativeTo="$parentTitle" relativePoint="BOTTOM" x="0" y="-5"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnEnter function="ChallengesDungeonScore_OnEnter"/>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Button>
+				</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="ChallengesFrame_OnLoad"/>
+			<OnShow function="ChallengesFrame_OnShow"/>
+			<OnHide function="ChallengesFrame_OnHide"/>
+			<OnDragStart>
+				self:StartMoving();
+			</OnDragStart>
+			<OnDragStop>
+				self:StopMovingOrSizing();
+			</OnDragStop>
+		</Scripts>
+	</Frame>
+</Ui>

@@ -1,0 +1,43 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- Group pings (retail PingSystem). FrameXML.toc: Pings\Blizzard_Ping.xml after ChallengesUI (MythicPlus_Send).
+	     Bindings.xml: see Pings\Bindings_Ping.txt -->
+	<Include file="Blizzard_RadialWheel.xml"/>
+	<Script file="Blizzard_Ping.lua"/>
+	<Script file="Blizzard_PingOptions.lua"/>
+
+	<!-- the wheel: retail RadialWheelFrameTemplate (Blizzard_RadialWheel.xml) -->
+	<Frame name="PingWheelFrame" inherits="RadialWheelFrameTemplate" parent="UIParent" frameStrata="DIALOG" hidden="true">
+		<Scripts>
+			<OnLoad>PingWheel_OnLoad(self);</OnLoad>
+		</Scripts>
+	</Frame>
+
+	<Frame name="PingMarkerTemplate" frameStrata="HIGH" virtual="true">
+		<Size x="40" y="40"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon">
+					<Size x="36" y="36"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Name" inherits="GameFontNormalSmall">
+					<Anchors>
+						<Anchor point="TOP" relativePoint="BOTTOM" x="0" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Distance" inherits="GameFontHighlightSmall">
+					<Anchors>
+						<Anchor point="BOTTOM" relativePoint="TOP" x="0" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnUpdate>PingMarker_OnUpdate(self, elapsed);</OnUpdate>
+		</Scripts>
+	</Frame>
+</Ui>

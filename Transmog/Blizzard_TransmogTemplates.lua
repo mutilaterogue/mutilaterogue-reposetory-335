@@ -1,0 +1,390 @@
+-- Трансмогрификация: шаблоны (ретейл: Blizzard_TransmogTemplates) - модели обликов, кнопки слотов, элементы оформления.
+
+local OP_GET_STATE, OP_STATE, OP_APPLY, OP_RESULT, OP_OPEN, OP_CLOSE, OP_GET_PAGE, OP_PAGE, GRID_COLUMNS, GRID_ROWS, MODEL_WIDTH, MODEL_HEIGHT, MODEL_SPACE_X, MODEL_SPACE_Y, LEFT_X1, LEFT_X2, CENTER_X1, CENTER_X2, RIGHT_X1, RIGHT_X2, PANEL_TOP, PANEL_BOTTOM, SLOTS, SLOT_UNASSIGNED_ATLAS, SLOT_BY_ID, CLASS_IDS, NUM_OUTFIT_BUTTONS, MAX_OUTFITS =
+	TransmogUI.OP_GET_STATE, TransmogUI.OP_STATE, TransmogUI.OP_APPLY, TransmogUI.OP_RESULT, TransmogUI.OP_OPEN, TransmogUI.OP_CLOSE, TransmogUI.OP_GET_PAGE, TransmogUI.OP_PAGE, TransmogUI.GRID_COLUMNS, TransmogUI.GRID_ROWS, TransmogUI.MODEL_WIDTH, TransmogUI.MODEL_HEIGHT, TransmogUI.MODEL_SPACE_X, TransmogUI.MODEL_SPACE_Y, TransmogUI.LEFT_X1, TransmogUI.LEFT_X2, TransmogUI.CENTER_X1, TransmogUI.CENTER_X2, TransmogUI.RIGHT_X1, TransmogUI.RIGHT_X2, TransmogUI.PANEL_TOP, TransmogUI.PANEL_BOTTOM, TransmogUI.SLOTS, TransmogUI.SLOT_UNASSIGNED_ATLAS, TransmogUI.SLOT_BY_ID, TransmogUI.CLASS_IDS, TransmogUI.NUM_OUTFIT_BUTTONS, TransmogUI.MAX_OUTFITS;
+
+function TransmogUI.ApplyCamera(model)
+	local entry = model.entry;
+	if not entry then
+		return;
+	end
+	local cam = TransmogUI.GetCamera(TransmogFrame.category, entry.itemId);
+	model:SetPosition(cam[1], cam[2], cam[3]);
+	model:SetFacing(cam[4] or 0);
+end
+
+function TransmogUI.DressGridModel(model)
+	local entry = model.entry;
+	if not entry then
+		return;
+	end
+	if not model.unitSet then
+		model:SetUnit("player");
+		model.unitSet = true;
+	end
+	model:Undress();
+	if entry.illusion then
+		model:TryOn("item:" .. entry.itemId .. ":" .. entry.illusion.id);   -- оружие руки с иллюзией
+	else
+		model:TryOn("item:" .. entry.itemId);
+	end
+	TransmogUI.ApplyCamera(model);
+end
+
+function TransmogItemModel_OnLoad(self)
+	-- рамка-карточка (ретейл: Border atlas transmog-itemcard-default, useAtlasSize, по центру)
+	local border = CreateFrame("Frame", nil, self:GetParent());
+	border:SetAllPoints(self);
+	border:SetFrameLevel(self:GetFrameLevel() + 2);
+	border.Card = border:CreateTexture(nil, "OVERLAY");
+	border.Card:SetAtlas("transmog-itemCard-default", true);
+	border.Card:SetPoint("CENTER");
+	border.Hover = border:CreateTexture(nil, "OVERLAY", nil, 1);
+	border.Hover:SetAtlas("transmog-itemCard-hover", true);
+	border.Hover:SetPoint("CENTER");
+	border.Hover:Hide();
+	border:Hide();
+	self.Border = border;
+	TransmogAnim.SetupCard(self, TransmogAnim.ITEMCARD_FX, border:GetFrameLevel() + 1);
+
+	self:SetScript("OnUpdate", function(model, elapsed)
+		model.Border.Hover:SetShown(model:IsMouseOver());
+		if model.entry then
+			TransmogUI.ApplyCamera(model);
+		end
+		if model.redressTime then
+			model.redressTime = model.redressTime - elapsed;
+			if model.redressTime <= 0 then
+				TransmogUI.DressGridModel(model);
+				local delays = { 0.3, 0.6, 1.0, 2.0 };
+				model.redressIndex = (model.redressIndex or 1) + 1;
+				model.redressTime = delays[model.redressIndex - 1];
+			end
+		end
+	end);
+end
+
+function TransmogItemModel_OnMouseDown(self, button)
+	local frame = TransmogFrame;
+	local entry = self.entry;
+	if entry and entry.illusion and frame.illusionSlot then
+		TransmogUI.OnIllusionCardClick(frame, entry);
+		return;
+	end
+	if not entry or not frame.selectedSlot then
+		return;
+	end
+	local _, link = GetItemInfo(entry.itemId);
+	if IsModifiedClick("CHATLINK") and link then
+		ChatEdit_InsertLink(link);
+		return;
+	end
+	if not entry.collected then
+		UIErrorsFrame:AddMessage(TRANSMOGRIFY_STYLE_UNCOLLECTED, 1.0, 0.1, 0.1, 1.0);
+		return;
+	end
+	local slotId = frame.selectedSlot;
+	if entry.itemId == GetInventoryItemID("player", slotId) and not frame.applied[slotId] then
+		frame.pending[slotId] = nil;   -- выбран собственный облик предмета
+	elseif entry.itemId == frame.applied[slotId] then
+		frame.pending[slotId] = nil;
+	else
+		frame.pending[slotId] = entry.itemId;
+	end
+	PlaySound("igMainMenuOptionCheckBoxOn");
+	TransmogUI.UpdateSlots(frame);
+	TransmogUI.UpdatePreview(frame);
+	TransmogUI.UpdateGrid(frame);
+end
+
+function TransmogItemModel_OnEnter(self)
+	local entry = self.entry;
+	if not entry then
+		return;
+	end
+	if entry.illusion then
+		TransmogUI.OnIllusionCardEnter(self, entry);
+		return;
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:SetHyperlink("item:" .. entry.itemId);
+	GameTooltip:AddLine(" ");
+	if entry.collected then
+		GameTooltip:AddLine("Щелчок - применить этот облик к слоту.", 0.1, 1, 0.1, true);
+	else
+		GameTooltip:AddLine(TRANSMOGRIFY_TOOLTIP_APPEARANCE_UNKNOWN, 1, 0.1, 0.1, true);
+	end
+	GameTooltip:Show();
+end
+
+---------------------------------------------------------------------------
+-- slot buttons
+---------------------------------------------------------------------------
+function TransmogSlotButton_OnLoad(self)
+	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+	local pending, saved = self.PendingFrame, self.SavedFrame;
+	pending.AnimStart = TransmogAnim.Create(pending, TransmogAnim.SLOT_PENDING_START);
+	pending.AnimLoop = TransmogAnim.Create(pending, TransmogAnim.SLOT_PENDING_LOOP, true);
+	saved.Anim = TransmogAnim.Create(saved, TransmogAnim.SLOT_SAVED);
+	saved.Anim:SetScript("OnFinished", function()
+		saved:Hide();
+		if TransmogFrame:IsShown() then
+			TransmogUI.UpdateSlotButton(TransmogFrame, self);
+		end
+	end);
+end
+
+-- ретейл: TransmogAppearanceSlotMixin:Update - рамка ожидания; вступление только если вид в слоте сменился
+function TransmogUI.UpdateSlotPending(button, hasPending, itemId)
+	local pending = button.PendingFrame;
+	if hasPending and not button.SavedFrame:IsShown() then
+		if not pending:IsShown() then
+			pending:Show();
+			pending.AnimLoop:Restart();
+		end
+		if button.lastPendingItem ~= itemId then
+			pending.AnimStart:Restart();
+		end
+		button.lastPendingItem = itemId;
+	else
+		pending.AnimStart:Finish();
+		pending.AnimLoop:Stop();
+		pending:Hide();
+		button.lastPendingItem = nil;
+	end
+end
+
+-- ретейл: TransmogAppearanceSlotMixin:OnTransmogrifySuccess
+function TransmogUI.PlaySlotSaved(button)
+	local saved = button.SavedFrame;
+	if saved:IsShown() then
+		return;
+	end
+	TransmogUI.UpdateSlotPending(button, false);
+	saved:Show();
+	saved.Anim:Restart();
+end
+
+function TransmogSlotButton_OnClick(self, button)
+	local frame = TransmogFrame;
+	local slotId = self.info.id;
+	if button == "RightButton" then
+		if frame.pending[slotId] ~= nil then
+			frame.pending[slotId] = nil;        -- отменить изменение
+		elseif frame.applied[slotId] then
+			frame.pending[slotId] = 0;          -- вернуть исходный облик предмета
+		end
+		PlaySound("igMainMenuOptionCheckBoxOff");
+		TransmogUI.UpdateSlots(frame);
+		TransmogUI.UpdatePreview(frame);
+		TransmogUI.UpdateGrid(frame);
+		return;
+	end
+	PlaySound("igMainMenuOptionCheckBoxOn");
+	TransmogFrame_SelectSlot(frame, slotId);
+end
+
+function TransmogSlotButton_OnEnter(self)
+	local frame = TransmogFrame;
+	local slotId = self.info.id;
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	local link = GetInventoryItemLink("player", slotId);
+	if not link then
+		GameTooltip:SetText(self.info.name);
+		GameTooltip:AddLine(TRANSMOG_SLOT_WARNING_NOTHING_EQUIPPED, 0.6, 0.6, 0.6, true);
+		GameTooltip:Show();
+		return;
+	end
+	GameTooltip:SetInventoryItem("player", slotId);
+	local itemId, changed = TransmogUI.GetDisplayedItem(frame, slotId);
+	local shown = itemId and GetItemInfo(itemId);
+	if frame.pending[slotId] == 0 then
+		GameTooltip:AddLine(TRANSMOGRIFY_TOOLTIP_REVERT, 1, 0.82, 0);
+	elseif shown and changed then   -- уже применённый облик дописывает Blizzard_TransmogTooltip.lua
+		GameTooltip:AddLine(TRANSMOGRIFIED:format(shown), 1, 0.5, 1, true);
+	end
+	GameTooltip:AddLine("ЛКМ - выбрать слот, ПКМ - отменить изменение / вернуть облик.", 0.5, 0.5, 0.5, true);
+	GameTooltip:Show();
+end
+
+-- зеркально по горизонтали (ретейл: rotation="180"/flip) - по координатам атласа
+function TransmogUI.FlipAtlasHorizontal(texture, atlas)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if info then
+		local left = info.leftTexCoord or info.left;
+		local right = info.rightTexCoord or info.right;
+		local top = info.topTexCoord or info.top;
+		local bottom = info.bottomTexCoord or info.bottom;
+		if left and right and top and bottom then
+			texture:SetTexCoord(right, left, top, bottom);
+		end
+	end
+end
+
+function TransmogTooltipButton_OnEnter(self)
+	if self.tooltipText then
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetText(_G[self.tooltipText] or self.tooltipText);
+		GameTooltip:Show();
+	end
+end
+
+---------------------------------------------------------------------------
+-- tertiary / square buttons
+---------------------------------------------------------------------------
+-- атлас на 3 части: края по SLICE_EDGE высоты атласа сохраняют пропорции, центр тянется
+local SLICE_EDGE = 0.5;
+
+local function SetSliced(left, center, right, atlas, height)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if not info then
+		return false;
+	end
+	local l = info.leftTexCoord or info.left;
+	local r = info.rightTexCoord or info.right;
+	local t = info.topTexCoord or info.top;
+	local b = info.bottomTexCoord or info.bottom;
+	local w, h = info.width, info.height;
+	if not (l and r and t and b and w and h) or h == 0 then
+		return false;
+	end
+	local edge = math.min(h * SLICE_EDGE, w / 2);   -- ширина края в пикселях атласа
+	local u = (r - l) * edge / w;                     -- та же ширина в координатах файла
+	local edgeWidth = edge * height / h;              -- на кнопке
+	for _, tex in ipairs({ left, center, right }) do
+		tex:SetAtlas(atlas);
+	end
+	left:SetTexCoord(l, l + u, t, b);
+	left:SetWidth(edgeWidth);
+	right:SetTexCoord(r - u, r, t, b);
+	right:SetWidth(edgeWidth);
+	center:SetTexCoord(l + u, r - u, t, b);
+	center:ClearAllPoints();
+	center:SetPoint("TOPLEFT", left, "TOPRIGHT");
+	center:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT");
+	return true;
+end
+
+-- рамка из 3 частей (Left/Center/Right) по атласу frame.sliceAtlas: поле с деньгами и т.п.
+function TransmogSlicedFrame_Update(self)
+	SetSliced(self.Left, self.Center, self.Right, self.sliceAtlas, self:GetHeight());
+end
+
+function TransmogUI.SetSlicedAtlas(button, atlas)
+	local height = button:GetHeight();
+	if not SetSliced(button.Left, button.Center, button.Right, atlas, height) and atlas ~= button.normalAtlas then
+		SetSliced(button.Left, button.Center, button.Right, button.normalAtlas, height);   -- нет такого атласа - обычный
+	end
+end
+
+function TransmogTertiaryButton_Update(self)
+	local height = self:GetHeight();
+	TransmogUI.SetSlicedAtlas(self, self:IsEnabled() == 1 and self.normalAtlas or self.disabledAtlas);
+	if not SetSliced(self.HighlightLeft, self.HighlightCenter, self.HighlightRight, self.hoverAtlas, height) then
+		SetSliced(self.HighlightLeft, self.HighlightCenter, self.HighlightRight, self.normalAtlas, height);
+	end
+end
+
+function TransmogTertiaryButton_OnMouseDown(self)
+	if self:IsEnabled() == 1 then
+		TransmogUI.SetSlicedAtlas(self, self.pushedAtlas);
+	end
+end
+
+function TransmogSquareButton_OnMouseDown(self)
+	if self:IsEnabled() == 1 then
+		self.NormalTex:SetAtlas(self.pushedAtlas);
+	end
+end
+
+function TransmogSquareButton_OnMouseUp(self)
+	self.NormalTex:SetAtlas(self.normalAtlas);
+end
+
+---------------------------------------------------------------------------
+-- model control buttons
+---------------------------------------------------------------------------
+function TransmogControlButton_OnLoad(self)
+	local atlas = self.iconAtlas;
+	if not atlas then
+		return;
+	end
+	self.Icon:SetAtlas(atlas);
+	self.Highlight:SetAtlas(atlas);
+	if self.mirror then
+		TransmogUI.FlipAtlasHorizontal(self.Icon, atlas);
+		TransmogUI.FlipAtlasHorizontal(self.Highlight, atlas);
+	end
+end
+
+function TransmogControlButton_OnMouseDown(self)
+	if self.spin then
+		TransmogFramePreview.spin = self.spin;
+	end
+end
+
+function TransmogControlButton_OnMouseUp(self)
+	if self.spin then
+		TransmogFramePreview.spin = nil;
+	end
+end
+
+-- атлас рамки кусками 3x3 (ретейл: у атласа есть поля нарезки, и SetAtlas режет сам; в 3.3.5 атлас
+-- растягивается целиком и мылится). Углы - в родном размере, края тянутся по одной оси, середина - по двум.
+-- texture - текстура из разметки: остаётся невидимой рамкой, куски встают по её краям
+function TransmogUI.SetNineSliceAtlas(texture, atlas, margin)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if not info then
+		return;
+	end
+	local l = info.leftTexCoord or info.left;
+	local r = info.rightTexCoord or info.right;
+	local t = info.topTexCoord or info.top;
+	local b = info.bottomTexCoord or info.bottom;
+	local w, h = info.width, info.height;
+	if not (l and r and t and b and w and h) or w <= 0 or h <= 0 then
+		return;
+	end
+	margin = margin or math.floor(math.min(w, h) / 3);
+	local mx, my = (r - l) * margin / w, (b - t) * margin / h;
+
+	local parent = texture:GetParent();
+	local layer, subLevel = texture:GetDrawLayer();
+	texture:SetAlpha(0);
+	texture.slices = texture.slices or {};
+
+	-- столбцы/строки: { координаты атласа, точки привязки }
+	local cols = { { l, l + mx }, { l + mx, r - mx }, { r - mx, r } };
+	local rows = { { t, t + my }, { t + my, b - my }, { b - my, b } };
+	for row = 1, 3 do
+		for col = 1, 3 do
+			local index = (row - 1) * 3 + col;
+			local slice = texture.slices[index];
+			if not slice then
+				slice = parent:CreateTexture(nil, layer, nil, subLevel);
+				texture.slices[index] = slice;
+			end
+			slice:SetTexture(info.file);
+			slice:SetTexCoord(cols[col][1], cols[col][2], rows[row][1], rows[row][2]);
+			slice:ClearAllPoints();
+			-- смещение от угла рамки: середина отступает на поле, края и углы - вплотную к краю
+			local x1 = col == 2 and margin or 0;
+			local y1 = row == 2 and -margin or 0;
+			local left = col == 3 and "RIGHT" or "LEFT";
+			local top = row == 3 and "BOTTOM" or "TOP";
+			slice:SetPoint(top .. left, texture, top .. left, x1, y1);
+			-- размер: углы и края - margin, остальное - растяжка до противоположного края
+			if col == 2 then
+				slice:SetPoint((row == 3 and "BOTTOM" or "TOP") .. "RIGHT", texture, (row == 3 and "BOTTOM" or "TOP") .. "RIGHT", -margin, y1);
+			else
+				slice:SetWidth(margin);
+			end
+			if row == 2 then
+				slice:SetPoint("BOTTOM" .. left, texture, "BOTTOM" .. left, x1, margin);
+			else
+				slice:SetHeight(margin);
+			end
+			slice:Show();
+		end
+	end
+end
