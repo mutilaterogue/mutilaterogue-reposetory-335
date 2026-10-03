@@ -376,45 +376,87 @@ local function ItemIDFromLink(link)
 	return link and tonumber(string.match(link, "item:(%d+)"));
 end
 
--- the key travels inside the link: uniqueId (the 8th number after the item id) = mapID * 100000 + level.
--- item:itemId:enchant:gem1:gem2:gem3:gem4:suffix:uniqueId:linkLevel
-local KEY_LINK_FACTOR = 100000;
+-- 3.3.5 links can't carry the key (the server rejects a changed link): a keystone link that arrives in chat
+-- gets a local token in its uniqueId field (the 8th number after the item id, client side only) -> the sender;
+-- the key of the sender comes from the server (MPLUS_KEY_OF / MPLUS_KEY_INFO).
+local KEY_TOKEN_BASE = 900000000;
+local keyTokens, keyTokenNames, keyCache, keyAsked = {}, {}, {}, {};
+
+local function LinkFields(link)
+	local fields = link and string.match(link, "item:([%-%d:]+)");
+	return fields and { strsplit(":", fields) };
+end
 
 local function KeyFromLink(link)
-	local fields = link and string.match(link, "item:([%-%d:]+)");
-	if not fields then
+	local list = LinkFields(link);
+	local token = list and tonumber(list[8]);
+	if not token or token < KEY_TOKEN_BASE then
 		return nil;
 	end
-	local list = { strsplit(":", fields) };
-	local packed = tonumber(list[9]);
-	if not packed or packed < KEY_LINK_FACTOR then
+	local sender = keyTokens[token - KEY_TOKEN_BASE];
+	if not sender then
 		return nil;
 	end
-	local mapID, level = math.floor(packed / KEY_LINK_FACTOR), packed % KEY_LINK_FACTOR;
-	local name = C_ChallengeMode.GetMapUIInfo(mapID);
-	return { mapID = mapID, level = level, name = name or "" };
+	if sender == UnitName("player") then
+		return MythicPlus.key;
+	end
+	local key = keyCache[sender];
+	if not key and not keyAsked[sender] then
+		keyAsked[sender] = true;
+		Send("MPLUS_KEY_OF", sender);
+	end
+	return key and key.mapID > 0 and key or nil;
 end
 
-local function AddKeyToLink(text)
-	local key = MythicPlus.key;
-	if not key or type(text) ~= "string" or ItemIDFromLink(text) ~= KEYSTONE_ITEM_ID then
-		return text;
+local function TokenFor(sender)
+	local token = keyTokenNames[sender];
+	if not token then
+		table.insert(keyTokens, sender);
+		token = #keyTokens;
+		keyTokenNames[sender] = token;
 	end
-	local packed = key.mapID * KEY_LINK_FACTOR + math.min(key.level, KEY_LINK_FACTOR - 1);
-	return (string.gsub(text, "item:([%-%d:]+)", function(fields)
+	-- a new link: the key may have changed since
+	keyCache[sender] = nil;
+	keyAsked[sender] = nil;
+	return token;
+end
+
+local function TagKeystoneLinks(self, event, msg, sender, ...)
+	if type(msg) ~= "string" or not string.find(msg, "item:" .. KEYSTONE_ITEM_ID .. ":", 1, true) then
+		return false;
+	end
+	sender = sender and string.match(sender, "^[^%-]+") or sender;
+	if event == "CHAT_MSG_WHISPER_INFORM" then
+		sender = UnitName("player");
+	end
+	local token = TokenFor(sender);
+	msg = string.gsub(msg, "item:(" .. KEYSTONE_ITEM_ID .. ":[%-%d:]+)", function(fields)
 		local list = { strsplit(":", fields) };
-		for i = #list + 1, 10 do
+		for i = #list + 1, 9 do
 			list[i] = "0";
 		end
-		list[9] = tostring(packed);
+		list[8] = tostring(KEY_TOKEN_BASE + token);
 		return "item:" .. table.concat(list, ":");
-	end, 1));
+	end);
+	return false, msg, sender, ...;
 end
 
--- shift-click of the own keystone: the link carries its dungeon and level
-local insertLink = ChatEdit_InsertLink;
-ChatEdit_InsertLink = function(text, ...)
-	return insertLink(AddKeyToLink(text), ...);
+for _, event in ipairs({ "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID",
+	"CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING", "CHAT_MSG_GUILD", "CHAT_MSG_OFFICER", "CHAT_MSG_WHISPER",
+	"CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_CHANNEL", "CHAT_MSG_BATTLEGROUND", "CHAT_MSG_BATTLEGROUND_LEADER" }) do
+	ChatFrame_AddMessageEventFilter(event, TagKeystoneLinks);
+end
+
+if Comm_Register then
+	Comm_Register("MPLUS_KEY_INFO", function(name, mapID, level, dungeon)
+		mapID = tonumber(mapID) or 0;
+		keyCache[name] = { mapID = mapID, level = tonumber(level) or 0, name = dungeon ~= "" and dungeon or (C_ChallengeMode.GetMapUIInfo(mapID)) or "" };
+		-- the open link tooltip: again with the data
+		local _, link = ItemRefTooltip:GetItem();
+		if ItemRefTooltip:IsShown() and link and ItemIDFromLink(link) == KEYSTONE_ITEM_ID then
+			ItemRefTooltip:SetHyperlink(link);
+		end
+	end);
 end
 
 local function ReadLines(tooltip)

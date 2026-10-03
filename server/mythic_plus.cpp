@@ -2081,6 +2081,33 @@ namespace
 
     // ---------------------------------------------------------------- scores of other players, leaderboard
     // C->S "MPLUS_SCORE_GET" : name -> S->C "MPLUS_SCORE" : name : rating : best level
+    // a keystone linked in chat by <name>: its dungeon and level (3.3.5 links can't carry them)
+    // C->S "MPLUS_KEY_OF" name -> S->C "MPLUS_KEY_INFO" name : mapId : level : dungeon (mapId 0 = no key)
+    void HandleKeyOf(Player* player, std::vector<std::string> const& args)
+    {
+        if (args.empty() || args[0].empty())
+            return;
+        std::string const& name = args[0];
+        ObjectGuid guid = sCharacterCache->GetCharacterGuidByName(name);
+        uint32 mapId = 0, level = 0;
+        if (!guid.IsEmpty())
+        {
+            auto itr = s_keys.find(guid.GetCounter());
+            if (itr != s_keys.end())
+            {
+                mapId = itr->second.MapId;
+                level = itr->second.Level;
+            }
+            else if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
+                "SELECT CAST(map_id AS SIGNED), CAST(level AS SIGNED) FROM character_mythic_keystone WHERE guid = {}", guid.GetCounter()).c_str()))
+            {
+                mapId = uint32((*result)[0].GetInt64());
+                level = uint32((*result)[1].GetInt64());
+            }
+        }
+        sAddonComm->Send(player, "MPLUS_KEY_INFO", Sanitize(name), mapId, level, Sanitize(mapId ? DungeonName(mapId) : std::string()));
+    }
+
     void HandleScoreGet(Player* player, std::vector<std::string> const& args)
     {
         if (args.empty() || args[0].empty())
@@ -2499,6 +2526,7 @@ public:
     mythic_plus_player() : PlayerScript("mythic_plus_player")
     {
         sAddonComm->Register(std::string("MPLUS_GET"), &HandleGet);
+        sAddonComm->Register(std::string("MPLUS_KEY_OF"), &HandleKeyOf);
         sAddonComm->Register(std::string("MPLUS_INSERT"), &HandleInsert);
         sAddonComm->Register(std::string("MPLUS_REMOVE"), &HandleRemove);
         sAddonComm->Register(std::string("MPLUS_START"), &HandleStart);
