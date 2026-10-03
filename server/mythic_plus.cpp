@@ -204,6 +204,7 @@ namespace
     {
         uint32 MapId = 0;
         uint32 Level = 0;
+        uint32 Week = 0;            // CurrentWeek() it was given in: gone at the weekly reset
     };
 
     struct BestRun
@@ -372,6 +373,7 @@ namespace
     char const* const MSG_TOO_FAR = "\xd0\x92\xd1\x8b \xd1\x81\xd0\xbb\xd0\xb8\xd1\x88\xd0\xba\xd0\xbe\xd0\xbc \xd0\xb4\xd0\xb0\xd0\xbb\xd0\xb5\xd0\xba\xd0\xbe \xd0\xbe\xd1\x82 \xd0\xba\xd1\x83\xd0\xbf\xd0\xb5\xd0\xbb\xd0\xb8 \xd1\x81\xd0\xb8\xd0\xbb\xd1\x8b.";
     char const* const MSG_STARTED = "\xd0\x98\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xbd\xd0\xb0\xd1\x87\xd0\xbd\xd0\xb5\xd1\x82\xd1\x81\xd1\x8f \xd1\x87\xd0\xb5\xd1\x80\xd0\xb5\xd0\xb7 10 \xd1\x81\xd0\xb5\xd0\xba\xd1\x83\xd0\xbd\xd0\xb4.";
     char const* const MSG_NO_LEAVE = "\xd0\x9d\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbf\xd0\xbe\xd0\xba\xd0\xb8\xd0\xbd\xd1\x83\xd1\x82\xd1\x8c \xd0\xbf\xd0\xbe\xd0\xb4\xd0\xb7\xd0\xb5\xd0\xbc\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb5 \xd0\xb2\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd0\xb8\xd1\x81\xd0\xbf\xd1\x8b\xd1\x82\xd0\xb0\xd0\xbd\xd0\xb8\xd1\x8f.";
+    char const* const MSG_KEY_EXPIRED = "\xd0\x95\xd0\xb6\xd0\xb5\xd0\xbd\xd0\xb5\xd0\xb4\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd1\x81\xd0\xb1\xd1\x80\xd0\xbe\xd1\x81: \xd0\xb2\xd0\xb0\xd1\x88 \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xb8\xd1\x81\xd1\x87\xd0\xb5\xd0\xb7.";
     char const* const MSG_HAS_KEY = "\xd0\xa3 \xd0\xb2\xd0\xb0\xd1\x81 \xd1\x83\xd0\xb6\xd0\xb5 \xd0\xb5\xd1\x81\xd1\x82\xd1\x8c \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87: %s (%u). \xd0\x9d\xd0\xbe\xd0\xb2\xd1\x8b\xd0\xb9 \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87 \xd0\xbd\xd0\xb5 \xd0\xb2\xd1\x8b\xd0\xb4\xd0\xb0\xd0\xbd.";
     char const* const MSG_NO_BATTLE_RES = "\xd0\x9d\xd0\xb5\xd1\x82 \xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd1\x83\xd0\xbf\xd0\xbd\xd1\x8b\xd1\x85 \xd0\xb1\xd0\xbe\xd0\xb5\xd0\xb2\xd1\x8b\xd1\x85 \xd0\xb2\xd0\xbe\xd1\x81\xd0\xba\xd1\x80\xd0\xb5\xd1\x88\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xb9.";
     char const* const MSG_BATTLE_RES = "\xd0\x91\xd0\xbe\xd0\xb5\xd0\xb2\xd0\xbe\xd0\xb5 \xd0\xb2\xd0\xbe\xd1\x81\xd0\xba\xd1\x80\xd0\xb5\xd1\x88\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xb8\xd1\x81\xd0\xbf\xd0\xbe\xd0\xbb\xd1\x8c\xd0\xb7\xd0\xbe\xd0\xb2\xd0\xb0\xd0\xbd\xd0\xbe. \xd0\x9e\xd1\x81\xd1\x82\xd0\xb0\xd0\xbb\xd0\xbe\xd1\x81\xd1\x8c: %u.";
@@ -429,6 +431,28 @@ namespace
     {
         time_t now = GameTime::GetGameTime();
         return now > WEEK_EPOCH ? uint32((now - WEEK_EPOCH) / WEEK) : 0;
+    }
+
+    // seconds to the next weekly reset
+    uint32 SecondsToReset()
+    {
+        time_t next = WEEK_EPOCH + time_t(CurrentWeek() + 1) * WEEK;
+        time_t now = GameTime::GetGameTime();
+        return next > now ? uint32(next - now) : 1;
+    }
+
+    // the keystone item shows "Duration": the time to the reset (retail: the key is gone on Wednesday)
+    void SetKeyDuration(Player* player, Item* item)
+    {
+        player->RemoveItemDurations(item);
+        item->SetUInt32Value(ITEM_FIELD_DURATION, SecondsToReset());
+        player->AddItemDurations(item);
+    }
+
+    void UpdateKeyDuration(Player* player)
+    {
+        if (Item* item = player->GetItemByEntry(KEYSTONE_ITEM))
+            SetKeyDuration(player, item);
     }
 
     Season const* CurrentSeason()
@@ -579,7 +603,7 @@ namespace
     void SaveKey(ObjectGuid::LowType guid, Keystone const& key)
     {
         if (key.MapId)
-            CharacterDatabase.Execute(Trinity::StringFormat("REPLACE INTO character_mythic_keystone (guid, map_id, level) VALUES ({}, {}, {})", guid, key.MapId, key.Level).c_str());
+            CharacterDatabase.Execute(Trinity::StringFormat("REPLACE INTO character_mythic_keystone (guid, map_id, level, week) VALUES ({}, {}, {}, {})", guid, key.MapId, key.Level, key.Week).c_str());
         else
             CharacterDatabase.Execute(Trinity::StringFormat("DELETE FROM character_mythic_keystone WHERE guid = {}", guid).c_str());
     }
@@ -612,12 +636,16 @@ namespace
     bool GiveKeyItem(Player* player)
     {
         if (player->HasItemCount(KEYSTONE_ITEM, 1, true))
+        {
+            UpdateKeyDuration(player);
             return true;
+        }
         ItemPosCountVec dest;
         if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, KEYSTONE_ITEM, 1) != EQUIP_ERR_OK)
             return false;
         if (Item* item = player->StoreNewItem(dest, KEYSTONE_ITEM, true))
         {
+            SetKeyDuration(player, item);
             player->SendNewItem(item, 1, true, false);
             return true;
         }
@@ -630,6 +658,7 @@ namespace
         Keystone& key = s_keys[guid];
         key.MapId = mapId;
         key.Level = mapId ? std::clamp(level, MIN_KEY_LEVEL, MAX_KEY_LEVEL) : 0;
+        key.Week = CurrentWeek();
         SaveKey(guid, key);
 
         if (Player* player = ObjectAccessor::FindConnectedPlayer(ObjectGuid::Create<HighGuid::Player>(guid)))
@@ -1723,10 +1752,24 @@ namespace
         ObjectGuid::LowType guid = player->GetGUID().GetCounter();
         s_keys.erase(guid);
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
-            "SELECT CAST(map_id AS SIGNED), CAST(level AS SIGNED) FROM character_mythic_keystone WHERE guid = {}", guid).c_str()))
+            "SELECT CAST(map_id AS SIGNED), CAST(level AS SIGNED), CAST(week AS SIGNED) FROM character_mythic_keystone WHERE guid = {}", guid).c_str()))
         {
             Field* f = result->Fetch();
-            s_keys[guid] = { uint32(f[0].GetInt64()), uint32(f[1].GetInt64()) };
+            Keystone key = { uint32(f[0].GetInt64()), uint32(f[1].GetInt64()), uint32(f[2].GetInt64()) };
+            // rows from before the week column: this week's
+            if (!key.Week)
+            {
+                key.Week = CurrentWeek();
+                SaveKey(guid, key);
+            }
+            // given before the last weekly reset: gone
+            if (key.Week != CurrentWeek())
+            {
+                CharacterDatabase.Execute(Trinity::StringFormat("DELETE FROM character_mythic_keystone WHERE guid = {}", guid).c_str());
+                Message(player, MSG_KEY_EXPIRED);
+            }
+            else
+                s_keys[guid] = key;
         }
 
         // item <-> row: the row is the truth
@@ -2367,6 +2410,8 @@ struct go_mythic_plus_font : public GameObjectAI
 class mythic_plus_world : public WorldScript
 {
     uint32 fontTimer = 0;
+    uint32 resetTimer = 0;
+    uint32 lastWeek = 0;
 
 public:
     mythic_plus_world() : WorldScript("mythic_plus_world") {}
@@ -2411,6 +2456,29 @@ public:
         }
 
         UpdatePings(diff);
+
+        // weekly reset: the keys of the past week are gone (offline owners: at login, LoadKey)
+        resetTimer += diff;
+        if (resetTimer >= 10 * IN_MILLISECONDS)
+        {
+            resetTimer = 0;
+            uint32 week = CurrentWeek();
+            if (lastWeek && week != lastWeek)
+            {
+                std::vector<ObjectGuid::LowType> expired;
+                for (auto const& pair : s_keys)
+                    if (pair.second.MapId && pair.second.Week != week)
+                        expired.push_back(pair.first);
+                for (ObjectGuid::LowType guid : expired)
+                {
+                    SetKey(guid, 0, 0);
+                    if (Player* player = ObjectAccessor::FindConnectedPlayer(ObjectGuid::Create<HighGuid::Player>(guid)))
+                        Message(player, MSG_KEY_EXPIRED);
+                }
+                CharacterDatabase.Execute(Trinity::StringFormat("DELETE FROM character_mythic_keystone WHERE week <> {}", week).c_str());
+            }
+            lastWeek = week;
+        }
 
         for (auto itr = s_runs.begin(); itr != s_runs.end();)
         {
