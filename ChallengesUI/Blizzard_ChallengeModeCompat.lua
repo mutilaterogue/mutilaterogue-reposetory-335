@@ -483,6 +483,8 @@ local function DecorateKeystone(tooltip)
 			entry.text = CHALLENGE_MODE_KEYSTONE_NAME:format(key.name);
 			table.insert(result, entry);
 			table.insert(result, { text = CHALLENGE_MODE_ITEM_POWER_LEVEL:format(key.level), r = 1, g = 0.82, b = 0 });
+		elseif entry.text == ITEM_UNIQUE then
+			-- the item is unique in the DB, retail does not show it
 		elseif string.sub(entry.text, 1, 1) == "\"" then
 			entry.wrap = true;
 			table.insert(description, entry);
