@@ -376,23 +376,134 @@ local function ItemIDFromLink(link)
 	return link and tonumber(string.match(link, "item:(%d+)"));
 end
 
-local function DecorateKeystone(tooltip)
-	local _, link = tooltip:GetItem();
-	if ItemIDFromLink(link) ~= KEYSTONE_ITEM_ID or not MythicPlus.key then
-		return;
+-- the key travels inside the link: uniqueId (the 8th number after the item id) = mapID * 100000 + level.
+-- item:itemId:enchant:gem1:gem2:gem3:gem4:suffix:uniqueId:linkLevel
+local KEY_LINK_FACTOR = 100000;
+
+local function KeyFromLink(link)
+	local fields = link and string.match(link, "item:([%-%d:]+)");
+	if not fields then
+		return nil;
 	end
+	local list = { strsplit(":", fields) };
+	local packed = tonumber(list[9]);
+	if not packed or packed < KEY_LINK_FACTOR then
+		return nil;
+	end
+	local mapID, level = math.floor(packed / KEY_LINK_FACTOR), packed % KEY_LINK_FACTOR;
+	local name = C_ChallengeMode.GetMapUIInfo(mapID);
+	return { mapID = mapID, level = level, name = name or "" };
+end
+
+local function AddKeyToLink(text)
 	local key = MythicPlus.key;
-	local line = _G[tooltip:GetName() .. "TextLeft1"];
-	if line then
-		line:SetText(CHALLENGE_MODE_KEYSTONE_NAME:format(key.name));
+	if not key or type(text) ~= "string" or ItemIDFromLink(text) ~= KEYSTONE_ITEM_ID then
+		return text;
 	end
-	tooltip:AddLine(CHALLENGE_MODE_ITEM_POWER_LEVEL:format(key.level), 1, 1, 1);
-	for _, affixID in ipairs(MythicPlus_GetAffixesForLevel(key.level)) do
-		local name = C_ChallengeMode.GetAffixInfo(affixID);
-		if name then
-			tooltip:AddLine(name, 1, 1, 1);
+	local packed = key.mapID * KEY_LINK_FACTOR + math.min(key.level, KEY_LINK_FACTOR - 1);
+	return (string.gsub(text, "item:([%-%d:]+)", function(fields)
+		local list = { strsplit(":", fields) };
+		for i = #list + 1, 10 do
+			list[i] = "0";
+		end
+		list[9] = tostring(packed);
+		return "item:" .. table.concat(list, ":");
+	end, 1));
+end
+
+-- shift-click of the own keystone: the link carries its dungeon and level
+local insertLink = ChatEdit_InsertLink;
+ChatEdit_InsertLink = function(text, ...)
+	return insertLink(AddKeyToLink(text), ...);
+end
+
+local function ReadLines(tooltip)
+	local name, lines = tooltip:GetName(), {};
+	for i = 1, tooltip:NumLines() do
+		local left, right = _G[name .. "TextLeft" .. i], _G[name .. "TextRight" .. i];
+		local entry = { text = left and left:GetText() or "" };
+		if left then
+			entry.r, entry.g, entry.b = left:GetTextColor();
+		end
+		if right and right:IsShown() and right:GetText() then
+			entry.right = right:GetText();
+			entry.rr, entry.rg, entry.rb = right:GetTextColor();
+		end
+		lines[i] = entry;
+	end
+	return lines;
+end
+
+local function WriteLines(tooltip, lines)
+	local name, count = tooltip:GetName(), tooltip:NumLines();
+	for i, entry in ipairs(lines) do
+		if i > count then
+			if entry.right then
+				tooltip:AddDoubleLine(entry.text, entry.right, entry.r, entry.g, entry.b, entry.rr, entry.rg, entry.rb);
+			else
+				tooltip:AddLine(entry.text, entry.r, entry.g, entry.b, entry.wrap);
+			end
+		else
+			local left, right = _G[name .. "TextLeft" .. i], _G[name .. "TextRight" .. i];
+			left:SetText(entry.text);
+			left:SetTextColor(entry.r or 1, entry.g or 1, entry.b or 1);
+			if right then
+				if entry.right then
+					right:SetText(entry.right);
+					right:SetTextColor(entry.rr or 1, entry.rg or 1, entry.rb or 1);
+					right:Show();
+				else
+					right:SetText("");
+					right:Hide();
+				end
+			end
 		end
 	end
+end
+
+-- retail order: name, Mythic Level, the item lines, Dungeon Modifiers + affixes, the description
+local function DecorateKeystone(tooltip)
+	local _, link = tooltip:GetItem();
+	if ItemIDFromLink(link) ~= KEYSTONE_ITEM_ID then
+		return;
+	end
+	-- a linked key: its own data; a hovered item (bags, character): the player's key
+	local key = KeyFromLink(link);
+	if not key and tooltip ~= ItemRefTooltip then
+		key = MythicPlus.key;
+	end
+	if not key then
+		return;
+	end
+
+	local lines = ReadLines(tooltip);
+	local result, description = {}, {};
+	for i, entry in ipairs(lines) do
+		if i == 1 then
+			entry.text = CHALLENGE_MODE_KEYSTONE_NAME:format(key.name);
+			table.insert(result, entry);
+			table.insert(result, { text = CHALLENGE_MODE_ITEM_POWER_LEVEL:format(key.level), r = 1, g = 0.82, b = 0 });
+		elseif string.sub(entry.text, 1, 1) == "\"" then
+			entry.wrap = true;
+			table.insert(description, entry);
+		else
+			table.insert(result, entry);
+		end
+	end
+	local affixes = MythicPlus_GetAffixesForLevel(key.level);
+	if #affixes > 0 then
+		table.insert(result, { text = DUNGEON_MODIFIERS or "Модификаторы подземелья:", r = 1, g = 1, b = 1 });
+		for _, affixID in ipairs(affixes) do
+			local name = C_ChallengeMode.GetAffixInfo(affixID);
+			if name then
+				table.insert(result, { text = "  " .. name, r = 0.12, g = 1, b = 0 });
+			end
+		end
+	end
+	for _, entry in ipairs(description) do
+		table.insert(result, entry);
+	end
+	WriteLines(tooltip, result);
 	tooltip:Show();
 end
 
