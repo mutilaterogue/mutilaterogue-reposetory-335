@@ -434,29 +434,14 @@ local function ReadLines(tooltip)
 	return lines;
 end
 
+-- the tooltip is rebuilt: the new list can be shorter than the old one
 local function WriteLines(tooltip, lines)
-	local name, count = tooltip:GetName(), tooltip:NumLines();
-	for i, entry in ipairs(lines) do
-		if i > count then
-			if entry.right then
-				tooltip:AddDoubleLine(entry.text, entry.right, entry.r, entry.g, entry.b, entry.rr, entry.rg, entry.rb);
-			else
-				tooltip:AddLine(entry.text, entry.r, entry.g, entry.b, entry.wrap);
-			end
+	tooltip:ClearLines();
+	for _, entry in ipairs(lines) do
+		if entry.right then
+			tooltip:AddDoubleLine(entry.text, entry.right, entry.r, entry.g, entry.b, entry.rr, entry.rg, entry.rb);
 		else
-			local left, right = _G[name .. "TextLeft" .. i], _G[name .. "TextRight" .. i];
-			left:SetText(entry.text);
-			left:SetTextColor(entry.r or 1, entry.g or 1, entry.b or 1);
-			if right then
-				if entry.right then
-					right:SetText(entry.right);
-					right:SetTextColor(entry.rr or 1, entry.rg or 1, entry.rb or 1);
-					right:Show();
-				else
-					right:SetText("");
-					right:Hide();
-				end
-			end
+			tooltip:AddLine(entry.text, entry.r, entry.g, entry.b, entry.wrap);
 		end
 	end
 end
