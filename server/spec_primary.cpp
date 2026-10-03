@@ -9,6 +9,8 @@
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "DBCStores.h"
+#include "StringFormat.h"
+#include "DatabaseEnv.h"
 #include "Player.h"
 #include "SpellMgr.h"
 
@@ -54,6 +56,31 @@ namespace
                 primary = *specSpells;
             sAddonComm->Send(player, "SPEC_SPELLS", uint32(tab->OrderIndex) + 1, JoinSpells(mastery), JoinSpells(primary));
         }
+
+        // "SPEC_INFO" index : role : description (custom_spec_info; ':' travels as {c}, '\n' -> '|n')
+        if (QueryResult result = WorldDatabase.Query(Trinity::StringFormat(
+            "SELECT CAST(tab AS SIGNED), role, description FROM custom_spec_info WHERE class_mask & {} <> 0", player->GetClassMask()).c_str()))
+            do
+            {
+                Field* f = result->Fetch();
+                std::string description = f[2].GetString();
+                std::string text;
+                for (size_t i = 0; i < description.size(); ++i)
+                {
+                    if (description[i] == '\\' && i + 1 < description.size() && description[i + 1] == 'n')
+                    {
+                        text += "|n";
+                        ++i;
+                    }
+                    else if (description[i] == '\n')
+                        text += "|n";
+                    else if (description[i] == ':')
+                        text += "{c}"; // the client puts the colon back
+                    else
+                        text += description[i];
+                }
+                sAddonComm->Send(player, "SPEC_INFO", uint32(f[0].GetInt64()), f[1].GetString(), text);
+            } while (result->NextRow());
     }
 
     void SendState(Player* player)

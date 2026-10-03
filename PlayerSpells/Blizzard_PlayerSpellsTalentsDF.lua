@@ -19,6 +19,10 @@ local ICON_SIZE_SQUARE = 45;
 local LINE_THICKNESS = 6;
 local NODE_RADIUS = 18;        -- линии начинаются и заканчиваются у края узла
 local POINTS_PER_TIER, PET_POINTS_PER_TIER = 5, 3;
+-- retail "pyramid": the nodes of each tier centered (an odd tier stands between the nodes of an even one),
+-- the edges diagonal. false - the 3.3.5 grid of Talent.dbc as is
+local PYRAMID = true;
+local PYRAMID_SPACING_X, PYRAMID_SPACING_Y, PYRAMID_TOP = 62, 62, 30;
 
 local function AtlasCoords(atlas)
 	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
@@ -49,6 +53,7 @@ local function DrawSegment(tree, x1, y1, x2, y2, atlas)
 		return;
 	end
 	local line = AcquireLine(tree);
+	line:SetVertexColor(1, 1, 1, 1);
 	local file, l, r, t, b = AtlasCoords(atlas);
 	if file then
 		line:SetTexture(file);
@@ -74,6 +79,55 @@ local function DrawSegment(tree, x1, y1, x2, y2, atlas)
 			line:SetTexCoord(l, b, r, b, l, t, r, t);
 		end
 	end
+end
+
+-- a line at any angle: the 3.3.5 TaxiFrame technique (a square line texture turned by tex coords), tinted
+local LINE_TEXTURE = "Interface\\TaxiFrame\\UI-Taxi-Line";
+local LINE_FACTOR_2 = (128 / 126) / 2;
+
+local function DrawDiagonal(tree, x1, y1, x2, y2, active)
+	local dx, dy = x2 - x1, y2 - y1;
+	local full = math.sqrt(dx * dx + dy * dy);
+	if full <= 2 * NODE_RADIUS + 1 then
+		return;
+	end
+	local ux, uy = dx / full, dy / full;
+	local sx, sy = x1 + ux * NODE_RADIUS, -(y1 + uy * NODE_RADIUS);
+	local ex, ey = x2 - ux * NODE_RADIUS, -(y2 - uy * NODE_RADIUS);
+	local line = AcquireLine(tree);
+	line:SetTexture(LINE_TEXTURE);
+	if active then
+		line:SetVertexColor(1, 0.82, 0, 1);
+	else
+		line:SetVertexColor(0.45, 0.45, 0.45, 0.9);
+	end
+	line:ClearAllPoints();
+	local w = 32;
+	dx, dy = ex - sx, ey - sy;
+	local cx, cy = (sx + ex) / 2, (sy + ey) / 2;
+	if dx < 0 then
+		dx, dy = -dx, -dy;
+	end
+	local l = math.sqrt(dx * dx + dy * dy);
+	local sn, cs = -dy / l, dx / l;
+	local sc = sn * cs;
+	local bwid, bhgt, BLx, BLy, TLx, TLy, TRx, TRy, BRx, BRy;
+	if dy >= 0 then
+		bwid = ((l * cs) - (w * sn)) * LINE_FACTOR_2;
+		bhgt = ((w * cs) - (l * sn)) * LINE_FACTOR_2;
+		BLx, BLy, BRy = (w / l) * sc, sn * sn, (l / w) * sc;
+		BRx, TLx, TLy, TRx = 1 - BLy, BLy, 1 - BRy, 1 - BLx;
+		TRy = BRx;
+	else
+		bwid = ((l * cs) + (w * sn)) * LINE_FACTOR_2;
+		bhgt = ((w * cs) + (l * sn)) * LINE_FACTOR_2;
+		BLx, BLy, BRx = sn * sn, -(l / w) * sc, 1 + (w / l) * sc;
+		BRy, TLx, TLy, TRy = BLx, 1 - BRx, 1 - BLx, 1 - BLy;
+		TRx = TLy;
+	end
+	line:SetTexCoord(TLx, TLy, BLx, BLy, TRx, TRy, BRx, BRy);
+	line:SetPoint("BOTTOMLEFT", tree.dfLineParent, "TOPLEFT", cx - bwid, cy - bhgt);
+	line:SetPoint("TOPRIGHT", tree.dfLineParent, "TOPLEFT", cx + bwid, cy + bhgt);
 end
 
 local function Center(tree, button)
@@ -190,7 +244,28 @@ function PlayerSpellsTalentsDF.SkinTree(tree)
 			end
 			SkinNode(button, isExceptional and "square" or "circle", state, iconPath);
 			byPosition[tier .. ":" .. column] = button;
-			info[id] = { button = button, rank = shownRank, maxRank = maxRank };
+			info[id] = { button = button, rank = shownRank, maxRank = maxRank, tier = tier, column = column };
+		end
+	end
+
+	if PYRAMID then
+		-- each tier centered in the tree by its column order
+		local tiers = {};
+		for _, data in pairs(info) do
+			tiers[data.tier] = tiers[data.tier] or {};
+			table.insert(tiers[data.tier], data);
+		end
+		local parent = tree.dfLineParent;
+		local width = parent:GetWidth();
+		for tier, list in pairs(tiers) do
+			table.sort(list, function(a, b) return a.column < b.column; end);
+			for k, data in ipairs(list) do
+				local x = width / 2 + (k - (#list + 1) / 2) * PYRAMID_SPACING_X;
+				local y = PYRAMID_TOP + (tier - 1) * PYRAMID_SPACING_Y;
+				data.button:ClearAllPoints();
+				data.button:SetPoint("CENTER", parent, "TOPLEFT", x, -y);
+				data.button.dfX, data.button.dfY = x, y;
+			end
 		end
 	end
 
@@ -208,7 +283,11 @@ function PlayerSpellsTalentsDF.SkinTree(tree)
 			local atlas = (data.rank > 0 or (fromData and fromData.rank >= fromData.maxRank)) and ATLAS.lineActive or ATLAS.lineLocked;
 			local x1, y1 = Center(tree, from);
 			local x2, y2 = Center(tree, data.button);
-			if math.abs(x1 - x2) < 1 then
+			if PYRAMID then
+				x1, y1 = from.dfX, from.dfY;
+				x2, y2 = data.button.dfX, data.button.dfY;
+				DrawDiagonal(tree, x1, y1, x2, y2, atlas == ATLAS.lineActive);
+			elseif math.abs(x1 - x2) < 1 then
 				DrawSegment(tree, x1, y1 + NODE_RADIUS, x2, y2 - NODE_RADIUS, atlas);
 			elseif math.abs(y1 - y2) < 1 then
 				local dir = x2 > x1 and 1 or -1;

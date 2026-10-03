@@ -70,6 +70,7 @@ local function RegisterComm()
 	end
 	PS.commRegistered = true;
 	Comm_Register("SPEC_SPELLS", function(...) PS.OnSpells(...); end);
+	Comm_Register("SPEC_INFO", function(...) PS.OnInfo(...); end);
 	Comm_Register("SPEC_STATE", function(active, primary1, primary2)
 		PS.primary[1] = tonumber(primary1) or 0;
 		PS.primary[2] = tonumber(primary2) or 0;
@@ -132,8 +133,14 @@ local function CreateSpecColumn(parent, index)
 
 	column.SpecName = column:CreateFontString(nil, "ARTWORK", Font("Game30Font", "GameFontNormalHuge"));
 	column.SpecName:SetPoint("TOP", column.SpecImage, "BOTTOM", 0, -54);
+	-- retail: the role (icon + name) under the name, then the description (custom_spec_info, server: SPEC_INFO)
+	column.RoleIcon = column:CreateTexture(nil, "ARTWORK");
+	column.RoleIcon:SetWidth(24);
+	column.RoleIcon:SetHeight(24);
+	column.RoleIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-ROLES");
+	column.RoleName = column:CreateFontString(nil, "ARTWORK", Font("GameFontNormalMed2", "GameFontNormal"));
 	column.Description = column:CreateFontString(nil, "ARTWORK", Font("GameFontNormalMed2", "GameFontNormal"));
-	column.Description:SetPoint("TOP", column.SpecName, "BOTTOM", 0, -24);
+	column.Description:SetPoint("TOP", column.SpecName, "BOTTOM", 0, -60);
 	column.Description:SetWidth(280);
 	column.Description:SetJustifyH("CENTER");
 
@@ -190,8 +197,19 @@ function PS.OnStateChanged(frame)
 	end
 end
 
--- server: the spells of each tree
+-- server: the spells of each tree, its role and description
 PS.spells = {};
+PS.info = {};
+
+function PS.OnInfo(index, role, description)
+	index = tonumber(index);
+	if index then
+		PS.info[index] = { role = role ~= "" and role or nil, description = string.gsub(description or "", "{c}", ":") };
+		if PS.frame and PS.frame:IsShown() then
+			PS.Refresh(PS.frame);
+		end
+	end
+end
 
 local function AbilityButton(column, i)
 	local button = column.abilities[i];
@@ -306,7 +324,25 @@ function PS.Refresh(frame)
 			column.SpecImage:SetTexCoord(0.08, 0.92, 0.25, 0.75);
 		end
 		column.SpecName:SetText(name);
-		column.Description:SetText((TALENT_POINTS or "") .. ": " .. (pointsSpent or 0));
+		local info = PS.info[i];
+		local points = (TALENT_POINTS or "") .. ": " .. (pointsSpent or 0);
+		column.Description:SetText(info and info.description ~= "" and (info.description .. "|n|n" .. points) or points);
+		local role = info and info.role;
+		if role and GetTexCoordsForRoleSmallCircle then
+			column.RoleIcon:SetTexCoord(GetTexCoordsForRoleSmallCircle(role));
+			column.RoleName:SetText(_G[role] or role);
+			-- icon + name centered under the spec name
+			local width = 24 + 5 + column.RoleName:GetStringWidth();
+			column.RoleIcon:ClearAllPoints();
+			column.RoleIcon:SetPoint("TOPLEFT", column.SpecName, "BOTTOM", -width / 2, -11);
+			column.RoleName:ClearAllPoints();
+			column.RoleName:SetPoint("LEFT", column.RoleIcon, "RIGHT", 5, 0);
+			column.RoleIcon:Show();
+			column.RoleName:Show();
+		else
+			column.RoleIcon:Hide();
+			column.RoleName:Hide();
+		end
 		LayoutAbilities(column, i);
 
 		local active = primary == i;
