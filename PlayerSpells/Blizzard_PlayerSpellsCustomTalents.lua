@@ -247,17 +247,20 @@ end
 local function LayoutTree(column, treeId)
 	column.lineCount = 0;
 	local list = {};
-	local maxCol = 0;
+	local minCol, maxCol;
 	for _, node in pairs(CT.nodes) do
 		if node.tree == treeId then
 			table.insert(list, node);
-			maxCol = math.max(maxCol, node.col);
+			minCol = math.min(minCol or node.col, node.col);
+			maxCol = math.max(maxCol or node.col, node.col);
 		end
 	end
+	minCol, maxCol = minCol or 0, maxCol or 0;
 	table.sort(list, function(a, b) return a.id < b.id; end);
 	local spacing = column.spacing or NODE_SPACING;
 	local width = column.Content:GetWidth();
-	local offsetX = (width - maxCol * spacing) / 2;
+	-- centered by the used columns (col may be fractional: 0.5 steps for the retail pyramid)
+	local offsetX = (width - (maxCol - minCol) * spacing) / 2 - minCol * spacing;
 	local centers = {};
 	for i, node in ipairs(list) do
 		local button = NodeButton(column, i);
@@ -628,7 +631,7 @@ local function RegisterComm()
 		id = tonumber(id);
 		if id then
 			CT.nodes[id] = {
-				id = id, tree = tonumber(tree) or 0, row = tonumber(row) or 0, col = tonumber(col) or 0,
+				id = id, tree = tonumber(tree) or 0, row = tonumber(row) or 0, col = (tonumber(col) or 0) / 2, -- the server sends half steps
 				maxRank = tonumber(maxRank) or 1, spells = SplitNumbers(spells, "/"), requires = SplitNumbers(requires, "/"),
 				minPoints = tonumber(minPoints) or 0,
 			};

@@ -61,7 +61,7 @@ namespace
         uint32 Id = 0;
         uint32 TreeId = 0;
         uint32 Row = 0;
-        uint32 Col = 0;
+        uint32 Col = 0;              // in half steps (col 1.5 -> 3)
         std::vector<uint32> Spells;   // one per rank
         std::vector<uint32> Requires;
         uint32 MinPoints = 0;
@@ -126,7 +126,7 @@ namespace
             } while (result->NextRow());
 
         s_nodes.clear();
-        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(tree_id AS SIGNED), CAST(`row` AS SIGNED), CAST(`col` AS SIGNED), spells, requires, CAST(min_points AS SIGNED) FROM custom_talent_node"))
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(tree_id AS SIGNED), CAST(`row` AS SIGNED), CAST(ROUND(`col` * 2) AS SIGNED), spells, requires, CAST(min_points AS SIGNED) FROM custom_talent_node"))
             do
             {
                 Field* f = result->Fetch();
