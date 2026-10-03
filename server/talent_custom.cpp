@@ -39,6 +39,8 @@
 #include <unordered_map>
 #include <vector>
 
+using namespace Trinity::ChatCommands;
+
 namespace
 {
     struct Tree
