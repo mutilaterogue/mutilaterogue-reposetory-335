@@ -69,6 +69,7 @@ local function RegisterComm()
 		return;
 	end
 	PS.commRegistered = true;
+	Comm_Register("SPEC_SPELLS", function(...) PS.OnSpells(...); end);
 	Comm_Register("SPEC_STATE", function(active, primary1, primary2)
 		PS.primary[1] = tonumber(primary1) or 0;
 		PS.primary[2] = tonumber(primary2) or 0;
@@ -117,12 +118,13 @@ local function CreateSpecColumn(parent, index)
 	column.Selected:SetAllPoints();
 	SetAtlasOr(column.Selected, "spec-selected-background1", 1, 0.82, 0, 0.06);
 	column.Selected:SetBlendMode("ADD");
-	column.Selected:SetAlpha(0.3);
+	column.Selected:SetAlpha(0.12);
 
 	column.SpecImage = column:CreateTexture(nil, "ARTWORK");
-	column.SpecImage:SetPoint("TOP", 0, -38);
-	column.SpecImage:SetWidth(306);
-	column.SpecImage:SetHeight(186);
+	column.SpecImage:SetPoint("TOP", 0, -44);
+	column.SpecImage:SetWidth(294);
+	column.SpecImage:SetHeight(174);
+	-- the border frames the picture: 6 px wider on every side
 	column.Border = column:CreateTexture(nil, "OVERLAY");
 	column.Border:SetPoint("CENTER", column.SpecImage);
 	column.Border:SetWidth(306);
@@ -135,20 +137,11 @@ local function CreateSpecColumn(parent, index)
 	column.Description:SetWidth(280);
 	column.Description:SetJustifyH("CENTER");
 
-	-- the tree icon in the retail sample ability ring
-	column.Ability = CreateFrame("Frame", nil, column);
-	column.Ability:SetWidth(70);
-	column.Ability:SetHeight(70);
-	column.Ability:SetPoint("BOTTOM", 0, 265);
-	column.Ability.Icon = column.Ability:CreateTexture(nil, "ARTWORK");
-	column.Ability.Icon:SetPoint("CENTER");
-	column.Ability.Icon:SetWidth(58);
-	column.Ability.Icon:SetHeight(58);
-	column.Ability.Ring = column.Ability:CreateTexture(nil, "OVERLAY");
-	column.Ability.Ring:SetPoint("CENTER");
-	column.Ability.Ring:SetWidth(70);
-	column.Ability.Ring:SetHeight(70);
-	SetAtlasOr(column.Ability.Ring, "spec-sampleabilityring");
+	-- retail "Sample Abilities": the mastery and the primary spells of the tree (server: SPEC_SPELLS)
+	column.SampleAbilityText = column:CreateFontString(nil, "ARTWORK", Font("GameFontHighlightMed2", "GameFontHighlight"));
+	column.SampleAbilityText:SetPoint("BOTTOM", 0, 330);
+	column.SampleAbilityText:SetText(SAMPLE_ABILITIES or "");
+	column.abilities = {};
 
 	column.ActivatedText = column:CreateFontString(nil, "ARTWORK", Font("GameFontNormalLarge2", "GameFontNormalLarge"));
 	column.ActivatedText:SetPoint("BOTTOM", 0, 97);
@@ -197,6 +190,80 @@ function PS.OnStateChanged(frame)
 	end
 end
 
+-- server: the spells of each tree
+PS.spells = {};
+
+local function AbilityButton(column, i)
+	local button = column.abilities[i];
+	if button then
+		return button;
+	end
+	button = CreateFrame("Button", nil, column);
+	button:SetWidth(70);
+	button:SetHeight(70);
+	button.Icon = button:CreateTexture(nil, "ARTWORK");
+	button.Icon:SetPoint("CENTER");
+	button.Icon:SetWidth(58);
+	button.Icon:SetHeight(58);
+	button.Ring = button:CreateTexture(nil, "OVERLAY");
+	button.Ring:SetAllPoints();
+	SetAtlasOr(button.Ring, "spec-sampleabilityring");
+	button:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetHyperlink("spell:" .. self.spellID);
+		GameTooltip:Show();
+	end);
+	button:SetScript("OnLeave", GameTooltip_Hide);
+	column.abilities[i] = button;
+	return button;
+end
+
+local function LayoutAbilities(column, index)
+	local list = {};
+	local data = PS.spells[index];
+	if data then
+		for _, spellID in ipairs(data.mastery) do table.insert(list, spellID); end
+		for _, spellID in ipairs(data.primary) do table.insert(list, spellID); end
+	end
+	local shown = 0;
+	for _, spellID in ipairs(list) do
+		local _, _, icon = GetSpellInfo(spellID);
+		if icon and shown < 4 then
+			shown = shown + 1;
+			local button = AbilityButton(column, shown);
+			button.spellID = spellID;
+			SetPortraitToTexture(button.Icon, icon);
+			button:Show();
+		end
+	end
+	for i = 1, shown do
+		column.abilities[i]:ClearAllPoints();
+		column.abilities[i]:SetPoint("BOTTOM", column, "BOTTOM", (i - (shown + 1) / 2) * 76, 245);
+	end
+	for i = shown + 1, #column.abilities do
+		column.abilities[i]:Hide();
+	end
+	column.SampleAbilityText:SetShown(shown > 0);
+end
+
+local function SplitIds(text)
+	local list = {};
+	for id in string.gmatch(text or "", "%d+") do
+		table.insert(list, tonumber(id));
+	end
+	return list;
+end
+
+function PS.OnSpells(index, mastery, primary)
+	index = tonumber(index);
+	if index then
+		PS.spells[index] = { mastery = SplitIds(mastery), primary = SplitIds(primary) };
+		if PS.frame and PS.frame:IsShown() then
+			PS.Refresh(PS.frame);
+		end
+	end
+end
+
 function PS.Create(container)
 	local frame = CreateFrame("Frame", "PlayerSpellsSpecializationsFrame", container);
 	frame:SetAllPoints(container);
@@ -240,8 +307,7 @@ function PS.Refresh(frame)
 		end
 		column.SpecName:SetText(name);
 		column.Description:SetText((TALENT_POINTS or "") .. ": " .. (pointsSpent or 0));
-		column.Ability.Icon:SetTexture(icon);
-		SetPortraitToTexture(column.Ability.Icon, icon);
+		LayoutAbilities(column, i);
 
 		local active = primary == i;
 		SetAtlasOr(column.Border, active and "spec-thumbnailborder-on" or "spec-thumbnailborder-off");

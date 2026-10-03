@@ -662,6 +662,8 @@ loader:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED");
 loader:SetScript("OnEvent", function(self, event)
 	if event == "PLAYER_LOGIN" then
 		RegisterComm();
+		-- the request from Setup (UI load) may go out before the comm is up
+		Send("CTAL_GET");
 	else
 		-- the spells of the custom talents of the new spec
 		Send("CTAL_SPEC");

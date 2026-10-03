@@ -13,6 +13,8 @@
 #include "SpellMgr.h"
 
 #include <cstdlib>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -26,6 +28,32 @@ namespace
         if (!tab || !(tab->ClassMask & player->GetClassMask()))
             return 0;
         return tab->OrderIndex + 1;
+    }
+
+    std::string JoinSpells(std::vector<uint32> const& spells)
+    {
+        std::string text;
+        for (uint32 spell : spells)
+            text += (text.empty() ? "" : "/") + std::to_string(spell);
+        return text;
+    }
+
+    // the specialization tab: "SPEC_SPELLS" index(1..3) : mastery spells a/b : primary spells c/d (retail sample abilities)
+    void SendSpells(Player* player)
+    {
+        for (uint32 i = 0; i < sTalentTabStore.GetNumRows(); ++i)
+        {
+            TalentTabEntry const* tab = sTalentTabStore.LookupEntry(i);
+            if (!tab || !(tab->ClassMask & player->GetClassMask()))
+                continue;
+            std::vector<uint32> mastery, primary;
+            for (uint32 j = 0; j < MAX_MASTERY_SPELLS; ++j)
+                if (tab->MasterySpellID[j])
+                    mastery.push_back(tab->MasterySpellID[j]);
+            if (std::vector<uint32> const* specSpells = GetTalentTreePrimarySpells(tab->ID))
+                primary = *specSpells;
+            sAddonComm->Send(player, "SPEC_SPELLS", uint32(tab->OrderIndex) + 1, JoinSpells(mastery), JoinSpells(primary));
+        }
     }
 
     void SendState(Player* player)
@@ -71,6 +99,7 @@ namespace
 
     void HandleGet(Player* player, std::vector<std::string> const& /*args*/)
     {
+        SendSpells(player);
         SendState(player);
     }
 
