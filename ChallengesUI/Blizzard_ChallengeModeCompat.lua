@@ -447,19 +447,20 @@ local function WriteLines(tooltip, lines)
 end
 
 -- retail order: name, Mythic Level, the item lines, Dungeon Modifiers + affixes, the description
-local function DecorateKeystone(tooltip)
+-- own: the item is the player's (bags, character, own trade slot) - else only a link with the key data
+local function DecorateKeystone(tooltip, own)
+	if tooltip.mplusDecorated then
+		return;
+	end
 	local _, link = tooltip:GetItem();
 	if ItemIDFromLink(link) ~= KEYSTONE_ITEM_ID then
 		return;
 	end
-	-- a linked key: its own data; a hovered item (bags, character): the player's key
-	local key = KeyFromLink(link);
-	if not key and tooltip ~= ItemRefTooltip then
-		key = MythicPlus.key;
-	end
+	local key = KeyFromLink(link) or (own and MythicPlus.key);
 	if not key then
 		return;
 	end
+	tooltip.mplusDecorated = true;
 
 	local lines = ReadLines(tooltip);
 	local result, description = {}, {};
@@ -496,9 +497,19 @@ end
 
 for _, tooltip in ipairs({ GameTooltip, ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2 }) do
 	if tooltip then
-		tooltip:HookScript("OnTooltipSetItem", DecorateKeystone);
+		tooltip:HookScript("OnTooltipSetItem", function(self) DecorateKeystone(self, false); end);
+		tooltip:HookScript("OnTooltipCleared", function(self) self.mplusDecorated = nil; end);
 	end
 end
+
+-- the player's own items: after the tooltip is built (someone else's key - trade, inspect - stays without data)
+hooksecurefunc(GameTooltip, "SetBagItem", function(tooltip) DecorateKeystone(tooltip, true); end);
+hooksecurefunc(GameTooltip, "SetTradePlayerItem", function(tooltip) DecorateKeystone(tooltip, true); end);
+hooksecurefunc(GameTooltip, "SetInventoryItem", function(tooltip, unit)
+	if unit == "player" then
+		DecorateKeystone(tooltip, true);
+	end
+end);
 
 ---------------------------------------------------------------------------
 -- start countdown (10 .. 1) in the middle of the screen
