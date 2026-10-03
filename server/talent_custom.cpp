@@ -164,6 +164,22 @@ namespace
         return s_states[player->GetGUID().GetCounter()][spec < MAX_TALENT_GROUPS ? spec : 0];
     }
 
+    // hero tree root (row 0): granted with the tree, free, can't be unlearned (retail)
+    bool IsRoot(Node const& node)
+    {
+        auto tree = s_trees.find(node.TreeId);
+        return tree != s_trees.end() && tree->second.Kind == 1 && node.Row == 0;
+    }
+
+    // the rank a node counts with: the hero root of the chosen tree is always at its max (not stored, no points)
+    uint32 RankOf(SpecState const& state, Node const& node)
+    {
+        if (IsRoot(node))
+            return state.Hero == node.TreeId ? node.MaxRank() : 0;
+        auto owned = state.Ranks.find(node.Id);
+        return owned != state.Ranks.end() ? owned->second : 0;
+    }
+
     uint32 SpentInTree(SpecState const& state, uint32 treeId)
     {
         uint32 spent = 0;
@@ -201,8 +217,7 @@ namespace
         for (auto const& pair : s_nodes)
         {
             Node const& node = pair.second;
-            auto owned = state.Ranks.find(node.Id);
-            uint32 rank = owned != state.Ranks.end() ? owned->second : 0;
+            uint32 rank = RankOf(state, node);
             Tree const& tree = s_trees[node.TreeId];
             if (!ClassTree(player, tree) || (tree.Kind == 1 && (state.Hero != tree.Id || !SpecTree(player, tree))))
                 rank = 0;
@@ -233,7 +248,8 @@ namespace
                 Field* f = result->Fetch();
                 uint8 spec = uint8(f[0].GetInt64());
                 uint32 node = uint32(f[1].GetInt64());
-                if (spec < MAX_TALENT_GROUPS && s_nodes.count(node))
+                // hero roots are free now: points once spent on them come back
+                if (spec < MAX_TALENT_GROUPS && s_nodes.count(node) && !IsRoot(s_nodes[node]))
                     states[spec].Ranks[node] = std::min<uint32>(uint32(f[2].GetInt64()), s_nodes[node].MaxRank());
             } while (result->NextRow());
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
@@ -334,8 +350,8 @@ namespace
         bool ok = ClassTree(player, tree) && player->GetLevel() >= 10 && player->GetFreeTalentPoints() > 0;
         if (ok && tree.Kind == 1)
             ok = state.Hero == tree.Id && player->GetLevel() >= tree.MinLevel;
-        uint32 rank = state.Ranks.count(node.Id) ? state.Ranks[node.Id] : 0;
-        ok = ok && rank < node.MaxRank() && SpentInTree(state, node.TreeId) >= node.MinPoints;
+        uint32 rank = RankOf(state, node);
+        ok = ok && !IsRoot(node) && rank < node.MaxRank() && SpentInTree(state, node.TreeId) >= node.MinPoints;
         if (ok && !node.Requires.empty())
         {
             // retail: any connected node above at its max rank
@@ -343,8 +359,7 @@ namespace
             for (uint32 required : node.Requires)
             {
                 auto req = s_nodes.find(required);
-                auto owned = state.Ranks.find(required);
-                if (req != s_nodes.end() && owned != state.Ranks.end() && owned->second >= req->second.MaxRank())
+                if (req != s_nodes.end() && RankOf(state, req->second) >= req->second.MaxRank())
                     any = true;
             }
             ok = any;

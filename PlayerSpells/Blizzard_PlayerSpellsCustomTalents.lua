@@ -75,9 +75,23 @@ local function FreePoints()
 	return (GetUnspentTalentPoints(false, false, group) or 0) - (GetGroupPreviewTalentPointsSpent(false, group) or 0);
 end
 
+-- hero tree root (row 0): granted with the chosen tree, free, can't be unlearned (server: IsRoot)
+local function IsRoot(node)
+	local tree = CT.trees[node.tree];
+	return tree and tree.kind == 1 and node.row == 0;
+end
+
+local function RankOf(node)
+	if IsRoot(node) then
+		return CT.hero == node.tree and node.maxRank or 0;
+	end
+	return CT.ranks[node.id] or 0;
+end
+CT.RankOf = RankOf;
+
 -- "yellow" learned (max or partial), "green" can take a point, "gray" closed
 local function NodeState(node)
-	local rank = CT.ranks[node.id] or 0;
+	local rank = RankOf(node);
 	if rank >= node.maxRank then
 		return "yellow", rank;
 	end
@@ -90,7 +104,7 @@ local function NodeState(node)
 		local any = false;
 		for _, required in ipairs(node.requires) do
 			local req = CT.nodes[required];
-			if req and (CT.ranks[required] or 0) >= req.maxRank then
+			if req and RankOf(req) >= req.maxRank then
 				any = true;
 			end
 		end
@@ -219,7 +233,7 @@ local function NodeButton(column, index)
 	end);
 	button:SetScript("OnEnter", function(self)
 		local node = self.node;
-		local rank = CT.ranks[node.id] or 0;
+		local rank = RankOf(node);
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 		GameTooltip:SetHyperlink("spell:" .. node.spells[math.max(1, rank)]);
 		GameTooltip:AddLine(" ");
@@ -302,7 +316,7 @@ local function LayoutTree(column, treeId)
 			local from, to = centers[required], centers[node.id];
 			local req = CT.nodes[required];
 			if from and to and req then
-				local active = (CT.ranks[required] or 0) >= req.maxRank;
+				local active = RankOf(req) >= req.maxRank;
 				DrawLine(column, from.x, from.y, to.x, to.y, active and ATLAS.lineActive or ATLAS.lineLocked);
 			end
 		end
@@ -479,7 +493,7 @@ function CT.Setup(frame)
 	hero.buttons = {};
 	hero.lines = {};
 	hero.spacing = 52;
-	hero.top = 46;
+	hero.top = 80; -- the root node below the ring
 	hero.Name = hero:CreateFontString(nil, "ARTWORK", _G.GameFontNormalHuge2 and "GameFontNormalHuge2" or "GameFontNormalLarge");
 	hero.Name:SetPoint("TOP", 0, -30);
 	hero.SubName = hero:CreateFontString(nil, "ARTWORK", "GameFontNormal");
