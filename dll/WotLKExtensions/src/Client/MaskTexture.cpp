@@ -1,3 +1,4 @@
+#include <Misc/Logger.hpp>
 #include <cstdarg>
 #include <cstdio>
 #include <Client/MaskTexture.hpp>
@@ -89,22 +90,19 @@ namespace
     using LuaToUserdata_t = void* (__cdecl*)(lua_State*, int);
     using LuaSetTop_t = void(__cdecl*)(lua_State*, int);
 
-    // ---------------- debug log (MaskTexture.log next to Wow.exe, first lines only) ----------------
+    // ---------------- debug log (the DLL log, first lines only) ----------------
     int s_logLines = 0;
     void MaskLog(const char* format, ...)
     {
         if (s_logLines >= 400)
             return;
         s_logLines++;
-        FILE* file = fopen("MaskTexture.log", s_logLines == 1 ? "w" : "a");
-        if (!file)
-            return;
+        char buffer[512];
         va_list args;
         va_start(args, format);
-        vfprintf(file, format, args);
+        vsnprintf(buffer, sizeof(buffer), format, args);
         va_end(args);
-        fputc('\n', file);
-        fclose(file);
+        LOG_INFO << "MaskTexture: " << buffer << "\n";
     }
 
     // ---------------- state ----------------
