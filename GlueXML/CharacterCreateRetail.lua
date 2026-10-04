@@ -70,7 +70,7 @@ local function StyleIconButton(button, size, small)
 		end
 	end
 	-- round icons (retail masks them): the DLL mask textures (FrameXML\MaskTexture.lua) if there
-	if button.CreateMaskTexture and TextureAddMask then
+	if button.CreateMaskTexture and TextureAddMask and TextureSetIsMask then
 		local mask = button:CreateMaskTexture();
 		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
 		mask:SetPoint("CENTER");
@@ -127,6 +127,55 @@ end
 ---------------------------------------------------------------------------
 -- races / classes after the 3.3.5 enumeration
 ---------------------------------------------------------------------------
+-- race tooltip (retail): the name, the description, the racial traits
+local function RaceTooltipText(button)
+	local file = button.crFile;
+	local text = "|cffffd100" .. (button.name or "") .. "|r";
+	if not button.enable then
+		return text .. "|n|n" .. (button.tooltip or "");
+	end
+	local flavor = GetFlavorText and GetFlavorText("RACE_INFO_" .. file, GetSelectedSex()) or _G["RACE_INFO_" .. file];
+	if flavor and flavor ~= "" then
+		text = text .. "|n|n" .. flavor;
+	end
+	local index = 1;
+	local ability = _G["ABILITY_INFO_" .. file .. index];
+	while ability do
+		text = text .. "|n|n" .. ability;
+		index = index + 1;
+		ability = _G["ABILITY_INFO_" .. file .. index];
+	end
+	return text;
+end
+
+function CR.HookRaceTooltip(button)
+	if button.crTooltip then
+		return;
+	end
+	button.crTooltip = true;
+	button:SetScript("OnEnter", function(self)
+		local line = CharacterCreateTooltipTextLeft1;
+		if line then
+			line:SetWidth(340);
+			line:SetJustifyH("LEFT");
+		end
+		if self.crHorde then
+			GlueTooltip_SetOwner(self, CharacterCreateTooltip, -10, 0, "TOPRIGHT", "TOPLEFT");
+		else
+			GlueTooltip_SetOwner(self, CharacterCreateTooltip, 10, 0, "TOPLEFT", "TOPRIGHT");
+		end
+		GlueTooltip_SetText(RaceTooltipText(self), CharacterCreateTooltip);
+	end);
+	button:SetScript("OnLeave", function()
+		CharacterCreateTooltip:Hide();
+		local line = CharacterCreateTooltipTextLeft1;
+		if line then
+			line:SetWidth(0);
+			line:SetJustifyH("CENTER");
+		end
+	end);
+end
+
 function CR.LayoutRaces(...)
 	local sex = GetSelectedSex();
 	local alliance, horde = 0, 0;
@@ -139,6 +188,8 @@ function CR.LayoutRaces(...)
 			local atlas = RaceAtlas(file, sex);
 			local _, faction = GetFactionForRace(index);
 			local isHorde = faction == "Horde";
+			button.crFile, button.crHorde = strupper(file), isHorde;
+			CR.HookRaceTooltip(button);
 			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas, nil, isHorde);
 			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas, nil, isHorde);
 			button:ClearAllPoints();
@@ -299,6 +350,47 @@ function CR.Setup()
 end
 
 ---------------------------------------------------------------------------
+-- camera (retail zooms on the customization): the scene moved toward the camera, smoothly
+--   x - toward the camera, z - up; tune the targets here
+---------------------------------------------------------------------------
+local CAMERA = {
+	select = { 0, 0, 0 },
+	body = { 1.5, 0, -0.1 },
+	head = { 3.6, 0, -0.85 },
+};
+-- the customization rows (3.3.5 order: skin, face, hair, hair color, facial hair)
+local ROW_CAMERA = { "body", "head", "head", "head", "head" };
+
+function CR.SetCamera(name)
+	local target = CAMERA[name] or CAMERA.select;
+	CR.cameraTarget = target;
+	if not CR.cameraFrame then
+		CR.cameraFrame = CreateFrame("Frame");
+		CR.cameraPosition = { 0, 0, 0 };
+		CR.cameraFrame:SetScript("OnUpdate", function(self, elapsed)
+			local position, goal = CR.cameraPosition, CR.cameraTarget;
+			local done = true;
+			for i = 1, 3 do
+				local delta = goal[i] - position[i];
+				if math.abs(delta) > 0.001 then
+					position[i] = position[i] + delta * math.min(1, (elapsed or 0.016) * 8);
+					done = false;
+				else
+					position[i] = goal[i];
+				end
+			end
+			if CharacterCreate and CharacterCreate.SetPosition then
+				CharacterCreate:SetPosition(position[1], position[2], position[3]);
+			end
+			if done then
+				self:Hide();
+			end
+		end);
+	end
+	CR.cameraFrame:Show();
+end
+
+---------------------------------------------------------------------------
 -- two stages (retail): 1 - race / class / gender, 2 - the appearance and the name only
 ---------------------------------------------------------------------------
 local function SetShownList(list, shown)
@@ -351,6 +443,7 @@ function CR.SetStage(stage)
 			CharacterCreateRandomName:Hide();
 		end
 	end
+	CR.SetCamera(stage == 1 and "select" or "body");
 	CharCreateOkayButton:SetText(stage == 1 and (CUSTOMIZE or "Настроить") or (CHARACTER_CREATE_ACCEPT or ACCEPT));
 	if stage == 2 and CharacterCreateNameEdit then
 		CharacterCreateNameEdit:SetFocus();
@@ -371,6 +464,10 @@ local function After(name, func)
 		return a, b, c;
 	end
 end
+
+-- a customization arrow: the camera to what it changes
+After("CharacterCustomization_Left", function(id) if CR.stage == 2 then CR.SetCamera(ROW_CAMERA[id] or "body"); end end);
+After("CharacterCustomization_Right", function(id) if CR.stage == 2 then CR.SetCamera(ROW_CAMERA[id] or "body"); end end);
 
 After("CharacterCreate_OnShow", function()
 	CR.Setup();
