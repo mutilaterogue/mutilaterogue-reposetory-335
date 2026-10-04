@@ -30,3 +30,9 @@ if not tContains then
 		return false;
 	end
 end
+
+-- TextureUtil.lua (role icons) indexes these at load
+Enum = Enum or {};
+Enum.LFGRole = Enum.LFGRole or { Tank = 0, Healer = 1, Damage = 2 };
+Constants = Constants or {};
+Constants.LFG_ROLEConstants = Constants.LFG_ROLEConstants or { LFG_ROLE_NO_ROLE = -1 };

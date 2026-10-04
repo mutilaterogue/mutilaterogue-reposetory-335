@@ -116,11 +116,14 @@ function ClearClampedTextureRotation(texture)
 	end
 end
 
+-- the login screen may lack these enums: the 3.3.5 values
+local LFGRoleEnum = (Enum and Enum.LFGRole) or { Tank = 0, Healer = 1, Damage = 2 };
+local LFGNoRole = Constants and Constants.LFG_ROLEConstants and Constants.LFG_ROLEConstants.LFG_ROLE_NO_ROLE or -1;
 local LFGRoleEnumToString = {
-	[Enum.LFGRole.Tank] = "TANK",
-	[Enum.LFGRole.Healer] = "HEALER",
-	[Enum.LFGRole.Damage] = "DAMAGER",
-	[Constants.LFG_ROLEConstants.LFG_ROLE_NO_ROLE] = "GUIDE",
+	[LFGRoleEnum.Tank] = "TANK",
+	[LFGRoleEnum.Healer] = "HEALER",
+	[LFGRoleEnum.Damage] = "DAMAGER",
+	[LFGNoRole] = "GUIDE",
 };
 
 local LFGRoleIcons = {
