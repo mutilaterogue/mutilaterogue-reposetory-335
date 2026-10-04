@@ -16,6 +16,8 @@ local function EnsureSetup(self)
 	self.Icon = self.Icon or self.Bar.Icon;
 
 	self.Bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar");
+	-- the icon shares ARTWORK with the bar fill and goes under it on long bars: above it
+	self.Icon:SetDrawLayer("OVERLAY");
 
 	local texture = self.Bar:GetStatusBarTexture();
 	if texture and texture.SetAtlas then
