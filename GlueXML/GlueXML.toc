@@ -48,6 +48,7 @@ AccountLogin.xml
 CharacterSelect.xml
 CharacterSelectRetail.lua
 CharacterCreate.xml
+CharacterCreateRetail.lua
 PatchDownload.xml
 MovieFrame.xml
 RealmWizard.xml
