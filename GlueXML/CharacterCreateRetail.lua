@@ -366,7 +366,7 @@ function CR.SetCamera(name)
 	local target = CAMERA[name] or CAMERA.select;
 	CR.cameraTarget = target;
 	if not CR.cameraFrame then
-		CR.cameraFrame = CreateFrame("Frame");
+		CR.cameraFrame = CreateFrame("Frame", nil, CharacterCreate);
 		CR.cameraPosition = { 0, 0, 0 };
 		CR.cameraFrame:SetScript("OnUpdate", function(self, elapsed)
 			local position, goal = CR.cameraPosition, CR.cameraTarget;
