@@ -197,12 +197,25 @@ namespace
         return spent;
     }
 
+    // the 3.3.5 talent points spent: the class tree only (hero trees have their own points)
     uint32 SpentTotal(SpecState const& state)
     {
         uint32 spent = 0;
         for (auto const& pair : state.Ranks)
+        {
+            auto node = s_nodes.find(pair.first);
+            auto tree = node != s_nodes.end() ? s_trees.find(node->second.TreeId) : s_trees.end();
+            if (tree != s_trees.end() && tree->second.Kind == 1)
+                continue;
             spent += pair.second;
+        }
         return spent;
+    }
+
+    // retail hero points: one per level from the tree's min_level (71 -> 10 at 80)
+    uint32 HeroPoints(Player const* player, Tree const& tree)
+    {
+        return player->GetLevel() >= tree.MinLevel ? player->GetLevel() - tree.MinLevel + 1 : 0;
     }
 
     // Player::s_extraUsedTalentsHook: the points of the active spec
@@ -343,7 +356,9 @@ namespace
             else
                 ++itr;
         }
-        if (spec == player->GetActiveSpec() && refund)
+        // hero trees cost no 3.3.5 points: nothing to give back
+        auto tree = s_trees.find(treeId);
+        if (spec == player->GetActiveSpec() && refund && tree != s_trees.end() && tree->second.Kind != 1)
             player->SetFreeTalentPoints(player->GetFreeTalentPoints() + refund);
     }
 
@@ -364,10 +379,13 @@ namespace
         uint8 spec = player->GetActiveSpec();
         SpecState& state = State(player, spec);
 
-        bool ok = ClassTree(player, tree) && player->GetLevel() >= 10 && player->GetFreeTalentPoints() > 0
-            && !MythicPlus_TalentsLocked(player);
-        if (ok && tree.Kind == 1)
-            ok = state.Hero == tree.Id && player->GetLevel() >= tree.MinLevel;
+        bool hero = tree.Kind == 1;
+        bool ok = ClassTree(player, tree) && player->GetLevel() >= 10 && !MythicPlus_TalentsLocked(player);
+        // the class tree takes the 3.3.5 points, a hero tree its own
+        if (ok && hero)
+            ok = state.Hero == tree.Id && player->GetLevel() >= tree.MinLevel && SpentInTree(state, tree.Id) < HeroPoints(player, tree);
+        else if (ok)
+            ok = player->GetFreeTalentPoints() > 0;
         uint32 rank = RankOf(state, node);
         // a choice node: the option (1 / 2) comes with the click; a learned one switches for free
         uint8 option = args.size() > 1 && CommToUInt32(args[1]) == 2 ? 2 : 1;
@@ -405,7 +423,8 @@ namespace
         state.Ranks[node.Id] = rank + 1;
         if (!node.Choice.empty())
             state.Choices[node.Id] = option;
-        player->SetFreeTalentPoints(player->GetFreeTalentPoints() - 1);
+        if (!hero)
+            player->SetFreeTalentPoints(player->GetFreeTalentPoints() - 1);
         SaveNode(player, spec, node.Id, rank + 1, node.Choice.empty() ? 1 : option);
         ApplySpells(player);
         SendState(player);

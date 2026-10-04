@@ -71,6 +71,11 @@ local function SpentInTree(treeId)
 	return spent;
 end
 
+function CT.HeroPointsLeft(tree)
+	local total = UnitLevel("player") >= tree.minLevel and (UnitLevel("player") - tree.minLevel + 1) or 0;
+	return math.max(0, total - SpentInTree(tree.id));
+end
+
 local function FreePoints()
 	local group = GetActiveTalentGroup(false, false) or 1;
 	return (GetUnspentTalentPoints(false, false, group) or 0) - (GetGroupPreviewTalentPointsSpent(false, group) or 0);
@@ -109,11 +114,25 @@ local function OptionSpell(node, option, rank)
 end
 
 -- the icon of a node: a choice node not chosen yet - both options halved side by side
+local CHOICE_ICON_SIZE, CHOICE_RING_SIZE = ICON_SIZE - 10, NODE_SIZE + 10;
+
 local function SetNodeIcon(button, node, rank, shape)
 	local chosen = ChosenOption(node);
+	-- an octagon: no mask on 3.3.5 - a smaller icon inside a bigger frame hides the corners
+	local iconSize = shape == "choice" and CHOICE_ICON_SIZE or ICON_SIZE;
+	button.iconSize = iconSize;
+	button.Icon:SetHeight(iconSize);
+	button.Icon2:SetHeight(iconSize);
+	if button.Ring then
+		local ringSize = shape == "choice" and CHOICE_RING_SIZE or NODE_SIZE;
+		button.Ring:ClearAllPoints();
+		button.Ring:SetPoint("CENTER");
+		button.Ring:SetWidth(ringSize);
+		button.Ring:SetHeight(ringSize);
+	end
 	button.Icon:ClearAllPoints();
 	button.Icon:SetPoint("CENTER");
-	button.Icon:SetWidth(button.iconSize or ICON_SIZE);
+	button.Icon:SetWidth(iconSize);
 	if IsChoice(node) and not chosen then
 		local _, _, left = GetSpellInfo(node.spells[1] or 0);
 		local _, _, right = GetSpellInfo(node.choice[1] or 0);
@@ -122,6 +141,7 @@ local function SetNodeIcon(button, node, rank, shape)
 		button.Icon:SetWidth((button.iconSize or ICON_SIZE) / 2);
 		button.Icon:SetTexture(left or "Interface\\Icons\\INV_Misc_QuestionMark");
 		button.Icon:SetTexCoord(0.08, 0.5, 0.08, 0.92);
+		button.Icon2:SetWidth(iconSize / 2);
 		button.Icon2:SetTexture(right or "Interface\\Icons\\INV_Misc_QuestionMark");
 		button.Icon2:SetTexCoord(0.5, 0.92, 0.08, 0.92);
 		button.Icon2:Show();
@@ -167,7 +187,9 @@ local function NodeState(node)
 		end
 		open = any;
 	end
-	if open and FreePoints() > 0 then
+	-- the class tree takes the 3.3.5 points, a hero tree its own (one per level from its min_level)
+	local points = tree and tree.kind == 1 and CT.HeroPointsLeft(tree) or FreePoints();
+	if open and points > 0 then
 		return "green", rank;
 	end
 	return rank > 0 and "yellow" or "gray", rank;
@@ -849,7 +871,10 @@ function CT.Refresh(frame)
 		SetAtlasIfExists(hero.Ring.Border, "talents-heroclass-ring-mainpane");
 		SetAtlasIfExists(hero.Ring.Highlight, "talents-heroclass-ring-mainpane");
 		hero.BlankNodes:Hide();
-		hero.Badge:Hide();
+		-- retail: the hero points still free on the ring
+		local left = CT.HeroPointsLeft(heroTree);
+		hero.Badge.Text:SetText(left);
+		hero.Badge:SetShown(left > 0);
 		LayoutTree(hero, heroTree.id);
 	else
 		hero.SubName:SetText(string.upper(CHOOSE or "Выберите"));
