@@ -56,6 +56,7 @@ local function AddRoundMask(button, textures, size)
 	end
 	local mask = button:CreateMaskTexture();
 	mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
+	mask:SetVertexColor(1, 1, 1, 0);
 	mask:SetPoint("CENTER");
 	mask:SetWidth(size);
 	mask:SetHeight(size);
@@ -82,11 +83,11 @@ local function StyleIconButton(button, size, small, ring)
 		if texture then
 			texture:ClearAllPoints();
 			texture:SetPoint("CENTER");
-			texture:SetWidth(size - 6);
-			texture:SetHeight(size - 6);
+			texture:SetWidth(size - 8);
+			texture:SetHeight(size - 8);
 		end
 	end
-	AddRoundMask(button, { normal or false, pushed or false }, size - 10);
+	AddRoundMask(button, { normal or false, pushed or false }, size - 12);
 
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
@@ -94,14 +95,27 @@ local function StyleIconButton(button, size, small, ring)
 	button.CRRing:SetWidth(size * 1.6);
 	button.CRRing:SetHeight(size * 1.6);
 	SetAtlasIf(button.CRRing, ring or "charactercreate-ring-metaldark");
+	-- the gold ring: the full size art (the small one is blurry), on a child frame over the metal ring
 	local checked = button:GetCheckedTexture();
-	if checked and SetAtlasIf(checked, small and "charactercreate-ring-select-small" or "charactercreate-ring-select") then
-		checked:ClearAllPoints();
-		checked:SetPoint("CENTER");
-		checked:SetWidth(size + 16);
-		checked:SetHeight(size + 16);
-		checked:SetBlendMode("BLEND");
+	if checked then
+		checked:SetAlpha(0);
 	end
+	local over = CreateFrame("Frame", nil, button);
+	over:SetAllPoints(button);
+	over:SetFrameLevel(button:GetFrameLevel() + 2);
+	button.CRSelect = over:CreateTexture(nil, "OVERLAY");
+	button.CRSelect:SetPoint("CENTER");
+	button.CRSelect:SetWidth(size + 16);
+	button.CRSelect:SetHeight(size + 16);
+	SetAtlasIf(button.CRSelect, "charactercreate-ring-select");
+	button.CRSelect:Hide();
+	over:SetScript("OnUpdate", function()
+		if button:GetChecked() then
+			button.CRSelect:Show();
+		else
+			button.CRSelect:Hide();
+		end
+	end);
 	local highlight = button:GetHighlightTexture();
 	if highlight then
 		highlight:SetAlpha(0);

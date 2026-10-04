@@ -254,6 +254,8 @@ do
 
 	local function CreateMaskTexture(self, name, layer, inherits)
 		local mask = self:CreateTexture(name, layer or "ARTWORK", inherits);
+		-- drawn, but invisible: a drawn texture keeps its corners on its rect (the mask UV needs them)
+		mask:SetVertexColor(1, 1, 1, 0);
 		if TextureSetIsMask then
 			TextureSetIsMask(mask, true);
 		end
@@ -303,6 +305,7 @@ do
 
 	local function ApplyMask(mask, frame, keys)
 		TextureSetIsMask(mask, true);
+		mask:SetVertexColor(1, 1, 1, 0);
 		if not (frame and keys) then
 			return;
 		end
@@ -333,6 +336,7 @@ do
 			list[#list + 1] = { mask, keys };
 		elseif TextureSetIsMask then
 			TextureSetIsMask(mask, true);
+			mask:SetVertexColor(1, 1, 1, 0);
 		else
 			deferredMasks[#deferredMasks + 1] = { mask };
 		end
