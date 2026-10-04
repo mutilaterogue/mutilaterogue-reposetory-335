@@ -1,0 +1,79 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Script file="DamageMeterSessionWindow.lua"/>
+
+	<Frame name="DamageMeterSessionWindow" mixin="DamageMeterSessionWindowMixin" parent="UIParent" movable="true" resizable="true" enableMouse="true" hidden="true">
+		<Size x="260" y="220"/>
+		<Anchors>
+			<Anchor point="CENTER" x="300" y="0"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" atlas="damagemeters-background" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="HeaderBar" atlas="ui-damagemeters-header-bar">
+					<Size x="0" y="24"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="TOPRIGHT" x="-2" y="-2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Title" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="28" y="-8"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Footer" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="8" y="5"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<!-- слева стрелка выбора типа, справа сегмент и шестерёнка -->
+			<Button parentKey="TypeDropDown" inherits="WowStyle1ArrowDropdownTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-3"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="SessionButton" inherits="DamageMeterHeaderButtonTemplate">
+				<Size x="22" y="22"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-34" y="-2"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="SettingsButton" inherits="DamageMeterSettingsDropdownButtonTemplate">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-4" y="-2"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="ResizeButton">
+				<Size x="64" y="64"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" x="5" y="-5"/>
+				</Anchors>
+				<NormalTexture atlas="damagemeters-scalehandle"/>
+				<HighlightTexture atlas="damagemeters-scalehandle-hover"/>
+				<PushedTexture atlas="damagemeters-scalehandle-pressed"/>
+			</Button>
+			<ScrollFrame parentKey="ScrollBox" inherits="WowScrollBoxList">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="6" y="-28"/>
+					<Anchor point="BOTTOMRIGHT" x="-18" y="20"/>
+				</Anchors>
+			</ScrollFrame>
+			<Frame parentKey="ScrollBar" inherits="MinimalScrollBar"/>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnEvent method="OnEvent"/>
+			<OnUpdate method="OnUpdate"/>
+			<OnDragStart>self:StartMoving();</OnDragStart>
+			<OnDragStop>self:StopMovingOrSizing();</OnDragStop>
+		</Scripts>
+	</Frame>
+</Ui>
