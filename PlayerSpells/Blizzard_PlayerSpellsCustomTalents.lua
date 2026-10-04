@@ -1,7 +1,7 @@
 -- Retail style talents: the class tree (left column) and the hero tree (middle column, one of 2-3) next to
 -- one 3.3.5 spec tree (right). Server: server/talent_custom.cpp (CTAL_*). The points are the 3.3.5 talent points.
 
-PlayerSpellsCustomTalents = { trees = {}, nodes = {}, ranks = {}, hero = 0, loaded = false };
+PlayerSpellsCustomTalents = { trees = {}, nodes = {}, ranks = {}, choices = {}, hero = 0, loaded = false };
 local CT = PlayerSpellsCustomTalents;
 
 -- retail node scale (ClassTalentsFrame): ~40 px nodes, ~56 px apart
@@ -15,6 +15,7 @@ local HEADER_HEIGHT = 80;
 local ATLAS = {
 	circle = { yellow = "talents-node-circle-yellow", green = "talents-node-circle-green", gray = "talents-node-circle-gray" },
 	square = { yellow = "talents-node-square-yellow", green = "talents-node-square-green", gray = "talents-node-square-gray" },
+	choice = { yellow = "talents-node-choice-yellow", green = "talents-node-choice-green", gray = "talents-node-choice-gray" },
 	lineActive = "talents-arrow-line-yellow",
 	lineLocked = "talents-arrow-line-gray",
 };
@@ -88,6 +89,62 @@ local function RankOf(node)
 	return CT.ranks[node.id] or 0;
 end
 CT.RankOf = RankOf;
+
+-- choice node (retail octagon): one of two options
+local function IsChoice(node)
+	return node.choice and #node.choice > 0;
+end
+
+-- the option of a learned choice node (1 / 2), nil - not chosen yet
+local function ChosenOption(node)
+	if not IsChoice(node) or RankOf(node) == 0 then
+		return nil;
+	end
+	return CT.choices[node.id] or 1;
+end
+
+local function OptionSpell(node, option, rank)
+	local list = option == 2 and node.choice or node.spells;
+	return list[math.max(1, math.min(rank, #list))] or list[1];
+end
+
+-- the icon of a node: a choice node not chosen yet - both options halved side by side
+local function SetNodeIcon(button, node, rank, shape)
+	local chosen = ChosenOption(node);
+	button.Icon:ClearAllPoints();
+	button.Icon:SetPoint("CENTER");
+	button.Icon:SetWidth(button.iconSize or ICON_SIZE);
+	if IsChoice(node) and not chosen then
+		local _, _, left = GetSpellInfo(node.spells[1] or 0);
+		local _, _, right = GetSpellInfo(node.choice[1] or 0);
+		button.Icon:ClearAllPoints();
+		button.Icon:SetPoint("RIGHT", button, "CENTER");
+		button.Icon:SetWidth((button.iconSize or ICON_SIZE) / 2);
+		button.Icon:SetTexture(left or "Interface\\Icons\\INV_Misc_QuestionMark");
+		button.Icon:SetTexCoord(0.08, 0.5, 0.08, 0.92);
+		button.Icon2:SetTexture(right or "Interface\\Icons\\INV_Misc_QuestionMark");
+		button.Icon2:SetTexCoord(0.5, 0.92, 0.08, 0.92);
+		button.Icon2:Show();
+		return;
+	end
+	button.Icon2:Hide();
+	local _, _, icon = GetSpellInfo(OptionSpell(node, chosen or 1, rank) or 0);
+	if shape == "circle" and icon then
+		SetPortraitToTexture(button.Icon, icon);
+		button.Icon:SetTexCoord(0, 1, 0, 1);
+	else
+		button.Icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
+		button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
+	end
+end
+
+local function NodeShape(node)
+	if IsChoice(node) then
+		return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(ATLAS.choice.gray) and "choice" or "square";
+	end
+	return node.maxRank == 1 and "square" or "circle";
+end
+CT.IsChoice, CT.SetNodeIcon, CT.NodeShape = IsChoice, SetNodeIcon, NodeShape;
 
 -- "yellow" learned (max or partial), "green" can take a point, "gray" closed
 local function NodeState(node)
@@ -206,6 +263,72 @@ local function DrawLine(column, x1, y1, x2, y2, atlas)
 	line:SetPoint("TOPRIGHT", column.Content, "TOPLEFT", cx + bwid, cy + bhgt);
 end
 
+-- the two options of a choice node over it (retail flyout)
+local flyout;
+function CT.ShowChoiceFlyout(owner)
+	local node = owner.node;
+	if not flyout then
+		flyout = CreateFrame("Frame", nil, UIParent);
+		flyout:SetFrameStrata("DIALOG");
+		flyout:SetWidth(104);
+		flyout:SetHeight(56);
+		flyout:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } });
+		flyout:SetBackdropColor(0, 0, 0, 0.9);
+		flyout:EnableMouse(true);
+		flyout.buttons = {};
+		for option = 1, 2 do
+			local button = CreateFrame("Button", nil, flyout);
+			button:SetWidth(40);
+			button:SetHeight(40);
+			button:SetPoint("LEFT", 8 + (option - 1) * 48, 0);
+			button.Icon = button:CreateTexture(nil, "ARTWORK");
+			button.Icon:SetAllPoints();
+			button.Ring = button:CreateTexture(nil, "OVERLAY");
+			button.Ring:SetPoint("CENTER");
+			button.Ring:SetWidth(48);
+			button.Ring:SetHeight(48);
+			button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
+			button:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("spell:" .. self.spellID);
+				GameTooltip:Show();
+			end);
+			button:SetScript("OnLeave", GameTooltip_Hide);
+			button:SetScript("OnClick", function(self)
+				Send("CTAL_LEARN", flyout.node.id, self.option);
+				flyout:Hide();
+				GameTooltip:Hide();
+			end);
+			button.option = option;
+			flyout.buttons[option] = button;
+		end
+		-- closes when the mouse leaves it and its node
+		flyout:SetScript("OnUpdate", function(self)
+			if not self:IsMouseOver() and not (self.owner and self.owner:IsMouseOver()) then
+				self:Hide();
+			end
+		end);
+	end
+	flyout.node = node;
+	flyout.owner = owner;
+	local chosen = ChosenOption(node);
+	for option = 1, 2 do
+		local button = flyout.buttons[option];
+		button.spellID = OptionSpell(node, option, math.max(1, RankOf(node))) or 0;
+		local _, _, icon = GetSpellInfo(button.spellID);
+		button.Icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
+		button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
+		local state = chosen == option and "yellow" or (chosen and "gray" or "green");
+		button.Ring:SetAtlas(ATLAS.square[state]);
+		button.Icon:SetDesaturated(chosen ~= nil and chosen ~= option);
+	end
+	flyout:ClearAllPoints();
+	flyout:SetPoint("BOTTOM", owner, "TOP", 0, 2);
+	flyout:SetScale(owner:GetEffectiveScale() / UIParent:GetEffectiveScale());
+	flyout:Show();
+end
+
 local function NodeButton(column, index)
 	local button = column.buttons[index];
 	if button then
@@ -219,6 +342,11 @@ local function NodeButton(column, index)
 	button.Icon:SetPoint("CENTER");
 	button.Icon:SetWidth(ICON_SIZE);
 	button.Icon:SetHeight(ICON_SIZE);
+	button.Icon2 = button:CreateTexture(nil, "ARTWORK");
+	button.Icon2:SetPoint("LEFT", button, "CENTER");
+	button.Icon2:SetWidth(ICON_SIZE / 2);
+	button.Icon2:SetHeight(ICON_SIZE);
+	button.Icon2:Hide();
 	button.Ring = button:CreateTexture(nil, "OVERLAY");
 	button.Ring:SetPoint("CENTER");
 	button.Ring:SetWidth(NODE_SIZE);
@@ -227,15 +355,28 @@ local function NodeButton(column, index)
 	button.Rank:SetPoint("CENTER", button, "BOTTOMRIGHT", -2, 4);
 	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
 	button:SetScript("OnClick", function(self)
-		if self.state == "green" then
-			Send("CTAL_LEARN", self.node.id);
+		local node = self.node;
+		-- a choice node: the two options; a learned one can switch
+		if IsChoice(node) and (self.state == "green" or RankOf(node) > 0) then
+			CT.ShowChoiceFlyout(self);
+		elseif self.state == "green" then
+			Send("CTAL_LEARN", node.id);
 		end
 	end);
 	button:SetScript("OnEnter", function(self)
 		local node = self.node;
 		local rank = RankOf(node);
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip:SetHyperlink("spell:" .. node.spells[math.max(1, rank)]);
+		if IsChoice(node) and not ChosenOption(node) then
+			-- not chosen yet: both options
+			GameTooltip:AddLine("Выбор таланта", 1, 0.82, 0);
+			for option = 1, 2 do
+				local name = GetSpellInfo(OptionSpell(node, option, 1) or 0);
+				GameTooltip:AddLine(option .. ". " .. (name or UNKNOWN), 1, 1, 1);
+			end
+		else
+			GameTooltip:SetHyperlink("spell:" .. OptionSpell(node, ChosenOption(node) or 1, rank));
+		end
 		GameTooltip:AddLine(" ");
 		GameTooltip:AddLine(string.format(TOOLTIP_TALENT_RANK or "Rank %d/%d", rank, node.maxRank), 1, 1, 1);
 		if rank > 0 and rank < node.maxRank then
@@ -286,16 +427,10 @@ local function LayoutTree(column, treeId)
 		button:SetPoint("CENTER", column.Content, "TOPLEFT", x, -y);
 		local state, rank = NodeState(node);
 		button.state = state;
-		local _, _, icon = GetSpellInfo(node.spells[math.max(1, rank)]);
-		local shape = node.maxRank == 1 and "square" or "circle";
-		if shape == "circle" and icon then
-			SetPortraitToTexture(button.Icon, icon);
-			button.Icon:SetTexCoord(0, 1, 0, 1);
-		else
-			button.Icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
-			button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
-		end
+		local shape = NodeShape(node);
+		SetNodeIcon(button, node, rank, shape);
 		button.Icon:SetDesaturated(state == "gray");
+		button.Icon2:SetDesaturated(state == "gray");
 		button.Ring:SetAtlas(ATLAS[shape][state]);
 		button.Rank:SetText(rank .. "/" .. node.maxRank);
 		if state == "green" then
@@ -416,6 +551,10 @@ local function PreviewTree(preview, treeId, chosen)
 			button.Icon:SetPoint("CENTER");
 			button.Icon:SetWidth(ICON_SIZE);
 			button.Icon:SetHeight(ICON_SIZE);
+			button.Icon2 = button:CreateTexture(nil, "ARTWORK");
+			button.Icon2:SetPoint("LEFT", button, "CENTER");
+			button.Icon2:SetWidth(ICON_SIZE / 2);
+			button.Icon2:SetHeight(ICON_SIZE);
 			button.Ring = button:CreateTexture(nil, "OVERLAY");
 			button.Ring:SetAllPoints();
 			button.Rank = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline");
@@ -436,17 +575,11 @@ local function PreviewTree(preview, treeId, chosen)
 		learned[node.id] = rank >= node.maxRank;
 		button:ClearAllPoints();
 		button:SetPoint("CENTER", preview.Content, "TOPLEFT", x, -y);
-		button.spellID = node.spells[math.max(1, rank)] or node.spells[1] or 0;
-		local _, _, icon = GetSpellInfo(button.spellID);
-		local shape = node.maxRank == 1 and "square" or "circle";
-		if shape == "circle" and icon then
-			SetPortraitToTexture(button.Icon, icon);
-			button.Icon:SetTexCoord(0, 1, 0, 1);
-		else
-			button.Icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
-			button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
-		end
+		button.spellID = OptionSpell(node, (chosen and ChosenOption(node)) or 1, rank) or 0;
+		local shape = NodeShape(node);
+		SetNodeIcon(button, node, chosen and rank or 0, shape);
 		button.Icon:SetDesaturated(rank == 0);
+		button.Icon2:SetDesaturated(rank == 0);
 		button.Ring:SetAtlas(ATLAS[shape][rank > 0 and "yellow" or "gray"]);
 		button.Rank:SetText(chosen and node.row > 0 and (rank .. "/" .. node.maxRank) or "");
 		button:Show();
@@ -761,13 +894,13 @@ local function RegisterComm()
 			CT.trees[id] = { id = id, kind = tonumber(kind) or 0, name = name or "", icon = icon or "", minLevel = tonumber(minLevel) or 10, description = description or "", specMask = tonumber(specMask) or 0 };
 		end
 	end);
-	Comm_Register("CTAL_NODE", function(id, tree, row, col, maxRank, spells, requires, minPoints)
+	Comm_Register("CTAL_NODE", function(id, tree, row, col, maxRank, spells, requires, minPoints, choice)
 		id = tonumber(id);
 		if id then
 			CT.nodes[id] = {
 				id = id, tree = tonumber(tree) or 0, row = tonumber(row) or 0, col = (tonumber(col) or 0) / 2, -- the server sends half steps
 				maxRank = tonumber(maxRank) or 1, spells = SplitNumbers(spells, "/"), requires = SplitNumbers(requires, "/"),
-				minPoints = tonumber(minPoints) or 0,
+				minPoints = tonumber(minPoints) or 0, choice = SplitNumbers(choice, "/"),
 			};
 		end
 	end);
@@ -778,11 +911,13 @@ local function RegisterComm()
 	Comm_Register("CTAL_STATE", function(spec, hero, list)
 		CT.hero = tonumber(hero) or 0;
 		wipe(CT.ranks);
+		wipe(CT.choices);
 		for entry in string.gmatch(list or "", "[^,]+") do
-			local node, rank = strsplit("/", entry);
+			local node, rank, choice = strsplit("/", entry);
 			node, rank = tonumber(node), tonumber(rank);
 			if node and rank then
 				CT.ranks[node] = rank;
+				CT.choices[node] = tonumber(choice) or 1;
 			end
 		end
 		OnUpdate();

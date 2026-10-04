@@ -65,6 +65,7 @@ namespace
         uint32 Row = 0;
         uint32 Col = 0;              // in half steps (col 1.5 -> 3)
         std::vector<uint32> Spells;   // one per rank
+        std::vector<uint32> Choice;   // choice node: the second option (one per rank), empty - an ordinary node
         std::vector<uint32> Requires;
         uint32 MinPoints = 0;
         uint32 MaxRank() const { return uint32(Spells.size()); }
@@ -73,6 +74,7 @@ namespace
     struct SpecState
     {
         std::map<uint32, uint32> Ranks;   // node -> rank
+        std::map<uint32, uint8> Choices;  // choice node -> 1 (Spells) / 2 (Choice)
         uint32 Hero = 0;
     };
 
@@ -128,7 +130,7 @@ namespace
             } while (result->NextRow());
 
         s_nodes.clear();
-        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(tree_id AS SIGNED), CAST(`row` AS SIGNED), CAST(ROUND(`col` * 2) AS SIGNED), spells, requires, CAST(min_points AS SIGNED) FROM custom_talent_node"))
+        if (QueryResult result = WorldDatabase.Query("SELECT CAST(id AS SIGNED), CAST(tree_id AS SIGNED), CAST(`row` AS SIGNED), CAST(ROUND(`col` * 2) AS SIGNED), spells, requires, CAST(min_points AS SIGNED), choice_spells FROM custom_talent_node"))
             do
             {
                 Field* f = result->Fetch();
@@ -140,6 +142,7 @@ namespace
                 node.Spells = SplitIds(f[4].GetString());
                 node.Requires = SplitIds(f[5].GetString());
                 node.MinPoints = uint32(f[6].GetInt64());
+                node.Choice = SplitIds(f[7].GetString());
                 if (!node.Spells.empty() && s_trees.count(node.TreeId))
                     s_nodes[node.Id] = node;
             } while (result->NextRow());
@@ -223,16 +226,23 @@ namespace
             Tree const& tree = s_trees[node.TreeId];
             if (!ClassTree(player, tree) || (tree.Kind == 1 && (state.Hero != tree.Id || !SpecTree(player, tree))))
                 rank = 0;
-            for (uint32 i = 0; i < node.Spells.size(); ++i)
+            // a choice node: only the chosen option's spell
+            auto chosen = state.Choices.find(node.Id);
+            uint8 option = chosen != state.Choices.end() ? chosen->second : 1;
+            for (uint8 o = 1; o <= 2; ++o)
             {
-                uint32 spell = node.Spells[i];
-                if (rank && i + 1 == rank)
+                std::vector<uint32> const& spells = o == 1 ? node.Spells : node.Choice;
+                for (uint32 i = 0; i < spells.size(); ++i)
                 {
-                    if (!player->HasSpell(spell))
-                        player->LearnSpell(spell, false);
+                    uint32 spell = spells[i];
+                    if (rank && o == option && i + 1 == rank)
+                    {
+                        if (!player->HasSpell(spell))
+                            player->LearnSpell(spell, false);
+                    }
+                    else if (player->HasSpell(spell))
+                        player->RemoveSpell(spell, false, false);
                 }
-                else if (player->HasSpell(spell))
-                    player->RemoveSpell(spell, false, false);
             }
         }
     }
@@ -244,7 +254,7 @@ namespace
         for (uint8 spec = 0; spec < MAX_TALENT_GROUPS; ++spec)
             states[spec] = SpecState();
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
-            "SELECT CAST(spec AS SIGNED), CAST(node_id AS SIGNED), CAST(`rank` AS SIGNED) FROM character_custom_talent WHERE guid = {}", guid).c_str()))
+            "SELECT CAST(spec AS SIGNED), CAST(node_id AS SIGNED), CAST(`rank` AS SIGNED), CAST(choice AS SIGNED) FROM character_custom_talent WHERE guid = {}", guid).c_str()))
             do
             {
                 Field* f = result->Fetch();
@@ -252,7 +262,11 @@ namespace
                 uint32 node = uint32(f[1].GetInt64());
                 // hero roots are free now: points once spent on them come back
                 if (spec < MAX_TALENT_GROUPS && s_nodes.count(node) && !IsRoot(s_nodes[node]))
+                {
                     states[spec].Ranks[node] = std::min<uint32>(uint32(f[2].GetInt64()), s_nodes[node].MaxRank());
+                    if (!s_nodes[node].Choice.empty())
+                        states[spec].Choices[node] = f[3].GetInt64() == 2 ? 2 : 1;
+                }
             } while (result->NextRow());
         if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat(
             "SELECT CAST(spec AS SIGNED), CAST(tree_id AS SIGNED) FROM character_hero_talent WHERE guid = {}", guid).c_str()))
@@ -279,7 +293,7 @@ namespace
                 Node const& node = nodePair.second;
                 if (node.TreeId == tree.Id)
                     sAddonComm->Send(player, "CTAL_NODE", node.Id, node.TreeId, node.Row, node.Col, node.MaxRank(),
-                        Join(node.Spells, '/'), Join(node.Requires, '/'), node.MinPoints);
+                        Join(node.Spells, '/'), Join(node.Requires, '/'), node.MinPoints, Join(node.Choice, '/'));
             }
         }
         sAddonComm->Send(player, "CTAL_DONE");
@@ -294,18 +308,19 @@ namespace
         for (auto const& pair : state.Ranks)
             if (pair.second)
             {
-                list << (first ? "" : ",") << pair.first << '/' << pair.second;
+                auto choice = state.Choices.find(pair.first);
+                list << (first ? "" : ",") << pair.first << '/' << pair.second << '/' << uint32(choice != state.Choices.end() ? choice->second : 1);
                 first = false;
             }
         sAddonComm->Send(player, "CTAL_STATE", uint32(spec), state.Hero, list.str(), player->GetFreeTalentPoints());
     }
 
-    void SaveNode(Player* player, uint8 spec, uint32 node, uint32 rank)
+    void SaveNode(Player* player, uint8 spec, uint32 node, uint32 rank, uint8 choice = 1)
     {
         ObjectGuid::LowType guid = player->GetGUID().GetCounter();
         if (rank)
             CharacterDatabase.Execute(Trinity::StringFormat(
-                "REPLACE INTO character_custom_talent (guid, spec, node_id, `rank`) VALUES ({}, {}, {}, {})", guid, spec, node, rank).c_str());
+                "REPLACE INTO character_custom_talent (guid, spec, node_id, `rank`, choice) VALUES ({}, {}, {}, {}, {})", guid, spec, node, rank, choice).c_str());
         else
             CharacterDatabase.Execute(Trinity::StringFormat(
                 "DELETE FROM character_custom_talent WHERE guid = {} AND spec = {} AND node_id = {}", guid, spec, node).c_str());
@@ -354,6 +369,20 @@ namespace
         if (ok && tree.Kind == 1)
             ok = state.Hero == tree.Id && player->GetLevel() >= tree.MinLevel;
         uint32 rank = RankOf(state, node);
+        // a choice node: the option (1 / 2) comes with the click; a learned one switches for free
+        uint8 option = args.size() > 1 && CommToUInt32(args[1]) == 2 ? 2 : 1;
+        if (!node.Choice.empty() && rank > 0)
+        {
+            auto chosen = state.Choices.find(node.Id);
+            if ((chosen == state.Choices.end() ? 1 : chosen->second) != option && !MythicPlus_TalentsLocked(player))
+            {
+                state.Choices[node.Id] = option;
+                SaveNode(player, spec, node.Id, rank, option);
+                ApplySpells(player);
+            }
+            SendState(player);
+            return;
+        }
         ok = ok && !IsRoot(node) && rank < node.MaxRank() && SpentInTree(state, node.TreeId) >= node.MinPoints;
         if (ok && !node.Requires.empty())
         {
@@ -374,8 +403,10 @@ namespace
         }
 
         state.Ranks[node.Id] = rank + 1;
+        if (!node.Choice.empty())
+            state.Choices[node.Id] = option;
         player->SetFreeTalentPoints(player->GetFreeTalentPoints() - 1);
-        SaveNode(player, spec, node.Id, rank + 1);
+        SaveNode(player, spec, node.Id, rank + 1, node.Choice.empty() ? 1 : option);
         ApplySpells(player);
         SendState(player);
     }
