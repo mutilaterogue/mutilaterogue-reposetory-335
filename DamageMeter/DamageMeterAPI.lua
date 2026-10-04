@@ -143,6 +143,11 @@ local function GetSource(session, guid, name, flags)
 		session.sources[guid] = source;
 	end
 
+	-- mine / party / raid (players and their pets) by the combat log affiliation: refreshed on every event
+	if flags then
+		source.inGroup = bit.band(flags, 0x7) > 0;
+	end
+
 	-- the class: by the GUID (any player seen in the combat log), by name only as a fallback
 	if source.isPlayer and not source.classFilename then
 		local classFilename;
@@ -276,10 +281,10 @@ local function ShouldIncludeSource(source)
 		return true;
 	end
 
-	if not source.isPlayer then
-		return true;		-- мобы и питомцы нужны для "полученного урона"
+	-- only the player, the group / raid and their pets (COMBATLOG_OBJECT_AFFILIATION_MINE/PARTY/RAID)
+	if source.inGroup ~= nil then
+		return source.inGroup;
 	end
-
 	return source.isGroupMember;
 end
 
