@@ -69,6 +69,20 @@ local function StyleIconButton(button, size, small)
 			texture:SetHeight(size - 6);
 		end
 	end
+	-- round icons (retail masks them): the DLL mask textures (FrameXML\MaskTexture.lua) if there
+	if button.CreateMaskTexture and TextureAddMask then
+		local mask = button:CreateMaskTexture();
+		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
+		mask:SetPoint("CENTER");
+		mask:SetWidth(size - 6);
+		mask:SetHeight(size - 6);
+		for _, texture in ipairs({ normal or false, pushed or false }) do
+			if texture then
+				texture:AddMaskTexture(mask);
+			end
+		end
+	end
+
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
 	button.CRRing:SetPoint("CENTER");
@@ -89,12 +103,24 @@ local function StyleIconButton(button, size, small)
 	end
 end
 
-local function RoundIcon(texture, atlas, fallback)
+local function RoundIcon(texture, atlas, fallback, mirror)
 	if not texture then
 		return;
 	end
-	if not SetAtlasIf(texture, atlas) and fallback then
-		texture:SetTexture(fallback);
+	if not SetAtlasIf(texture, atlas) then
+		if fallback then
+			texture:SetTexture(fallback);
+		end
+		return;
+	end
+	-- the right column looks to the middle (retail): the atlas mirrored
+	if mirror then
+		local info = C_Texture.GetAtlasInfo(atlas);
+		local left, right = info.leftTexCoord or info.left, info.rightTexCoord or info.right;
+		local top, bottom = info.topTexCoord or info.top, info.bottomTexCoord or info.bottom;
+		if left and right and top and bottom then
+			texture:SetTexCoord(right, left, top, bottom);
+		end
 	end
 end
 
@@ -111,11 +137,12 @@ function CR.LayoutRaces(...)
 		if button then
 			StyleIconButton(button, RACE_SIZE);
 			local atlas = RaceAtlas(file, sex);
-			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas);
-			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas);
 			local _, faction = GetFactionForRace(index);
+			local horde = faction == "Horde";
+			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas, nil, horde);
+			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas, nil, horde);
 			button:ClearAllPoints();
-			if faction == "Horde" then
+			if horde then
 				button:SetPoint("TOPRIGHT", CharacterCreateFrame, "TOPRIGHT", -68, -136 - horde * RACE_SPACING);
 				horde = horde + 1;
 			else
@@ -203,6 +230,7 @@ function CR.Setup()
 	-- faction crests over the race columns
 	local function Crest(atlas, point, x)
 		local crest = frame:CreateTexture(nil, "ARTWORK");
+		CR[point == "LEFT" and "AllianceCrest" or "HordeCrest"] = crest;
 		crest:SetWidth(76);
 		crest:SetHeight(76);
 		crest:SetPoint("TOP" .. point, frame, "TOP" .. point, x, -40);
@@ -231,7 +259,7 @@ function CR.Setup()
 			if previous then
 				row:SetPoint("TOP", previous, "BOTTOM", 0, -6);
 			else
-				row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -170, -150);
+				row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -120, -220);
 			end
 			previous = row;
 		end
@@ -271,6 +299,65 @@ function CR.Setup()
 end
 
 ---------------------------------------------------------------------------
+-- two stages (retail): 1 - race / class / gender, 2 - the appearance and the name only
+---------------------------------------------------------------------------
+local function SetShownList(list, shown)
+	for _, region in ipairs(list) do
+		if region then
+			if shown then
+				region:Show();
+			else
+				region:Hide();
+			end
+		end
+	end
+end
+
+function CR.StageFrames()
+	local first, second = {}, {};
+	for i = 1, MAX_RACES do
+		local button = _G["CharacterCreateRaceButton" .. i];
+		if button and (CharacterCreate.numRaces or 0) >= i then
+			table.insert(first, button);
+		end
+	end
+	for i = 1, MAX_CLASSES_PER_RACE do
+		local button = _G["CharacterCreateClassButton" .. i];
+		if button and (CharacterCreate.numClasses or 0) >= i then
+			table.insert(first, button);
+		end
+	end
+	for _, region in ipairs({ CharacterCreateGenderButtonMale, CharacterCreateGenderButtonFemale, CR.AllianceCrest, CR.HordeCrest }) do
+		table.insert(first, region);
+	end
+	for i = 1, NUM_CHAR_CUSTOMIZATIONS do
+		table.insert(second, _G["CharacterCustomizationButtonFrame" .. i]);
+	end
+	for _, region in ipairs({ CharCreateRandomizeButton, CharacterCreateNameEdit }) do
+		table.insert(second, region);
+	end
+	return first, second;
+end
+
+function CR.SetStage(stage)
+	CR.stage = stage;
+	local first, second = CR.StageFrames();
+	SetShownList(first, stage == 1);
+	SetShownList(second, stage == 2);
+	if CharacterCreateRandomName then
+		if stage == 2 and CharacterCreateRandomName.crShown then
+			CharacterCreateRandomName:Show();
+		else
+			CharacterCreateRandomName:Hide();
+		end
+	end
+	CharCreateOkayButton:SetText(stage == 1 and (CUSTOMIZE or "Настроить") or (CHARACTER_CREATE_ACCEPT or ACCEPT));
+	if stage == 2 and CharacterCreateNameEdit then
+		CharacterCreateNameEdit:SetFocus();
+	end
+end
+
+---------------------------------------------------------------------------
 -- hooks into the 3.3.5 flow (wrapped by hand: the XML calls these by name)
 ---------------------------------------------------------------------------
 local function After(name, func)
@@ -285,6 +372,29 @@ local function After(name, func)
 	end
 end
 
-After("CharacterCreate_OnShow", function() CR.Setup(); end);
+After("CharacterCreate_OnShow", function()
+	CR.Setup();
+	if CharacterCreateRandomName then
+		CharacterCreateRandomName.crShown = CharacterCreateRandomName:IsShown();
+	end
+	CR.SetStage(1);
+end);
+
+-- Okay / Back by the stage: Okay on the first one goes to the appearance, Back on the second one comes back
+local okay, back = CharacterCreate_Okay, CharacterCreate_Back;
+CharacterCreate_Okay = function(...)
+	if CR.stage == 1 then
+		CR.SetStage(2);
+		return;
+	end
+	return okay(...);
+end;
+CharacterCreate_Back = function(...)
+	if CR.stage == 2 then
+		CR.SetStage(1);
+		return;
+	end
+	return back(...);
+end;
 After("CharacterCreateEnumerateRaces", function(...) CR.Setup(); CR.LayoutRaces(...); end);
 After("CharacterCreateEnumerateClasses", function(...) CR.Setup(); CR.LayoutClasses(...); end);
