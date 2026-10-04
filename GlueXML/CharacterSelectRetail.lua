@@ -448,3 +448,6 @@ end);
 After("UpdateCharacterSelection", function()
 	RS.UpdateSelection();
 end);
+
+-- retail has no blue Death Knight buttons: the 3.3.5 swap would put its old panel art over the red buttons
+CharacterSelect_DeathKnightSwap = function() end;

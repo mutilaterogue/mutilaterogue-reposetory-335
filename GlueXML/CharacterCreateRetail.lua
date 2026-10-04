@@ -67,28 +67,7 @@ local function AddRoundMask(button, textures, size)
 	end
 end
 
-local function StyleIconButton(button, size, small, ring)
-	if button.crStyled then
-		return;
-	end
-	button.crStyled = true;
-	local name = button:GetName();
-	button:SetWidth(size);
-	button:SetHeight(size);
-	Hide(name .. "Shadow");
-	Hide(name .. "BevelEdge");
-	Hide(name .. "Text");
-	local normal, pushed = _G[name .. "NormalTexture"], _G[name .. "PushedTexture"];
-	for _, texture in ipairs({ normal or false, pushed or false }) do
-		if texture then
-			texture:ClearAllPoints();
-			texture:SetPoint("CENTER");
-			texture:SetWidth(size - 8);
-			texture:SetHeight(size - 8);
-		end
-	end
-	AddRoundMask(button, { normal or false, pushed or false }, size - 12);
-
+local function AddRings(button, size, ring)
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
 	button.CRRing:SetPoint("CENTER");
@@ -116,6 +95,31 @@ local function StyleIconButton(button, size, small, ring)
 			button.CRSelect:Hide();
 		end
 	end);
+end
+
+local function StyleIconButton(button, size, small, ring)
+	if button.crStyled then
+		return;
+	end
+	button.crStyled = true;
+	local name = button:GetName();
+	button:SetWidth(size);
+	button:SetHeight(size);
+	Hide(name .. "Shadow");
+	Hide(name .. "BevelEdge");
+	Hide(name .. "Text");
+	local normal, pushed = _G[name .. "NormalTexture"], _G[name .. "PushedTexture"];
+	for _, texture in ipairs({ normal or false, pushed or false }) do
+		if texture then
+			texture:ClearAllPoints();
+			texture:SetPoint("CENTER");
+			texture:SetWidth(size - 8);
+			texture:SetHeight(size - 8);
+		end
+	end
+	AddRoundMask(button, { normal or false, pushed or false }, size - 12);
+
+	AddRings(button, size, ring);
 	local highlight = button:GetHighlightTexture();
 	if highlight then
 		highlight:SetAlpha(0);
@@ -351,7 +355,12 @@ function CR.Setup()
 				checked:SetAllPoints(button);
 				checked:SetBlendMode("BLEND");
 			end
-			AddRoundMask(button, { _G[name .. "NormalTexture"] or false, _G[name .. "PushedTexture"] or false, checked or false }, 52);
+			AddRoundMask(button, { _G[name .. "NormalTexture"] or false, _G[name .. "PushedTexture"] or false, checked or false }, 46);
+			-- the rings of the other icon buttons; the gold symbol stays the chosen one's art
+			AddRings(button, 52);
+			if checked then
+				checked:SetAlpha(1);
+			end
 			local highlight = button:GetHighlightTexture();
 			if highlight then
 				highlight:SetAlpha(0);
@@ -570,3 +579,6 @@ CharacterCreate_Back = function(...)
 end;
 After("CharacterCreateEnumerateRaces", function(...) CR.Setup(); CR.LayoutRaces(...); end);
 After("CharacterCreateEnumerateClasses", function(...) CR.Setup(); CR.LayoutClasses(...); end);
+
+-- retail has no blue Death Knight buttons: the 3.3.5 swap would put its old panel art over the red buttons
+CharacterCreate_DeathKnightSwap = function() end;
