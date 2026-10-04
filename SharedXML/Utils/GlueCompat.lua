@@ -36,3 +36,20 @@ Enum = Enum or {};
 Enum.LFGRole = Enum.LFGRole or { Tank = 0, Healer = 1, Damage = 2 };
 Constants = Constants or {};
 Constants.LFG_ROLEConstants = Constants.LFG_ROLEConstants or { LFG_ROLE_NO_ROLE = -1 };
+
+-- ThreeSliceButtonTemplate (SharedXML\ThreeSliceButton) needs it: FrameXML\UIPanelTemplates.lua is not on the login screen
+if not ButtonControllerMixin then
+	ButtonControllerMixin = {};
+
+	function ButtonControllerMixin:OnLoad()
+		if self:GetParent().InitButton then
+			self:GetParent():InitButton();
+		end
+	end
+
+	function ButtonControllerMixin:OnShow()
+		if self:GetParent().UpdateButton then
+			self:GetParent():UpdateButton();
+		end
+	end
+end

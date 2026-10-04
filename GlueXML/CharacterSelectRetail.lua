@@ -324,8 +324,8 @@ function RS.Setup()
 				texture:SetAlpha(0);
 			end
 		end
-		if button.Glow then
-			button.Glow:SetAlpha(0.25);
+		if button.HighlightTex then
+			button.HighlightTex:SetAlpha(0.25);
 		end
 		local text = button:GetFontString();
 		if text then
@@ -341,12 +341,6 @@ function RS.Setup()
 	end
 	RS.NavBar = bar;
 
-	-- the red retail buttons (GlueButtons.lua) after their new sizes
-	if GlueRetailButton_Update then
-		for _, button in ipairs({ CharSelectEnterWorldButton, CharacterSelectBackButton, CharacterSelectDeleteButton, create }) do
-			GlueRetailButton_Update(button);
-		end
-	end
 end
 
 ---------------------------------------------------------------------------
