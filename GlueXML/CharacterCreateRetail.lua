@@ -49,6 +49,23 @@ end
 ---------------------------------------------------------------------------
 -- icon buttons: retail art over the 3.3.5 check buttons
 ---------------------------------------------------------------------------
+-- round icons (retail masks them): the DLL mask textures (XMLExt.lua)
+local function AddRoundMask(button, textures, size)
+	if not (button.CreateMaskTexture and TextureAddMask and TextureSetIsMask) then
+		return;
+	end
+	local mask = button:CreateMaskTexture();
+	mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
+	mask:SetPoint("CENTER");
+	mask:SetWidth(size);
+	mask:SetHeight(size);
+	for _, texture in ipairs(textures) do
+		if texture then
+			texture:AddMaskTexture(mask);
+		end
+	end
+end
+
 local function StyleIconButton(button, size, small, ring)
 	if button.crStyled then
 		return;
@@ -69,40 +86,13 @@ local function StyleIconButton(button, size, small, ring)
 			texture:SetHeight(size - 6);
 		end
 	end
-	-- round icons (retail masks them): the DLL mask textures (FrameXML\MaskTexture.lua) if there
-	if not (button.CreateMaskTexture and TextureAddMask and TextureSetIsMask) and not CR.maskWarned then
-		CR.maskWarned = true;
-		geterrorhandler()(("CharacterCreateRetail: no masks (CreateMaskTexture=%s TextureAddMask=%s TextureSetIsMask=%s)")
-			:format(tostring(button.CreateMaskTexture ~= nil), tostring(TextureAddMask ~= nil), tostring(TextureSetIsMask ~= nil)));
-	end
-	if button.CreateMaskTexture and TextureAddMask and TextureSetIsMask then
-		-- a mask is never drawn, so nothing loads its file on the login screen (in the game the portraits do):
-		-- one almost invisible pixel of it keeps it loaded
-		if not CR.maskPreload then
-			CR.maskPreload = CharacterCreate:CreateTexture(nil, "BACKGROUND");
-			CR.maskPreload:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
-			CR.maskPreload:SetWidth(1);
-			CR.maskPreload:SetHeight(1);
-			CR.maskPreload:SetPoint("BOTTOMLEFT");
-			CR.maskPreload:SetAlpha(0.02);
-		end
-		local mask = button:CreateMaskTexture();
-		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
-		mask:SetPoint("CENTER");
-		mask:SetWidth(size - 6);
-		mask:SetHeight(size - 6);
-		for _, texture in ipairs({ normal or false, pushed or false }) do
-			if texture then
-				texture:AddMaskTexture(mask);
-			end
-		end
-	end
+	AddRoundMask(button, { normal or false, pushed or false }, size - 6);
 
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
 	button.CRRing:SetPoint("CENTER");
-	button.CRRing:SetWidth(size + 8);
-	button.CRRing:SetHeight(size + 8);
+	button.CRRing:SetWidth(size * 1.45);
+	button.CRRing:SetHeight(size * 1.45);
 	SetAtlasIf(button.CRRing, ring or "charactercreate-ring-metaldark");
 	local checked = button:GetCheckedTexture();
 	if checked and SetAtlasIf(checked, small and "charactercreate-ring-select-small" or "charactercreate-ring-select") then
@@ -296,8 +286,9 @@ function CR.Setup()
 	top:SetHeight(160);
 	local bottom = Vignette("charactercreate-vignette-bottom", "BOTTOMLEFT", "BOTTOMLEFT", 0, "BOTTOMRIGHT", "BOTTOMRIGHT", 0);
 	bottom:SetHeight(220);
+	--[[ the side vignette covers the whole screen: darker everywhere, off
 	local sides = Vignette(HasAtlas("charactercreate-vignette-sides-widescreen") and "charactercreate-vignette-sides-widescreen" or "charactercreate-vignette-sides",
-		"TOPLEFT", "TOPLEFT", 0, "BOTTOMRIGHT", "BOTTOMRIGHT", 0);
+		"TOPLEFT", "TOPLEFT", 0, "BOTTOMRIGHT", "BOTTOMRIGHT", 0); ]]
 
 	-- faction crests over the race columns
 	local function Crest(atlas, point, x, text)
@@ -345,6 +336,7 @@ function CR.Setup()
 				checked:SetAllPoints(button);
 				checked:SetBlendMode("BLEND");
 			end
+			AddRoundMask(button, { _G[name .. "NormalTexture"] or false, _G[name .. "PushedTexture"] or false, checked or false }, 52);
 			local highlight = button:GetHighlightTexture();
 			if highlight then
 				highlight:SetAlpha(0);
