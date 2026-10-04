@@ -46,6 +46,7 @@ AceSerializer.lua
 LibDeflate.lua
 AccountLogin.xml
 CharacterSelect.xml
+CharacterSelectRetail.lua
 CharacterCreate.xml
 PatchDownload.xml
 MovieFrame.xml
