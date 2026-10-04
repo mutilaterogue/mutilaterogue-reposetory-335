@@ -70,6 +70,11 @@ local function StyleIconButton(button, size, small)
 		end
 	end
 	-- round icons (retail masks them): the DLL mask textures (FrameXML\MaskTexture.lua) if there
+	if not (button.CreateMaskTexture and TextureAddMask and TextureSetIsMask) and not CR.maskWarned then
+		CR.maskWarned = true;
+		geterrorhandler()(("CharacterCreateRetail: no masks (CreateMaskTexture=%s TextureAddMask=%s TextureSetIsMask=%s)")
+			:format(tostring(button.CreateMaskTexture ~= nil), tostring(TextureAddMask ~= nil), tostring(TextureSetIsMask ~= nil)));
+	end
 	if button.CreateMaskTexture and TextureAddMask and TextureSetIsMask then
 		local mask = button:CreateMaskTexture();
 		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
