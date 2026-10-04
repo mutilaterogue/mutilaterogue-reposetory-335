@@ -162,10 +162,61 @@ function DamageMeterEntryMixin:OnClick()
 	window:Refresh();
 end
 
+local function Amount(value)
+	return DamageMeter_FormatAmount(value or 0);
+end
+
+-- retail spell tooltip: hits, average, crits, the biggest hit, the share, overkill / overheal; a death: its recap
+local function ShowSpellTooltip(self, data)
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:AddLine(data.name or UNKNOWN, 1, 1, 1);
+
+	if data.death then
+		local deathTime = data.death.time or GetTime();
+		for _, event in ipairs(data.death.events or {}) do
+			local seconds = string.format("%.1f", (event.time or deathTime) - deathTime);
+			local text = (event.amount < 0 and "-" or "+") .. Amount(math.abs(event.amount));
+			local r, g, b = 1, 0.2, 0.2;
+			if event.amount > 0 then
+				r, g, b = 0.2, 1, 0.2;
+			end
+			GameTooltip:AddDoubleLine(seconds .. "  " .. event.spell .. " (" .. event.source .. ")", text, 1, 1, 1, r, g, b);
+		end
+		GameTooltip:Show();
+		return;
+	end
+
+	local hits = data.hitCount or 0;
+	local Line = function(label, value)
+		GameTooltip:AddDoubleLine(label, value, 1, 0.82, 0, 1, 1, 1);
+	end
+	Line("Всего", Amount(data.totalAmount) .. string.format(" (%.1f%%)", data.percent or 0));
+	if data.amountPerSecond then
+		Line("В секунду", Amount(data.amountPerSecond));
+	end
+	if hits > 0 then
+		Line("Срабатываний", hits);
+		Line("В среднем", Amount((data.totalAmount or 0) / hits));
+		Line("Наибольшее", Amount(data.maxHit));
+		Line("Критических", string.format("%d (%.1f%%)", data.critCount or 0, (data.critCount or 0) / hits * 100));
+	end
+	if (data.overAmount or 0) > 0 then
+		local label = data.meterType == Enum.DamageMeterType.HealingDone and "Избыточное исцеление" or "Избыточный урон";
+		Line(label, Amount(data.overAmount));
+	end
+	GameTooltip:Show();
+end
+
 function DamageMeterEntryMixin:OnEnter()
 	self.Highlight:Show();
+	local data = self.data;
+	-- a spell line (no source to open): its details
+	if data and not (data.sourceGUID or data.sourceCreatureID) and (data.hitCount or data.death) then
+		ShowSpellTooltip(self, data);
+	end
 end
 
 function DamageMeterEntryMixin:OnLeave()
 	self.Highlight:Hide();
+	GameTooltip:Hide();
 end
