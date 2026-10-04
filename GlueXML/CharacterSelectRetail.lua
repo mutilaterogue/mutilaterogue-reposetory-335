@@ -139,13 +139,24 @@ local function CreateCard(parent, index)
 	card.Background:SetAllPoints();
 	SetAtlasOr(card.Background, "glues-characterselect-card-singles", 0, 0, 0, 0.6);
 	card.Hover = card:CreateTexture(nil, "BORDER");
-	card.Hover:SetAllPoints();
 	SetAtlasOr(card.Hover, "glues-characterselect-card-singles-hover", 1, 1, 1, 0.08);
 	card.Hover:Hide();
 	card.Selected = card:CreateTexture(nil, "ARTWORK");
-	card.Selected:SetAllPoints();
 	SetAtlasOr(card.Selected, "glues-characterselect-card-selected", 1, 0.82, 0, 0.15);
 	card.Selected:Hide();
+	-- hover / selected atlases carry their glow around the card: sized by their atlas size against the card's
+	local base = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("glues-characterselect-card-singles");
+	for _, texture in ipairs({ card.Hover, card.Selected }) do
+		local info = base and C_Texture.GetAtlasInfo(texture == card.Hover and "glues-characterselect-card-singles-hover" or "glues-characterselect-card-selected");
+		texture:ClearAllPoints();
+		if info and base.width > 0 and base.height > 0 then
+			texture:SetPoint("CENTER");
+			texture:SetWidth(info.width * CARD_WIDTH / base.width);
+			texture:SetHeight(info.height * CARD_HEIGHT / base.height);
+		else
+			texture:SetAllPoints();
+		end
+	end
 
 	card.Faction = card:CreateTexture(nil, "OVERLAY");
 	card.Faction:SetPoint("RIGHT", -16, 0);
@@ -295,7 +306,8 @@ function RS.Setup()
 	end
 	local header = CreateFrame("Frame", nil, list);
 	header:SetPoint("TOP", 0, -14);
-	header:SetWidth(CARD_WIDTH);
+	header:SetPoint("LEFT", list, "LEFT", 14, 0);
+	header:SetPoint("RIGHT", list, "RIGHT", -14, 0);
 	header:SetHeight(34);
 	header.Background = header:CreateTexture(nil, "BACKGROUND");
 	header.Background:SetAllPoints();
