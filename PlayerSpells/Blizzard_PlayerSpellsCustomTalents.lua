@@ -367,6 +367,81 @@ local function CreateChoiceDialog(frame)
 	return dialog;
 end
 
+-- the nodes of a hero tree, gray, with their edges: what the player chooses (no clicks)
+local function PreviewTree(preview, treeId)
+	local list, minCol, maxCol = {}, nil, nil;
+	for _, node in pairs(CT.nodes) do
+		if node.tree == treeId then
+			table.insert(list, node);
+			minCol = math.min(minCol or node.col, node.col);
+			maxCol = math.max(maxCol or node.col, node.col);
+		end
+	end
+	table.sort(list, function(a, b) return a.id < b.id; end);
+	minCol, maxCol = minCol or 0, maxCol or 0;
+	local spacing = preview.spacing;
+	local offsetX = (preview.Content:GetWidth() - (maxCol - minCol) * spacing) / 2 - minCol * spacing;
+	local centers = {};
+	preview.lineCount = 0;
+	for i, node in ipairs(list) do
+		local button = preview.buttons[i];
+		if not button then
+			button = CreateFrame("Frame", nil, preview.Content);
+			button:SetWidth(NODE_SIZE);
+			button:SetHeight(NODE_SIZE);
+			button:SetFrameLevel(preview.Content:GetFrameLevel() + 2);
+			button.Icon = button:CreateTexture(nil, "ARTWORK");
+			button.Icon:SetPoint("CENTER");
+			button.Icon:SetWidth(ICON_SIZE);
+			button.Icon:SetHeight(ICON_SIZE);
+			button.Ring = button:CreateTexture(nil, "OVERLAY");
+			button.Ring:SetAllPoints();
+			button:EnableMouse(true);
+			button:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("spell:" .. self.spellID);
+				GameTooltip:Show();
+			end);
+			button:SetScript("OnLeave", GameTooltip_Hide);
+			preview.buttons[i] = button;
+		end
+		local x = offsetX + node.col * spacing;
+		local y = preview.top + node.row * spacing;
+		centers[node.id] = { x = x, y = y };
+		button:ClearAllPoints();
+		button:SetPoint("CENTER", preview.Content, "TOPLEFT", x, -y);
+		button.spellID = node.spells[1] or 0;
+		local _, _, icon = GetSpellInfo(button.spellID);
+		local shape = node.maxRank == 1 and "square" or "circle";
+		if shape == "circle" and icon then
+			SetPortraitToTexture(button.Icon, icon);
+			button.Icon:SetTexCoord(0, 1, 0, 1);
+		else
+			button.Icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
+			button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
+		end
+		-- the root comes with the tree: yellow, the rest gray
+		local root = node.row == 0;
+		button.Icon:SetDesaturated(not root);
+		button.Ring:SetAtlas(ATLAS[shape][root and "yellow" or "gray"]);
+		button:Show();
+	end
+	for i = #list + 1, #preview.buttons do
+		preview.buttons[i]:Hide();
+	end
+	for _, node in ipairs(list) do
+		for _, required in ipairs(node.requires) do
+			local from, to = centers[required], centers[node.id];
+			if from and to then
+				DrawLine(preview, from.x, from.y, to.x, to.y, ATLAS.lineLocked);
+			end
+		end
+	end
+	for i = preview.lineCount + 1, #preview.lines do
+		preview.lines[i]:Hide();
+	end
+end
+
 local function ShowChoiceDialog(frame)
 	local dialog = frame.HeroChoiceDialog;
 	local trees = TreesOfKind(1);
@@ -378,7 +453,7 @@ local function ShowChoiceDialog(frame)
 		if not card then
 			card = CreateFrame("Frame", nil, dialog);
 			card:SetWidth(cardWidth);
-			card:SetHeight(520);
+			card:SetHeight(620);
 			card.Background = card:CreateTexture(nil, "BACKGROUND");
 			card.Background:SetPoint("TOP", 0, -150);
 			card.Background:SetWidth(284);
@@ -397,14 +472,17 @@ local function ShowChoiceDialog(frame)
 			SetAtlasIfExists(card.Border, "talents-heroclass-ring-mainpane");
 			card.Name = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 			card.Name:SetPoint("TOP", 0, -6);
+			-- the tree preview on the backplate (retail selection dialog), the description and the button under it
+			card.Preview = { Content = CreateFrame("Frame", nil, card), buttons = {}, lines = {}, lineCount = 0, spacing = 52, top = 46 };
+			card.Preview.Content:SetAllPoints(card.Background);
 			card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
-			card.Description:SetPoint("TOPLEFT", card.Background, "TOPLEFT", 24, -40);
-			card.Description:SetPoint("TOPRIGHT", card.Background, "TOPRIGHT", -24, -40);
+			card.Description:SetPoint("TOPLEFT", card.Background, "BOTTOMLEFT", 10, -12);
+			card.Description:SetPoint("TOPRIGHT", card.Background, "BOTTOMRIGHT", -10, -12);
 			card.Description:SetJustifyH("CENTER");
 			card.Button = CreateFrame("Button", nil, card, "UIPanelButtonTemplate");
 			card.Button:SetWidth(164);
 			card.Button:SetHeight(22);
-			card.Button:SetPoint("BOTTOM", card.Background, "BOTTOM", 0, 24);
+			card.Button:SetPoint("TOP", card.Description, "BOTTOM", 0, -12);
 			dialog.cards[i] = card;
 		end
 		card:ClearAllPoints();
@@ -412,6 +490,7 @@ local function ShowChoiceDialog(frame)
 		RoundIcon(card.Icon, tree.icon);
 		card.Name:SetText(string.upper(tree.name));
 		card.Description:SetText(tree.description);
+		PreviewTree(card.Preview, tree.id);
 		if UnitLevel("player") < tree.minLevel then
 			card.Button:SetText(string.format(UNIT_LEVEL_TEMPLATE or "Level %d", tree.minLevel));
 			card.Button:Disable();
