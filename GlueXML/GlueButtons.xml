@@ -42,36 +42,171 @@
 	<Texture name="GluePanelButtonHighlightTextureBlue" file="Interface\Glues\Common\Glue-Panel-Button-Highlight-Blue" alphaMode="ADD" virtual="true">
 		<TexCoords left="0" right="0.625" top="0" bottom="0.6875"/>
 	</Texture>
-	<!-- retail 12.x Blizzard_GlueXMLBase GlueButtons.xml: the glue buttons are the red three slice buttons
-	     (SharedXML\ThreeSliceButton, loaded before this file by GlueXML.toc) -->
-	<Button name="GlueButtonTemplate" inherits="BigRedThreeSliceButtonTemplate" virtual="true">
+	<!-- retail (12.x Blizzard_GlueXMLBase GlueButtons.xml): the glue buttons are the red three slice 128-RedButton
+	     (Left / Center / Right atlases, -Pressed / -Disabled, -Highlight); the layout in GlueButtons.lua -->
+	<Button name="GlueButtonTemplate" virtual="true">
 		<Size x="170" y="45"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Left"><Anchors><Anchor point="TOPLEFT"/><Anchor point="BOTTOMLEFT"/></Anchors></Texture>
+				<Texture parentKey="Right"><Anchors><Anchor point="TOPRIGHT"/><Anchor point="BOTTOMRIGHT"/></Anchors></Texture>
+				<Texture parentKey="Center"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Glow" setAllPoints="true" alphaMode="ADD"/>
+			</Layer>
+		</Layers>
+		<ButtonText>
+			<Anchors>
+				<Anchor point="CENTER">
+					<Offset>
+						<AbsDimension x="0" y="1"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+		</ButtonText>
 		<NormalFont style="GlueFontNormal"/>
 		<HighlightFont style="GlueFontHighlight"/>
 		<DisabledFont style="GlueFontDisable"/>
+		<PushedTextOffset x="-2" y="-1"/>
+		<Scripts>
+			<OnSizeChanged>GlueRetailButton_Update(self);</OnSizeChanged>
+			<OnEnable>GlueRetailButton_Update(self);</OnEnable>
+			<OnDisable>GlueRetailButton_Update(self);</OnDisable>
+			<OnMouseDown>GlueRetailButton_Update(self, true);</OnMouseDown>
+			<OnMouseUp>GlueRetailButton_Update(self);</OnMouseUp>
+		</Scripts>
 	</Button>
-	<Button name="GlueButtonTemplateBlue" inherits="BigRedThreeSliceButtonTemplate" virtual="true">
+	<Button name="GlueButtonTemplateBlue" virtual="true">
 		<Size x="170" y="45"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Left"><Anchors><Anchor point="TOPLEFT"/><Anchor point="BOTTOMLEFT"/></Anchors></Texture>
+				<Texture parentKey="Right"><Anchors><Anchor point="TOPRIGHT"/><Anchor point="BOTTOMRIGHT"/></Anchors></Texture>
+				<Texture parentKey="Center"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Glow" setAllPoints="true" alphaMode="ADD"/>
+			</Layer>
+		</Layers>
+		<ButtonText>
+			<Anchors>
+				<Anchor point="CENTER">
+					<Offset>
+						<AbsDimension x="0" y="1"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+		</ButtonText>
 		<NormalFont style="GlueFontNormal"/>
 		<HighlightFont style="GlueFontHighlight"/>
 		<DisabledFont style="GlueFontDisable"/>
+		<PushedTextOffset x="-2" y="-1"/>
+		<Scripts>
+			<OnSizeChanged>GlueRetailButton_Update(self);</OnSizeChanged>
+			<OnEnable>GlueRetailButton_Update(self);</OnEnable>
+			<OnDisable>GlueRetailButton_Update(self);</OnDisable>
+			<OnMouseDown>GlueRetailButton_Update(self, true);</OnMouseDown>
+			<OnMouseUp>GlueRetailButton_Update(self);</OnMouseUp>
+		</Scripts>
 	</Button>
-	<Button name="GlueButtonSmallTemplate" inherits="BigRedThreeSliceButtonTemplate" virtual="true">
+	<Button name="GlueButtonSmallTemplate" virtual="true">
 		<Size x="150" y="38"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Left"><Anchors><Anchor point="TOPLEFT"/><Anchor point="BOTTOMLEFT"/></Anchors></Texture>
+				<Texture parentKey="Right"><Anchors><Anchor point="TOPRIGHT"/><Anchor point="BOTTOMRIGHT"/></Anchors></Texture>
+				<Texture parentKey="Center"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Glow" setAllPoints="true" alphaMode="ADD"/>
+			</Layer>
+		</Layers>
+		<ButtonText>
+			<Anchors>
+				<Anchor point="CENTER">
+					<Offset>
+						<AbsDimension x="0" y="1"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+		</ButtonText>
 		<NormalFont style="GlueFontNormalSmall"/>
 		<HighlightFont style="GlueFontHighlightSmall"/>
 		<DisabledFont style="GlueFontDisableSmall"/>
+		<PushedTextOffset x="-2" y="-1"/>
+		<Scripts>
+			<OnSizeChanged>GlueRetailButton_Update(self);</OnSizeChanged>
+			<OnEnable>GlueRetailButton_Update(self);</OnEnable>
+			<OnDisable>GlueRetailButton_Update(self);</OnDisable>
+			<OnMouseDown>GlueRetailButton_Update(self, true);</OnMouseDown>
+			<OnMouseUp>GlueRetailButton_Update(self);</OnMouseUp>
+		</Scripts>
 	</Button>
-	<Button name="GlueButtonSmallTemplateBlue" inherits="BigRedThreeSliceButtonTemplate" virtual="true">
+	<Button name="GlueButtonSmallTemplateBlue" virtual="true">
 		<Size x="150" y="38"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Left"><Anchors><Anchor point="TOPLEFT"/><Anchor point="BOTTOMLEFT"/></Anchors></Texture>
+				<Texture parentKey="Right"><Anchors><Anchor point="TOPRIGHT"/><Anchor point="BOTTOMRIGHT"/></Anchors></Texture>
+				<Texture parentKey="Center"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Glow" setAllPoints="true" alphaMode="ADD"/>
+			</Layer>
+		</Layers>
+		<ButtonText>
+			<Anchors>
+				<Anchor point="CENTER">
+					<Offset>
+						<AbsDimension x="0" y="1"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+		</ButtonText>
 		<NormalFont style="GlueFontNormalSmall"/>
 		<HighlightFont style="GlueFontHighlightSmall"/>
 		<DisabledFont style="GlueFontDisableSmall"/>
+		<PushedTextOffset x="-2" y="-1"/>
+		<Scripts>
+			<OnSizeChanged>GlueRetailButton_Update(self);</OnSizeChanged>
+			<OnEnable>GlueRetailButton_Update(self);</OnEnable>
+			<OnDisable>GlueRetailButton_Update(self);</OnDisable>
+			<OnMouseDown>GlueRetailButton_Update(self, true);</OnMouseDown>
+			<OnMouseUp>GlueRetailButton_Update(self);</OnMouseUp>
+		</Scripts>
 	</Button>
-	<Button name="GlueButtonBigTemplate" inherits="BigRedThreeSliceButtonTemplate" virtual="true">
+	<Button name="GlueButtonBigTemplate" virtual="true">
 		<Size x="250" y="66"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Left"><Anchors><Anchor point="TOPLEFT"/><Anchor point="BOTTOMLEFT"/></Anchors></Texture>
+				<Texture parentKey="Right"><Anchors><Anchor point="TOPRIGHT"/><Anchor point="BOTTOMRIGHT"/></Anchors></Texture>
+				<Texture parentKey="Center"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Glow" setAllPoints="true" alphaMode="ADD"/>
+			</Layer>
+		</Layers>
+		<ButtonText>
+			<Anchors>
+				<Anchor point="CENTER">
+					<Offset>
+						<AbsDimension x="0" y="1"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+		</ButtonText>
 		<NormalFont style="GlueFontNormalLarge"/>
 		<HighlightFont style="GlueFontHighlightLarge"/>
 		<DisabledFont style="GlueFontDisableLarge"/>
+		<PushedTextOffset x="-2" y="-1"/>
+		<Scripts>
+			<OnSizeChanged>GlueRetailButton_Update(self);</OnSizeChanged>
+			<OnEnable>GlueRetailButton_Update(self);</OnEnable>
+			<OnDisable>GlueRetailButton_Update(self);</OnDisable>
+			<OnMouseDown>GlueRetailButton_Update(self, true);</OnMouseDown>
+			<OnMouseUp>GlueRetailButton_Update(self);</OnMouseUp>
+		</Scripts>
 	</Button>
 </Ui>

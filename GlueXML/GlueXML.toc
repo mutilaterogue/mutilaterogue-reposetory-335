@@ -34,7 +34,6 @@ GlueLocalization.xml
 
 GlueBasicControls.xml
 GlueParent.xml
-..\SharedXML\ThreeSliceButton\ThreeSliceButtonTemplate.xml
 GlueButtons.xml
 GlueTemplates.xml
 GlueDialog.xml
