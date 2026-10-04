@@ -86,13 +86,13 @@ local function StyleIconButton(button, size, small, ring)
 			texture:SetHeight(size - 6);
 		end
 	end
-	AddRoundMask(button, { normal or false, pushed or false }, size - 6);
+	AddRoundMask(button, { normal or false, pushed or false }, size - 10);
 
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
 	button.CRRing:SetPoint("CENTER");
-	button.CRRing:SetWidth(size * 1.45);
-	button.CRRing:SetHeight(size * 1.45);
+	button.CRRing:SetWidth(size * 1.6);
+	button.CRRing:SetHeight(size * 1.6);
 	SetAtlasIf(button.CRRing, ring or "charactercreate-ring-metaldark");
 	local checked = button:GetCheckedTexture();
 	if checked and SetAtlasIf(checked, small and "charactercreate-ring-select-small" or "charactercreate-ring-select") then
@@ -302,6 +302,7 @@ function CR.Setup()
 		end
 		-- the faction name next to it (retail: ALLIANCE / HORDE)
 		local label = frame:CreateFontString(nil, "ARTWORK", "GlueFontNormal");
+		CR[point == "LEFT" and "AllianceLabel" or "HordeLabel"] = label;
 		label:SetText(text or "");
 		if point == "LEFT" then
 			label:SetPoint("LEFT", crest, "RIGHT", 4, 0);
@@ -464,7 +465,7 @@ function CR.StageFrames()
 			table.insert(first, button);
 		end
 	end
-	for _, region in ipairs({ CharacterCreateGenderButtonMale, CharacterCreateGenderButtonFemale, CR.AllianceCrest, CR.HordeCrest }) do
+	for _, region in ipairs({ CharacterCreateGenderButtonMale, CharacterCreateGenderButtonFemale, CR.AllianceCrest, CR.HordeCrest, CR.AllianceLabel or false, CR.HordeLabel or false }) do
 		table.insert(first, region);
 	end
 	for i = 1, NUM_CHAR_CUSTOMIZATIONS do

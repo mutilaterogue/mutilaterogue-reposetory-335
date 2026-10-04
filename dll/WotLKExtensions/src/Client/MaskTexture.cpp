@@ -231,9 +231,18 @@ namespace
     // ---------------- hooks ----------------
     int __fastcall TextureDrawHook(void* texture, void* /*edx*/, void* batch)
     {
-        if (s_isMask.count(texture))
-            return 0;
-        return reinterpret_cast<TextureDraw_t>(ADDR_TEXTURE_DRAW)(texture, batch);
+        if (!s_isMask.count(texture))
+            return reinterpret_cast<TextureDraw_t>(ADDR_TEXTURE_DRAW)(texture, batch);
+
+        // a mask is not drawn, but Draw is where its corner positions follow its rect: a moved, resized
+        // or re-shown mask would keep its old place and hide the textures it masks.
+        // The original runs (positions updated), then the item it added to the batch is dropped.
+        uint32_t& count = *At<uint32_t>(batch, BATCH_COUNT);
+        uint32_t before = count;
+        int result = reinterpret_cast<TextureDraw_t>(ADDR_TEXTURE_DRAW)(texture, batch);
+        if (count > before)
+            count = before;
+        return result;
     }
 
     void __cdecl UiShadersCreateHook()
