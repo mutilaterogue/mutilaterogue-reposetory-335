@@ -2348,6 +2348,14 @@ namespace
     }
 }
 
+// talents can't change once a keystone run started (countdown or running): spec_primary.cpp, talent_custom.cpp,
+// Player::s_talentsLockedHook (core/Player_talents_lock.patch)
+bool MythicPlus_TalentsLocked(Player const* player)
+{
+    Run* run = player ? FindRun(player->GetMap()) : nullptr;
+    return run && run->Level && (run->State == RUN_COUNTDOWN || run->State == RUN_ACTIVE);
+}
+
 // ---------------------------------------------------------------- Font of Power
 // ---------------------------------------------------------------- completion chest: personal loot
 // every player of the run opens it once and gets their own roll of gameobject_loot_template CHEST_ENTRY
@@ -2446,6 +2454,7 @@ public:
     void OnStartup() override
     {
         LoadData();
+        Player::s_talentsLockedHook = &MythicPlus_TalentsLocked;  // core/Player_talents_lock.patch
         CharacterDatabase.Execute("DELETE FROM item_mythic WHERE item_guid NOT IN (SELECT guid FROM item_instance)");
     }
 

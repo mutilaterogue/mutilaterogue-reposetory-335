@@ -41,6 +41,8 @@
 
 using namespace Trinity::ChatCommands;
 
+bool MythicPlus_TalentsLocked(Player const* player);  // mythic_plus.cpp
+
 namespace
 {
     struct Tree
@@ -347,7 +349,8 @@ namespace
         uint8 spec = player->GetActiveSpec();
         SpecState& state = State(player, spec);
 
-        bool ok = ClassTree(player, tree) && player->GetLevel() >= 10 && player->GetFreeTalentPoints() > 0;
+        bool ok = ClassTree(player, tree) && player->GetLevel() >= 10 && player->GetFreeTalentPoints() > 0
+            && !MythicPlus_TalentsLocked(player);
         if (ok && tree.Kind == 1)
             ok = state.Hero == tree.Id && player->GetLevel() >= tree.MinLevel;
         uint32 rank = RankOf(state, node);
@@ -385,7 +388,7 @@ namespace
             return;
         uint8 spec = player->GetActiveSpec();
         SpecState& state = State(player, spec);
-        if (state.Hero == treeId)
+        if (state.Hero == treeId || MythicPlus_TalentsLocked(player))
             return;
         if (state.Hero)
             RefundTree(player, spec, state.Hero);

@@ -13,13 +13,25 @@
 #include "DatabaseEnv.h"
 #include "Player.h"
 #include "SpellMgr.h"
+#include "SpellScript.h"
+#include "Chat.h"
 
 #include <cstdlib>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
+bool MythicPlus_TalentsLocked(Player const* player);  // mythic_plus.cpp
+
 namespace
 {
+    // the cast of a specialization change (retail: 2 s). 0 - the change is instant
+    constexpr uint32 SPEC_CHANGE_SPELL = 0;
+
+    char const* const MSG_TALENTS_LOCKED = "\xd0\x9d\xd0\xb5\xd0\xbb\xd1\x8c\xd0\xb7\xd1\x8f \xd0\xbc\xd0\xb5\xd0\xbd\xd1\x8f\xd1\x82\xd1\x8c \xd1\x82\xd0\xb0\xd0\xbb\xd0\xb0\xd0\xbd\xd1\x82\xd1\x8b \xd0\xb2\xd0\xbe \xd0\xb2\xd1\x80\xd0\xb5\xd0\xbc\xd1\x8f \xd1\x8d\xd0\xbf\xd0\xbe\xd1\x85\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd0\xbe\xd0\xb3\xd0\xbe \xd0\xba\xd0\xbb\xd1\x8e\xd1\x87\xd0\xb0.";
+
+    std::unordered_map<ObjectGuid::LowType, uint32> s_pending;   // the tab index waiting for the end of the cast
+
     // the tab id of the primary tree -> its index in the class tabs (1..3) by TalentTab.dbc OrderIndex, 0 = none
     uint32 PrimaryIndex(Player* player, uint8 spec)
     {
@@ -124,6 +136,14 @@ namespace
                     player->LearnSpell(mastery, false);
     }
 
+    void ApplySpec(Player* player, uint32 index)
+    {
+        ClearPrimary(player);
+        if (player->LearnPrimaryTalentSpecialization(uint8(index - 1)))
+            LearnMastery(player);
+        SendState(player);
+    }
+
     void HandleGet(Player* player, std::vector<std::string> const& /*args*/)
     {
         SendSpells(player);
@@ -142,10 +162,20 @@ namespace
             SendState(player);
             return;
         }
-        ClearPrimary(player);
-        if (player->LearnPrimaryTalentSpecialization(uint8(index - 1)))
-            LearnMastery(player);
-        SendState(player);
+        if (MythicPlus_TalentsLocked(player))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(MSG_TALENTS_LOCKED);
+            SendState(player);
+            return;
+        }
+        if (SPEC_CHANGE_SPELL)
+        {
+            // the change happens when the cast ends (spell_spec_change)
+            s_pending[player->GetGUID().GetCounter()] = index;
+            player->CastSpell(player, SPEC_CHANGE_SPELL, false);
+            return;
+        }
+        ApplySpec(player, index);
     }
 }
 
@@ -169,7 +199,41 @@ public:
     }
 };
 
+// the specialization change cast (SPEC_CHANGE_SPELL, spell_script_names 'spell_spec_change'): the change at its end
+class spell_spec_change : public SpellScript
+{
+    PrepareSpellScript(spell_spec_change);
+
+    SpellCastResult CheckCast()
+    {
+        Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr;
+        if (player && MythicPlus_TalentsLocked(player))
+            return SPELL_FAILED_DONT_REPORT;
+        return SPELL_CAST_OK;
+    }
+
+    void HandleAfterCast()
+    {
+        Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr;
+        if (!player)
+            return;
+        auto itr = s_pending.find(player->GetGUID().GetCounter());
+        if (itr == s_pending.end())
+            return;
+        uint32 index = itr->second;
+        s_pending.erase(itr);
+        ApplySpec(player, index);
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_spec_change::CheckCast);
+        AfterCast += SpellCastFn(spell_spec_change::HandleAfterCast);
+    }
+};
+
 void AddSC_spec_primary()
 {
+    RegisterSpellScript(spell_spec_change);
     new spec_primary_player();
 }

@@ -147,12 +147,13 @@ local function CreateSpecColumn(parent, index)
 	-- retail "Sample Abilities": the mastery and the primary spells of the tree (server: SPEC_SPELLS)
 	column.SampleAbilityText = column:CreateFontString(nil, "ARTWORK", Font("GameFontHighlightMed2", "GameFontHighlight"));
 	column.SampleAbilityText:SetPoint("BOTTOM", 0, 330);
-	column.SampleAbilityText:SetText(SAMPLE_ABILITIES or "");
+	column.SampleAbilityText:SetText(SAMPLE_ABILITIES or "Примеры способностей");
 	column.abilities = {};
 
 	column.ActivatedText = column:CreateFontString(nil, "ARTWORK", Font("GameFontNormalLarge2", "GameFontNormalLarge"));
 	column.ActivatedText:SetPoint("BOTTOM", 0, 97);
-	column.ActivatedText:SetText(SPEC_ACTIVE);
+	column.ActivatedText:SetText(SPEC_ACTIVE or "Активно");
+	column.ActivatedText:SetTextColor(0.1, 1, 0.1);
 
 	column.ActivateButton = CreateFrame("Button", nil, column, "UIPanelButtonTemplate");
 	column.ActivateButton:SetWidth(160);
