@@ -10,6 +10,15 @@ local RS = CharacterSelectRetail;
 
 local CARD_WIDTH, CARD_HEIGHT, CARD_SPACING = 300, 72, 4;
 
+-- the login screen widgets lack SetShown
+local function Show(region, shown)
+	if shown then
+		region:Show();
+	else
+		region:Hide();
+	end
+end
+
 local function HasAtlas(atlas)
 	return atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) ~= nil;
 end
@@ -133,7 +142,7 @@ function RS.UpdateSelection()
 	end
 	local selected = CharacterSelect.selectedIndex or 0;
 	for _, card in ipairs(RS.cards) do
-		card.Selected:SetShown(not card.create and card.index == selected);
+		Show(card.Selected, not card.create and card.index == selected);
 	end
 	-- the name plate over Enter World
 	local name, race, class, level, zone, sex, ghost = GetCharacterInfo(selected);
