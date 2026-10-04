@@ -10,8 +10,8 @@
 CharacterCreateRetail = {};
 local CR = CharacterCreateRetail;
 
-local RACE_SIZE, RACE_SPACING = 60, 78;
-local CLASS_SIZE, CLASS_SPACING = 54, 66;
+local RACE_SIZE, RACE_SPACING = 64, 82;
+local CLASS_SIZE, CLASS_SPACING = 64, 84;
 
 local function HasAtlas(atlas)
 	return atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) ~= nil;
@@ -49,7 +49,7 @@ end
 ---------------------------------------------------------------------------
 -- icon buttons: retail art over the 3.3.5 check buttons
 ---------------------------------------------------------------------------
-local function StyleIconButton(button, size, small)
+local function StyleIconButton(button, size, small, ring)
 	if button.crStyled then
 		return;
 	end
@@ -101,15 +101,15 @@ local function StyleIconButton(button, size, small)
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
 	button.CRRing:SetPoint("CENTER");
-	button.CRRing:SetWidth(size + 14);
-	button.CRRing:SetHeight(size + 14);
-	SetAtlasIf(button.CRRing, small and "charactercreate-ring-metallight-small" or "charactercreate-ring-metallight");
+	button.CRRing:SetWidth(size + 8);
+	button.CRRing:SetHeight(size + 8);
+	SetAtlasIf(button.CRRing, ring or "charactercreate-ring-metaldark");
 	local checked = button:GetCheckedTexture();
 	if checked and SetAtlasIf(checked, small and "charactercreate-ring-select-small" or "charactercreate-ring-select") then
 		checked:ClearAllPoints();
 		checked:SetPoint("CENTER");
-		checked:SetWidth(size + 22);
-		checked:SetHeight(size + 22);
+		checked:SetWidth(size + 16);
+		checked:SetHeight(size + 16);
 		checked:SetBlendMode("BLEND");
 	end
 	local highlight = button:GetHighlightTexture();
@@ -195,20 +195,22 @@ function CR.LayoutRaces(...)
 		local file = select(i + 1, ...);
 		local button = _G["CharacterCreateRaceButton" .. index];
 		if button then
-			StyleIconButton(button, RACE_SIZE);
-			local atlas = RaceAtlas(file, sex);
 			local _, faction = GetFactionForRace(index);
 			local isHorde = faction == "Horde";
+			local ring = isHorde and "charactercreate-ring-horde" or "charactercreate-ring-alliance";
+			StyleIconButton(button, RACE_SIZE, false, ring);
+			SetAtlasIf(button.CRRing, button.enable and ring or ring .. "-disabled");
+			local atlas = RaceAtlas(file, sex);
 			button.crFile, button.crHorde = strupper(file), isHorde;
 			CR.HookRaceTooltip(button);
 			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas, nil, isHorde);
 			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas, nil, isHorde);
 			button:ClearAllPoints();
 			if isHorde then
-				button:SetPoint("TOPRIGHT", CharacterCreateFrame, "TOPRIGHT", -68, -136 - horde * RACE_SPACING);
+				button:SetPoint("TOPRIGHT", CharacterCreateFrame, "TOPRIGHT", -44, -150 - horde * RACE_SPACING);
 				horde = horde + 1;
 			else
-				button:SetPoint("TOPLEFT", CharacterCreateFrame, "TOPLEFT", 68, -136 - alliance * RACE_SPACING);
+				button:SetPoint("TOPLEFT", CharacterCreateFrame, "TOPLEFT", 44, -150 - alliance * RACE_SPACING);
 				alliance = alliance + 1;
 			end
 		end
@@ -227,16 +229,24 @@ function CR.LayoutClasses(...)
 			local atlas = "classicon-" .. strlower(file);
 			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas);
 			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas);
+			-- retail: an unavailable class is only grey (no red cross)
 			local disabled = _G[button:GetName() .. "DisableTexture"];
 			if disabled then
-				SetAtlasIf(disabled, "common-icon-redx");
-				disabled:ClearAllPoints();
-				disabled:SetPoint("BOTTOMRIGHT", 2, -2);
-				disabled:SetWidth(20);
-				disabled:SetHeight(20);
+				disabled:SetAlpha(0);
+			end
+			SetAtlasIf(button.CRRing, button.enable and "charactercreate-ring-metaldark" or "charactercreate-ring-metaldark-disabled");
+			if not button.CRLabel then
+				button.CRLabel = button:CreateFontString(nil, "OVERLAY", "GlueFontNormalSmall");
+				button.CRLabel:SetPoint("TOP", button, "BOTTOM", 0, -6);
+			end
+			button.CRLabel:SetText(select(i, ...));
+			if button.enable then
+				button.CRLabel:SetTextColor(1, 0.82, 0);
+			else
+				button.CRLabel:SetTextColor(0.5, 0.5, 0.5);
 			end
 			button:ClearAllPoints();
-			button:SetPoint("BOTTOM", CharacterCreateFrame, "BOTTOM", (index - (count + 1) / 2) * CLASS_SPACING, 130);
+			button:SetPoint("BOTTOM", CharacterCreateFrame, "BOTTOM", (index - (count + 1) / 2) * CLASS_SPACING, 120);
 		end
 		index = index + 1;
 	end
@@ -290,25 +300,57 @@ function CR.Setup()
 		"TOPLEFT", "TOPLEFT", 0, "BOTTOMRIGHT", "BOTTOMRIGHT", 0);
 
 	-- faction crests over the race columns
-	local function Crest(atlas, point, x)
+	local function Crest(atlas, point, x, text)
 		local crest = frame:CreateTexture(nil, "ARTWORK");
 		CR[point == "LEFT" and "AllianceCrest" or "HordeCrest"] = crest;
-		crest:SetWidth(76);
-		crest:SetHeight(76);
-		crest:SetPoint("TOP" .. point, frame, "TOP" .. point, x, -40);
+		crest:SetWidth(48);
+		crest:SetHeight(48);
+		crest:SetPoint("TOP" .. point, frame, "TOP" .. point, x, -30);
 		if not SetAtlasIf(crest, atlas) then
 			crest:Hide();
 		end
+		-- the faction name next to it (retail: ALLIANCE / HORDE)
+		local label = frame:CreateFontString(nil, "ARTWORK", "GlueFontNormal");
+		label:SetText(text or "");
+		if point == "LEFT" then
+			label:SetPoint("LEFT", crest, "RIGHT", 4, 0);
+		else
+			label:SetPoint("RIGHT", crest, "LEFT", -4, 0);
+		end
 	end
-	Crest("charactercreate-icon-alliance", "LEFT", 60);
-	Crest("charactercreate-icon-horde", "RIGHT", -60);
+	Crest("charactercreate-icon-alliance", "LEFT", 40, "АЛЬЯНС");
+	Crest("charactercreate-icon-horde", "RIGHT", -40, "ОРДА");
 
 	-- gender: top center
+	-- gender: the retail male / female symbols, the gold one when chosen
 	for i, button in ipairs({ CharacterCreateGenderButtonMale, CharacterCreateGenderButtonFemale }) do
 		if button then
-			StyleIconButton(button, 44, true);
+			local gender = i == 1 and "male" or "female";
+			local name = button:GetName();
+			Hide(name .. "Shadow");
+			Hide(name .. "BevelEdge");
+			Hide(name .. "Text");
+			button:SetWidth(52);
+			button:SetHeight(52);
+			for _, key in ipairs({ "NormalTexture", "PushedTexture" }) do
+				local texture = _G[name .. key];
+				if texture and SetAtlasIf(texture, "charactercreate-gendericon-" .. gender) then
+					texture:ClearAllPoints();
+					texture:SetAllPoints(button);
+				end
+			end
+			local checked = button:GetCheckedTexture();
+			if checked and SetAtlasIf(checked, "charactercreate-gendericon-" .. gender .. "-selected") then
+				checked:ClearAllPoints();
+				checked:SetAllPoints(button);
+				checked:SetBlendMode("BLEND");
+			end
+			local highlight = button:GetHighlightTexture();
+			if highlight then
+				highlight:SetAlpha(0);
+			end
 			button:ClearAllPoints();
-			button:SetPoint("TOP", frame, "TOP", (i - 1.5) * 56, -40);
+			button:SetPoint("TOP", frame, "TOP", (i - 1.5) * 60, -24);
 		end
 	end
 
@@ -342,12 +384,12 @@ function CR.Setup()
 	end
 	CharCreateBackButton:ClearAllPoints();
 	CharCreateBackButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 46, 28);
-	CharCreateBackButton:SetWidth(250);
-	CharCreateBackButton:SetHeight(58);
+	CharCreateBackButton:SetWidth(230);
+	CharCreateBackButton:SetHeight(50);
 	CharCreateOkayButton:ClearAllPoints();
 	CharCreateOkayButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -46, 28);
-	CharCreateOkayButton:SetWidth(250);
-	CharCreateOkayButton:SetHeight(58);
+	CharCreateOkayButton:SetWidth(230);
+	CharCreateOkayButton:SetHeight(50);
 	if CharacterCreateRotateLeft and CharacterCreateRotateRight then
 		CharacterCreateRotateLeft:ClearAllPoints();
 		CharacterCreateRotateLeft:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -4, 200);
