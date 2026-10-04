@@ -283,9 +283,9 @@ function RS.Setup()
 	CharSelectEnterWorldButton:SetHeight(58);
 	if CharacterSelectRotateLeft and CharacterSelectRotateRight then
 		CharacterSelectRotateLeft:ClearAllPoints();
-		CharacterSelectRotateLeft:SetPoint("BOTTOMRIGHT", plate, "TOP", -2, 150);
+		CharacterSelectRotateLeft:SetPoint("BOTTOMRIGHT", plate, "TOP", -4, 6);
 		CharacterSelectRotateRight:ClearAllPoints();
-		CharacterSelectRotateRight:SetPoint("BOTTOMLEFT", plate, "TOP", 2, 150);
+		CharacterSelectRotateRight:SetPoint("BOTTOMLEFT", plate, "TOP", 4, 6);
 	end
 
 	-- Back: bottom left (retail)
@@ -318,12 +318,14 @@ function RS.Setup()
 		button:SetWidth(width - 20);
 		button:SetHeight(40);
 		-- text only: the 3.3.5 button art off
-		for _, texture in ipairs({ button:GetNormalTexture(), button:GetPushedTexture(), button:GetDisabledTexture() }) do
-			texture:SetAlpha(0);
+		for _, texture in pairs({ button:GetNormalTexture() or false, button:GetPushedTexture() or false,
+			button:GetDisabledTexture() or false, button.Left or false, button.Center or false, button.Right or false }) do
+			if texture then
+				texture:SetAlpha(0);
+			end
 		end
-		local highlight = button:GetHighlightTexture();
-		if highlight then
-			highlight:SetAlpha(0.25);
+		if button.Glow then
+			button.Glow:SetAlpha(0.25);
 		end
 		local text = button:GetFontString();
 		if text then
@@ -338,6 +340,13 @@ function RS.Setup()
 		end
 	end
 	RS.NavBar = bar;
+
+	-- the red retail buttons (GlueButtons.lua) after their new sizes
+	if GlueRetailButton_Update then
+		for _, button in ipairs({ CharSelectEnterWorldButton, CharacterSelectBackButton, CharacterSelectDeleteButton, create }) do
+			GlueRetailButton_Update(button);
+		end
+	end
 end
 
 ---------------------------------------------------------------------------
