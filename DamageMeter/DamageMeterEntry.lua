@@ -29,8 +29,13 @@ local function EnsureSetup(self)
 		self:RegisterForClicks("AnyUp");
 	end
 
-	-- method="..." in the template is not reliable on 3.3.5 frames made by ScrollBox: the scripts by hand
-	self:SetScript("OnClick", function(frame, ...) DamageMeterEntryMixin.OnClick(frame, ...); end);
+	-- method="..." in the template is not reliable on 3.3.5 frames made by ScrollBox: the scripts by hand.
+	-- ScrollBox may make the row a plain Frame (no OnClick): then the click is OnMouseUp
+	if self:HasScript("OnClick") then
+		self:SetScript("OnClick", function(frame, ...) DamageMeterEntryMixin.OnClick(frame, ...); end);
+	else
+		self:SetScript("OnMouseUp", function(frame, ...) DamageMeterEntryMixin.OnClick(frame, ...); end);
+	end
 	self:SetScript("OnEnter", function(frame) DamageMeterEntryMixin.OnEnter(frame); end);
 	self:SetScript("OnLeave", function(frame) DamageMeterEntryMixin.OnLeave(frame); end);
 end
