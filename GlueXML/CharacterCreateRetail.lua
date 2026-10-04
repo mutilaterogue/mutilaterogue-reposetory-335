@@ -27,7 +27,8 @@ end
 
 local function Hide(name)
 	local region = type(name) == "string" and _G[name] or name;
-	if region then
+	-- some of these names are plain globals (strings) on the login screen, not frames
+	if type(region) == "table" and type(region.Hide) == "function" then
 		region:Hide();
 		if region.SetAlpha then
 			region:SetAlpha(0);
