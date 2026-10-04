@@ -138,11 +138,11 @@ function CR.LayoutRaces(...)
 			StyleIconButton(button, RACE_SIZE);
 			local atlas = RaceAtlas(file, sex);
 			local _, faction = GetFactionForRace(index);
-			local horde = faction == "Horde";
-			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas, nil, horde);
-			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas, nil, horde);
+			local isHorde = faction == "Horde";
+			RoundIcon(_G[button:GetName() .. "NormalTexture"], atlas, nil, isHorde);
+			RoundIcon(_G[button:GetName() .. "PushedTexture"], atlas, nil, isHorde);
 			button:ClearAllPoints();
-			if horde then
+			if isHorde then
 				button:SetPoint("TOPRIGHT", CharacterCreateFrame, "TOPRIGHT", -68, -136 - horde * RACE_SPACING);
 				horde = horde + 1;
 			else
