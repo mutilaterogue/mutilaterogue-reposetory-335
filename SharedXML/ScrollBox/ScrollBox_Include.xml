@@ -1,0 +1,28 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- ScrollBox для 3.3.5a. В FrameXML.toc одна строка: SharedXML\ScrollBox\ScrollBox_Include.xml -->
+	<Script file="ScrollBoxCompat.lua"/>
+	<Script file="Interpolator.lua"/>
+	<Script file="InputUtil.lua"/>
+	<Script file="EventFrame.lua"/>
+	<Script file="ScrollController.lua"/>
+	<Script file="ScrollBoxPadding.lua"/>
+	<Script file="ScrollBoxView.lua"/>
+	<Script file="ScrollBoxViewUtil.lua"/>
+	<Script file="ScrollBoxStride.lua"/>
+	<Script file="ScrollBoxListView.lua"/>
+	<Script file="ScrollBoxLinearView.lua"/>
+	<Script file="ScrollBoxBiaxalView.lua"/>
+	<Script file="ScrollBoxGridView.lua"/>
+	<Script file="ScrollBoxSequenceView.lua"/>
+	<Script file="ScrollBoxTreeView.lua"/>
+	<Script file="ScrollBox.lua"/>
+	<Script file="ScrollBar.lua"/>
+	<Script file="ScrollUtil.lua"/>
+	<Include file="ScrollBox.xml"/>
+	<Include file="ScrollBar.xml"/>
+	<Script file="TrimScrollBar.lua"/>
+	<Include file="TrimScrollBar.xml"/>
+	<Script file="MinimalScrollBar.lua"/>
+	<Include file="MinimalScrollBar.xml"/>
+	<Include file="ScrollTemplates.xml"/>
+</Ui>

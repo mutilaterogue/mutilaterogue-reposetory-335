@@ -1,0 +1,193 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\UI.xsd">
+	<Script file="SharedUIPanelTemplates.lua"/>
+
+	<!-- Кнопка закрытия с якорями по умолчанию -->
+	<Button name="UIPanelCloseButtonDefaultAnchors" inherits="UIPanelCloseButton" virtual="true">
+		<Anchors>
+			<Anchor point="TOPRIGHT" x="1" y="0"/>
+		</Anchors>
+	</Button>
+
+	<!-- Плоский фон (уголки берутся из атласа, если он есть) -->
+	<Frame name="FlatPanelBackgroundTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBottomLeft" parentKey="BottomLeft" atlas="uiframebackground-nineslice-cornerbottomleft" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentBottomRight" parentKey="BottomRight" atlas="uiframebackground-nineslice-cornerbottomright" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="BottomEdge">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentBottomLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentBottomRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="TopSection">
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentBottomRight" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				local r, g, b, a = PANEL_BACKGROUND_COLOR:GetRGBA();
+				self.BottomEdge:SetTexture(r, g, b, a);
+				self.TopSection:SetTexture(r, g, b, a);
+				self.BottomLeft:SetVertexColor(r, g, b, a);
+				self.BottomRight:SetVertexColor(r, g, b, a);
+			</OnLoad>
+		</Scripts>
+	</Frame>
+
+	<!-- Простая панель -->
+	<Frame name="SimplePanelTemplate" virtual="true">
+		<KeyValues>
+			<KeyValue key="layoutType" value="SimplePanelTemplate" type="string"/>
+		</KeyValues>
+		<Size x="338" y="424"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg" parentKey="Bg" file="Interface\FrameGeneral\UI-Background-Rock"  >
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="-6"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="3"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-26"/>
+					<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
+				</Anchors>
+			</Frame>
+			<Frame parentKey="NineSlice" inherits="NineSlicePanelTemplate"/>
+		</Frames>
+	</Frame>
+
+	<!-- Панель без портрета -->
+	<Frame name="DefaultPanelBaseTemplate" mixin="DefaultPanelMixin" virtual="true">
+		<KeyValues>
+			<KeyValue key="layoutType" value="ButtonFrameTemplateNoPortrait" type="string"/>
+		</KeyValues>
+		<Size x="338" y="424"/>
+		<Frames>
+			<Frame parentKey="TitleContainer">
+				<Size x="0" y="20"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="30" y="-1"/>
+					<Anchor point="TOPRIGHT" x="-24" y="-1"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString name="$parentTitleText" parentKey="TitleText" inherits="GameFontNormal" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOP" x="0" y="-5"/>
+								<Anchor point="LEFT"/>
+								<Anchor point="RIGHT"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame parentKey="NineSlice" inherits="NineSlicePanelTemplate"/>
+		</Frames>
+	</Frame>
+
+	<Frame name="DefaultPanelTemplate" inherits="DefaultPanelBaseTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg" parentKey="Bg" file="Interface\FrameGeneral\UI-Background-Rock"  >
+					<Anchors>
+						<Anchor point="TOPLEFT" x="6" y="-21"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentTopTileStreaks" parentKey="TopTileStreaks" atlas="_UI-Frame-TopTileStreaks" >
+					<Size x="0" y="22"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="6" y="-21"/>
+						<Anchor point="TOPRIGHT" x="-2" y="-21"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="DefaultPanelFlatTemplate" inherits="DefaultPanelBaseTemplate" virtual="true">
+		<Frames>
+			<Frame name="$parentBg" parentKey="Bg" inherits="FlatPanelBackgroundTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="6" y="-20"/>
+					<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+	</Frame>
+
+	<!-- Панель с портретом и кнопками -->
+	<Frame name="ButtonFrameBaseTemplate" inherits="RetailPortraitFrameTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg" parentKey="Bg" file="Interface\FrameGeneral\UI-Background-Rock"  >
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-21"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture parentKey="TopTileStreaks" atlas="_UI-Frame-TopTileStreaks" >
+					<Size x="0" y="22"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="6" y="-21"/>
+						<Anchor point="TOPRIGHT" x="-2" y="-21"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="ButtonFrameTemplate" inherits="ButtonFrameBaseTemplate" virtual="true">
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" useParentLevel="true" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-60"/>
+					<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+	</Frame>
+
+	<!-- Кнопка панели с автоотступами -->
+	<Button name="MagicButtonTemplate" inherits="UIPanelButtonTemplate" virtual="true">
+		<Size x="80" y="22"/>
+		<Scripts>
+			<OnLoad function="MagicButton_OnLoad"/>
+		</Scripts>
+	</Button>
+
+	<!-- Полоса для перетаскивания окна -->
+	<Button name="PanelDragBarTemplate" mixin="PanelDragBarMixin" virtual="true">
+		<KeyValues>
+			<KeyValue key="showCursorOnHover" value="false" type="boolean"/>
+		</KeyValues>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnEnter method="OnEnter"/>
+			<OnLeave method="OnLeave"/>
+			<OnDragStart method="OnDragStart"/>
+			<OnDragStop method="OnDragStop"/>
+		</Scripts>
+	</Button>
+</Ui>

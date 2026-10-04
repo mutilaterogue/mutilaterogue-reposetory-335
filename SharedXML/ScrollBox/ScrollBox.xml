@@ -1,0 +1,53 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!--Move/create to ScrollUtil.xml-->
+	<Frame name="ScrollBoxDragIndicatorTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Texture">
+					<Color r="1" g="1" b="1" a=".5"/>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!--Move/create to ScrollUtil.xml-->
+	<Frame name="ScrollBoxDragBoxTemplate" inherits="ScrollBoxDragIndicatorTemplate" virtual="true"/>
+	<Frame name="ScrollBoxDragLineTemplate" inherits="ScrollBoxDragIndicatorTemplate" virtual="true">
+		<Size x="1" y="2"/>
+	</Frame>
+
+	<!-- 3.3.5: clipChildren нет — ScrollBox это ScrollFrame, ScrollTarget внутри ScrollChild (ClipChild).
+	     Наследники (WowScrollBoxList/WowScrollBox и любой ScrollBox в UI) объявляются как <ScrollFrame>. -->
+	<ScrollFrame name="ScrollBoxBaseTemplate" mixin="ScrollBoxBaseMixin" virtual="true">
+		<KeyValues>
+			<KeyValue key="canInterpolateScroll" value="false" type="boolean"/>
+		</KeyValues>
+		<ScrollChild>
+			<Frame parentKey="ClipChild">
+				<Size x="1" y="1"/>
+				<Frames>
+					<Frame parentKey="ScrollTarget" mixin="EventFrameMixin" useParentLevel="true">
+						<Size x="1" y="1"/>
+					</Frame>
+				</Frames>
+			</Frame>
+		</ScrollChild>
+		<Frames>
+			<Frame parentKey="DragDelegate"/>
+			<Frame parentKey="Shadows" setAllPoints="true">
+				<Layers>
+					<Layer>
+						<Texture parentKey="Lower" hidden="false"/>
+						<Texture parentKey="Upper" hidden="false"/>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnSizeChanged method="OnSizeChanged"/>
+			<OnMouseWheel method="OnMouseWheel"/>
+		</Scripts>
+	</ScrollFrame>
+
+</Ui>
