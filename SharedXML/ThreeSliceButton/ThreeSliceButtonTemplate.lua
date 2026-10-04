@@ -155,20 +155,27 @@ function ThreeSliceButtonMixin:OnMouseUp()
 end
 
 -- UIButtonMixin (ретейл): tooltip - строка или функция
+-- the login screen has GlueTooltip instead of GameTooltip
+local function Tooltip()
+	return GameTooltip or GlueTooltip;
+end
+
 function ThreeSliceButtonMixin:OnEnter()
 	local tooltip = self.tooltip;
 	if type(tooltip) == "function" then
 		tooltip = tooltip(self);
 	end
-	if tooltip then
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-		GameTooltip:SetText(tooltip, 1, 1, 1, 1, true);
-		GameTooltip:Show();
+	local frame = Tooltip();
+	if tooltip and frame then
+		frame:SetOwner(self, "ANCHOR_RIGHT");
+		frame:SetText(tooltip, 1, 1, 1, 1, true);
+		frame:Show();
 	end
 end
 
 function ThreeSliceButtonMixin:OnLeave()
-	if GameTooltip:GetOwner() == self then
-		GameTooltip:Hide();
+	local frame = Tooltip();
+	if frame and frame:GetOwner() == self then
+		frame:Hide();
 	end
 end
