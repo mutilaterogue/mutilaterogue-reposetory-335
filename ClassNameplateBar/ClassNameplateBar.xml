@@ -1,0 +1,50 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Script file="ClassNameplateBar.lua"/>
+
+	<Frame name="ClassNameplateBarFrame" mixin="ClassNameplateBarFrameMixin" parent="UIParent" frameStrata="BACKGROUND" hidden="true">
+		<Size x="120" y="20"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" setAllPoints="true">
+					<Color r="0" g="0" b="0" a="0.7"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Name" inherits="GameFontHighlightSmall" hidden="true">
+					<Anchors>
+						<Anchor point="BOTTOM" relativePoint="TOP" x="0" y="5"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="HealthText" inherits="NumberFontNormalSmall" hidden="true" >
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<StatusBar parentKey="HealthBar">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="1" y="-1"/>
+					<Anchor point="TOPRIGHT" x="-1" y="-1"/>
+				</Anchors>
+			</StatusBar>
+			<StatusBar parentKey="PowerBar">
+				
+			</StatusBar>
+			<Frame parentKey="HealPrediction" hidden="true">
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture setAllPoints="true">
+							<Color r="0.2" g="0.8" b="0.2" a="0.45"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnEvent method="OnEvent"/>
+		</Scripts>
+	</Frame>
+</Ui>
