@@ -4,7 +4,7 @@
 ..\SharedXML\Utils\NineSliceLayouts.lua
 ..\SharedXML\Utils\C_Timer.lua
 ..\SharedXML\Utils\Compat.lua
-..\SharedXML\Utils\GlueCompat.lua
+GlueCompat.lua
 ..\FrameXML\Util.lua
 GlueStrings.lua
 GlueFonts.xml

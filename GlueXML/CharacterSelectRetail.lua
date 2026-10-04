@@ -66,6 +66,66 @@ local function SetAtlasOr(texture, atlas, r, g, b, a)
 	return false;
 end
 
+-- an atlas as a nine slice: the corners keep `margin` px (atlas px), the edges and the center stretch
+function NineSliceAtlas(frame, atlas, margin)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if not info or not info.file or not info.width or info.width <= 0 then
+		return false;
+	end
+	local left = info.leftTexCoord or info.left;
+	local right = info.rightTexCoord or info.right;
+	local top = info.topTexCoord or info.top;
+	local bottom = info.bottomTexCoord or info.bottom;
+	local mx = margin / info.width * (right - left);
+	local my = margin / info.height * (bottom - top);
+	-- texcoord columns / rows, frame anchors
+	local us = { left, left + mx, right - mx, right };
+	local vs = { top, top + my, bottom - my, bottom };
+	frame.slices = frame.slices or {};
+	for row = 1, 3 do
+		for col = 1, 3 do
+			local index = (row - 1) * 3 + col;
+			local piece = frame.slices[index] or frame:CreateTexture(nil, "BACKGROUND");
+			frame.slices[index] = piece;
+			piece:SetTexture(info.file);
+			piece:SetTexCoord(us[col], us[col + 1], vs[row], vs[row + 1]);
+			piece:ClearAllPoints();
+			local x1 = col == 1 and 0 or (col == 2 and margin or nil);
+			local y1 = row == 1 and 0 or (row == 2 and -margin or nil);
+			-- left / top edge of the piece
+			if col == 3 then
+				piece:SetPoint("LEFT", frame, "RIGHT", -margin, 0);
+			end
+			if row == 3 then
+				piece:SetPoint("TOP", frame, "BOTTOM", 0, margin);
+			end
+			if x1 then
+				piece:SetPoint("LEFT", frame, "LEFT", x1, 0);
+			end
+			if y1 then
+				piece:SetPoint("TOP", frame, "TOP", 0, y1);
+			end
+			-- right / bottom edge of the piece
+			if col == 1 then
+				piece:SetPoint("RIGHT", frame, "LEFT", margin, 0);
+			elseif col == 2 then
+				piece:SetPoint("RIGHT", frame, "RIGHT", -margin, 0);
+			else
+				piece:SetPoint("RIGHT", frame, "RIGHT", 0, 0);
+			end
+			if row == 1 then
+				piece:SetPoint("BOTTOM", frame, "TOP", 0, -margin);
+			elseif row == 2 then
+				piece:SetPoint("BOTTOM", frame, "BOTTOM", 0, margin);
+			else
+				piece:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0);
+			end
+			piece:Show();
+		end
+	end
+	return true;
+end
+
 ---------------------------------------------------------------------------
 -- cards
 ---------------------------------------------------------------------------
@@ -227,9 +287,12 @@ function RS.Setup()
 	list:SetPoint("TOPRIGHT", ui, "TOPRIGHT", -14, -80);
 	list:SetPoint("BOTTOMRIGHT", ui, "BOTTOMRIGHT", -14, 60);
 	list:SetWidth(PANEL_WIDTH);
-	list.Background = list:CreateTexture(nil, "BACKGROUND");
-	list.Background:SetAllPoints();
-	SetAtlasOr(list.Background, "glues-characterselect-card-all-bg", 0, 0, 0, 0.75);
+	-- retail slices this atlas (corners fixed, edges and center stretched): 9 pieces by hand
+	if not NineSliceAtlas(list, "glues-characterselect-card-all-bg", 48) then
+		list.Background = list:CreateTexture(nil, "BACKGROUND");
+		list.Background:SetAllPoints();
+		list.Background:SetTexture(0, 0, 0, 0.75);
+	end
 	local header = CreateFrame("Frame", nil, list);
 	header:SetPoint("TOP", 0, -14);
 	header:SetWidth(CARD_WIDTH);
