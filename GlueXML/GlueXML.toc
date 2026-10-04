@@ -6,7 +6,6 @@
 ..\SharedXML\Utils\Compat.lua
 GlueCompat.lua
 ..\FrameXML\Util.lua
-..\FrameXML\MaskTexture.lua
 GlueStrings.lua
 GlueFonts.xml
 GlueFontStyles.xml

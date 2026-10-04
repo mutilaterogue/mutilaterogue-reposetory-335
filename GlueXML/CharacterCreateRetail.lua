@@ -154,25 +154,21 @@ function CR.HookRaceTooltip(button)
 	end
 	button.crTooltip = true;
 	button:SetScript("OnEnter", function(self)
-		local line = CharacterCreateTooltipTextLeft1;
-		if line then
-			line:SetWidth(340);
-			line:SetJustifyH("LEFT");
-		end
 		if self.crHorde then
 			GlueTooltip_SetOwner(self, CharacterCreateTooltip, -10, 0, "TOPRIGHT", "TOPLEFT");
 		else
 			GlueTooltip_SetOwner(self, CharacterCreateTooltip, 10, 0, "TOPLEFT", "TOPRIGHT");
 		end
+		-- after SetOwner (it resets the width): the long race text wraps
+		local line = CharacterCreateTooltipTextLeft1;
+		if line then
+			line:SetWidth(340);
+			line:SetJustifyH("LEFT");
+		end
 		GlueTooltip_SetText(RaceTooltipText(self), CharacterCreateTooltip);
 	end);
 	button:SetScript("OnLeave", function()
 		CharacterCreateTooltip:Hide();
-		local line = CharacterCreateTooltipTextLeft1;
-		if line then
-			line:SetWidth(0);
-			line:SetJustifyH("CENTER");
-		end
 	end);
 end
 
@@ -453,6 +449,21 @@ end
 ---------------------------------------------------------------------------
 -- hooks into the 3.3.5 flow (wrapped by hand: the XML calls these by name)
 ---------------------------------------------------------------------------
+-- the glue tooltip keeps old anchors and the race text width: cleared on every owner
+local setOwner = GlueTooltip_SetOwner;
+GlueTooltip_SetOwner = function(self, tooltip, ...)
+	tooltip = tooltip or GlueTooltip;
+	if tooltip then
+		tooltip:ClearAllPoints();
+		local line = tooltip.GetName and _G[tooltip:GetName() .. "TextLeft1"];
+		if line then
+			line:SetWidth(0);
+			line:SetJustifyH("CENTER");
+		end
+	end
+	return setOwner(self, tooltip, ...);
+end;
+
 local function After(name, func)
 	local original = _G[name];
 	if not original then
