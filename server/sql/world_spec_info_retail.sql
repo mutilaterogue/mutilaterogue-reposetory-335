@@ -1,23 +1,35 @@
--- world DB: custom_spec_info (world_spec_info.sql) from the retail TalentTab.db2 (12.1.0): the role (RoleMask 2 tank,
--- 4 healer, 8 damage) and the description of each tree. $Gmale:female; is resolved by the client by the character's sex.
--- The db2 has no Warrior, Paladin, Mage, Druid rows. INSERT IGNORE keeps the rows already there (the Rogue ones of
--- world_spec_info.sql): delete them first to take these.
+-- world DB: custom_spec_info (world_spec_info.sql) from the retail ChrSpecialization.db2 (12.1.0): the role and the
+-- description (with the preferred weapons and the primary stat) of each 3.3.5 tree. Druid: Balance, Feral, Restoration
+-- (Guardian has no 3.3.5 tree); Rogue Combat takes Outlaw. INSERT IGNORE keeps the rows already there (the Rogue ones
+-- of world_spec_info.sql): delete them first to take these.
 INSERT IGNORE INTO `custom_spec_info` (`class_mask`, `tab`, `role`, `description`) VALUES
-(4, 1, 'DAMAGER', 'A master of the wild who can tame a wide variety of beasts to assist $Ghim:her; in combat.'),
-(4, 2, 'DAMAGER', 'A master archer or sharpshooter who excels in bringing down enemies from afar.'),
-(4, 3, 'DAMAGER', 'A rugged tracker who favors using animal venom, explosives and traps as deadly weapons.'),
-(8, 1, 'DAMAGER', 'A deadly master of poisons who dispatches victims with vicious dagger strikes.'),
-(8, 2, 'DAMAGER', 'A swashbuckler who uses agility and guile to stand toe-to-toe with enemies.'),
-(8, 3, 'DAMAGER', 'A dark stalker who leaps from the shadows to ambush $Ghis:her; unsuspecting prey.'),
-(16, 1, 'HEALER', 'Uses magic to shield allies from taking damage as well as heal their wounds.'),
-(16, 2, 'HEALER', 'A versatile healer who can reverse damage on individuals or groups and even heal from beyond the grave.'),
-(16, 3, 'DAMAGER', 'Uses sinister Shadow magic, especially damage-over-time spells, to eradicate enemies.'),
-(32, 1, 'TANK', 'A dark guardian who manipulates and corrupts life energy to sustain $Ghim:her;self in the face of an enemy onslaught.'),
-(32, 2, 'DAMAGER', 'An icy harbinger of doom, channeling runic power and delivering rapid weapon strikes.'),
-(32, 3, 'DAMAGER', 'A master of death and decay, spreading infection and controlling undead minions to do $Ghis:her; bidding.'),
-(64, 1, 'DAMAGER', 'A spellcaster who harnesses the destructive forces of nature and the elements.'),
-(64, 2, 'DAMAGER', 'A totemic warrior who strikes foes with weapons imbued with elemental power.'),
-(64, 3, 'HEALER', 'A healer who calls upon ancestral spirits and the cleansing power of water to mend allies'' wounds.'),
-(256, 1, 'DAMAGER', 'A master of Shadow magic who specializes in fear, drains and damage-over-time spells.'),
-(256, 2, 'DAMAGER', 'A master of demonic magic who transforms into a demon and compels demonic powers to aid him.'),
-(256, 3, 'DAMAGER', 'A master of burst damage who calls down fire to burn and demolish enemies.');
+(1, 1, 'DAMAGER', 'A battle-hardened master of weapons, using mobility and overpowering attacks to strike their opponents down.\nPreferred Weapon: Two-Handed Axe, Mace, Sword\nPrimary Stat: Strength'),
+(1, 2, 'DAMAGER', 'A furious dual-wielding berserker unleashing a flurry of attacks to carve their opponents to pieces.\nPreferred Weapons: Dual Two-Handed Axes, Maces, Swords\nPrimary Stat: Strength'),
+(1, 3, 'TANK', 'A stalwart protector who uses a shield to safeguard themselves and their allies.\nPreferred Weapon: Axe, Mace, Sword, and Shield\nPrimary Stat: Strength'),
+(2, 1, 'HEALER', 'Invokes the power of the Light to heal and protect allies and vanquish evil from the darkest corners of the world.\nPreferred Weapon: Sword, Mace, and Shield\nPrimary Stat: Intellect'),
+(2, 2, 'TANK', 'Uses Holy magic to shield themselves and defend allies from attackers.\nPreferred Weapon: Sword, Mace, Axe, and Shield\nPrimary Stat: Strength'),
+(2, 3, 'DAMAGER', 'A righteous crusader who judges and punishes opponents with weapons and Holy magic.\nPreferred Weapon: Two-Handed Sword, Mace, Axe\nPrimary Stat: Strength'),
+(4, 1, 'DAMAGER', 'A master of the wild who can tame a wide variety of beasts to assist them in combat.\nPreferred Weapon: Bow, Crossbow, Gun\nPrimary Stat: Agility'),
+(4, 2, 'DAMAGER', 'A master sharpshooter who excels in bringing down enemies from afar.\nPreferred Weapon: Bow, Crossbow, Gun\nPrimary Stat: Agility'),
+(4, 3, 'DAMAGER', 'An adaptive ranger who favors using explosives, animal venom, and coordinated attacks with their bonded beast.\nPreferred Weapon: Polearm, Staff, Axe, Dagger, Sword\nPrimary Stat: Agility'),
+(8, 1, 'DAMAGER', 'A deadly master of poisons who dispatches victims with vicious dagger strikes.\nPreferred Weapons: Daggers\nPrimary Stat: Agility'),
+(8, 2, 'DAMAGER', 'A ruthless fugitive who uses agility and guile to stand toe-to-toe with enemies.\nPreferred Weapons: Axes, Maces, Swords, Fist Weapons\nPrimary Stat: Agility'),
+(8, 3, 'DAMAGER', 'A dark stalker who leaps from the shadows to ambush their unsuspecting prey.\nPreferred Weapons: Daggers\nPrimary Stat: Agility'),
+(16, 1, 'HEALER', 'Shields allies from harm and cures their wounds by smiting enemies.\nPreferred Weapon: Staff, Wand, Dagger, Mace\nPrimary Stat: Intellect'),
+(16, 2, 'HEALER', 'A versatile healer who can reverse damage on individuals or groups and even heal from beyond the grave.\nPreferred Weapon: Staff, Wand, Dagger, Mace\nPrimary Stat: Intellect'),
+(16, 3, 'DAMAGER', 'Uses sinister Shadow magic and terrifying Void magic to eradicate enemies.\nPreferred Weapon: Staff, Wand, Dagger, Mace\nPrimary Stat: Intellect'),
+(32, 1, 'TANK', 'A dark guardian who manipulates and corrupts life energy to sustain themselves in the face of an enemy onslaught.\nPreferred Weapon: Two-Handed Axe, Mace, Sword\nPrimary Stat: Strength'),
+(32, 2, 'DAMAGER', 'An icy harbinger of doom, channeling runic power and delivering vicious weapon strikes.\nPreferred Weapons: Dual Axes, Maces, Swords\nPrimary Stat: Strength'),
+(32, 3, 'DAMAGER', 'A master of death and decay, spreading infection and controlling undead minions to do their bidding.\nPreferred Weapon: Two-Handed Axe, Mace, Sword\nPrimary Stat: Strength'),
+(64, 1, 'DAMAGER', 'A spellcaster who harnesses the destructive forces of nature and the elements.\nPreferred Weapon: Mace, Dagger, and Shield\nPrimary Stat: Intellect'),
+(64, 2, 'DAMAGER', 'A totemic warrior who strikes foes with weapons imbued with elemental power.\nPreferred Weapons: Dual Axes, Maces, Fist Weapons\nPrimary Stat: Agility'),
+(64, 3, 'HEALER', 'A healer who calls upon ancestral spirits and the cleansing power of water to mend allies'' wounds.\nPreferred Weapon: Mace, Dagger, and Shield\nPrimary Stat: Intellect'),
+(128, 1, 'DAMAGER', 'Manipulates raw Arcane magic, destroying enemies with overwhelming power.\nPreferred Weapon: Staff, Wand, Dagger, Sword\nPrimary Stat: Intellect'),
+(128, 2, 'DAMAGER', 'Focuses the pure essence of Fire magic, assaulting enemies with combustive flames.\nPreferred Weapon: Staff, Wand, Dagger, Sword\nPrimary Stat: Intellect'),
+(128, 3, 'DAMAGER', 'Freezes enemies in their tracks and shatters them with Frost magic.\nPreferred Weapon: Staff, Wand, Dagger, Sword\nPrimary Stat: Intellect'),
+(256, 1, 'DAMAGER', 'A master of shadow magic who specializes in drains and damage-over-time spells.\nPreferred Weapon: Staff, Wand, Dagger, Sword\nPrimary Stat: Intellect'),
+(256, 2, 'DAMAGER', 'A commander of demons who twists the souls of their army into devastating power.\nPreferred Weapon: Staff, Wand, Dagger, Sword\nPrimary Stat: Intellect'),
+(256, 3, 'DAMAGER', 'A master of chaos who calls down fire to burn and demolish enemies.\nPreferred Weapon: Staff, Wand, Dagger, Sword\nPrimary Stat: Intellect'),
+(1024, 1, 'DAMAGER', 'Can shapeshift into a powerful Moonkin, balancing the power of Arcane and Nature magic to destroy enemies.\nPreferred Weapon: Staff, Dagger, Mace\nPrimary Stat: Intellect'),
+(1024, 2, 'DAMAGER', 'Takes on the form of a great cat to deal damage with bleeds and bites.\nPreferred Weapon: Staff, Polearm\nPrimary Stat: Agility'),
+(1024, 3, 'HEALER', 'Channels powerful Nature magic to regenerate and revitalize allies.\nPreferred Weapon: Staff, Dagger, Mace\nPrimary Stat: Intellect');
