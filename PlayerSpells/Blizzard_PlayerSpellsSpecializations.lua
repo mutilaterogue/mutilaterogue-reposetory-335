@@ -197,6 +197,8 @@ function PS.OnStateChanged(frame)
 	end
 end
 
+local ROLE_ATLAS = { TANK = "UI-LFG-RoleIcon-Tank", HEALER = "UI-LFG-RoleIcon-Healer", DAMAGER = "UI-LFG-RoleIcon-DPS" };
+
 -- server: the spells of each tree, its role and description
 PS.spells = {};
 PS.info = {};
@@ -204,7 +206,12 @@ PS.info = {};
 function PS.OnInfo(index, role, description)
 	index = tonumber(index);
 	if index then
-		PS.info[index] = { role = role ~= "" and role or nil, description = string.gsub(description or "", "{c}", ":") };
+		local text = string.gsub(description or "", "{c}", ":");
+		-- $Gmale:female; (db2 texts) by the character's sex
+		text = string.gsub(text, "%$[Gg]([^:;]*):([^;]*);", function(male, female)
+			return UnitSex("player") == 3 and female or male;
+		end);
+		PS.info[index] = { role = role ~= "" and role or nil, description = text };
 		if PS.frame and PS.frame:IsShown() then
 			PS.Refresh(PS.frame);
 		end
@@ -328,8 +335,16 @@ function PS.Refresh(frame)
 		local points = (TALENT_POINTS or "") .. ": " .. (pointsSpent or 0);
 		column.Description:SetText(info and info.description ~= "" and (info.description .. "|n|n" .. points) or points);
 		local role = info and info.role;
-		if role and GetTexCoordsForRoleSmallCircle then
-			column.RoleIcon:SetTexCoord(GetTexCoordsForRoleSmallCircle(role));
+		if role then
+			-- retail atlas (UI-LFG-RoleIcon-*); else the 3.3.5 round icons (UI-LFG-ICON-PORTRAITROLES)
+			local atlas = ROLE_ATLAS[role];
+			if atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+				column.RoleIcon:SetTexCoord(0, 1, 0, 1);
+				column.RoleIcon:SetAtlas(atlas);
+			else
+				column.RoleIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES");
+				column.RoleIcon:SetTexCoord(GetTexCoordsForRoleSmallCircle(role));
+			end
 			column.RoleName:SetText(_G[role] or role);
 			-- icon + name centered under the spec name
 			local width = 24 + 5 + column.RoleName:GetStringWidth();
