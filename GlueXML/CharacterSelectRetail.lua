@@ -8,7 +8,39 @@
 CharacterSelectRetail = {};
 local RS = CharacterSelectRetail;
 
-local CARD_WIDTH, CARD_HEIGHT, CARD_SPACING = 300, 72, 4;
+local CARD_WIDTH, CARD_HEIGHT, CARD_SPACING = 330, 72, 4;
+local PANEL_WIDTH = CARD_WIDTH + 30;
+
+-- GetCharacterInfo gives localized race / class names only: the tokens by name (ruRU male / female, enUS)
+local CLASS_TOKENS = {
+	["Воин"] = "WARRIOR", ["Паладин"] = "PALADIN", ["Охотник"] = "HUNTER", ["Охотница"] = "HUNTER",
+	["Разбойник"] = "ROGUE", ["Разбойница"] = "ROGUE", ["Жрец"] = "PRIEST", ["Жрица"] = "PRIEST",
+	["Рыцарь смерти"] = "DEATHKNIGHT", ["Шаман"] = "SHAMAN", ["Шаманка"] = "SHAMAN", ["Маг"] = "MAGE",
+	["Чернокнижник"] = "WARLOCK", ["Чернокнижница"] = "WARLOCK", ["Друид"] = "DRUID",
+	["Warrior"] = "WARRIOR", ["Paladin"] = "PALADIN", ["Hunter"] = "HUNTER", ["Rogue"] = "ROGUE", ["Priest"] = "PRIEST",
+	["Death Knight"] = "DEATHKNIGHT", ["Shaman"] = "SHAMAN", ["Mage"] = "MAGE", ["Warlock"] = "WARLOCK", ["Druid"] = "DRUID",
+};
+local CLASS_COLORS = {
+	WARRIOR = "C79C6E", PALADIN = "F58CBA", HUNTER = "ABD473", ROGUE = "FFF569", PRIEST = "FFFFFF",
+	DEATHKNIGHT = "C41F3B", SHAMAN = "0070DE", MAGE = "69CCF0", WARLOCK = "9482C9", DRUID = "FF7D0A",
+};
+local HORDE_RACES = {
+	["Орк"] = true, ["Нежить"] = true, ["Таурен"] = true, ["Тролль"] = true, ["Эльф крови"] = true, ["Эльфийка крови"] = true,
+	["Orc"] = true, ["Undead"] = true, ["Tauren"] = true, ["Troll"] = true, ["Blood Elf"] = true,
+};
+
+local function ClassText(class)
+	local color = CLASS_COLORS[CLASS_TOKENS[class or ""] or ""];
+	return color and ("|cff" .. color .. class .. "|r") or (class or "");
+end
+
+local function InfoText(level, class, ghost)
+	local text = (LEVEL or "Уровень") .. " " .. (level or 0) .. " " .. ClassText(class);
+	if ghost then
+		text = text .. " |cff999999(" .. (DEAD or "мертв") .. ")|r";
+	end
+	return text;
+end
 
 -- the login screen widgets lack SetShown
 local function Show(region, shown)
@@ -54,6 +86,11 @@ local function CreateCard(parent, index)
 	card.Selected:SetAllPoints();
 	SetAtlasOr(card.Selected, "glues-characterselect-card-selected", 1, 0.82, 0, 0.15);
 	card.Selected:Hide();
+
+	card.Faction = card:CreateTexture(nil, "OVERLAY");
+	card.Faction:SetPoint("RIGHT", -16, 0);
+	card.Faction:SetWidth(40);
+	card.Faction:SetHeight(40);
 
 	card.Name = card:CreateFontString(nil, "OVERLAY", "GlueFontNormalLarge");
 	card.Name:SetPoint("TOPLEFT", 18, -12);
@@ -103,30 +140,21 @@ function RS.UpdateList()
 		card.Name:SetText(name or "");
 		card.Name:SetTextColor(1, 0.82, 0);
 		local info = ghost and CHARACTER_SELECT_INFO_GHOST or CHARACTER_SELECT_INFO;
-		card.Info:SetText(string.format(info or "%d %s", level or 0, class or ""));
+		card.Info:SetText(InfoText(level, class, ghost));
 		card.Zone:SetText(zone or "");
+		card.horde = HORDE_RACES[race or ""] or false;
 		card:ClearAllPoints();
 		card:SetPoint("TOP", RS.List.Header, "BOTTOM", 0, -6 - (i - 1) * (CARD_HEIGHT + CARD_SPACING));
 		card:Show();
 		shown = i;
 	end
 
-	-- "create a character" card (3.3.5: CharacterSelect.createIndex, set by UpdateCharacterList)
 	local nextIndex = shown + 1;
-	if (CharacterSelect.createIndex or 0) > 0 and IsConnectedToServer() and nextIndex <= MAX_CHARACTERS_DISPLAYED then
-		local card = RS.cards[nextIndex] or CreateCard(RS.List, nextIndex);
-		RS.cards[nextIndex] = card;
-		card.index, card.create = nil, true;
-		SetAtlasOr(card.Background, "glues-characterselect-card-empty", 0, 0, 0, 0.4);
-		card.Name:SetText("+  " .. (CREATE_NEW_CHARACTER or "Создать персонажа"));
-		card.Name:SetTextColor(1, 1, 1);
-		card.Info:SetText("");
-		card.Zone:SetText("");
-		card.Selected:Hide();
-		card:ClearAllPoints();
-		card:SetPoint("TOP", RS.List.Header, "BOTTOM", 0, -6 - (nextIndex - 1) * (CARD_HEIGHT + CARD_SPACING));
-		card:Show();
-		nextIndex = nextIndex + 1;
+	-- "Create Character" under the list (3.3.5: CharacterSelect.createIndex, set by UpdateCharacterList)
+	if (CharacterSelect.createIndex or 0) > 0 and IsConnectedToServer() then
+		RS.CreateButton:Enable();
+	else
+		RS.CreateButton:Disable();
 	end
 	for i = nextIndex, #RS.cards do
 		RS.cards[i]:Hide();
@@ -142,14 +170,16 @@ function RS.UpdateSelection()
 	end
 	local selected = CharacterSelect.selectedIndex or 0;
 	for _, card in ipairs(RS.cards) do
-		Show(card.Selected, not card.create and card.index == selected);
+		local isSelected = card.index == selected;
+		Show(card.Selected, isSelected);
+		local faction = card.horde and "horde" or "alliance";
+		SetAtlasOr(card.Faction, "glues-characterselect-icon-faction-" .. faction .. (isSelected and "-selected" or ""));
 	end
 	-- the name plate over Enter World
 	local name, race, class, level, zone, sex, ghost = GetCharacterInfo(selected);
 	if name and selected > 0 then
 		RS.NamePlate.Name:SetText(name);
-		local info = ghost and CHARACTER_SELECT_INFO_GHOST or CHARACTER_SELECT_INFO;
-		RS.NamePlate.Context:SetText(string.format(info or "%d %s", level or 0, class or "") .. ((zone and zone ~= "") and ("  |cff999999" .. zone .. "|r") or ""));
+		RS.NamePlate.Context:SetText("");
 		RS.NamePlate:Show();
 	else
 		RS.NamePlate:Hide();
@@ -192,12 +222,16 @@ function RS.Setup()
 	end
 
 	-- the list (retail CharacterSelectListTemplate: right side)
+	-- one dark panel: the realm, the cards, the buttons under them (retail CharacterSelectListTemplate)
 	local list = CreateFrame("Frame", "CharacterSelectRetailList", ui);
-	list:SetPoint("TOPRIGHT", ui, "TOPRIGHT", -24, -80);
-	list:SetWidth(CARD_WIDTH + 20);
-	list:SetHeight(MAX_CHARACTERS_DISPLAYED * (CARD_HEIGHT + CARD_SPACING) + 60);
+	list:SetPoint("TOPRIGHT", ui, "TOPRIGHT", -14, -80);
+	list:SetPoint("BOTTOMRIGHT", ui, "BOTTOMRIGHT", -14, 60);
+	list:SetWidth(PANEL_WIDTH);
+	list.Background = list:CreateTexture(nil, "BACKGROUND");
+	list.Background:SetAllPoints();
+	SetAtlasOr(list.Background, "glues-characterselect-card-all-bg", 0, 0, 0, 0.75);
 	local header = CreateFrame("Frame", nil, list);
-	header:SetPoint("TOP");
+	header:SetPoint("TOP", 0, -14);
 	header:SetWidth(CARD_WIDTH);
 	header:SetHeight(34);
 	header.Background = header:CreateTexture(nil, "BACKGROUND");
@@ -209,62 +243,97 @@ function RS.Setup()
 	RS.List = list;
 	RS.cards = {};
 
-	-- the name plate (retail CharacterSelectUI SelectedBackdrop / Name / CharacterContext)
+	-- Create Character + Delete under the cards (retail: the red button and the trash icon)
+	local create = CreateFrame("Button", "CharacterSelectRetailCreateButton", list, "GlueButtonTemplate");
+	create:SetWidth(210);
+	create:SetHeight(42);
+	create:SetPoint("BOTTOMLEFT", list, "BOTTOMLEFT", 16, 14);
+	create:SetText(CREATE_NEW_CHARACTER or "Создать персонажа");
+	create:SetScript("OnClick", function()
+		if (CharacterSelect.createIndex or 0) > 0 then
+			CharacterSelect_SelectCharacter(CharacterSelect.createIndex);
+		end
+	end);
+	RS.CreateButton = create;
+	CharacterSelectDeleteButton:SetParent(list);
+	CharacterSelectDeleteButton:ClearAllPoints();
+	CharacterSelectDeleteButton:SetPoint("LEFT", create, "RIGHT", 6, 0);
+	CharacterSelectDeleteButton:SetWidth(PANEL_WIDTH - 210 - 16 - 6 - 16);
+	CharacterSelectDeleteButton:SetHeight(42);
+	CharacterSelectDeleteButton:SetText(DELETE or "Удалить");
+
+	-- the name over Enter World (retail CharacterSelectUI SelectedBackdrop / Name)
 	local plate = CreateFrame("Frame", nil, ui);
 	plate:SetWidth(420);
-	plate:SetHeight(65);
-	plate:SetPoint("BOTTOM", CharSelectEnterWorldButton, "TOP", 0, 10);
+	plate:SetHeight(50);
+	plate:SetPoint("BOTTOM", CharSelectEnterWorldButton, "TOP", 0, 4);
 	plate.Background = plate:CreateTexture(nil, "BACKGROUND");
 	plate.Background:SetAllPoints();
 	SetAtlasOr(plate.Background, "glues-characterselect-namebg");
+	plate.Name = plate:CreateFontString(nil, "OVERLAY", "GlueFontNormalHuge");
+	plate.Name:SetPoint("BOTTOM", 0, 10);
 	plate.Context = plate:CreateFontString(nil, "OVERLAY", "GlueFontHighlight");
-	plate.Context:SetPoint("BOTTOM", 0, 12);
-	plate.Name = plate:CreateFontString(nil, "OVERLAY", "GlueFontNormalLarge");
-	plate.Name:SetPoint("BOTTOM", plate.Context, "TOP", 0, 5);
+	plate.Context:SetPoint("TOP", plate, "BOTTOM", 0, 0);
 	RS.NamePlate = plate;
 
-	-- Enter World: big, bottom center; rotate buttons under it
+	-- Enter World: bottom center; rotate buttons over the model, at its feet (retail)
 	CharSelectEnterWorldButton:ClearAllPoints();
-	CharSelectEnterWorldButton:SetPoint("BOTTOM", ui, "BOTTOM", 0, 45);
-	CharSelectEnterWorldButton:SetWidth(250);
-	CharSelectEnterWorldButton:SetHeight(64);
+	CharSelectEnterWorldButton:SetPoint("BOTTOM", ui, "BOTTOM", 0, 40);
+	CharSelectEnterWorldButton:SetWidth(270);
+	CharSelectEnterWorldButton:SetHeight(58);
 	if CharacterSelectRotateLeft and CharacterSelectRotateRight then
 		CharacterSelectRotateLeft:ClearAllPoints();
-		CharacterSelectRotateLeft:SetPoint("TOPRIGHT", CharSelectEnterWorldButton, "BOTTOM", -2, 6);
+		CharacterSelectRotateLeft:SetPoint("BOTTOMRIGHT", plate, "TOP", -2, 150);
 		CharacterSelectRotateRight:ClearAllPoints();
-		CharacterSelectRotateRight:SetPoint("TOPLEFT", CharSelectEnterWorldButton, "BOTTOM", 2, 6);
+		CharacterSelectRotateRight:SetPoint("BOTTOMLEFT", plate, "TOP", 2, 150);
 	end
 
-	-- delete: under the list, as the retail tool buttons
-	CharacterSelectDeleteButton:ClearAllPoints();
-	CharacterSelectDeleteButton:SetPoint("BOTTOMRIGHT", ui, "BOTTOMRIGHT", -24, 20);
+	-- Back: bottom left (retail)
+	CharacterSelectBackButton:SetParent(ui);
+	CharacterSelectBackButton:ClearAllPoints();
+	CharacterSelectBackButton:SetPoint("BOTTOMLEFT", ui, "BOTTOMLEFT", 50, 40);
+	CharacterSelectBackButton:SetWidth(240);
+	CharacterSelectBackButton:SetHeight(52);
+	CharacterSelectBackButton:SetText("<  " .. (BACK or "Назад"));
 
-	-- the top bar (retail CharacterSelectNavBar): change realm, addons, back
+	-- the top bar (retail CharacterSelectNavBar): text items between dividers, a gold line under them
 	local bar = CreateFrame("Frame", "CharacterSelectRetailNavBar", ui);
 	bar:SetPoint("TOP", ui, "TOP", 0, 0);
-	bar:SetWidth(640);
-	bar:SetHeight(52);
+	bar:SetWidth(520);
+	bar:SetHeight(56);
 	bar.Background = bar:CreateTexture(nil, "BACKGROUND");
 	bar.Background:SetAllPoints();
-	SetAtlasOr(bar.Background, "glues-characterselect-tophud-middle-bg", 0, 0, 0, 0.7);
-	local buttons = { CharSelectChangeRealmButton, CharacterSelectAddonsButton, CharacterSelectBackButton };
-	local shownButtons = {};
-	for _, button in ipairs(buttons) do
+	SetAtlasOr(bar.Background, "glues-characterselect-tophud-middle-bg", 0, 0, 0, 0.6);
+	local items = {};
+	for _, button in ipairs({ CharacterSelectAddonsButton, CharSelectChangeRealmButton }) do
 		if button then
-			button:SetParent(bar);
-			table.insert(shownButtons, button);
+			table.insert(items, button);
 		end
 	end
-	local width = 190;
-	for i, button in ipairs(shownButtons) do
+	local width = bar:GetWidth() / math.max(1, #items);
+	for i, button in ipairs(items) do
+		button:SetParent(bar);
 		button:ClearAllPoints();
-		button:SetPoint("CENTER", bar, "CENTER", (i - (#shownButtons + 1) / 2) * width, 2);
-		button:SetWidth(width - 14);
-		if i < #shownButtons then
+		button:SetPoint("CENTER", bar, "LEFT", (i - 0.5) * width, 4);
+		button:SetWidth(width - 20);
+		button:SetHeight(40);
+		-- text only: the 3.3.5 button art off
+		for _, texture in ipairs({ button:GetNormalTexture(), button:GetPushedTexture(), button:GetDisabledTexture() }) do
+			texture:SetAlpha(0);
+		end
+		local highlight = button:GetHighlightTexture();
+		if highlight then
+			highlight:SetAlpha(0.25);
+		end
+		local text = button:GetFontString();
+		if text then
+			text:SetText(string.upper(text:GetText() or ""));
+		end
+		if i < #items then
 			local divider = bar:CreateTexture(nil, "ARTWORK");
-			divider:SetPoint("CENTER", bar, "CENTER", (i - #shownButtons / 2) * width, 2);
+			divider:SetPoint("CENTER", bar, "LEFT", i * width, 4);
 			divider:SetWidth(2);
-			divider:SetHeight(32);
+			divider:SetHeight(30);
 			SetAtlasOr(divider, "glues-characterselect-tophud-bg-divider", 1, 1, 1, 0.2);
 		end
 	end
