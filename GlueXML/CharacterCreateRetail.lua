@@ -76,6 +76,16 @@ local function StyleIconButton(button, size, small)
 			:format(tostring(button.CreateMaskTexture ~= nil), tostring(TextureAddMask ~= nil), tostring(TextureSetIsMask ~= nil)));
 	end
 	if button.CreateMaskTexture and TextureAddMask and TextureSetIsMask then
+		-- a mask is never drawn, so nothing loads its file on the login screen (in the game the portraits do):
+		-- one almost invisible pixel of it keeps it loaded
+		if not CR.maskPreload then
+			CR.maskPreload = CharacterCreate:CreateTexture(nil, "BACKGROUND");
+			CR.maskPreload:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
+			CR.maskPreload:SetWidth(1);
+			CR.maskPreload:SetHeight(1);
+			CR.maskPreload:SetPoint("BOTTOMLEFT");
+			CR.maskPreload:SetAlpha(0.02);
+		end
 		local mask = button:CreateMaskTexture();
 		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask");
 		mask:SetPoint("CENTER");
