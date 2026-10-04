@@ -348,27 +348,49 @@ local function RoundIcon(texture, icon)
 	SetPortraitToTexture(texture, icon);
 end
 
+-- retail HeroTalentsSelectionDialog: a window in the middle, one column per hero tree (name, icon, description,
+-- the tree), "Activate" or "Active" at the bottom; the active column glows like the specialization tab
+local CHOICE_COLUMN_WIDTH, CHOICE_HEIGHT = 300, 520;
+
 local function CreateChoiceDialog(frame)
-	local dialog = CreateFrame("Frame", nil, frame);
-	dialog:SetAllPoints(frame);
-	dialog:SetFrameLevel(frame:GetFrameLevel() + 50);
+	-- the talents behind are dimmed; the window catches the mouse
+	local shade = CreateFrame("Frame", nil, frame);
+	shade:SetAllPoints(frame);
+	shade:SetFrameLevel(frame:GetFrameLevel() + 50);
+	shade:EnableMouse(true);
+	local shadeTexture = shade:CreateTexture(nil, "BACKGROUND");
+	shadeTexture:SetAllPoints();
+	shadeTexture:SetTexture(0, 0, 0, 0.6);
+	shade:SetScript("OnMouseUp", function() shade:Hide(); end);
+
+	local dialog = CreateFrame("Frame", nil, shade);
+	dialog:SetPoint("CENTER", frame, "CENTER", 0, 20);
+	dialog:SetHeight(CHOICE_HEIGHT);
 	dialog:EnableMouse(true);
-	local shade = dialog:CreateTexture(nil, "BACKGROUND");
-	shade:SetAllPoints();
-	shade:SetTexture(0, 0, 0, 0.8);
-	dialog.Title = dialog:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge");
-	dialog.Title:SetPoint("TOP", 0, -60);
-	dialog.Title:SetTextColor(0.12, 1, 0);
+	dialog:SetFrameLevel(shade:GetFrameLevel() + 1);
+	dialog:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 },
+	});
+	dialog:SetBackdropColor(0.05, 0.05, 0.05, 1);
+	dialog:SetBackdropBorderColor(0.5, 0.45, 0.35, 1);
+	dialog.Background = dialog:CreateTexture(nil, "BACKGROUND", nil, 1);
+	dialog.Background:SetPoint("TOPLEFT", 4, -4);
+	dialog.Background:SetPoint("BOTTOMRIGHT", -4, 4);
+	if not SetAtlasIfExists(dialog.Background, "spec-background") then
+		dialog.Background:SetTexture(0.08, 0.08, 0.08, 1);
+	end
 	dialog.Close = CreateFrame("Button", nil, dialog, "UIPanelCloseButton");
-	dialog.Close:SetPoint("TOPRIGHT", -10, -10);
-	dialog.Close:SetScript("OnClick", function() dialog:Hide(); end);
+	dialog.Close:SetPoint("TOPRIGHT", 2, 2);
+	dialog.Close:SetScript("OnClick", function() shade:Hide(); end);
 	dialog.cards = {};
-	dialog:Hide();
-	return dialog;
+	shade.Dialog = dialog;
+	shade:Hide();
+	return shade;
 end
 
--- the nodes of a hero tree, gray, with their edges: what the player chooses (no clicks)
-local function PreviewTree(preview, treeId)
+-- the nodes of a hero tree with their edges; the chosen tree in its real state, another one gray (its root yellow)
+local function PreviewTree(preview, treeId, chosen)
 	local list, minCol, maxCol = {}, nil, nil;
 	for _, node in pairs(CT.nodes) do
 		if node.tree == treeId then
@@ -381,7 +403,7 @@ local function PreviewTree(preview, treeId)
 	minCol, maxCol = minCol or 0, maxCol or 0;
 	local spacing = preview.spacing;
 	local offsetX = (preview.Content:GetWidth() - (maxCol - minCol) * spacing) / 2 - minCol * spacing;
-	local centers = {};
+	local centers, learned = {}, {};
 	preview.lineCount = 0;
 	for i, node in ipairs(list) do
 		local button = preview.buttons[i];
@@ -396,6 +418,8 @@ local function PreviewTree(preview, treeId)
 			button.Icon:SetHeight(ICON_SIZE);
 			button.Ring = button:CreateTexture(nil, "OVERLAY");
 			button.Ring:SetAllPoints();
+			button.Rank = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline");
+			button.Rank:SetPoint("CENTER", button, "BOTTOMRIGHT", -2, 4);
 			button:EnableMouse(true);
 			button:SetScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
@@ -408,9 +432,11 @@ local function PreviewTree(preview, treeId)
 		local x = offsetX + node.col * spacing;
 		local y = preview.top + node.row * spacing;
 		centers[node.id] = { x = x, y = y };
+		local rank = chosen and RankOf(node) or (node.row == 0 and node.maxRank or 0);
+		learned[node.id] = rank >= node.maxRank;
 		button:ClearAllPoints();
 		button:SetPoint("CENTER", preview.Content, "TOPLEFT", x, -y);
-		button.spellID = node.spells[1] or 0;
+		button.spellID = node.spells[math.max(1, rank)] or node.spells[1] or 0;
 		local _, _, icon = GetSpellInfo(button.spellID);
 		local shape = node.maxRank == 1 and "square" or "circle";
 		if shape == "circle" and icon then
@@ -420,10 +446,9 @@ local function PreviewTree(preview, treeId)
 			button.Icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark");
 			button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92);
 		end
-		-- the root comes with the tree: yellow, the rest gray
-		local root = node.row == 0;
-		button.Icon:SetDesaturated(not root);
-		button.Ring:SetAtlas(ATLAS[shape][root and "yellow" or "gray"]);
+		button.Icon:SetDesaturated(rank == 0);
+		button.Ring:SetAtlas(ATLAS[shape][rank > 0 and "yellow" or "gray"]);
+		button.Rank:SetText(chosen and node.row > 0 and (rank .. "/" .. node.maxRank) or "");
 		button:Show();
 	end
 	for i = #list + 1, #preview.buttons do
@@ -433,7 +458,7 @@ local function PreviewTree(preview, treeId)
 		for _, required in ipairs(node.requires) do
 			local from, to = centers[required], centers[node.id];
 			if from and to then
-				DrawLine(preview, from.x, from.y, to.x, to.y, ATLAS.lineLocked);
+				DrawLine(preview, from.x, from.y, to.x, to.y, learned[required] and ATLAS.lineActive or ATLAS.lineLocked);
 			end
 		end
 	end
@@ -443,75 +468,91 @@ local function PreviewTree(preview, treeId)
 end
 
 local function ShowChoiceDialog(frame)
-	local dialog = frame.HeroChoiceDialog;
+	local shade = frame.HeroChoiceDialog;
+	local dialog = shade.Dialog;
 	local trees = TreesOfKind(1);
-	dialog.Title:SetText(HERO_TALENTS_CHOOSE or "Выберите геройские таланты");
-	local cardWidth, gap = 320, 40;
-	local total = #trees * cardWidth + (#trees - 1) * gap;
+	dialog:SetWidth(math.max(1, #trees) * CHOICE_COLUMN_WIDTH + 8);
 	for i, tree in ipairs(trees) do
 		local card = dialog.cards[i];
 		if not card then
 			card = CreateFrame("Frame", nil, dialog);
-			card:SetWidth(cardWidth);
-			card:SetHeight(620);
-			card.Background = card:CreateTexture(nil, "BACKGROUND");
-			card.Background:SetPoint("TOP", 0, -150);
-			card.Background:SetWidth(284);
-			card.Background:SetHeight(362);
-			if not SetAtlasIfExists(card.Background, "talents-heroclass-backplate-full-expanded") then
-				card.Background:SetTexture(0, 0, 0, 0.5);
+			card:SetWidth(CHOICE_COLUMN_WIDTH);
+			card:SetHeight(CHOICE_HEIGHT - 8);
+			-- the active column: the yellow glow of the specialization tab
+			card.Selected = card:CreateTexture(nil, "BACKGROUND", nil, 2);
+			card.Selected:SetAllPoints();
+			if not SetAtlasIfExists(card.Selected, "spec-selected-background1") then
+				card.Selected:SetTexture(1, 0.82, 0, 0.08);
 			end
+			card.Selected:SetBlendMode("ADD");
+			card.Selected:SetAlpha(0.35);
+			if i > 1 then
+				card.Divider = card:CreateTexture(nil, "ARTWORK");
+				card.Divider:SetPoint("TOP", card, "TOPLEFT", 0, 0);
+				card.Divider:SetPoint("BOTTOM", card, "BOTTOMLEFT", 0, 0);
+				card.Divider:SetWidth(2);
+				card.Divider:SetTexture(0, 0, 0, 0.6);
+			end
+			card.Name = card:CreateFontString(nil, "ARTWORK", _G.GameFontHighlightHuge and "GameFontHighlightHuge" or "GameFontHighlightLarge");
+			card.Name:SetPoint("TOP", 0, -22);
 			card.Icon = card:CreateTexture(nil, "ARTWORK");
-			card.Icon:SetPoint("TOP", 0, -40);
-			card.Icon:SetWidth(108);
-			card.Icon:SetHeight(108);
+			card.Icon:SetPoint("TOP", 0, -62);
+			card.Icon:SetWidth(100);
+			card.Icon:SetHeight(100);
 			card.Border = card:CreateTexture(nil, "OVERLAY");
 			card.Border:SetPoint("CENTER", card.Icon, "CENTER", 0, -2);
-			card.Border:SetWidth(192);
-			card.Border:SetHeight(192);
+			card.Border:SetWidth(178);
+			card.Border:SetHeight(178);
 			SetAtlasIfExists(card.Border, "talents-heroclass-ring-mainpane");
-			card.Name = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-			card.Name:SetPoint("TOP", 0, -6);
-			-- the tree preview on the backplate (retail selection dialog), the description and the button under it
-			card.Preview = { Content = CreateFrame("Frame", nil, card), buttons = {}, lines = {}, lineCount = 0, spacing = 52, top = 46 };
-			card.Preview.Content:SetAllPoints(card.Background);
-			card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
-			card.Description:SetPoint("TOPLEFT", card.Background, "BOTTOMLEFT", 10, -12);
-			card.Description:SetPoint("TOPRIGHT", card.Background, "BOTTOMRIGHT", -10, -12);
+			card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontNormal");
+			card.Description:SetPoint("TOP", card.Icon, "BOTTOM", 0, -18);
+			card.Description:SetWidth(CHOICE_COLUMN_WIDTH - 40);
 			card.Description:SetJustifyH("CENTER");
+			card.Preview = { Content = CreateFrame("Frame", nil, card), buttons = {}, lines = {}, lineCount = 0, spacing = 46, top = 22 };
+			card.Preview.Content:SetPoint("TOP", card, "TOP", 0, -250);
+			card.Preview.Content:SetWidth(CHOICE_COLUMN_WIDTH - 20);
+			card.Preview.Content:SetHeight(210);
 			card.Button = CreateFrame("Button", nil, card, "UIPanelButtonTemplate");
-			card.Button:SetWidth(164);
+			card.Button:SetWidth(150);
 			card.Button:SetHeight(22);
-			card.Button:SetPoint("TOP", card.Description, "BOTTOM", 0, -12);
+			card.Button:SetPoint("BOTTOM", 0, 22);
+			card.Active = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
+			card.Active:SetPoint("BOTTOM", 0, 24);
+			card.Active:SetTextColor(0.1, 1, 0.1);
+			card.Active:SetText(SPEC_ACTIVE or "Активно");
+			card.Locked = card:CreateFontString(nil, "ARTWORK", "GameFontDisable");
+			card.Locked:SetPoint("BOTTOM", 0, 26);
 			dialog.cards[i] = card;
 		end
 		card:ClearAllPoints();
-		card:SetPoint("TOPLEFT", dialog, "TOP", -total / 2 + (i - 1) * (cardWidth + gap), -120);
+		card:SetPoint("TOPLEFT", dialog, "TOPLEFT", 4 + (i - 1) * CHOICE_COLUMN_WIDTH, -4);
+		local active = tree.id == CT.hero;
+		card.Selected:SetShown(active);
 		RoundIcon(card.Icon, tree.icon);
 		card.Name:SetText(string.upper(tree.name));
 		card.Description:SetText(tree.description);
-		PreviewTree(card.Preview, tree.id);
-		if UnitLevel("player") < tree.minLevel then
-			card.Button:SetText(string.format(UNIT_LEVEL_TEMPLATE or "Level %d", tree.minLevel));
-			card.Button:Disable();
-		else
-			card.Button:SetText(tree.id == CT.hero and ACTIVE_PETS or ACCEPT);
-			card.Button:SetEnabled(tree.id ~= CT.hero);
-		end
+		PreviewTree(card.Preview, tree.id, active);
+
+		local levelOk = UnitLevel("player") >= tree.minLevel;
+		card.Active:SetShown(active);
+		card.Button:SetShown(not active and levelOk);
+		card.Locked:SetShown(not active and not levelOk);
+		card.Locked:SetText(string.format(UNIT_LEVEL_TEMPLATE or "Level %d", tree.minLevel));
+		card.Button:SetText(TALENT_SPEC_ACTIVATE or "Активировать");
 		card.Button:SetScript("OnClick", function()
 			if CT.hero ~= 0 then
 				StaticPopup_Show("CTAL_CHANGE_HERO", nil, nil, tree.id);
 			else
 				Send("CTAL_HERO", tree.id);
 			end
-			dialog:Hide();
+			shade:Hide();
 		end);
 		card:Show();
 	end
 	for i = #trees + 1, #dialog.cards do
 		dialog.cards[i]:Hide();
 	end
-	dialog:Show();
+	shade:Show();
 end
 
 StaticPopupDialogs["CTAL_CHANGE_HERO"] = {
