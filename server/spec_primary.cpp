@@ -208,7 +208,10 @@ class spell_spec_change : public SpellScript
     {
         Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr;
         if (player && MythicPlus_TalentsLocked(player))
+        {
+            ChatHandler(player->GetSession()).SendSysMessage(MSG_TALENTS_LOCKED);
             return SPELL_FAILED_DONT_REPORT;
+        }
         return SPELL_CAST_OK;
     }
 
