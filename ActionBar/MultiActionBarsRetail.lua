@@ -58,8 +58,15 @@ function MultiActionBarsRetail_Layout()
 	end
 
 	-- right bars: at the right edge, centered, MultiBarLeft left of MultiBarRight
+	-- centered on the screen's height, but never over the minimap (a big UI scale leaves little height)
 	MultiBarRight:ClearAllPoints();
-	MultiBarRight:SetPoint("RIGHT", UIParent, "RIGHT", -5, 0);
+	local screenHeight = UIParent:GetHeight();
+	local minimapBottom = MinimapCluster and MinimapCluster:GetBottom();
+	if minimapBottom and (screenHeight + BAR_LENGTH) / 2 > minimapBottom - BAR_SPACING then
+		MultiBarRight:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -5, minimapBottom - BAR_SPACING - screenHeight);
+	else
+		MultiBarRight:SetPoint("RIGHT", UIParent, "RIGHT", -5, 0);
+	end
 	MultiBarLeft:ClearAllPoints();
 	MultiBarLeft:SetPoint("TOPRIGHT", MultiBarRight, "TOPLEFT", -BAR_SPACING, 0);
 end
@@ -179,8 +186,10 @@ MultiActionBarsRetail_Setup();
 local eventFrame = CreateFrame("Frame");
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED");
+eventFrame:RegisterEvent("UI_SCALE_CHANGED");
+eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED");
 eventFrame:SetScript("OnEvent", function(self, event)
-	if event == "PLAYER_ENTERING_WORLD" or layoutPending then
+	if event ~= "PLAYER_REGEN_ENABLED" or layoutPending then
 		StanceBarRetail_LayoutButtons();
 		MultiActionBarsRetail_Layout();
 	end
