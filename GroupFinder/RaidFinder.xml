@@ -1,0 +1,140 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!-- Raid Finder (retail Blizzard_GroupFinder\RaidFinder.xml) for the server's raid queue (server/raid_finder.cpp):
+	     laid out as the dungeon finder in PVEFrame - the roles on the blue background, the raid dropdown, the dark inset
+	     with the raid and the queue, "Find Group" at the bottom. Shown inside PVEFrame (PVEFrame.lua, tab 1 section 2).
+	     Included by PVEFrame.xml before PVEFrame. -->
+	<Script file="RaidFinder.lua"/>
+
+	<Button name="RaidFinderRoleButtonTemplate" inherits="LFGRoleButtonWithBackgroundTemplate" virtual="true">
+		<Scripts>
+			<OnLoad function="RaidFinderRoleButton_OnLoad"/>
+		</Scripts>
+	</Button>
+
+	<Frame name="RaidFinderFrame" parent="UIParent" hidden="true">
+		<Size x="338" y="428"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentRoleBackground" file="Interface\LFGFrame\UI-LFG-BlueBG">
+					<Size x="512" y="128"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="2" y="275"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture name="$parentTopTileStreaks" atlas="_UI-Frame-TopTileStreaks" useAtlasSize="true" horizTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="-21"/>
+						<Anchor point="TOPRIGHT" x="-2" y="-21"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentBtnCornerRight" atlas="UI-Frame-BtnCornerRight" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentButtonBottomBorder" atlas="_UI-Frame-BtnBotTile" useAtlasSize="true" horizTile="true">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="-23" y="2"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentBtnCornerRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-60"/>
+					<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
+				</Anchors>
+			</Frame>
+
+			<!-- roles: ids as the stock LFG role buttons (1 damage, 2 tank, 3 healer) -->
+			<Button name="$parentRoleButtonTank" parentKey="RoleTank" inherits="RaidFinderRoleButtonTemplate" id="2">
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="74" y="334"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentRoleButtonHealer" parentKey="RoleHealer" inherits="RaidFinderRoleButtonTemplate" id="3">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentRoleButtonTank" relativePoint="RIGHT" x="23" y="0"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentRoleButtonDPS" parentKey="RoleDamage" inherits="RaidFinderRoleButtonTemplate" id="1">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentRoleButtonHealer" relativePoint="RIGHT" x="23" y="0"/>
+				</Anchors>
+			</Button>
+
+			<Frame name="$parentRaidDropDown" parentKey="RaidDropDown" inherits="UIDropDownMenuTemplate">
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="117" y="285"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentName" inherits="GameFontNormal" justifyH="RIGHT" text="Рейд:">
+							<Size x="115" y="24"/>
+							<Anchors>
+								<Anchor point="RIGHT" relativePoint="LEFT" x="0" y="2"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<!-- the raid and the queue, in the inset -->
+			<Frame name="$parentInfo" parentKey="Info">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="10" y="-12"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-10" y="10"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString name="$parentTitle" parentKey="Title" inherits="QuestTitleFontBlackShadow" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT"/>
+								<Anchor point="TOPRIGHT"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentDescription" parentKey="Description" inherits="QuestFont" justifyH="LEFT" justifyV="TOP">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentTitle" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+								<Anchor point="RIGHT"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentQueueTitle" parentKey="QueueTitle" inherits="QuestTitleFontBlackShadow" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentDescription" relativePoint="BOTTOMLEFT" x="0" y="-14"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentQueue" parentKey="Queue" inherits="QuestFont" justifyH="LEFT" justifyV="TOP">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentQueueTitle" relativePoint="BOTTOMLEFT" x="0" y="-6"/>
+								<Anchor point="RIGHT"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<Button name="$parentFindGroupButton" parentKey="FindGroupButton" inherits="UIPanelButtonTemplate" text="FIND_A_GROUP">
+				<Size x="135" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOM" x="0" y="3"/>
+				</Anchors>
+				<Scripts>
+					<OnClick function="RaidFinderFindGroupButton_OnClick"/>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad function="RaidFinderFrame_OnLoad"/>
+			<OnShow function="RaidFinderFrame_OnShow"/>
+			<OnHide function="RaidFinderFrame_OnHide"/>
+		</Scripts>
+	</Frame>
+</Ui>

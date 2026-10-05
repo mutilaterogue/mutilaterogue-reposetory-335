@@ -1,5 +1,5 @@
 -- The retail group finder window (PVEFrame.xml) on 3.3.5: the stock windows shown inside it.
---   tab 1 "Dungeons and raids": LFDParentFrame (dungeon finder); raid finder and premade groups: placeholders for now
+--   tab 1 "Dungeons and raids": LFDParentFrame (dungeon finder), RaidFinderFrame (RaidFinder.xml), premade groups: a placeholder
 --   tab 2 "PvP": PVPParentFrame - its battlegrounds tab (PVPBattlegroundFrame) and its honor / arena tab (PVPFrame)
 --   tab 3 "Mythic+": ChallengesFrame (ChallengesUI), over the whole window
 -- The stock windows keep their logic; their own frame art, title and close button are hidden. Whatever opens them
@@ -29,8 +29,8 @@ local TAB_NAMES = {
 local SECTIONS = {
 	{
 		{ frame = "LFDParentFrame", text = LOOKING_FOR_DUNGEON or "Поиск подземелий", icon = "Interface\\Icons\\INV_Helmet_08" },
-		-- retail's raid finder and premade groups: not on 3.3.5 yet, a placeholder for now
-		{ frame = "RaidFinderFrame", placeholder = true, text = "Поиск рейда", icon = "Interface\\LFGFrame\\UI-LFR-PORTRAIT" },
+		-- the raid finder: RaidFinder.xml (the server's raid queue); premade groups: a placeholder for now
+		{ frame = "RaidFinderFrame", text = "Поиск рейда", icon = "Interface\\LFGFrame\\UI-LFR-PORTRAIT" },
 		{ frame = "LFGListPVEStub", placeholder = true, text = "Заранее собранные группы", icon = "Interface\\Icons\\Achievement_General_StayClassy" },
 	},
 	{
