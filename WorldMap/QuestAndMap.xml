@@ -249,8 +249,8 @@
 			<!-- retail QuestLogBorderFrameTemplate: the metal frame and its filigree over the list -->
 			<Frame name="$parentBorderFrame" parentKey="BorderFrame">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="-3" y="4"/>
-					<Anchor point="BOTTOMRIGHT" x="3" y="-4"/>
+					<Anchor point="TOPLEFT" x="-5" y="4"/>
+					<Anchor point="BOTTOMRIGHT" x="0" y="-4"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
@@ -267,7 +267,7 @@
 			<Button name="$parentQuestsTab" parentKey="QuestsTab">
 				<Size x="43" y="55"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="3" y="-28"/>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="0" y="-28"/>
 				</Anchors>
 				<Layers>
 					<Layer level="BACKGROUND">

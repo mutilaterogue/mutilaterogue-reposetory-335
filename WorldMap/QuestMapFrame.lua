@@ -127,6 +127,78 @@ function QuestMap_ShowSlices(pieces, shown)
 	end
 end
 
+-- the retail scroll bar (MinimalScrollBar) on a 3.3.5 UIPanelScrollFrameTemplate: thin track, thumb, arrows
+function QuestMap_RetailScrollBar(scrollFrame)
+	local name = scrollFrame:GetName();
+	local bar = _G[name .. "ScrollBar"];
+	if not bar or bar.retailStyled then
+		return;
+	end
+	bar.retailStyled = true;
+	bar:SetWidth(8);
+
+	-- the track: top, stretched middle, bottom
+	local trackTop = bar:CreateTexture(nil, "BACKGROUND");
+	SetAtlasIf(trackTop, "minimal-scrollbar-track-top", true);
+	trackTop:SetPoint("TOP", bar, "TOP", 0, 0);
+	local trackBottom = bar:CreateTexture(nil, "BACKGROUND");
+	SetAtlasIf(trackBottom, "minimal-scrollbar-track-bottom", true);
+	trackBottom:SetPoint("BOTTOM", bar, "BOTTOM", 0, 0);
+	local trackMiddle = bar:CreateTexture(nil, "BACKGROUND");
+	SetAtlasIf(trackMiddle, "!minimal-scrollbar-track-middle");
+	trackMiddle:SetWidth(8);
+	trackMiddle:SetPoint("TOP", trackTop, "BOTTOM");
+	trackMiddle:SetPoint("BOTTOM", trackBottom, "TOP");
+
+	-- the thumb: the slider's thumb is the middle, the caps hang on it
+	local thumb = bar:GetThumbTexture();
+	if thumb then
+		SetAtlasIf(thumb, "minimal-scrollbar-thumb-middle");
+		thumb:SetWidth(8);
+		thumb:SetHeight(28);
+		local capTop = bar:CreateTexture(nil, "OVERLAY");
+		SetAtlasIf(capTop, "minimal-scrollbar-small-thumb-top", true);
+		capTop:SetPoint("BOTTOM", thumb, "TOP");
+		local capBottom = bar:CreateTexture(nil, "OVERLAY");
+		SetAtlasIf(capBottom, "minimal-scrollbar-small-thumb-bottom", true);
+		capBottom:SetPoint("TOP", thumb, "BOTTOM");
+	end
+
+	-- the arrows
+	local function Arrow(button, atlas)
+		if not button then
+			return;
+		end
+		button:SetWidth(17);
+		button:SetHeight(11);
+		for _, key in ipairs({ "Normal", "Pushed", "Disabled", "Highlight" }) do
+			local texture = button["Get" .. key .. "Texture"] and button["Get" .. key .. "Texture"](button);
+			if texture then
+				local suffix = (key == "Pushed" and "-down") or (key == "Highlight" and "-over") or "";
+				SetAtlasIf(texture, atlas .. suffix);
+				texture:ClearAllPoints();
+				texture:SetAllPoints(button);
+				if key == "Disabled" then
+					texture:SetDesaturated(true);
+				elseif key == "Highlight" then
+					texture:SetBlendMode("BLEND");
+				end
+			end
+		end
+	end
+	local up, down = _G[name .. "ScrollBarScrollUpButton"], _G[name .. "ScrollBarScrollDownButton"];
+	Arrow(up, "minimal-scrollbar-arrow-top");
+	Arrow(down, "minimal-scrollbar-arrow-bottom");
+	if up then
+		up:ClearAllPoints();
+		up:SetPoint("BOTTOM", bar, "TOP", 0, 2);
+	end
+	if down then
+		down:ClearAllPoints();
+		down:SetPoint("TOP", bar, "BOTTOM", 0, -2);
+	end
+end
+
 local OBJECTIVE_FRAMES = {};
 function QuestLog_GetObjectiveFrame(index)
 	if not OBJECTIVE_FRAMES[index] then
@@ -190,6 +262,9 @@ function QuestMapFrame_OnLoad(self)
 	bar:SetPoint("BOTTOMRIGHT", 0, 0);
 	bar:SetHeight(25);
 	bar:SetTexture(0, 0, 0, 0.75);
+
+	QuestMap_RetailScrollBar(QuestScrollFrame);
+	QuestMap_RetailScrollBar(QuestMapDetailsScrollFrame);
 
 	optionsDropDown = QuestMapQuestOptionsDropDown;
 	optionsDropDown.questID = 0;
