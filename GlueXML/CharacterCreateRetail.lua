@@ -570,7 +570,14 @@ local CAMERA = {
 -- the customization rows (3.3.5 order: skin, face, hair, hair color, facial hair)
 local ROW_CAMERA = { "body", "head", "head", "head", "head" };
 
+-- off: on the login screen the client places the model every frame itself, SetPosition only made it jerk.
+-- The zoom needs the glue camera from the DLL; until then the camera stays where the client puts it.
+CR.CAMERA_ENABLED = false;
+
 function CR.SetCamera(name)
+	if not CR.CAMERA_ENABLED then
+		return;
+	end
 	local target = CAMERA[name] or CAMERA.select;
 	CR.cameraTarget = target;
 	if not CR.cameraFrame then
