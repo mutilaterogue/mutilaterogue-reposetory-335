@@ -4,8 +4,9 @@ MAX_TARGET_BUFFS = 32;
 MAX_BOSS_FRAMES = 4;
 
 -- aura positioning constants
-local AURA_START_X = 5;
-local AURA_START_Y = 32;
+-- the retail places: under the frame art (TargetFrameContainer.FrameTexture's bottom + 9)
+local AURA_START_X = 25;
+local AURA_START_Y = 26;
 local AURA_OFFSET_Y = 3;
 local LARGE_AURA_SIZE = 21;
 local SMALL_AURA_SIZE = 17;
@@ -285,35 +286,51 @@ function TargetFrame_CheckFaction (self)
 	end
 end
 
+-- retail TargetFrameMixin:CheckClassification: the rare frame art, the dragon on the portrait (gold elite / boss, silver
+-- rare elite), the star under the portrait for rares
 function TargetFrame_CheckClassification (self, forceNormalTexture)
-	local texture;
 	local classification = UnitClassification(self.unit);
-	if ( classification == "worldboss" or classification == "elite" ) then
-		texture = "Interface\\TargetingFrame\\UI-TargetingFrame-Elite";
-	elseif ( classification == "rareelite" ) then
-		texture = "Interface\\TargetingFrame\\UI-TargetingFrame-Rare-Elite";
-	elseif ( classification == "rare" ) then
-		texture = "Interface\\TargetingFrame\\UI-TargetingFrame-Rare";
+	if ( forceNormalTexture ) then
+		classification = "normal";
 	end
-	if ( texture and not forceNormalTexture) then
-		self.borderTexture:SetTexture(texture);
-		self.haveElite = true;
-		if ( self.threatIndicator ) then
-			self.threatIndicator:SetTexCoord(0, 0.9453125, 0.181640625, 0.400390625);
-			self.threatIndicator:SetWidth(242);
-			self.threatIndicator:SetHeight(112);
-			self.threatIndicator:SetPoint("TOPLEFT", self, "TOPLEFT", -22, 9);
-		end		
+	local name = self:GetName();
+	local bossPortrait = _G[name.."BossPortraitFrameTexture"];
+	local bossIcon = _G[name.."TextureFrameBossIcon"];
+
+	if ( classification == "rare" or classification == "rareelite" ) then
+		self.borderTexture:SetAtlas("UI-HUD-UnitFrame-Target-Rare-PortraitOn", true);
 	else
-		self.borderTexture:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame");
-		self.haveElite = nil;
-		if ( self.threatIndicator ) then
-			self.threatIndicator:SetTexCoord(0, 0.9453125, 0, 0.181640625);
-			self.threatIndicator:SetWidth(242);
-			self.threatIndicator:SetHeight(93);
-			self.threatIndicator:SetPoint("TOPLEFT", self, "TOPLEFT", -24, 0);
-		end	
+		self.borderTexture:SetAtlas("UI-HUD-UnitFrame-Target-PortraitOn", true);
 	end
+
+	if ( bossPortrait ) then
+		bossPortrait:ClearAllPoints();
+		if ( classification == "worldboss" ) then
+			bossPortrait:SetAtlas("UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold-Winged", true);
+			bossPortrait:SetPoint("TOPRIGHT", self, "TOPRIGHT", 8, -8);
+			bossPortrait:Show();
+		elseif ( classification == "rareelite" ) then
+			bossPortrait:SetAtlas("ui-hud-unitframe-target-portraiton-boss-rare-silver", true);
+			bossPortrait:SetPoint("TOPRIGHT", self, "TOPRIGHT", -11, -8);
+			bossPortrait:Show();
+		elseif ( classification == "elite" ) then
+			bossPortrait:SetAtlas("UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold", true);
+			bossPortrait:SetPoint("TOPRIGHT", self, "TOPRIGHT", -11, -8);
+			bossPortrait:Show();
+		else
+			bossPortrait:Hide();
+		end
+	end
+	if ( bossIcon ) then
+		if ( classification == "rare" or classification == "rareelite" ) then
+			bossIcon:Show();
+		else
+			bossIcon:Hide();
+		end
+	end
+
+	-- the spell bar's place (Target_Spellbar_AdjustPosition) follows the dragon
+	self.haveElite = (classification == "worldboss" or classification == "elite" or classification == "rareelite") or nil;
 end
 
 function TargetFrame_CheckDead (self)
@@ -899,12 +916,7 @@ function BossTargetFrame_OnLoad(self, unit, event)
 	self.maxDebuffs = 0;
 	TargetFrame_OnLoad(self, unit, BossTargetFrameDropDown_Initialize);
 	self:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT");
-	self.borderTexture:SetTexture("Interface\\TargetingFrame\\UI-UnitFrame-Boss");
-	self.levelText:SetPoint("CENTER", 12, -16);
-	self.raidTargetIcon:SetPoint("RIGHT", -90, 0);
-	self.threatNumericIndicator:SetPoint("BOTTOM", self, "TOP", -85, -22);
-	self.threatIndicator:SetTexture("Interface\\TargetingFrame\\UI-UnitFrame-Boss-Flash");
-	self.threatIndicator:SetTexCoord(0.0, 0.945, 0.0, 0.73125);
+	-- the retail target art (TargetFrame.xml), smaller
 	self:SetHitRectInsets(0, 95, 15, 30);
 	self:SetScale(0.75);
 	if ( event ) then
@@ -968,12 +980,14 @@ function FocusFrame_SetSmallSize(smallSize, onChange)
 		FocusFrame.maxDebuffs = 8;		
 		FocusFrame:SetScale(SMALL_FOCUS_SCALE);
 		FocusFrameToT:SetScale(SMALL_FOCUS_UPSCALE);
-		FocusFrameToT:SetPoint("BOTTOMRIGHT", -13, -17);
+		FocusFrameToT:ClearAllPoints();
+		FocusFrameToT:SetPoint("TOPRIGHT", FocusFrame, "BOTTOMRIGHT", 20, 8);
 		FocusFrame.TOT_AURA_ROW_WIDTH = 80;	-- not as much room for auras with scaled-up ToT frame
 		FocusFrame.spellbar:SetScale(SMALL_FOCUS_UPSCALE);		
 		FocusFrameTextureFrameName:SetFontObject(FocusFontSmall);
 		FocusFrameHealthBar.TextString:SetFontObject(TextStatusBarTextLarge);
-		FocusFrameHealthBar.TextString:SetPoint("CENTER", -50, 4)
+		FocusFrameHealthBar.TextString:ClearAllPoints();
+		FocusFrameHealthBar.TextString:SetPoint("CENTER", FocusFrameHealthBar, "CENTER", 0, 0);
 		FocusFrameTextureFrameName:SetWidth(120);
 		if ( onChange ) then
 			-- the frame needs to be repositioned because anchor offsets get adjusted with scale			
@@ -998,12 +1012,14 @@ function FocusFrame_SetSmallSize(smallSize, onChange)
 		FocusFrame.maxDebuffs = nil;
 		FocusFrame:SetScale(LARGE_FOCUS_SCALE);
 		FocusFrameToT:SetScale(LARGE_FOCUS_SCALE);
-		FocusFrameToT:SetPoint("BOTTOMRIGHT", -35, -10);
+		FocusFrameToT:ClearAllPoints();
+		FocusFrameToT:SetPoint("TOPRIGHT", FocusFrame, "BOTTOMRIGHT", 12, 10);
 		FocusFrame.TOT_AURA_ROW_WIDTH = TOT_AURA_ROW_WIDTH;
 		FocusFrame.spellbar:SetScale(LARGE_FOCUS_SCALE);
 		FocusFrameTextureFrameName:SetFontObject(GameFontNormalSmall);
 		FocusFrameHealthBar.TextString:SetFontObject(TextStatusBarText);
-		FocusFrameHealthBar.TextString:SetPoint("CENTER", -50, 3)
+		FocusFrameHealthBar.TextString:ClearAllPoints();
+		FocusFrameHealthBar.TextString:SetPoint("CENTER", FocusFrameHealthBar, "CENTER", 0, 0);
 		FocusFrameTextureFrameName:SetWidth(100);
 		if ( onChange ) then
 			-- the frame needs to be repositioned because anchor offsets get adjusted with scale		
@@ -1019,3 +1035,37 @@ function FocusFrame_SetSmallSize(smallSize, onChange)
 		TargetFrame_Update(FocusFrame);
 	end
 end
+-- *********************************************************************************
+-- retail power bar art: one atlas per power type (white, the atlas has the color)
+-- *********************************************************************************
+local POWER_BAR_SUFFIX = { [0] = "Mana", [1] = "Rage", [2] = "Focus", [3] = "Energy", [6] = "RunicPower" };
+
+local function PowerBarPrefix(manaBar)
+	local frame = manaBar:GetParent();
+	if ( not frame or not frame.totFrame and not frame:GetName() ) then
+		return nil;
+	end
+	local name = frame:GetName();
+	if ( name and name:match("ToT$") ) then
+		return "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-";
+	end
+	if ( frame == TargetFrame or frame == FocusFrame or (name and name:match("^Boss%dTargetFrame$")) ) then
+		return "UI-HUD-UnitFrame-Target-PortraitOn-Bar-";
+	end
+	return nil;
+end
+
+hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar)
+	if ( not manaBar or not manaBar.unit ) then
+		return;
+	end
+	local prefix = PowerBarPrefix(manaBar);
+	if ( not prefix ) then
+		return;
+	end
+	local texture = manaBar:GetStatusBarTexture();
+	if ( texture and texture.SetAtlas ) then
+		texture:SetAtlas(prefix .. (POWER_BAR_SUFFIX[UnitPowerType(manaBar.unit)] or "Mana"));
+	end
+	manaBar:SetStatusBarColor(1, 1, 1);
+end);
