@@ -69,7 +69,7 @@ local function Skin(frame)
 		setHeight(self, self.retailHeight or height);
 	end
 
-	-- the sort button (retail BagItemAutoSortButton): sorts the backpack and the bags (ContainerFrameCombined.lua)
+	-- the sort button (retail BagItemAutoSortButton): sorts the backpack and the bags (ContainerFrameRetail_SortBags)
 	local sort = CreateFrame("Button", name .. "SortButton", frame);
 	sort:SetWidth(SORT_WIDTH);
 	sort:SetHeight(26);
@@ -89,9 +89,7 @@ local function Skin(frame)
 	highlight:SetAllPoints(sort);
 	sort:SetScript("OnClick", function()
 		PlaySound("igMainMenuOptionCheckBoxOn");
-		if ContainerFrameCombinedBags_SortBags then
-			ContainerFrameCombinedBags_SortBags();
-		end
+		ContainerFrameRetail_SortBags();
 	end);
 	sort:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
@@ -191,3 +189,141 @@ hooksecurefunc("ContainerFrame_GenerateFrame", Layout);
 
 -- every update: the search box in its place
 hooksecurefunc("ContainerFrame_Update", PlaceSearchBox);
+
+---------------------------------------------------------------------------
+-- sorting (as in ContainerFrameCombined.lua, here so it works without the combined bags):
+-- one swap per step, waiting for the server to unlock the items
+---------------------------------------------------------------------------
+local FIRST_BAG, LAST_BAG = 0, NUM_BAG_SLOTS;
+local SORT_STEP_DELAY = 0.1;
+local SORT_MAX_STEPS = 400;
+
+local function ItemIDFromLink(link)
+	return link and tonumber(link:match("item:(%d+)"));
+end
+
+-- retail order: equipment by slot, consumables, trade goods, ..., junk last; inside a group
+-- higher quality, higher item level, name. Special bags (soul shards, quiver, profession
+-- bags) keep their items.
+local CLASS_ORDER = {
+	[2] = 1, [4] = 2,					-- weapons, armor
+	[0] = 3,							-- consumables
+	[12] = 4,							-- quest items
+	[3] = 5, [7] = 6, [5] = 7, [9] = 8,	-- gems, trade goods, reagents, recipes
+	[1] = 9, [11] = 10, [6] = 11,		-- containers, quivers, projectiles
+	[15] = 12, [13] = 13, [16] = 14,	-- miscellaneous, keys, glyphs
+};
+
+local sorter = CreateFrame("Frame");
+sorter:Hide();
+
+local function SortKey(link)
+	if not link then
+		return nil;
+	end
+	local name, _, quality, iLevel, _, _, _, _, equipLoc = GetItemInfo(link);
+	local itemID = ItemIDFromLink(link) or 0;
+	if not name then
+		return ("9|%08d"):format(itemID);
+	end
+	local itemClass = select(6, GetItemInfo(link));
+	-- 3.3.5 GetItemInfo has no classID: map the localized class name through GetAuctionItemClasses
+	local classOrder = 20;
+	if not sorter.classByName then
+		sorter.classByName = {};
+		-- 3.3.5 auction classes: weapon, armor, container, consumable, glyph, trade goods,
+		-- projectile, quiver, recipe, gem, miscellaneous, quest
+		local ids = { 2, 4, 1, 0, 16, 7, 6, 11, 9, 3, 15, 12 };
+		for index, className in ipairs({ GetAuctionItemClasses() }) do
+			sorter.classByName[className] = ids[index];
+		end
+	end
+	local classID = sorter.classByName[itemClass];
+	if quality == 0 then
+		classOrder = 99;		-- junk last
+	elseif classID and CLASS_ORDER[classID] then
+		classOrder = CLASS_ORDER[classID];
+	end
+	return ("%02d|%s|%d|%04d|%s|%08d"):format(classOrder, equipLoc or "", 9 - (quality or 0),
+		9999 - (iLevel or 0), name, itemID);
+end
+
+local function SortableSlots()
+	local slots = {};
+	for bag = FIRST_BAG, LAST_BAG do
+		local _, bagType = GetContainerNumFreeSlots(bag);
+		if bag == 0 or bagType == 0 then
+			for slot = 1, GetContainerNumSlots(bag) do
+				table.insert(slots, { bag = bag, slot = slot });
+			end
+		end
+	end
+	return slots;
+end
+
+-- next swap to do: first slot whose item is not the wanted one, and where the wanted one is
+local function NextSwap()
+	local slots = SortableSlots();
+	local keys, wanted = {}, {};
+	for index, pos in ipairs(slots) do
+		local _, _, locked = GetContainerItemInfo(pos.bag, pos.slot);
+		if locked then
+			return "wait";
+		end
+		keys[index] = SortKey(GetContainerItemLink(pos.bag, pos.slot));
+		if keys[index] then
+			table.insert(wanted, keys[index]);
+		end
+	end
+	table.sort(wanted);
+
+	-- identical items (same key) count as equal: swapping them would only merge stacks
+	for index = 1, #slots do
+		local want = wanted[index];
+		if keys[index] ~= want then
+			for from = index + 1, #slots do
+				if keys[from] == want then
+					return slots[from], slots[index];
+				end
+			end
+			return nil;
+		end
+	end
+	return nil;
+end
+
+sorter:SetScript("OnUpdate", function(self, elapsed)
+	self.delay = (self.delay or 0) - elapsed;
+	if self.delay > 0 then
+		return;
+	end
+	self.delay = SORT_STEP_DELAY;
+
+	if InCombatLockdown() or CursorHasItem() then
+		return;
+	end
+	self.steps = self.steps + 1;
+	local from, to = NextSwap();
+	if from == "wait" and self.steps < SORT_MAX_STEPS then
+		return;
+	end
+	if not from or self.steps >= SORT_MAX_STEPS then
+		self:Hide();
+		return;
+	end
+	PickupContainerItem(from.bag, from.slot);
+	PickupContainerItem(to.bag, to.slot);
+	if CursorHasItem() then
+		ClearCursor();
+	end
+end);
+
+function ContainerFrameRetail_SortBags()
+	if InCombatLockdown() then
+		UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "Нельзя в бою", 1, 0.1, 0.1);
+		return;
+	end
+	sorter.steps = 0;
+	sorter.delay = 0;
+	sorter:Show();
+end
