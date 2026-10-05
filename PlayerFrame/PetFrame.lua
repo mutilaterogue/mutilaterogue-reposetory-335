@@ -29,11 +29,12 @@ function PetFrame_OnLoad (self)
 	end
 	SecureUnitButton_OnLoad(self, "pet", showmenu);
 	
+	-- under the player frame's bars (PetFrame.xml); lower for the runes / the druid's second power bar / the totems
 	local _, class = UnitClass("player");
-	if ( class == "DEATHKNIGHT"  or class == "DRUID" ) then	--Death Knights need the Pet frame moved down for their Runes and Druids need it moved down for the secondary power bar.
-		self:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 60, -75);
+	if ( class == "DEATHKNIGHT"  or class == "DRUID" ) then
+		self:SetPoint("TOPLEFT", PlayerFrame, "BOTTOMLEFT", 80, -3);
 	elseif ( class == "SHAMAN" ) then
-		self:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", 60, -100);
+		self:SetPoint("TOPLEFT", PlayerFrame, "BOTTOMLEFT", 80, -28);
 	end
 end
 
@@ -47,11 +48,9 @@ function PetFrame_Update (self, override)
 			end
 			--self.flashState = 1;
 			--self.flashTimer = PET_FLASH_ON_TIME;
+			-- retail: one frame art (PetFrame.xml), no "no mana" variant
 			if ( UnitPowerMax(self.unit) == 0 ) then
-				PetFrameTexture:SetTexture("Interface\\TargetingFrame\\UI-SmallTargetingFrame-NoMana");
 				PetFrameManaBarText:Hide();
-			else
-				PetFrameTexture:SetTexture("Interface\\TargetingFrame\\UI-SmallTargetingFrame");
 			end
 			PetAttackModeTexture:Hide();
 
@@ -203,3 +202,23 @@ function PetCastingBarFrame_OnEvent (self, event, ...)
 	end
 	CastingBarFrame_OnEvent(self, event, ...);
 end
+-- the retail power bar art by the power type (TargetofTarget bars), white: the atlas has the color
+local PET_POWER_BAR_ATLAS = {
+	[0] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Mana",
+	[1] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Rage",
+	[2] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Focus",
+	[3] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Energy",
+	[6] = "UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-RunicPower",
+};
+
+hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar)
+	if ( manaBar ~= PetFrameManaBar or not manaBar.unit ) then
+		return;
+	end
+	local atlas = PET_POWER_BAR_ATLAS[UnitPowerType(manaBar.unit)] or PET_POWER_BAR_ATLAS[0];
+	local texture = manaBar:GetStatusBarTexture();
+	if ( texture and texture.SetAtlas ) then
+		texture:SetAtlas(atlas);
+	end
+	manaBar:SetStatusBarColor(1, 1, 1);
+end);
