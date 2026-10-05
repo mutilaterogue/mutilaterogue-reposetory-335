@@ -6,12 +6,14 @@ Only the .m2 and its .skin files are copied: the textures are referenced by full
 
 Camera (WotLK, 100 bytes, M2 header cameras at 0x110): type, fov, far, near, positions track,
 position_base (+36), target track, target_base (+68), roll track. The glue backgrounds keep static
-cameras in the base vectors (the tracks hold zeros), so only the bases are moved:
-  target' = target + (0, 0, LIFT)                         raised from the chest to the face
-  camera' = target' + (camera - target) * DISTANCE        same direction, closer
+cameras in the base vectors (the tracks hold zeros), so only the bases are moved. The character stands at
+the background's attachment 0 (attachments at 0xF0, 40 bytes, position at +8):
+  target' = the face: attachment 0 + HEIGHT * FACE up
+  camera' = level with it, on the scene camera's side, at the distance the head view needs (fov, VIEW)
 
 Usage: python tools/glue_zoom.py <...\\Interface\\Glues\\Models> <out dir> [Name ...]
 """
+import math
 import os
 import shutil
 import struct
@@ -22,12 +24,14 @@ CAMERA_SIZE = 100
 POSITION_BASE = 36
 TARGET_BASE = 68
 
-DISTANCE = 0.6      # of the camera's distance to its target
-LIFT = 0.3          # the target up to the face (scene units)
-# per background (smaller races, other scales); missing names use the defaults above
-TUNING = {
-    "Dwarf": (0.65, 0.12),       # also the gnomes
-    "Tauren": (0.6, 0.4),
+ATTACHMENTS = 0xF0     # attachment 0 of a glue background: where the character stands (feet)
+ATTACHMENT_SIZE = 40
+FACE = 0.9              # the face at this part of the character's height
+VIEW = 0.45             # the view this part of the character's height tall
+# the character's height per background (the client puts gnomes on Dwarf, trolls on Orc)
+HEIGHT = {
+    "Human": 1.8, "Dwarf": 1.2, "NightElf": 2.2, "Draenei": 2.3, "Orc": 1.8,
+    "Scourge": 1.6, "Tauren": 2.5, "BloodElf": 1.8, "DeathKnight": 1.8,
 }
 
 DEFAULT_NAMES = ["Human", "Dwarf", "NightElf", "Draenei", "Orc", "Scourge", "Tauren", "BloodElf", "DeathKnight"]
@@ -41,17 +45,27 @@ def find_dir(models, name):
 
 
 def zoom_camera(data, name):
-    distance, lift = TUNING.get(name, (DISTANCE, LIFT))
+    height = HEIGHT.get(name, 1.8)
     count, offset = struct.unpack_from("<II", data, CAMERAS)
+    natt, oatt = struct.unpack_from("<II", data, ATTACHMENTS)
+    if not natt:
+        print("  no attachment 0 (the character's place)")
+        return 0
+    feet = struct.unpack_from("<3f", data, oatt + 8)
+    face = (feet[0], feet[1], feet[2] + height * FACE)
     for i in range(count):
         base = offset + i * CAMERA_SIZE
+        fov = struct.unpack_from("<f", data, base + 4)[0]
         pos = struct.unpack_from("<3f", data, base + POSITION_BASE)
         tgt = struct.unpack_from("<3f", data, base + TARGET_BASE)
-        new_tgt = (tgt[0], tgt[1], tgt[2] + lift)
-        new_pos = tuple(new_tgt[k] + (pos[k] - tgt[k]) * distance for k in range(3))
-        struct.pack_into("<3f", data, base + TARGET_BASE, *new_tgt)
+        # the same side as the scene's camera, level with the face, as far as the head view needs
+        dx, dy = pos[0] - feet[0], pos[1] - feet[1]
+        length = math.hypot(dx, dy) or 1.0
+        distance = (height * VIEW / 2) / math.tan(fov / 2)
+        new_pos = (face[0] + dx / length * distance, face[1] + dy / length * distance, face[2])
+        struct.pack_into("<3f", data, base + TARGET_BASE, *face)
         struct.pack_into("<3f", data, base + POSITION_BASE, *new_pos)
-        print(f"  camera {i}: {fmt(pos)} -> {fmt(new_pos)}, target {fmt(tgt)} -> {fmt(new_tgt)}")
+        print(f"  camera {i}: {fmt(pos)} -> {fmt(new_pos)}, target {fmt(tgt)} -> {fmt(face)} (feet {fmt(feet)})")
     return count
 
 
