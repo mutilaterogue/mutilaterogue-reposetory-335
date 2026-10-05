@@ -271,6 +271,8 @@ local function Embed(name, full, y)
 	end
 	embedded[name] = true;
 	if frame.isPlaceholder then
+		-- inside this window, not under it (a UIParent child is drawn below the window's background)
+		frame:SetParent(PVEFrame);
 		frame:ClearAllPoints();
 		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", 224, 0);
 		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 2);
