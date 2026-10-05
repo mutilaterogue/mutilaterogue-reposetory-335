@@ -9,7 +9,7 @@
 
 CharacterCreateRetail = {};
 local CR = CharacterCreateRetail;
-CR.DEMO_NO_ALLIANCE_RINGS = true;	-- TEMP: false brings the Alliance rings back
+CR.DEMO_NO_ALLIANCE_RINGS = false;	-- TEMP: false brings the Alliance rings back
 
 local RACE_SIZE, RACE_SPACING = 64, 82;
 local CLASS_SIZE, CLASS_SPACING = 52, 80;
@@ -110,17 +110,18 @@ local function StyleIconButton(button, size, small, ring)
 	Hide(name .. "BevelEdge");
 	Hide(name .. "Text");
 	local normal, pushed = _G[name .. "NormalTexture"], _G[name .. "PushedTexture"];
+	local iconSize = size - (small and 11 or 12);	-- the class icons a pixel bigger
 	for _, texture in ipairs({ normal or false, pushed or false }) do
 		if texture then
 			texture:ClearAllPoints();
 			texture:SetPoint("CENTER");
-			texture:SetWidth(size - 12);
-			texture:SetHeight(size - 12);
+			texture:SetWidth(iconSize);
+			texture:SetHeight(iconSize);
 		end
 	end
 	-- the mask exactly over the icon: outside its rect a mask repeats its edge pixels, and the circle
 	-- touches the edge at the middle of each side (thin dark lines there when the icon was bigger)
-	AddRoundMask(button, { normal or false, pushed or false }, size - 12);
+	AddRoundMask(button, { normal or false, pushed or false }, iconSize);
 
 	AddRings(button, size, ring, small and 3 or 0);
 	local highlight = button:GetHighlightTexture();
