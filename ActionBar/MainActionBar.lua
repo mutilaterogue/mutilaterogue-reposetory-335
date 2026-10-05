@@ -15,48 +15,6 @@ local function SetAtlasIf(texture, atlas, useSize)
 	return false;
 end
 
--- a nine slice atlas over a frame's rect (margins: the atlas' slice data in AtlasInfo)
-local function SliceAtlas(frame, atlas, layer, subLevel, region)
-	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
-	local file = info and (info.filename or info.file);
-	local u1, u2 = info and (info.leftTexCoord or info.left), info and (info.rightTexCoord or info.right);
-	local v1, v2 = info and (info.topTexCoord or info.top), info and (info.bottomTexCoord or info.bottom);
-	if not (file and u1 and u2 and v1 and v2 and info.width and info.width > 0) then
-		return;
-	end
-	local left, top, right, bottom = 0, 0, 0, 0;
-	local raw = AtlasInfo and AtlasInfo[file] and (AtlasInfo[file][atlas] or AtlasInfo[file][strlower(atlas)]);
-	if info.sliceData then
-		local slice = info.sliceData;
-		left, top, right, bottom = slice.marginLeft, slice.marginTop, slice.marginRight, slice.marginBottom;
-	elseif raw and raw.slice then
-		left, top, right, bottom = raw.slice[1], raw.slice[2], raw.slice[3], raw.slice[4];
-	end
-	local du, dv = (u2 - u1) / info.width, (v2 - v1) / info.height;
-	local cols = {
-		{ u1, u1 + left * du, "LEFT", 0, "LEFT", left },
-		{ u1 + left * du, u2 - right * du, "LEFT", left, "RIGHT", -right },
-		{ u2 - right * du, u2, "RIGHT", -right, "RIGHT", 0 },
-	};
-	local rows = {
-		{ v1, v1 + top * dv, "TOP", 0, "TOP", -top },
-		{ v1 + top * dv, v2 - bottom * dv, "TOP", -top, "BOTTOM", bottom },
-		{ v2 - bottom * dv, v2, "BOTTOM", bottom, "BOTTOM", 0 },
-	};
-	for _, row in ipairs(rows) do
-		for _, col in ipairs(cols) do
-			local piece = frame:CreateTexture(nil, layer);
-			if subLevel and piece.SetDrawLayer then
-				piece:SetDrawLayer(layer, subLevel);
-			end
-			piece:SetTexture(file);
-			piece:SetTexCoord(col[1], col[2], row[1], row[2]);
-			piece:SetPoint("TOPLEFT", region, row[3] .. col[3], col[4], row[4]);
-			piece:SetPoint("BOTTOMRIGHT", region, row[5] .. col[5], col[6], row[6]);
-		end
-	end
-end
-
 ---------------------------------------------------------------------------
 -- the retail button art
 ---------------------------------------------------------------------------
@@ -232,8 +190,6 @@ function MainActionBar_OnLoad(self)
 	self:SetFrameLevel(level);
 	self.EndCaps:SetFrameLevel(level + 5);
 	self.ActionBarPageNumber:SetFrameLevel(level + 5);
-
-	SliceAtlas(self, "UI-HUD-ActionBar-Frame", "BACKGROUND", -3, self.BorderArt);
 
 	MainActionBar_HideStockArt();
 

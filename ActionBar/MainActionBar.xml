@@ -12,12 +12,64 @@
 			<Anchor point="BOTTOM" relativeTo="MainMenuBar" relativePoint="TOP" x="0" y="14"/>
 		</Anchors>
 		<Layers>
-			<!-- the bar frame (a nine slice atlas, sliced over this empty region in MainActionBar_OnLoad) -->
+			<!-- the bar's dark fill under the slots (UI-HUD-ActionBar-Frame-Background-NineSlice-Center) -->
 			<Layer level="BACKGROUND" textureSubLevel="-3">
-				<Texture parentKey="BorderArt">
+				<Texture name="$parentBackground" atlas="UI-HUD-ActionBar-Frame-Background-NineSlice-Center">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="2" y="-1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<!-- the bar frame: the retail nine slice pieces (UI-HUD-ActionBar-Frame-NineSlice-*), over the rect
+			     (-4, 4) - (8, -7) of the retail BorderArt -->
+			<Layer level="BORDER" textureSubLevel="2">
+				<Texture name="$parentFrameTopLeft" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerTopLeft">
+					<Size x="17" y="16"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="-4" y="4"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameTopRight" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerTopRight">
+					<Size x="22" y="16"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="8" y="4"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameBottomLeft" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerBottomLeft">
+					<Size x="17" y="23"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="-4" y="-7"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameBottomRight" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerBottomRight">
+					<Size x="22" y="23"/>
+					<Anchors>
 						<Anchor point="BOTTOMRIGHT" x="8" y="-7"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameTop" atlas="_UI-HUD-ActionBar-Frame-NineSlice-EdgeTop" horizTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameTopLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameTopRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameBottom" atlas="_UI-HUD-ActionBar-Frame-NineSlice-EdgeBottom" horizTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameBottomLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameBottomRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameLeft" atlas="!UI-HUD-ActionBar-Frame-NineSlice-EdgeLeft" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameTopLeft" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameBottomLeft" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameRight" atlas="!UI-HUD-ActionBar-Frame-NineSlice-EdgeRight" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameTopRight" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameBottomRight" relativePoint="TOPRIGHT"/>
 					</Anchors>
 				</Texture>
 			</Layer>
