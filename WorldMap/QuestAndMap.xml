@@ -271,14 +271,14 @@
 				</Anchors>
 				<Layers>
 					<Layer level="BACKGROUND">
-						<Texture parentKey="Background" atlas="common-sidetab" useAtlasSize="true">
+						<Texture parentKey="Background" atlas="common-sidetab-2x" useAtlasSize="true">
 							<Anchors>
 								<Anchor point="CENTER"/>
 							</Anchors>
 						</Texture>
 					</Layer>
 					<Layer level="BORDER">
-						<Texture parentKey="SelectedTexture" atlas="common-sidetab-selected" useAtlasSize="true">
+						<Texture parentKey="SelectedTexture" atlas="common-sidetab-selected-2x" useAtlasSize="true">
 							<Anchors>
 								<Anchor point="CENTER"/>
 							</Anchors>
@@ -292,7 +292,7 @@
 						</Texture>
 					</Layer>
 					<Layer level="HIGHLIGHT">
-						<Texture atlas="common-sidetab-hover" useAtlasSize="true" alphaMode="ADD">
+						<Texture atlas="common-sidetab-hover-2x" useAtlasSize="true" alphaMode="ADD">
 							<Anchors>
 								<Anchor point="CENTER"/>
 							</Anchors>
