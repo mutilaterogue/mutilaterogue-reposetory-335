@@ -177,7 +177,13 @@ function RaidFinderFrame_OnLoad(self)
 	self.Info.QueueTitle:SetTextColor(1, 0.82, 0);
 	self.Info.Description:SetTextColor(1, 1, 1);
 	self.Info.Queue:SetTextColor(1, 1, 1);
-	-- the content over the inset
+end
+
+-- the inset under the content: set on every show, PVEFrame changes this frame's level when it takes it in
+local function LayerInset(self)
+	self.Inset:ClearAllPoints();
+	self.Inset:SetPoint("TOPLEFT", self, "TOPLEFT", 4, -60);
+	self.Inset:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -6, 26);
 	self.Inset:SetFrameLevel(self:GetFrameLevel());
 	for _, child in ipairs({ self:GetChildren() }) do
 		if child ~= self.Inset then
@@ -187,6 +193,7 @@ function RaidFinderFrame_OnLoad(self)
 end
 
 function RaidFinderFrame_OnShow(self)
+	LayerInset(self);
 	Send("RF_LIST");
 	Send("RF_STATUS");
 	Update();
