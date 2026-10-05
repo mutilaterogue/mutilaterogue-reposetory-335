@@ -166,7 +166,7 @@ end
 -- the saved place (retail style): the frame's point nearest to the screen's edges (corner, side or center),
 -- the offset from that same point of UIParent. A frame at the right / top edge stays there when the UI scale
 -- (UIParent's size in UI units) changes; from the bottom left corner it would drift.
-local function GetAnchoredPosition(frame)
+local function GetAnchoredPosition(frame, defaultPoint)
 	local left, bottom = GetFramePosition(frame);
 	if not left then
 		return nil;
@@ -179,9 +179,20 @@ local function GetAnchoredPosition(frame)
 	-- by the nearest edge, not the center: a frame whose size follows the screen or its contents
 	-- (the objective tracker's height, the micro menu's width) keeps that edge where it was
 	local right, top = left + width, bottom + height;
+	-- a frame near both edges (the objective tracker is almost the screen's height): the side of its default
+	-- anchor, the one it grows from
+	defaultPoint = defaultPoint or "";
 	local h, x;
 	if math.min(left, screenWidth - right) < screenWidth / 3 then
-		if left <= screenWidth - right then
+		local nearLeft = left <= screenWidth - right;
+		if left < screenWidth / 3 and screenWidth - right < screenWidth / 3 then
+			if defaultPoint:find("LEFT") then
+				nearLeft = true;
+			elseif defaultPoint:find("RIGHT") then
+				nearLeft = false;
+			end
+		end
+		if nearLeft then
 			h, x = "LEFT", left;
 		else
 			h, x = "RIGHT", right - screenWidth;
@@ -191,7 +202,15 @@ local function GetAnchoredPosition(frame)
 	end
 	local v, y;
 	if math.min(bottom, screenHeight - top) < screenHeight / 3 then
-		if bottom <= screenHeight - top then
+		local nearBottom = bottom <= screenHeight - top;
+		if bottom < screenHeight / 3 and screenHeight - top < screenHeight / 3 then
+			if defaultPoint:find("BOTTOM") then
+				nearBottom = true;
+			elseif defaultPoint:find("TOP") then
+				nearBottom = false;
+			end
+		end
+		if nearBottom then
 			v, y = "BOTTOM", bottom;
 		else
 			v, y = "TOP", top - screenHeight;
@@ -378,7 +397,7 @@ function EditModeCore:StoreSystemPosition(systemName)
 		return;
 	end
 
-	local point, x, y = GetAnchoredPosition(system.frame);
+	local point, x, y = GetAnchoredPosition(system.frame, system.defaultPoints[1] and system.defaultPoints[1][1]);
 	if point then
 		entry.point, entry.x, entry.y = point, x, y;
 	end
@@ -424,7 +443,7 @@ function EditModeCore:ApplyLayoutToSystem(systemName)
 		else
 			SetFramePosition(system.frame, entry.x, entry.y);
 			-- and from now on anchored (kept with the next save)
-			local point, x, y = GetAnchoredPosition(system.frame);
+			local point, x, y = GetAnchoredPosition(system.frame, system.defaultPoints[1] and system.defaultPoints[1][1]);
 			if point then
 				entry.point, entry.x, entry.y = point, x, y;
 			end
