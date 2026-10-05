@@ -372,7 +372,8 @@ local function ApplyPending()
 			local byLayer = {}
 
 			for _, region in ipairs({ parent:GetRegions() }) do
-				if region.GetDrawLayer then
+				-- textures only: OriginalSetDrawLayer is the Texture method (a FontString errors with it)
+				if region.GetDrawLayer and region:IsObjectType("Texture") then
 					local layer = region:GetDrawLayer()
 					byLayer[layer] = byLayer[layer] or {}
 					local list = byLayer[layer]
