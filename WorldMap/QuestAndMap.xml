@@ -316,8 +316,8 @@
 
 			<ScrollFrame name="QuestScrollFrame" parentKey="QuestsFrame" inherits="UIPanelScrollFrameTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="1" y="-1"/>
-					<Anchor point="BOTTOMRIGHT" x="-27" y="1"/>
+					<Anchor point="TOPLEFT" x="1" y="-20"/>
+					<Anchor point="BOTTOMRIGHT" x="-30" y="20"/>
 				</Anchors>
 				<ScrollChild>
 					<Frame name="QuestScrollFrameContents" parentKey="Contents">
@@ -350,8 +350,8 @@
 					</Button>
 					<ScrollFrame name="QuestMapDetailsScrollFrame" parentKey="ScrollFrame" inherits="UIPanelScrollFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="4" y="-34"/>
-							<Anchor point="BOTTOMRIGHT" x="-27" y="26"/>
+							<Anchor point="TOPLEFT" x="4" y="-52"/>
+							<Anchor point="BOTTOMRIGHT" x="-30" y="44"/>
 						</Anchors>
 						<ScrollChild>
 							<Frame name="QuestMapDetailsScrollChild" parentKey="Contents">
@@ -372,16 +372,6 @@
 										<Anchors>
 											<Anchor point="TOPLEFT" relativeTo="QuestMapDetailsTextFrame" relativePoint="BOTTOMLEFT"/>
 										</Anchors>
-										<Layers>
-											<Layer level="BACKGROUND">
-												<Texture name="$parentBackground" atlas="QuestDetails-RewardsOverlay">
-													<Anchors>
-														<Anchor point="TOPLEFT" x="25" y="0"/>
-														<Anchor point="BOTTOMRIGHT"/>
-													</Anchors>
-												</Texture>
-											</Layer>
-										</Layers>
 									</Frame>
 								</Frames>
 							</Frame>
