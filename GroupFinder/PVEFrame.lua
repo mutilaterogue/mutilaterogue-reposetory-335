@@ -208,10 +208,9 @@ local function ApplyRetailLFD()
 		LFDQueueFrameTypeDropDown:ClearAllPoints();
 		LFDQueueFrameTypeDropDown:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 117, 285);
 	end
+	-- retail has no quest paper under the list: the dark inset only
 	if LFDQueueFrameBackground then
-		LFDQueueFrameBackground:ClearAllPoints();
-		LFDQueueFrameBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 26);
-		LFDQueueFrameBackground:Show();
+		Suppress(LFDQueueFrameBackground);
 	end
 	-- the old scroll bar backgrounds; the bar itself in the retail style
 	for _, scrollName in ipairs({ "LFDQueueFrameRandomScrollFrame", "LFDQueueFrameSpecificListScrollFrame" }) do
