@@ -152,7 +152,7 @@ function QuestMap_RetailScrollBar(scrollFrame)
 
 	-- the thumb: the slider keeps an invisible thumb for dragging; the visible thumb (top cap, middle,
 	-- bottom cap) is a frame placed by the bar's value itself, so nothing lags behind or falls apart
-	local THUMB_HEIGHT = 50;
+	local THUMB_HEIGHT = 40;
 	local thumb = bar:GetThumbTexture();
 	if thumb then
 		thumb:SetTexture(0, 0, 0, 0);
@@ -163,21 +163,21 @@ function QuestMap_RetailScrollBar(scrollFrame)
 		visual:SetHeight(THUMB_HEIGHT);
 		visual:SetFrameLevel(bar:GetFrameLevel() + 2);
 		local capTop = visual:CreateTexture(nil, "ARTWORK");
-		SetAtlasIf(capTop, "minimal-scrollbar-thumb-top", true);
+		SetAtlasIf(capTop, "minimal-scrollbar-small-thumb-top", true);
 		capTop:SetPoint("TOP");
 		local capBottom = visual:CreateTexture(nil, "ARTWORK");
-		SetAtlasIf(capBottom, "minimal-scrollbar-thumb-bottom", true);
+		SetAtlasIf(capBottom, "minimal-scrollbar-small-thumb-bottom", true);
 		capBottom:SetPoint("BOTTOM");
 		local middle = visual:CreateTexture(nil, "ARTWORK");
-		SetAtlasIf(middle, "minimal-scrollbar-thumb-middle");
+		SetAtlasIf(middle, "minimal-scrollbar-small-thumb-middle");
 		middle:SetPoint("TOPLEFT", capTop, "BOTTOMLEFT");
 		middle:SetPoint("BOTTOMRIGHT", capBottom, "TOPRIGHT");
 		-- the middle atlas is 715 px tall: only its top part, not the whole strip squeezed
-		local info = C_Texture.GetAtlasInfo("minimal-scrollbar-thumb-middle");
+		local info = C_Texture.GetAtlasInfo("minimal-scrollbar-small-thumb-middle");
 		if info then
 			local l, r = info.left or info.leftTexCoord, info.right or info.rightTexCoord;
 			local t, bt = info.top or info.topTexCoord, info.bottom or info.bottomTexCoord;
-			middle:SetTexCoord(l, r, t, t + (bt - t) * (THUMB_HEIGHT - 44) / 715);
+			middle:SetTexCoord(l, r, t, t + (bt - t) * (THUMB_HEIGHT - 16) / 715);
 		end
 		bar.thumbVisual = visual;
 		-- follow the value; hidden when there is nothing to scroll
