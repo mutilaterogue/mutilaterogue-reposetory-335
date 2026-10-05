@@ -145,6 +145,132 @@ function WorldMapLegionNavBar_Update()
 end
 
 ---------------------------------------------------------------------------
+-- zoom and pan (retail map canvas): mouse wheel zooms at the cursor, a drag moves the zoomed map
+---------------------------------------------------------------------------
+local ZOOM_MIN, ZOOM_MAX, ZOOM_STEP = 1, 3, 0.25;
+local zoom, panX, panY = 1, 0, 0;
+local onCanvas = false;
+-- the stock frames drawn over the map area: they go into the canvas while the window shows
+local CANVAS_FRAMES = { "WorldMapDetailFrame", "WorldMapButton", "WorldMapPOIFrame", "WorldMapBossButtonFrame",
+	"WorldMapArchaeologyDigSites" };
+
+local function ApplyZoom()
+	local canvas = WorldMapLegionCanvas;
+	local maxX, maxY = MAP_WIDTH * (zoom - 1), MAP_HEIGHT * (zoom - 1);
+	panX = math.max(0, math.min(panX, maxX));
+	panY = math.max(0, math.min(panY, maxY));
+	canvas:SetScale(zoom);
+	canvas:ClearAllPoints();
+	canvas:SetPoint("TOPLEFT", WorldMapLegionScrollHolder, "TOPLEFT", -panX / zoom, panY / zoom);
+	if WorldMapBlobFrame_CalculateHitTranslations then
+		WorldMapBlobFrame_CalculateHitTranslations();
+	end
+	if WorldMapFrame_SetPOIMaxBounds then
+		WorldMapFrame_SetPOIMaxBounds();
+	end
+end
+
+function WorldMapLegion_ResetZoom()
+	zoom, panX, panY = 1, 0, 0;
+	if onCanvas then
+		ApplyZoom();
+	end
+end
+
+-- the cursor in the view (pixels from its top left, in the view's scale)
+local function CursorInView()
+	local view = WorldMapLegionScrollFrame;
+	local scale = view:GetEffectiveScale();
+	local x, y = GetCursorPosition();
+	return x / scale - view:GetLeft(), view:GetTop() - y / scale;
+end
+
+local function OnMouseWheel(self, delta)
+	if not onCanvas then
+		return;
+	end
+	local newZoom = math.max(ZOOM_MIN, math.min(ZOOM_MAX, zoom + delta * ZOOM_STEP));
+	if newZoom == zoom then
+		return;
+	end
+	-- the map point under the cursor stays under it
+	local cx, cy = CursorInView();
+	local mx, my = (cx + panX) / zoom, (cy + panY) / zoom;
+	zoom = newZoom;
+	panX, panY = mx * zoom - cx, my * zoom - cy;
+	ApplyZoom();
+end
+
+-- a drag pans (zoomed); a drag is not a click on the map
+local dragger = CreateFrame("Frame");
+dragger:Hide();
+dragger:SetScript("OnUpdate", function(self)
+	local x, y = CursorInView();
+	local dx, dy = x - self.x, y - self.y;
+	if not self.moved and math.abs(dx) + math.abs(dy) > 4 then
+		self.moved = true;
+	end
+	if self.moved then
+		panX, panY = self.panX - dx, self.panY - dy;
+		ApplyZoom();
+	end
+end);
+
+local function OnMouseDown(self, button)
+	if onCanvas and button == "LeftButton" and zoom > 1 then
+		dragger.x, dragger.y = CursorInView();
+		dragger.panX, dragger.panY = panX, panY;
+		dragger.moved = false;
+		dragger:Show();
+	end
+end
+
+local function OnMouseUp(self, button)
+	if dragger:IsShown() and button == "LeftButton" then
+		dragger:Hide();
+		WorldMapLegion.dragged = dragger.moved;
+	end
+end
+
+WorldMapLegion = WorldMapLegion or {};
+WorldMapButton:EnableMouseWheel(true);
+WorldMapButton:SetScript("OnMouseWheel", OnMouseWheel);
+WorldMapButton:HookScript("OnMouseDown", OnMouseDown);
+WorldMapButton:HookScript("OnMouseUp", OnMouseUp);
+local stockButtonClick = WorldMapButton_OnClick;
+WorldMapButton_OnClick = function(...)
+	if WorldMapLegion.dragged then
+		WorldMapLegion.dragged = false;
+		return;
+	end
+	return stockButtonClick(...);
+end;
+
+-- the stock map frames into the canvas (windowed) or back to the map frame (full screen)
+local function SetOnCanvas(on)
+	if on == onCanvas then
+		return;
+	end
+	onCanvas = on;
+	local parent = on and WorldMapLegionCanvas or WorldMapFrame;
+	for _, name in ipairs(CANVAS_FRAMES) do
+		local frame = _G[name];
+		if frame and (on and frame:GetParent() == WorldMapFrame or not on and frame:GetParent() == WorldMapLegionCanvas) then
+			frame:SetParent(parent);
+		end
+	end
+	if on then
+		WorldMapLegionScrollFrame:Show();
+	else
+		WorldMapLegionScrollFrame:Hide();
+		zoom, panX, panY = 1, 0, 0;
+	end
+	if WorldMapFrame_ResetFrameLevels then
+		WorldMapFrame_ResetFrameLevels();
+	end
+end
+
+---------------------------------------------------------------------------
 -- layout
 ---------------------------------------------------------------------------
 -- the stock windowed map parts the Legion window replaces
@@ -175,10 +301,16 @@ function WorldMapLegion_Layout()
 			end
 		end
 
-		-- the map in the window (anchor offsets are in the map's scale)
+		-- the map in the window: the canvas view where the map was, the map at the canvas' top left
+		local view = WorldMapLegionScrollFrame;
+		view:ClearAllPoints();
+		view:SetPoint("TOPLEFT", border, "TOPLEFT", 1, -TOP);
+		view:SetFrameLevel(WorldMapFrame:GetFrameLevel() + 1);
+		SetOnCanvas(true);
 		local scale = WorldMapDetailFrame:GetScale();
 		WorldMapDetailFrame:ClearAllPoints();
-		WorldMapDetailFrame:SetPoint("TOPLEFT", border, "TOPLEFT", 1 / scale, -TOP / scale);
+		WorldMapDetailFrame:SetPoint("TOPLEFT", WorldMapLegionCanvas, "TOPLEFT", 0, 0);
+		ApplyZoom();
 
 		WorldMapLegionNavBar:SetWidth(MAP_WIDTH - 180);
 		WorldMapLevelDropDown:ClearAllPoints();
@@ -203,6 +335,7 @@ function WorldMapLegion_Layout()
 		end
 		WorldMapLegionNavBar_Update();
 	else
+		SetOnCanvas(false);
 		border:Hide();
 		panelButton:Hide();
 		WorldMapFrameCloseButton:Show();
@@ -220,6 +353,10 @@ function WorldMapLegion_Layout()
 		end
 	end
 	QuestMapFrame:SetFrameLevel(WorldMapDetailFrame:GetFrameLevel() + 30);
+	-- the retail border over the list and the details
+	if QuestMapFrame.BorderFrame then
+		QuestMapFrame.BorderFrame:SetFrameLevel(QuestMapFrame:GetFrameLevel() + 20);
+	end
 end
 
 hooksecurefunc("WorldMap_ToggleSizeUp", WorldMapLegion_Layout);
@@ -227,9 +364,16 @@ hooksecurefunc("WorldMap_ToggleSizeDown", WorldMapLegion_Layout);
 hooksecurefunc("WorldMapFrame_SetMiniMode", WorldMapLegion_Layout);
 hooksecurefunc("WorldMapFrame_SetQuestMapView", WorldMapLegion_Layout);
 hooksecurefunc("WorldMapFrame_SetFullMapView", WorldMapLegion_Layout);
+local lastMapID;
 hooksecurefunc("WorldMapFrame_UpdateMap", function()
 	if IsWindowed() then
 		WorldMapLegionNavBar_Update();
+		-- another map: the zoom back to the whole map
+		local mapID = tostring(GetCurrentMapContinent()) .. ":" .. tostring(GetCurrentMapZone()) .. ":" .. tostring(GetCurrentMapDungeonLevel());
+		if mapID ~= lastMapID then
+			lastMapID = mapID;
+			WorldMapLegion_ResetZoom();
+		end
 	end
 end);
 WorldMapFrame:HookScript("OnShow", WorldMapLegion_Layout);

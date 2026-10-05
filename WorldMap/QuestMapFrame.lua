@@ -249,15 +249,13 @@ function QuestLogQuests_Update(poiTable)
 				noHeaders = false;
 				headerIndex = headerIndex + 1;
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
-				button:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up");
-				button:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight");
+				SetAtlasIf(button.CollapseIcon, "common-button-list-plus");
 				button.ButtonText:SetText(headerTitle or "");
-				button:SetHitRectInsets(0, -button.ButtonText:GetWidth(), 0, 0);
 				button:ClearAllPoints();
 				if prevButton then
 					button:SetPoint("TOPLEFT", prevButton, "BOTTOMLEFT", 0, 0);
 				else
-					button:SetPoint("TOPLEFT", 1, -6);
+					button:SetPoint("TOPLEFT", 4, -6);
 				end
 				button.questLogIndex = headerLogIndex;
 				button:Show();
@@ -270,15 +268,13 @@ function QuestLogQuests_Update(poiTable)
 				noHeaders = false;
 				headerIndex = headerIndex + 1;
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
-				button:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up");
-				button:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight");
+				SetAtlasIf(button.CollapseIcon, "common-button-list-minus");
 				button.ButtonText:SetText(headerTitle or "");
-				button:SetHitRectInsets(0, -button.ButtonText:GetWidth(), 0, 0);
 				button:ClearAllPoints();
 				if prevButton then
 					button:SetPoint("TOPLEFT", prevButton, "BOTTOMLEFT", 0, 0);
 				else
-					button:SetPoint("TOPLEFT", 1, -6);
+					button:SetPoint("TOPLEFT", 4, -6);
 				end
 				button.questLogIndex = headerLogIndex;
 				button:Show();
@@ -309,12 +305,11 @@ function QuestLogQuests_Update(poiTable)
 			button.Text:SetTextColor(difficultyColor.r, difficultyColor.g, difficultyColor.b);
 			button.difficultyColor = difficultyColor;
 			totalHeight = totalHeight + button.Text:GetHeight();
+			-- retail: the tracking box at the right, checked when watched
 			if IsQuestWatched(questLogIndex) then
-				button.Check:Show();
-				button.Check:ClearAllPoints();
-				button.Check:SetPoint("LEFT", button.Text, "LEFT", math.min(button.Text:GetStringWidth(), button.Text:GetWidth()) + 2, 0);
+				button.Checkbox.CheckMark:Show();
 			else
-				button.Check:Hide();
+				button.Checkbox.CheckMark:Hide();
 			end
 
 			local tagAtlas = TagAtlas(questTag, isComplete, isDaily);
@@ -419,7 +414,7 @@ function QuestLogQuests_Update(poiTable)
 			if prevButton then
 				button:SetPoint("TOPLEFT", prevButton, "BOTTOMLEFT", 0, 0);
 			else
-				button:SetPoint("TOPLEFT", 1, -6);
+				button:SetPoint("TOPLEFT", 4, -6);
 			end
 			button:Show();
 			prevButton = button;
@@ -429,9 +424,9 @@ function QuestLogQuests_Update(poiTable)
 
 	-- background
 	if titleIndex == 0 and noHeaders then
-		SetAtlasIf(questsFrame.Background, "NoQuestsBackground");
+		SetAtlasIf(questsFrame.Background, "QuestLog-main-background");
 	else
-		SetAtlasIf(questsFrame.Background, "QuestLogBackground");
+		SetAtlasIf(questsFrame.Background, "QuestLog-main-background");
 	end
 
 	if WORLDMAP_SETTINGS and WORLDMAP_SETTINGS.selectedQuestId then

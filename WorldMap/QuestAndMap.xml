@@ -10,38 +10,92 @@
 	<Script file="WorldMapLegion.lua"/>
 
 	<!-- QuestMapFrame.xml templates (renamed: 3.3.5 has its own QuestLog* templates) -->
+	<!-- retail ListHeaderVisualTemplate (QuestLogHeaderTemplate): a bar with the zone name and a +/- at the right -->
 	<Button name="QuestMapLogHeaderTemplate" virtual="true">
-		<Size x="16" y="16"/>
+		<Size x="292" y="24"/>
 		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Bar" atlas="common-button-list-collapseExpand" setAllPoints="true"/>
+			</Layer>
 			<Layer level="ARTWORK">
-				<FontString parentKey="ButtonText" inherits="GameFontNormalLarge" justifyH="LEFT">
-					<Size x="234" y="10"/>
+				<FontString parentKey="ButtonText" inherits="GameFontHighlightMedium" justifyH="LEFT">
+					<Size x="240" y="12"/>
 					<Anchors>
-						<Anchor point="LEFT" relativePoint="RIGHT" x="5" y="0"/>
+						<Anchor point="LEFT" x="9" y="1"/>
 					</Anchors>
 				</FontString>
+				<Texture parentKey="CollapseIcon" atlas="common-button-list-minus" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="RIGHT" x="-8" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture atlas="common-button-list-collapseExpand" alphaMode="ADD" alpha="0.4" setAllPoints="true"/>
 			</Layer>
 		</Layers>
 		<Scripts>
 			<OnLoad>
-				self.ButtonText:SetTextColor(0.7, 0.7, 0.7);
 				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
 			</OnLoad>
 			<OnClick>
 				QuestMapLogHeaderButton_OnClick(self, button);
 			</OnClick>
-			<OnEnter>
-				self.ButtonText:SetTextColor(1, 1, 1);
-			</OnEnter>
-			<OnLeave>
-				self.ButtonText:SetTextColor(0.7, 0.7, 0.7);
-			</OnLeave>
 		</Scripts>
 	</Button>
 
+	<!-- retail QuestLogTitleTemplate: the title, the tag, the tracking box at the right, the glow on hover -->
 	<Button name="QuestMapLogTitleTemplate" virtual="true">
 		<Size x="297" y="16"/>
+		<Frames>
+			<Button name="$parentCheckbox" parentKey="Checkbox">
+				<Size x="14" y="14"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-6" y="-8"/>
+				</Anchors>
+				<HitRectInsets>
+					<AbsInset left="-6" right="-6" top="-6" bottom="-6"/>
+				</HitRectInsets>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture atlas="questlog-icon-ticksquare" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture parentKey="CheckMark" atlas="questlog-icon-checkmark-yellow" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="1" y="1"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="HIGHLIGHT">
+						<Texture atlas="questlog-icon-ticksquare" useAtlasSize="true" alphaMode="ADD">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						PlaySound("igMainMenuOptionCheckBoxOn");
+						QuestMapQuestOptions_TrackQuest(self:GetParent().questID);
+					</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
 		<Layers>
+			<Layer level="BORDER">
+				<Texture parentKey="HighlightTexture" atlas="questlog-quest-glow-yellow" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Text" inherits="GameFontNormalLeft" justifyH="LEFT">
 					<Size x="215" y="0"/>
@@ -50,13 +104,10 @@
 					</Anchors>
 					<Color r="0.75" g="0.61" b="0"/>
 				</FontString>
-				<Texture parentKey="Check" file="Interface\Buttons\UI-CheckBox-Check" hidden="true">
-					<Size x="16" y="16"/>
-				</Texture>
 				<Texture parentKey="TagTexture" hidden="true">
 					<Size x="18" y="18"/>
 					<Anchors>
-						<Anchor point="TOPRIGHT" x="0" y="-5"/>
+						<Anchor point="TOPRIGHT" x="-24" y="-6"/>
 					</Anchors>
 				</Texture>
 			</Layer>
@@ -69,9 +120,11 @@
 				QuestMapLogTitleButton_OnClick(self, button);
 			</OnClick>
 			<OnEnter>
+				self.HighlightTexture:Show();
 				QuestMapLogTitleButton_OnEnter(self);
 			</OnEnter>
 			<OnLeave>
+				self.HighlightTexture:Hide();
 				QuestMapLogTitleButton_OnLeave(self);
 			</OnLeave>
 		</Scripts>
@@ -139,6 +192,25 @@
 		</Scripts>
 	</Frame>
 
+	<!-- the windowed map's canvas (retail MapCanvas ScrollContainer): the stock map frames move into it;
+	     the scroll frame clips, the canvas scales for the zoom and moves for the pan -->
+	<ScrollFrame name="WorldMapLegionScrollFrame" parent="WorldMapFrame" hidden="true">
+		<Size x="702" y="468"/>
+		<ScrollChild>
+			<Frame name="WorldMapLegionScrollHolder">
+				<Size x="702" y="468"/>
+				<Frames>
+					<Frame name="WorldMapLegionCanvas">
+						<Size x="702" y="468"/>
+						<Anchors>
+							<Anchor point="TOPLEFT"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+			</Frame>
+		</ScrollChild>
+	</ScrollFrame>
+
 	<Button name="WorldMapLegionQuestPanelButton" parent="WorldMapFrame" hidden="true">
 		<Size x="32" y="32"/>
 		<Layers>
@@ -172,7 +244,7 @@
 		<Size x="330" y="468"/>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentBackground" parentKey="Background" atlas="QuestLogBackground" setAllPoints="true"/>
+				<Texture name="$parentBackground" parentKey="Background" atlas="QuestLog-main-background" setAllPoints="true"/>
 			</Layer>
 			<Layer level="OVERLAY">
 				<Texture name="$parentVerticalSeparator" parentKey="VerticalSeparator">
@@ -187,6 +259,70 @@
 		</Layers>
 		<Frames>
 			<Frame name="QuestMapQuestOptionsDropDown" inherits="UIDropDownMenuTemplate" hidden="true"/>
+
+			<!-- retail QuestLogBorderFrameTemplate: the metal frame and its filigree over the list -->
+			<Frame name="$parentBorderFrame" parentKey="BorderFrame">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="-3" y="4"/>
+					<Anchor point="BOTTOMRIGHT" x="3" y="-4"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BORDER">
+						<Texture atlas="questlog-frame" setAllPoints="true"/>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture atlas="questlog-frame-filigree" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOP" x="0" y="1"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<!-- retail side tab (LargeSideTabButtonTemplate): Quests -->
+			<Button name="$parentQuestsTab" parentKey="QuestsTab">
+				<Size x="43" y="55"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="3" y="-28"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture atlas="common-sidetab-selected" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture parentKey="Icon" atlas="questlog-tab-icon-quest" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="-2" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="HIGHLIGHT">
+						<Texture atlas="common-sidetab-hover" useAtlasSize="true" alphaMode="ADD">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						QuestMapFrame_ReturnFromQuestDetails();
+					</OnClick>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+						GameTooltip:SetText(QUESTS_LABEL or QUEST_LOG);
+						GameTooltip:Show();
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
 
 			<ScrollFrame name="QuestScrollFrame" parentKey="QuestsFrame" inherits="UIPanelScrollFrameTemplate">
 				<Anchors>
