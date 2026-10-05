@@ -58,7 +58,8 @@ local questsFrame, contents, detailsFrame, detailsScroll, detailsContents, textP
 -- the corners at their atlas size, the edges and the middle stretched between them
 function QuestMap_SliceAtlas(frame, atlas, layer, left, top, right, bottom, pieces)
 	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
-	if not (info and info.filename and info.width and info.width > 0) then
+	local file = info and (info.filename or info.file);
+	if not (file and info.width and info.width > 0) then
 		return pieces or {};
 	end
 	if not left and info.sliceData then
@@ -91,7 +92,7 @@ function QuestMap_SliceAtlas(frame, atlas, layer, left, top, right, bottom, piec
 			index = index + 1;
 			local piece = pieces[index] or frame:CreateTexture(nil, layer or "BACKGROUND");
 			pieces[index] = piece;
-			piece:SetTexture(info.filename);
+			piece:SetTexture(file);
 			piece:SetTexCoord(col[1], col[2], row[1], row[2]);
 			piece:ClearAllPoints();
 			-- left / right edges, top / bottom edges of the piece
@@ -126,8 +127,8 @@ function QuestLogQuests_GetHeaderButton(index)
 	if not headers[index] then
 		local header = CreateFrame("Button", nil, contents, "QuestMapLogHeaderTemplate");
 		-- the retail header bar: a three slice, its highlight the same bar added
-		header.BarSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseExpand", "BACKGROUND", 10, 0, 10, 0);
-		header.HighlightSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseExpand", "HIGHLIGHT", 10, 0, 10, 0);
+		header.BarSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseexpand", "BACKGROUND", 10, 0, 10, 0);
+		header.HighlightSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseexpand", "HIGHLIGHT", 10, 0, 10, 0);
 		for _, piece in ipairs(header.HighlightSlices) do
 			piece:SetBlendMode("ADD");
 			piece:SetAlpha(0.4);

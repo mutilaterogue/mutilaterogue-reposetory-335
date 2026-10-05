@@ -246,6 +246,28 @@ WorldMapButton_OnClick = function(...)
 	return stockButtonClick(...);
 end;
 
+-- the player arrow (a client frame outside the canvas): its offset from the map's corner times the zoom,
+-- hidden while the zoomed view does not show the player
+local arrowOut = false;
+local stockPositionArrow, stockShowArrow = PositionWorldMapArrowFrame, ShowWorldMapArrowFrame;
+if stockPositionArrow and stockShowArrow then
+	PositionWorldMapArrowFrame = function(point, relativeTo, relativePoint, x, y, ...)
+		if onCanvas and x and y then
+			local viewX, viewY = x * zoom - panX, -y * zoom - panY;
+			arrowOut = viewX < 0 or viewX > MAP_WIDTH or viewY < 0 or viewY > MAP_HEIGHT;
+			return stockPositionArrow(point, relativeTo, relativePoint, x * zoom, y * zoom, ...);
+		end
+		arrowOut = false;
+		return stockPositionArrow(point, relativeTo, relativePoint, x, y, ...);
+	end;
+	ShowWorldMapArrowFrame = function(show, ...)
+		if show and onCanvas and arrowOut then
+			show = nil;
+		end
+		return stockShowArrow(show, ...);
+	end;
+end
+
 -- the stock map frames into the canvas (windowed) or back to the map frame (full screen)
 local function SetOnCanvas(on)
 	if on == onCanvas then
