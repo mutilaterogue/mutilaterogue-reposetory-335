@@ -53,32 +53,9 @@ function WorldMapLegionBorder_OnLoad(self)
 		self.CloseButton:SetScript("OnClick", function() HideUIPanel(WorldMapFrame); end);
 	end
 
-	-- maximize: the full screen map
-	local maximizeMinimize = self.MaximizeMinimizeFrame;
-	-- next to the close button (the XML anchor resolves before the template's button)
-	if maximizeMinimize and self.CloseButton then
-		maximizeMinimize:ClearAllPoints();
-		maximizeMinimize:SetPoint("RIGHT", self.CloseButton, "LEFT", 2, 0);
-		maximizeMinimize:SetFrameLevel(self.CloseButton:GetFrameLevel());
-	end
-	if maximizeMinimize and maximizeMinimize.SetOnMaximizedCallback then
-		-- retail: maximized is the same window over the whole screen (the map bigger, no quest panel)
-		maximizeMinimize:SetOnMaximizedCallback(function()
-			WorldMapLegion.maximized = true;
-			WorldMapLegion_Layout();
-		end);
-		maximizeMinimize:SetOnMinimizedCallback(function()
-			WorldMapLegion.maximized = false;
-			WorldMapFrame:SetScale(1);
-			-- back where the panel manager puts it
-			if WorldMapFrame:IsShown() then
-				HideUIPanel(WorldMapFrame);
-				ShowUIPanel(WorldMapFrame);
-			else
-				WorldMapLegion_Layout();
-			end
-		end);
-		maximizeMinimize:Minimize(true, true);
+	-- no maximize (the window only)
+	if self.MaximizeMinimizeFrame then
+		self.MaximizeMinimizeFrame:Hide();
 	end
 end
 
@@ -311,22 +288,6 @@ local STOCK_WINDOWED = { "WorldMapFrameMiniBorderLeft", "WorldMapFrameMiniBorder
 	"WorldMapFrameTitle", "WorldMapFrameSizeUpButton", "WorldMapFrameCloseButton",
 	"WorldMapLevelUpButton", "WorldMapLevelDownButton", "WorldMapZoomOutButton" };
 
--- the panel manager anchors the map when it shows it: the maximized one goes to the middle after that
-local recenter = CreateFrame("Frame");
-recenter:Hide();
-recenter:SetScript("OnUpdate", function(self)
-	self:Hide();
-	if WorldMapLegion.maximized and IsWindowed() then
-		WorldMapFrame:ClearAllPoints();
-		WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
-	end
-end);
-function WorldMapLegion_Recenter()
-	WorldMapFrame:ClearAllPoints();
-	WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
-	recenter:Show();
-end
-
 function WorldMapLegion_Layout()
 	local border, panelButton = WorldMapLegionBorder, WorldMapLegionQuestPanelButton;
 	if not (border and QuestMapFrame) then
@@ -335,8 +296,7 @@ function WorldMapLegion_Layout()
 	QuestMapFrame_HideStockParts();
 
 	if IsWindowed() then
-		local maximized = WorldMapLegion.maximized;
-		local open = QuestMapFrame.open and not maximized;
+		local open = QuestMapFrame.open;
 		local width = MAP_WIDTH + (open and PANEL_WIDTH or 0);
 		local height = TOP + MAP_HEIGHT + BOTTOM;
 		WorldMapFrame:SetWidth(width);
@@ -381,20 +341,7 @@ function WorldMapLegion_Layout()
 		panelButton:SetPoint("BOTTOMRIGHT", border, "TOPLEFT", MAP_WIDTH - 2, -(TOP + MAP_HEIGHT) + 2);
 		panelButton:SetFrameLevel(WorldMapDetailFrame:GetFrameLevel() + 40);
 		SetAtlasIf(panelButton.Icon, open and "QuestCollapse-Hide-Up" or "QuestCollapse-Show-Up");
-		if maximized then
-			panelButton:Hide();
-		else
-			panelButton:Show();
-		end
-
-		-- maximized: the whole window scaled to the screen, in its middle
-		if maximized then
-			local scale = math.min((UIParent:GetWidth() - 40) / width, (UIParent:GetHeight() - 40) / height);
-			WorldMapFrame:SetScale(scale);
-			WorldMapLegion_Recenter();
-		else
-			WorldMapFrame:SetScale(1);
-		end
+		panelButton:Show();
 
 		if open then
 			QuestMapFrame_Show();
@@ -404,7 +351,6 @@ function WorldMapLegion_Layout()
 		WorldMapLegionNavBar_Update();
 	else
 		SetOnCanvas(false);
-		WorldMapFrame:SetScale(1);
 		WorldMapQuestShowObjectives:Show();
 		border:Hide();
 		panelButton:Hide();
