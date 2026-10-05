@@ -10,15 +10,18 @@
 local COLUMNS = 10;
 local BUTTON_SIZE = 37;
 local SPACING = 5;
-local PADDING_WIDTH = 15;
-local PADDING_TOP = 62;			-- title bar + search row
-local PADDING_BOTTOM = 32;		-- money row
+local PADDING_SIDE = 10;		-- the same as the separate bags (ContainerFrameRetail.lua)
+local PADDING_WIDTH = 2 * PADDING_SIDE + 1;
+local PADDING_TOP = 72;			-- title bar + search row + a gap
+local PADDING_BOTTOM = 34;		-- money row
+local PORTRAIT_SIZE = 40;		-- inside the small ring of HeldBagLayout
 local FIRST_BAG, LAST_BAG = 0, NUM_BAG_SLOTS;	-- backpack .. bag 4
 
 local SEARCH_ALPHA = 0.4;
 local SORT_STEP_DELAY = 0.1;
 local SORT_MAX_STEPS = 400;
 
+-- combined or separate bags: retail CVar combinedBags (registered here), kept between sessions
 local useCombined = true;
 
 -- retail NEW_ITEM_ATLAS_BY_QUALITY
@@ -295,7 +298,7 @@ function ContainerFrameCombinedBags_UpdateLayout()
 		local column = (index - 1) % COLUMNS;
 		local row = math.floor((index - 1) / COLUMNS);
 		button:ClearAllPoints();
-		button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -7 - column * step, PADDING_BOTTOM + row * step);
+		button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PADDING_SIDE - column * step, PADDING_BOTTOM + row * step);
 		button:Show();
 	end
 	frame.numItems = #items;
@@ -343,22 +346,37 @@ end
 
 -- the separate 3.3.5 bags (bank, keyring) stand to the left of the combined window
 function UpdateContainerFramePlacement()
+	-- the same distance from the screen's edge as the separate bags (ContainerFrameRetail.lua: 20)
+	local edge = 20;
 	if frame:IsShown() then
 		if not frame.userPlaced then
 			frame:ClearAllPoints();
-			frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -4, CONTAINER_OFFSET_Y);
+			frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -edge, CONTAINER_OFFSET_Y);
 		end
-		CONTAINER_OFFSET_X = frame:GetWidth() + 4;
+		CONTAINER_OFFSET_X = edge + frame:GetWidth() + 12;
 	else
-		CONTAINER_OFFSET_X = 0;
+		CONTAINER_OFFSET_X = edge;
 	end
 	updateContainerFrameAnchors();
 end
 
 function ContainerFrameCombinedBags_OnLoad(self)
 	frame = self;
-	self.TitleText:SetText(COMBINED_BAG_TITLE or "Сумки");
-	SetPortraitToTexture(self.portrait, "Interface\\Icons\\INV_Misc_Bag_08");
+	if GetCVar("combinedBags") == nil and RegisterCVar then
+		pcall(RegisterCVar, "combinedBags", "1");
+	end
+	useCombined = GetCVar("combinedBags") ~= "0";
+
+	-- the retail look (ContainerFrameCombinedBags: PortraitFrameFlatTemplate, HeldBagLayout), as the separate bags
+	self:SetBorder("HeldBagLayout");
+	local portrait = self:GetPortrait();
+	portrait:SetWidth(PORTRAIT_SIZE);
+	portrait:SetHeight(PORTRAIT_SIZE);
+	portrait:ClearAllPoints();
+	portrait:SetPoint("TOPLEFT", self, "TOPLEFT", -6, 2);
+	self:SetTitleOffsets(PORTRAIT_SIZE, -24);
+	self:SetTitle(COMBINED_BAG_TITLE or "Сумки");
+	self:SetPortraitToAsset("Interface\\Buttons\\Button-Backpack-Up");
 
 	-- retail atlases for the sort button, the portrait highlight and the money box
 	local sort = self.SortButton;
@@ -488,8 +506,8 @@ function ContainerFrameCombinedBags_OnShow(self)
 
 	BagItemSearchBox:SetParent(self);
 	BagItemSearchBox:ClearAllPoints();
-	BagItemSearchBox:SetPoint("TOPLEFT", self, "TOPLEFT", 62, -32);
-	BagItemSearchBox:SetWidth(self:GetWidth() - 110);
+	BagItemSearchBox:SetPoint("TOPLEFT", self, "TOPLEFT", PADDING_SIDE + 6, -40);
+	BagItemSearchBox:SetPoint("RIGHT", self, "RIGHT", -PADDING_SIDE - 32, 0);
 	BagItemSearchBox.anchorBag = self;
 	BagItemSearchBox:Show();
 
@@ -527,6 +545,7 @@ function ContainerFrameCombinedBags_ToggleMode()
 	local wasOpen = frame:IsShown() or orig.IsBagOpen(0);
 	CloseAllBags();
 	useCombined = not useCombined;
+	SetCVar("combinedBags", useCombined and "1" or "0");
 	if wasOpen then
 		OpenAllBags(true);
 	end

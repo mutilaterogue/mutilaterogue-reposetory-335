@@ -102,6 +102,17 @@ local function Skin(frame)
 	sort:SetScript("OnLeave", GameTooltip_Hide);
 	frame.SortButton = sort;
 
+	-- right click on the backpack's portrait: back to the combined bags (ContainerFrameCombined.lua), as in retail
+	local portraitButton = _G[name .. "PortraitButton"];
+	if portraitButton then
+		portraitButton:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+		portraitButton:HookScript("OnClick", function(self, button)
+			if button == "RightButton" and frame:GetID() == 0 and ContainerFrameCombinedBags_ToggleMode then
+				ContainerFrameCombinedBags_ToggleMode();
+			end
+		end);
+	end
+
 	-- the stock bag art: the stock code shows it again on every open, so alpha 0
 	for _, key in ipairs(STOCK_ART) do
 		local region = _G[name .. key];
