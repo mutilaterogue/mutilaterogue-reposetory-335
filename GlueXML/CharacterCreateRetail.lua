@@ -114,10 +114,12 @@ local function StyleIconButton(button, size, small, ring)
 		if texture then
 			texture:ClearAllPoints();
 			texture:SetPoint("CENTER");
-			texture:SetWidth(size - 8);
-			texture:SetHeight(size - 8);
+			texture:SetWidth(size - 12);
+			texture:SetHeight(size - 12);
 		end
 	end
+	-- the mask exactly over the icon: outside its rect a mask repeats its edge pixels, and the circle
+	-- touches the edge at the middle of each side (thin dark lines there when the icon was bigger)
 	AddRoundMask(button, { normal or false, pushed or false }, size - 12);
 
 	AddRings(button, size, ring, small and 3 or 0);
