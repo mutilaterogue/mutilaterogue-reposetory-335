@@ -299,6 +299,17 @@ namespace
 
         uint32_t count = *At<uint32_t>(batch, BATCH_COUNT);
         auto* items = *At<BatchItem*>(batch, BATCH_ITEMS);
+        // the render skips items it cannot draw (a texture not loaded yet, no vertices) without setting
+        // a pixel shader: skip them too, or every later item gets the masks of the one before it
+        while (s_renderItem < count
+            && (!items[s_renderItem].gxTex || !items[s_renderItem].numVerts || !items[s_renderItem].numIndices))
+        {
+            static int skips = 0;
+            if (skips++ < 40)
+                MaskLog("PixelShaderSet: skipped item %u (gxTex %p verts %u indices %u)", s_renderItem,
+                    items[s_renderItem].gxTex, items[s_renderItem].numVerts, items[s_renderItem].numIndices);
+            s_renderItem++;
+        }
         BatchItem* item = s_renderItem < count ? &items[s_renderItem] : nullptr;
         s_renderItem++;
 

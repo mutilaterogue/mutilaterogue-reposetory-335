@@ -67,12 +67,12 @@ local function AddRoundMask(button, textures, size)
 	end
 end
 
-local function AddRings(button, size, ring)
+local function AddRings(button, size, ring, shrink)
 	-- the metal ring over the icon, the gold ring when chosen
 	button.CRRing = button:CreateTexture(nil, "OVERLAY");
 	button.CRRing:SetPoint("CENTER");
-	button.CRRing:SetWidth(size * 1.6);
-	button.CRRing:SetHeight(size * 1.6);
+	button.CRRing:SetWidth(size * 1.6 - (shrink or 0));
+	button.CRRing:SetHeight(size * 1.6 - (shrink or 0));
 	SetAtlasIf(button.CRRing, ring or "charactercreate-ring-metaldark");
 	-- the gold ring: the full size art (the small one is blurry), on a child frame over the metal ring
 	local checked = button:GetCheckedTexture();
@@ -119,7 +119,7 @@ local function StyleIconButton(button, size, small, ring)
 	end
 	AddRoundMask(button, { normal or false, pushed or false }, size - 12);
 
-	AddRings(button, size, ring);
+	AddRings(button, size, ring, small and 3 or 0);
 	local highlight = button:GetHighlightTexture();
 	if highlight then
 		highlight:SetAlpha(0);
