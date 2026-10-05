@@ -338,7 +338,7 @@ function QuestLogQuests_Update(poiTable)
 				noHeaders = false;
 				headerIndex = headerIndex + 1;
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
-				SetAtlasIf(button.CollapseIcon, "common-button-list-plus");
+				SetAtlasIf(button.CollapseIcon, "common-button-list-plus", true);	-- its own size: plus 13x13, minus 13x4
 				button.ButtonText:SetText(headerTitle or "");
 				button:ClearAllPoints();
 				if prevButton then
@@ -357,7 +357,7 @@ function QuestLogQuests_Update(poiTable)
 				noHeaders = false;
 				headerIndex = headerIndex + 1;
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
-				SetAtlasIf(button.CollapseIcon, "common-button-list-minus");
+				SetAtlasIf(button.CollapseIcon, "common-button-list-minus", true);
 				button.ButtonText:SetText(headerTitle or "");
 				button:ClearAllPoints();
 				if prevButton then
