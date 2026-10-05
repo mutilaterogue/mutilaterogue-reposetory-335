@@ -387,7 +387,9 @@ function ContainerFrameCombinedBags_OnLoad(self)
 	left:SetAtlas("common-coinbox-left");
 	left:SetWidth(8);
 	left:SetHeight(17);
-	left:SetPoint("LEFT", self, "BOTTOMLEFT", 8, 16);
+	-- around the money only (the currencies get their own box left of it, ContainerFrameRetail.lua)
+	left:SetPoint("RIGHT", money, "LEFT", 0, 0);
+	self.MoneyBoxLeft = left;
 	local right = money:CreateTexture(nil, "BACKGROUND");
 	right:SetAtlas("common-coinbox-right");
 	right:SetWidth(8);

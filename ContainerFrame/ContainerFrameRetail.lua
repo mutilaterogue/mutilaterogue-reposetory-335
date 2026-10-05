@@ -370,23 +370,101 @@ end
 -- the currencies shown on the backpack (Blizzard_TokenUI ManageBackpackTokenFrame): in the bottom row, left of the
 -- money (retail ContainerFrameTokenWatcher); the bags keep their height (their SetHeight above)
 ---------------------------------------------------------------------------
+local MAX_TOKENS = MAX_WATCHED_TOKENS or 3;
+
+-- a retail coin box (common-coinbox left / center / right) from one region's left to another's right
+local function CoinBox(parent)
+	local box = {};
+	box.left = parent:CreateTexture(nil, "BACKGROUND");
+	box.left:SetAtlas("common-coinbox-left");
+	box.left:SetWidth(8);
+	box.left:SetHeight(17);
+	box.right = parent:CreateTexture(nil, "BACKGROUND");
+	box.right:SetAtlas("common-coinbox-right");
+	box.right:SetWidth(8);
+	box.right:SetHeight(17);
+	box.middle = parent:CreateTexture(nil, "BACKGROUND");
+	box.middle:SetAtlas("_common-coinbox-center");
+	box.middle:SetPoint("TOPLEFT", box.left, "TOPRIGHT");
+	box.middle:SetPoint("BOTTOMRIGHT", box.right, "BOTTOMLEFT");
+	return box;
+end
+
 local function PlaceTokenFrame()
 	local tokens = BackpackTokenFrame;
 	if not (tokens and tokens:IsShown()) then
 		return;
 	end
 	local backpack = tokens:GetParent();
-	if backpack and (backpack.RetailFrame or backpack == ContainerFrameCombinedBags) then
-		tokens:ClearAllPoints();
-		tokens:SetPoint("BOTTOMLEFT", backpack, "BOTTOMLEFT", 4, 0);
-		tokens:SetFrameLevel(backpack:GetFrameLevel() + 5);
+	if not (backpack and (backpack.RetailFrame or backpack == ContainerFrameCombinedBags)) then
+		return;
 	end
+
+	-- no 3.3.5 token frame art: only the tokens, in a coin box like the money's
+	if not tokens.retailBox then
+		for _, region in ipairs({ tokens:GetRegions() }) do
+			if region:IsObjectType("Texture") then
+				region:SetAlpha(0);
+			end
+		end
+		tokens.retailBox = CoinBox(tokens);
+	end
+	tokens:ClearAllPoints();
+	tokens:SetAllPoints(backpack);
+	tokens:SetFrameLevel(backpack:GetFrameLevel() + 5);
+	tokens:EnableMouse(false);
+
+	local shown = {};
+	for i = 1, MAX_TOKENS do
+		local token = _G["BackpackTokenFrameToken" .. i];
+		if token and token:IsShown() then
+			shown[#shown + 1] = token;
+		end
+	end
+	local box = tokens.retailBox;
+	if #shown == 0 then
+		box.left:Hide();
+		box.middle:Hide();
+		box.right:Hide();
+		return;
+	end
+
+	-- the combined window: right, left of the money's box; the backpack: the bottom left
+	local combined = backpack == ContainerFrameCombinedBags;
+	for index, token in ipairs(shown) do
+		token:ClearAllPoints();
+		if index == 1 then
+			if combined then
+				-- past the money's box and this box's right end
+				token:SetPoint("RIGHT", backpack.MoneyBoxLeft, "LEFT", -14, 0);
+			else
+				token:SetPoint("BOTTOMLEFT", backpack, "BOTTOMLEFT", 10, 11);
+			end
+		elseif combined then
+			token:SetPoint("RIGHT", shown[index - 1], "LEFT", -6, 0);
+		else
+			token:SetPoint("LEFT", shown[index - 1], "RIGHT", 6, 0);
+		end
+	end
+	local leftmost = combined and shown[#shown] or shown[1];
+	local rightmost = combined and shown[1] or shown[#shown];
+	local count = _G[leftmost:GetName() .. "Count"];
+	box.left:ClearAllPoints();
+	box.left:SetPoint("RIGHT", count or leftmost, "LEFT", -2, 0);
+	box.right:ClearAllPoints();
+	box.right:SetPoint("LEFT", rightmost, "RIGHT", 2, 0);
+	box.left:Show();
+	box.middle:Show();
+	box.right:Show();
 end
 
 local function HookTokenUI()
 	if ManageBackpackTokenFrame and BackpackTokenFrame and not BackpackTokenFrame.retailHooked then
 		BackpackTokenFrame.retailHooked = true;
 		hooksecurefunc("ManageBackpackTokenFrame", PlaceTokenFrame);
+		if BackpackTokenFrame_Update then
+			hooksecurefunc("BackpackTokenFrame_Update", PlaceTokenFrame);
+		end
 		PlaceTokenFrame();
 	end
 end
