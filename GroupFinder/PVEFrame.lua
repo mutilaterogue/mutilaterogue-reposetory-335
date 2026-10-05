@@ -180,7 +180,28 @@ end
 local function ApplyRetailLFD()
 	local frame = LFDParentFrame;
 	HideLFDTitle(frame);
+	-- the queue frame's own title and old frame art
+	for _, name in ipairs({ "LFDQueueFrameTitleText", "LFDQueueFrameLayout" }) do
+		if _G[name] then
+			Suppress(_G[name]);
+		end
+	end
 	RetailBackdrop(frame);
+	-- the roles and the dropdown at their retail places
+	if LFDQueueFrameRoleButtonTank then
+		LFDQueueFrameRoleButtonTank:ClearAllPoints();
+		LFDQueueFrameRoleButtonTank:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 37, 334);
+		LFDQueueFrameRoleButtonHealer:ClearAllPoints();
+		LFDQueueFrameRoleButtonHealer:SetPoint("LEFT", LFDQueueFrameRoleButtonTank, "RIGHT", 23, 0);
+		LFDQueueFrameRoleButtonDPS:ClearAllPoints();
+		LFDQueueFrameRoleButtonDPS:SetPoint("LEFT", LFDQueueFrameRoleButtonHealer, "RIGHT", 23, 0);
+		LFDQueueFrameRoleButtonLeader:ClearAllPoints();
+		LFDQueueFrameRoleButtonLeader:SetPoint("LEFT", LFDQueueFrameRoleButtonDPS, "RIGHT", 23, 0);
+	end
+	if LFDQueueFrameTypeDropDown then
+		LFDQueueFrameTypeDropDown:ClearAllPoints();
+		LFDQueueFrameTypeDropDown:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 117, 285);
+	end
 	if LFDQueueFrameBackground then
 		LFDQueueFrameBackground:ClearAllPoints();
 		LFDQueueFrameBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 26);
@@ -199,7 +220,7 @@ local function ApplyRetailLFD()
 	if LFDQueueFrameFindGroupButton then
 		LFDQueueFrameFindGroupButton:SetSize(135, 22);
 		LFDQueueFrameFindGroupButton:ClearAllPoints();
-		LFDQueueFrameFindGroupButton:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4);
+		LFDQueueFrameFindGroupButton:SetPoint("BOTTOM", frame, "BOTTOM", 0, 3);
 	end
 	if LFDQueueFrameCancelButton then
 		Suppress(LFDQueueFrameCancelButton);
@@ -240,6 +261,12 @@ local function Embed(name, full, y)
 		ApplyRetailLFD();
 	end
 	if name == "PVPParentFrame" then
+		-- PVPFrame's unnamed "Player vs. Player" title: this window's title says it
+		for _, region in ipairs({ PVPFrame:GetRegions() }) do
+			if region:IsObjectType("FontString") and region:GetText() == PLAYER_V_PLAYER then
+				Suppress(region);
+			end
+		end
 		-- the left buttons choose its tab
 		PVPParentFrameTab1:Hide();
 		PVPParentFrameTab1.Show = PVPParentFrameTab1.Hide;
