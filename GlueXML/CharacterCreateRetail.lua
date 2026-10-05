@@ -577,7 +577,13 @@ function CR.SetCamera(name)
 	if not background then
 		return;
 	end
-	SetBackgroundModel(CharacterCreate, background .. (zoomed and "_ZOOM" or ""));
+	-- not SetBackgroundModel: it would look up the ambience / lights by the "_ZOOM" name (none);
+	-- the same music goes on, the lights are the race's own
+	local name = background .. (zoomed and "_ZOOM" or "");
+	SetCharCustomizeBackground("Interface\\Glues\\Models\\UI_" .. name .. "\\UI_" .. name .. ".m2");
+	if SetLighting then
+		SetLighting(CharacterCreate, strupper(background));
+	end
 	CR.zoomed = zoomed;
 end
 
