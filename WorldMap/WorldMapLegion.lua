@@ -196,9 +196,6 @@ function WorldMapLegion_Layout()
 			QuestMapFrame_Hide();
 		end
 		WorldMapLegionNavBar_Update();
-		if WorldMapFrame:IsShown() and UpdateUIPanelPositions then
-			UpdateUIPanelPositions(WorldMapFrame);
-		end
 	else
 		border:Hide();
 		panelButton:Hide();
