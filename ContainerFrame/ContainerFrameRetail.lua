@@ -54,6 +54,23 @@ function updateContainerFrameAnchors()
 	stockUpdateAnchors();
 end
 
+-- the currencies' row under the money (when currencies show on the backpack)
+local TOKEN_ROW = 20;
+local MAX_TOKENS = MAX_WATCHED_TOKENS or 3;
+
+function ContainerFrameRetail_TokenRowHeight()
+	if not (BackpackTokenFrame and BackpackTokenFrame:IsShown()) then
+		return 0;
+	end
+	for i = 1, MAX_TOKENS do
+		local token = _G["BackpackTokenFrameToken" .. i];
+		if token and token:IsShown() then
+			return TOKEN_ROW;
+		end
+	end
+	return 0;
+end
+
 local STOCK_ART = { "BackgroundTop", "BackgroundMiddle1", "BackgroundMiddle2", "BackgroundBottom", "Background1Slot",
 	"Portrait", "Name" };
 
@@ -175,7 +192,7 @@ local function PlaceSearchBox(frame)
 end
 
 -- after the stock layout (textures, size, item places): the retail frame, size and places
-local function Layout(frame, size, id)
+function ContainerFrameRetail_Layout(frame, size, id)
 	local retail = Skin(frame);
 	local name = frame:GetName();
 	local isBackpack = id == 0;
@@ -197,7 +214,8 @@ local function Layout(frame, size, id)
 
 	local rows = math.max(1, math.ceil(size / COLUMNS));
 	local top = isBackpack and PADDING_TOP_SEARCH or PADDING_TOP;
-	local bottom = isBackpack and PADDING_BOTTOM_MONEY or PADDING_BOTTOM;
+	local tokenRow = isBackpack and ContainerFrameRetail_TokenRowHeight() or 0;
+	local bottom = isBackpack and (PADDING_BOTTOM_MONEY + tokenRow) or PADDING_BOTTOM;
 	local step = BUTTON_SIZE + SPACING;
 	frame:SetWidth(FRAME_WIDTH);
 	frame.retailHeight = rows * BUTTON_SIZE + (rows - 1) * SPACING + top + bottom;
@@ -219,11 +237,13 @@ local function Layout(frame, size, id)
 	local money = _G[name .. "MoneyFrame"];
 	if money then
 		money:ClearAllPoints();
-		money:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 9);
+		money:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 9 + tokenRow);
 	end
 end
 
-hooksecurefunc("ContainerFrame_GenerateFrame", Layout);
+hooksecurefunc("ContainerFrame_GenerateFrame", function(...)
+	ContainerFrameRetail_Layout(...);
+end);
 
 -- every update: the search box in its place
 hooksecurefunc("ContainerFrame_Update", PlaceSearchBox);
@@ -370,8 +390,6 @@ end
 -- the currencies shown on the backpack (Blizzard_TokenUI ManageBackpackTokenFrame): in the bottom row, left of the
 -- money (retail ContainerFrameTokenWatcher); the bags keep their height (their SetHeight above)
 ---------------------------------------------------------------------------
-local MAX_TOKENS = MAX_WATCHED_TOKENS or 3;
-
 -- a retail coin box (common-coinbox left / center / right) from one region's left to another's right
 local function CoinBox(parent)
 	local box = {};
@@ -429,43 +447,58 @@ local function PlaceTokenFrame()
 		return;
 	end
 
-	-- the combined window: right, left of the money's box; the backpack: the bottom left
-	local combined = backpack == ContainerFrameCombinedBags;
+	-- a row of its own under the money, the whole width, the currencies at its right (as the money above)
+	box.left:ClearAllPoints();
+	box.left:SetPoint("LEFT", backpack, "BOTTOMLEFT", 8, 16);
+	box.right:ClearAllPoints();
+	box.right:SetPoint("RIGHT", backpack, "BOTTOMRIGHT", -8, 16);
 	for index, token in ipairs(shown) do
 		token:ClearAllPoints();
 		if index == 1 then
-			if combined then
-				-- past the money's box and this box's right end
-				token:SetPoint("RIGHT", backpack.MoneyBoxLeft, "LEFT", -14, 0);
-			else
-				token:SetPoint("BOTTOMLEFT", backpack, "BOTTOMLEFT", 10, 11);
-			end
-		elseif combined then
-			token:SetPoint("RIGHT", shown[index - 1], "LEFT", -6, 0);
+			token:SetPoint("RIGHT", box.right, "LEFT", -4, 0);
 		else
-			token:SetPoint("LEFT", shown[index - 1], "RIGHT", 6, 0);
+			token:SetPoint("RIGHT", shown[index - 1], "LEFT", -6, 0);
 		end
 	end
-	local leftmost = combined and shown[#shown] or shown[1];
-	local rightmost = combined and shown[1] or shown[#shown];
-	local count = _G[leftmost:GetName() .. "Count"];
-	box.left:ClearAllPoints();
-	box.left:SetPoint("RIGHT", count or leftmost, "LEFT", -2, 0);
-	box.right:ClearAllPoints();
-	box.right:SetPoint("LEFT", rightmost, "RIGHT", 2, 0);
 	box.left:Show();
 	box.middle:Show();
 	box.right:Show();
 end
 
+-- the row appears / goes: the bag's size and the money's place again
+local lastTokenRow = 0;
+local function UpdateTokens()
+	local row = ContainerFrameRetail_TokenRowHeight();
+	if BackpackTokenFrame and BackpackTokenFrame.retailBox and row == 0 then
+		local box = BackpackTokenFrame.retailBox;
+		box.left:Hide();
+		box.middle:Hide();
+		box.right:Hide();
+	end
+	PlaceTokenFrame();
+	if row ~= lastTokenRow then
+		lastTokenRow = row;
+		local combined = ContainerFrameCombinedBags;
+		if combined and combined:IsShown() and ContainerFrameCombinedBags_UpdateLayout then
+			ContainerFrameCombinedBags_UpdateLayout();
+		end
+		for i = 1, NUM_CONTAINER_FRAMES or 13 do
+			local frame = _G["ContainerFrame" .. i];
+			if frame and frame:IsShown() and frame.RetailFrame and frame.retailID == 0 then
+				ContainerFrameRetail_Layout(frame, frame.retailSize, 0);
+			end
+		end
+	end
+end
+
 local function HookTokenUI()
 	if ManageBackpackTokenFrame and BackpackTokenFrame and not BackpackTokenFrame.retailHooked then
 		BackpackTokenFrame.retailHooked = true;
-		hooksecurefunc("ManageBackpackTokenFrame", PlaceTokenFrame);
+		hooksecurefunc("ManageBackpackTokenFrame", UpdateTokens);
 		if BackpackTokenFrame_Update then
-			hooksecurefunc("BackpackTokenFrame_Update", PlaceTokenFrame);
+			hooksecurefunc("BackpackTokenFrame_Update", UpdateTokens);
 		end
-		PlaceTokenFrame();
+		UpdateTokens();
 	end
 end
 

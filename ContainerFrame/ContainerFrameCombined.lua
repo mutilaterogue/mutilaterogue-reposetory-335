@@ -292,14 +292,21 @@ function ContainerFrameCombinedBags_UpdateLayout()
 	local rows = math.max(1, math.ceil(#items / COLUMNS));
 	local step = BUTTON_SIZE + SPACING;
 	frame:SetWidth(COLUMNS * BUTTON_SIZE + (COLUMNS - 1) * SPACING + PADDING_WIDTH);
-	frame.retailHeight = rows * BUTTON_SIZE + (rows - 1) * SPACING + PADDING_TOP + PADDING_BOTTOM;
+	-- the currencies' row under the money (ContainerFrameRetail.lua): everything over it one row up
+	local tokenRow = ContainerFrameRetail_TokenRowHeight and ContainerFrameRetail_TokenRowHeight() or 0;
+	local bottom = PADDING_BOTTOM + tokenRow;
+	frame.MoneyFrame:ClearAllPoints();
+	frame.MoneyFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 9 + tokenRow);
+	frame.MoneyBoxLeft:SetPoint("LEFT", frame, "BOTTOMLEFT", 8, 16 + tokenRow);
+	frame.MoneyBoxRight:SetPoint("RIGHT", frame, "BOTTOMRIGHT", -8, 16 + tokenRow);
+	frame.retailHeight = rows * BUTTON_SIZE + (rows - 1) * SPACING + PADDING_TOP + bottom;
 	frame:SetHeight(frame.retailHeight);
 
 	for index, button in ipairs(items) do
 		local column = (index - 1) % COLUMNS;
 		local row = math.floor((index - 1) / COLUMNS);
 		button:ClearAllPoints();
-		button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PADDING_SIDE - column * step, PADDING_BOTTOM + row * step);
+		button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PADDING_SIDE - column * step, bottom + row * step);
 		button:Show();
 	end
 	frame.numItems = #items;
@@ -387,14 +394,14 @@ function ContainerFrameCombinedBags_OnLoad(self)
 	left:SetAtlas("common-coinbox-left");
 	left:SetWidth(8);
 	left:SetHeight(17);
-	-- around the money only (the currencies get their own box left of it, ContainerFrameRetail.lua)
-	left:SetPoint("RIGHT", money, "LEFT", 0, 0);
+	left:SetPoint("LEFT", self, "BOTTOMLEFT", 8, 16);
 	self.MoneyBoxLeft = left;
 	local right = money:CreateTexture(nil, "BACKGROUND");
 	right:SetAtlas("common-coinbox-right");
 	right:SetWidth(8);
 	right:SetHeight(17);
 	right:SetPoint("RIGHT", self, "BOTTOMRIGHT", -8, 16);
+	self.MoneyBoxRight = right;
 	local middle = money:CreateTexture(nil, "BACKGROUND");
 	middle:SetAtlas("_common-coinbox-center");
 	middle:SetPoint("TOPLEFT", left, "TOPRIGHT");
