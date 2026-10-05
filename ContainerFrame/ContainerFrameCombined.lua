@@ -292,7 +292,8 @@ function ContainerFrameCombinedBags_UpdateLayout()
 	local rows = math.max(1, math.ceil(#items / COLUMNS));
 	local step = BUTTON_SIZE + SPACING;
 	frame:SetWidth(COLUMNS * BUTTON_SIZE + (COLUMNS - 1) * SPACING + PADDING_WIDTH);
-	frame:SetHeight(rows * BUTTON_SIZE + (rows - 1) * SPACING + PADDING_TOP + PADDING_BOTTOM);
+	frame.retailHeight = rows * BUTTON_SIZE + (rows - 1) * SPACING + PADDING_TOP + PADDING_BOTTOM;
+	frame:SetHeight(frame.retailHeight);
 
 	for index, button in ipairs(items) do
 		local column = (index - 1) % COLUMNS;
@@ -396,6 +397,13 @@ function ContainerFrameCombinedBags_OnLoad(self)
 	middle:SetAtlas("_common-coinbox-center");
 	middle:SetPoint("TOPLEFT", left, "TOPRIGHT");
 	middle:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT");
+
+	-- the window's height is its own: the stock code sizes "the backpack" (GetBackpackFrame: this window) for the
+	-- currencies (ManageBackpackTokenFrame: BACKPACK_HEIGHT + the token row), which would cut the slots
+	local setHeight = self.SetHeight;
+	self.SetHeight = function(window, height)
+		setHeight(window, window.retailHeight or height);
+	end
 
 	self.holders = {};
 	for bag = FIRST_BAG, LAST_BAG do

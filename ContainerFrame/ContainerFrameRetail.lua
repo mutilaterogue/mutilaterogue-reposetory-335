@@ -365,3 +365,39 @@ function ContainerFrameRetail_SortBags()
 	sorter.delay = 0;
 	sorter:Show();
 end
+
+---------------------------------------------------------------------------
+-- the currencies shown on the backpack (Blizzard_TokenUI ManageBackpackTokenFrame): in the bottom row, left of the
+-- money (retail ContainerFrameTokenWatcher); the bags keep their height (their SetHeight above)
+---------------------------------------------------------------------------
+local function PlaceTokenFrame()
+	local tokens = BackpackTokenFrame;
+	if not (tokens and tokens:IsShown()) then
+		return;
+	end
+	local backpack = tokens:GetParent();
+	if backpack and (backpack.RetailFrame or backpack == ContainerFrameCombinedBags) then
+		tokens:ClearAllPoints();
+		tokens:SetPoint("BOTTOMLEFT", backpack, "BOTTOMLEFT", 4, 0);
+		tokens:SetFrameLevel(backpack:GetFrameLevel() + 5);
+	end
+end
+
+local function HookTokenUI()
+	if ManageBackpackTokenFrame and not BackpackTokenFrame.retailHooked then
+		BackpackTokenFrame.retailHooked = true;
+		hooksecurefunc("ManageBackpackTokenFrame", PlaceTokenFrame);
+		PlaceTokenFrame();
+	end
+end
+
+local tokenWatcher = CreateFrame("Frame");
+tokenWatcher:RegisterEvent("ADDON_LOADED");
+tokenWatcher:SetScript("OnEvent", function(self, event, addon)
+	if addon == "Blizzard_TokenUI" then
+		HookTokenUI();
+	end
+end);
+if BackpackTokenFrame then
+	HookTokenUI();
+end
