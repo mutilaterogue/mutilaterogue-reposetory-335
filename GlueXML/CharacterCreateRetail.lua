@@ -261,6 +261,173 @@ function CR.LayoutClasses(...)
 end
 
 ---------------------------------------------------------------------------
+-- the appearance (stage 2, retail): category icons and the option rows on the left,
+-- each row "< option >" in the retail dropdown box; the name box at the bottom
+---------------------------------------------------------------------------
+-- the categories: icon, camera; clicking one only moves the camera (3.3.5 has no option groups)
+local CATEGORIES = {
+	{ "body", "body" },
+	{ "head", "head" },
+	{ "hair", "head" },
+};
+
+local function ArrowButton(parent, atlas)
+	local button = CreateFrame("Button", nil, parent);
+	button:SetWidth(38);
+	button:SetHeight(38);
+	local normal = button:CreateTexture(nil, "ARTWORK");
+	normal:SetAllPoints(button);
+	SetAtlasIf(normal, atlas);
+	button:SetNormalTexture(normal);
+	local pushed = button:CreateTexture(nil, "ARTWORK");
+	pushed:SetAllPoints(button);
+	SetAtlasIf(pushed, atlas .. "-down");
+	button:SetPushedTexture(pushed);
+	local highlight = button:CreateTexture(nil, "HIGHLIGHT");
+	highlight:SetAllPoints(button);
+	SetAtlasIf(highlight, atlas);
+	highlight:SetBlendMode("ADD");
+	highlight:SetAlpha(0.3);
+	button:SetHighlightTexture(highlight);
+	return button;
+end
+
+function CR.SelectCategory(index)
+	CR.category = index;
+	for i, tab in ipairs(CR.Tabs or {}) do
+		SetAtlasIf(tab.Icon, "charactercreate-icon-customize-" .. CATEGORIES[i][1] .. (i == index and "-selected" or ""));
+	end
+	CR.SetCamera(CATEGORIES[index][2]);
+end
+
+function CR.StyleCustomization(frame)
+	-- the category icons over the rows
+	CR.Tabs = {};
+	for i, category in ipairs(CATEGORIES) do
+		local tab = CreateFrame("Button", nil, frame);
+		tab:SetWidth(64);
+		tab:SetHeight(64);
+		tab:SetPoint("TOPLEFT", frame, "TOPLEFT", 70 + (i - 1) * 74, -150);
+		tab.Icon = tab:CreateTexture(nil, "ARTWORK");
+		tab.Icon:SetAllPoints(tab);
+		tab:SetScript("OnClick", function()
+			CR.SelectCategory(i);
+			PlaySound("gsCharacterCreationLook");
+		end);
+		CR.Tabs[i] = tab;
+		SetAtlasIf(tab.Icon, "charactercreate-icon-customize-" .. category[1] .. (i == 1 and "-selected" or ""));
+	end
+
+	-- the option rows: "< name >" in the dropdown box, the 3.3.5 arrow buttons replaced
+	local previous;
+	for i = 1, NUM_CHAR_CUSTOMIZATIONS do
+		local row = _G["CharacterCustomizationButtonFrame" .. i];
+		if row then
+			local name = row:GetName();
+			Hide(name .. "Left");
+			Hide(name .. "Right");
+			Hide(name .. "Middle");
+			Hide(name .. "LeftButton");
+			Hide(name .. "RightButton");
+			row:SetWidth(300);
+			row:SetHeight(40);
+			row:ClearAllPoints();
+			if previous then
+				row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -10);
+			else
+				row:SetPoint("TOPLEFT", frame, "TOPLEFT", 60, -240);
+			end
+			previous = row;
+
+			local back = ArrowButton(row, "charactercreate-customize-backbutton");
+			back:SetPoint("LEFT", row, "LEFT", 0, 0);
+			back:SetScript("OnClick", function()
+				CharacterCustomization_Left(row:GetID());
+				PlaySound("gsCharacterCreationLook");
+			end);
+			local nextButton = ArrowButton(row, "charactercreate-customize-nextbutton");
+			nextButton:SetPoint("RIGHT", row, "RIGHT", 0, 0);
+			nextButton:SetScript("OnClick", function()
+				CharacterCustomization_Right(row:GetID());
+				PlaySound("gsCharacterCreationLook");
+			end);
+
+			local box = row:CreateTexture(nil, "BACKGROUND");
+			box:SetPoint("LEFT", back, "RIGHT", 4, 0);
+			box:SetPoint("RIGHT", nextButton, "LEFT", -4, 0);
+			box:SetHeight(38);
+			SetAtlasIf(box, "charactercreate-customize-dropdownbox");
+
+			local text = _G[name .. "Text"];
+			if text then
+				text:ClearAllPoints();
+				text:SetPoint("CENTER", box, "CENTER", 0, 0);
+				text:SetFontObject(GlueFontHighlight);
+			end
+		end
+	end
+
+	-- randomize: the retail dice under the rows
+	local random = CharCreateRandomizeButton;
+	if random and previous then
+		for _, key in ipairs({ "Left", "Right", "Center", "Glow" }) do
+			if random[key] then
+				random[key]:SetAlpha(0);
+			end
+		end
+		random.Left = nil;	-- GlueRetailButton_Update leaves it alone
+		random:SetWidth(300);
+		random:SetHeight(40);
+		random:ClearAllPoints();
+		random:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -16);
+		local box = random:CreateTexture(nil, "BACKGROUND");
+		box:SetAllPoints(random);
+		SetAtlasIf(box, "charactercreate-customize-dropdownbox");
+		local dice = random:CreateTexture(nil, "ARTWORK");
+		dice:SetWidth(24);
+		dice:SetHeight(24);
+		dice:SetPoint("RIGHT", random:GetFontString() or random, "LEFT", -8, 0);
+		SetAtlasIf(dice, "charactercreate-icon-dice");
+	end
+
+	-- the name: the dropdown box art at the bottom center, the random name dice next to it
+	local edit = CharacterCreateNameEdit;
+	if edit then
+		if edit.SetBackdrop then
+			edit:SetBackdrop(nil);
+		end
+		edit:SetWidth(260);
+		edit:SetHeight(40);
+		edit:ClearAllPoints();
+		edit:SetPoint("BOTTOM", frame, "BOTTOM", 0, 40);
+		edit:SetTextInsets(12, 12, 0, 0);
+		edit:SetJustifyH("CENTER");
+		local box = edit:CreateTexture(nil, "BACKGROUND");
+		box:SetAllPoints(edit);
+		SetAtlasIf(box, "charactercreate-customize-dropdownbox");
+	end
+	local randomName = CharacterCreateRandomName;
+	if randomName and edit then
+		for _, key in ipairs({ "Left", "Right", "Center", "Glow" }) do
+			if randomName[key] then
+				randomName[key]:SetAlpha(0);
+			end
+		end
+		randomName.Left = nil;
+		randomName:SetText("");
+		randomName:SetWidth(38);
+		randomName:SetHeight(38);
+		randomName:ClearAllPoints();
+		randomName:SetPoint("LEFT", edit, "RIGHT", 6, 0);
+		local dice = randomName:CreateTexture(nil, "ARTWORK");
+		dice:SetWidth(28);
+		dice:SetHeight(28);
+		dice:SetPoint("CENTER");
+		SetAtlasIf(dice, "charactercreate-icon-dice");
+	end
+end
+
+---------------------------------------------------------------------------
 -- the screen
 ---------------------------------------------------------------------------
 function CR.Setup()
@@ -372,34 +539,8 @@ function CR.Setup()
 		end
 	end
 
-	-- customization on the right, between the Horde column and the middle
-	local previous;
-	for i = 1, NUM_CHAR_CUSTOMIZATIONS do
-		local row = _G["CharacterCustomizationButtonFrame" .. i];
-		if row then
-			row:ClearAllPoints();
-			if previous then
-				row:SetPoint("TOP", previous, "BOTTOM", 0, -6);
-			else
-				row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -120, -220);
-			end
-			previous = row;
-		end
-	end
-	if CharCreateRandomizeButton and previous then
-		CharCreateRandomizeButton:ClearAllPoints();
-		CharCreateRandomizeButton:SetPoint("TOP", previous, "BOTTOM", 0, -12);
-	end
+	CR.StyleCustomization(frame);
 
-	-- the name under the classes; Back bottom left, Create bottom right (retail navigation)
-	if CharacterCreateNameEdit then
-		CharacterCreateNameEdit:ClearAllPoints();
-		CharacterCreateNameEdit:SetPoint("BOTTOM", frame, "BOTTOM", 0, 50);
-	end
-	if CharacterCreateRandomName then
-		CharacterCreateRandomName:ClearAllPoints();
-		CharacterCreateRandomName:SetPoint("LEFT", CharacterCreateNameEdit, "RIGHT", 8, 0);
-	end
 	CharCreateBackButton:ClearAllPoints();
 	CharCreateBackButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 46, 28);
 	CharCreateBackButton:SetWidth(230);
@@ -493,6 +634,9 @@ function CR.StageFrames()
 	for i = 1, NUM_CHAR_CUSTOMIZATIONS do
 		table.insert(second, _G["CharacterCustomizationButtonFrame" .. i]);
 	end
+	for _, tab in ipairs(CR.Tabs or {}) do
+		table.insert(second, tab);
+	end
 	for _, region in ipairs({ CharCreateRandomizeButton, CharacterCreateNameEdit }) do
 		table.insert(second, region);
 	end
@@ -511,7 +655,11 @@ function CR.SetStage(stage)
 			CharacterCreateRandomName:Hide();
 		end
 	end
-	CR.SetCamera(stage == 1 and "select" or "body");
+	if stage == 2 and CR.Tabs then
+		CR.SelectCategory(1);
+	else
+		CR.SetCamera("select");
+	end
 	CharCreateOkayButton:SetText(stage == 1 and (CUSTOMIZE or "Настроить") or (CHARACTER_CREATE_ACCEPT or ACCEPT));
 	if stage == 2 and CharacterCreateNameEdit then
 		CharacterCreateNameEdit:SetFocus();
