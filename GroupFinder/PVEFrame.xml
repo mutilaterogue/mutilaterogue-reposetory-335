@@ -183,39 +183,15 @@
 					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
 				</Anchors>
 			</Frame>
-			<Button name="PVEFrameTab1" inherits="CharacterFrameTabButtonTemplate" id="1" text="Подземелья и рейды">
+			<!-- retail tabs (TabSystem\TabSystemTemplates.xml) -->
+			<Frame name="$parentTabSystem" parentKey="TabSystem" inherits="TabSystemTemplate">
+				<KeyValues>
+					<KeyValue key="minTabWidth" value="70" type="number"/>
+				</KeyValues>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="11" y="2"/>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="12" y="2"/>
 				</Anchors>
-				<Scripts>
-					<OnClick>
-						PVEFrame_ShowTab(self:GetID());
-						PlaySound("igCharacterInfoTab");
-					</OnClick>
-				</Scripts>
-			</Button>
-			<Button name="PVEFrameTab2" inherits="CharacterFrameTabButtonTemplate" id="2" text="PLAYER_V_PLAYER">
-				<Anchors>
-					<Anchor point="LEFT" relativeTo="PVEFrameTab1" relativePoint="RIGHT" x="-15" y="0"/>
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						PVEFrame_ShowTab(self:GetID());
-						PlaySound("igCharacterInfoTab");
-					</OnClick>
-				</Scripts>
-			</Button>
-			<Button name="PVEFrameTab3" inherits="CharacterFrameTabButtonTemplate" id="3" text="Эпохальные+">
-				<Anchors>
-					<Anchor point="LEFT" relativeTo="PVEFrameTab2" relativePoint="RIGHT" x="-15" y="0"/>
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						PVEFrame_ShowTab(self:GetID());
-						PlaySound("igCharacterInfoTab");
-					</OnClick>
-				</Scripts>
-			</Button>
+			</Frame>
 		</Frames>
 		<Scripts>
 			<OnLoad function="PVEFrame_OnLoad"/>

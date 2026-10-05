@@ -19,6 +19,12 @@ local TITLES = {
 	"Эпохальные+",
 };
 
+local TAB_NAMES = {
+	"Подземелья и рейды",
+	PLAYER_V_PLAYER or "Игрок против игрока",
+	"Эпохальные+",
+};
+
 -- the sections of every tab: the window, the stock tab inside it (PVPParentFrame), the left button's text and icon
 local SECTIONS = {
 	{
@@ -376,64 +382,9 @@ function PVEFrame_ShowSection(index, keepShown)
 	end
 end
 
--- retail tabs (PanelTabButtonTemplate): uiframe-tab / uiframe-activetab pieces instead of the 3.3.5 art
-local function UpdateRetailTabs()
-	for i = 1, 3 do
-		local tab = _G["PVEFrameTab" .. i];
-		local active = i == selectedTab;
-		local prefix = active and "uiframe-activetab" or "uiframe-tab";
-		tab.retailLeft:SetAtlas(prefix .. "-left", true);
-		tab.retailRight:SetAtlas(prefix .. "-right", true);
-		tab.retailMiddle:SetAtlas("_" .. prefix .. "-center", true);
-		tab.retailMiddle:SetHorizTile(true);
-		-- the active tab reaches up into the window, its text a bit higher
-		local y = active and -3 or 0;
-		tab.retailLeft:SetPoint("TOPLEFT", tab, "TOPLEFT", -3, y);
-		tab.retailRight:SetPoint("TOPRIGHT", tab, "TOPRIGHT", 7, y);
-		local text = _G[tab:GetName() .. "Text"];
-		text:ClearAllPoints();
-		text:SetPoint("CENTER", tab, "CENTER", 0, active and -3 or 2);
-		text:SetFontObject(active and GameFontHighlightSmall or GameFontNormalSmall);
-	end
-end
-
-local function SetupRetailTabs()
-	for i = 1, 3 do
-		local tab = _G["PVEFrameTab" .. i];
-		local name = tab:GetName();
-		for _, suffix in ipairs({ "Left", "Middle", "Right", "LeftDisabled", "MiddleDisabled", "RightDisabled" }) do
-			if _G[name .. suffix] then
-				Suppress(_G[name .. suffix]);
-			end
-		end
-		if tab:GetHighlightTexture() then
-			tab:GetHighlightTexture():SetTexture(nil);
-		end
-		tab.retailLeft = tab:CreateTexture(nil, "BACKGROUND");
-		tab.retailRight = tab:CreateTexture(nil, "BACKGROUND");
-		tab.retailMiddle = tab:CreateTexture(nil, "BACKGROUND");
-		tab.retailMiddle:SetPoint("TOPLEFT", tab.retailLeft, "TOPRIGHT");
-		tab.retailMiddle:SetPoint("TOPRIGHT", tab.retailRight, "TOPLEFT");
-		-- the hover glow of the retail tab
-		local highlight = tab:CreateTexture(nil, "HIGHLIGHT");
-		highlight:SetAtlas("_uiframe-tab-center", false);
-		highlight:SetPoint("TOPLEFT", tab, "TOPLEFT", 0, -5);
-		highlight:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", 0, 5);
-		highlight:SetBlendMode("ADD");
-		highlight:SetAlpha(0.4);
-		if i > 1 then
-			tab:ClearAllPoints();
-			tab:SetPoint("TOPLEFT", _G["PVEFrameTab" .. (i - 1)], "TOPRIGHT", 3, 0);
-		end
-	end
-	PVEFrameTab1:ClearAllPoints();
-	PVEFrameTab1:SetPoint("TOPLEFT", PVEFrame, "BOTTOMLEFT", 19, 2);
-end
-
 function PVEFrame_ShowTab(tab, section, keepShown)
 	selectedTab = tab;
-	PanelTemplates_SetTab(PVEFrame, tab);
-	UpdateRetailTabs();
+	PVEFrame.TabSystem:SetTabVisuallySelected(tab);
 	PVEFrame:SetTitle(TITLES[tab]);
 	PVEFrame:SetPortraitToAsset(PORTRAITS[tab]);
 
@@ -496,9 +447,19 @@ function GroupFinderGroupButton_OnClick(self)
 end
 
 function PVEFrame_OnLoad(self)
-	PanelTemplates_SetNumTabs(self, 3);
-	SetupRetailTabs();
-	PanelTemplates_SetTab(self, 1);
+	-- retail tabs: TabSystem, each tab opens its first section
+	TabSystemOwnerMixin.OnLoad(self);
+	self:SetTabSystem(self.TabSystem);
+	for tab = 1, #TITLES do
+		local tabID = self:AddNamedTab(TAB_NAMES[tab]);
+		_G["PVEFrameTab" .. tab] = self.TabSystem:GetTabButton(tabID);
+		self:SetTabCallback(tabID, function(isUserAction)
+			if isUserAction then
+				PVEFrame_ShowTab(tab);
+			end
+		end);
+	end
+	self.TabSystem:SetFrameLevel(self:GetFrameLevel() + 25);
 	UIPanelWindows["PVEFrame"] = { area = "left", pushable = 0, whileDead = 1, xOffset = "15", yOffset = "-10" };
 	for _, section in ipairs(SECTIONS[1]) do
 		if section.placeholder and not _G[section.frame] then
