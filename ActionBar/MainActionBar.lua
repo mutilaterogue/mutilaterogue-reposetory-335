@@ -20,15 +20,16 @@ end
 ---------------------------------------------------------------------------
 
 -- the frame textures the stock code resets (ActionButton_Update sets UI-Quickslot / UI-Quickslot2 as the normal texture)
+-- a button on a bar without bar art (the extra bars) has the bigger "add row" frame (ActionButtonOverrides.lua)
 local function ActionButtonRetail_UpdateNormal(button)
 	local normal = button:GetNormalTexture();
 	if normal then
-		SetAtlasIf(normal, "UI-HUD-ActionBar-IconFrame");
+		SetAtlasIf(normal, button.retailAddRow and "UI-HUD-ActionBar-IconFrame-AddRow" or "UI-HUD-ActionBar-IconFrame");
 		normal:SetDrawLayer("OVERLAY");
 		normal:ClearAllPoints();
 		normal:SetPoint("TOPLEFT");
-		normal:SetWidth(46);
-		normal:SetHeight(45);
+		normal:SetWidth(button.retailAddRow and 51 or 46);
+		normal:SetHeight(button.retailAddRow and 51 or 45);
 	end
 end
 
@@ -54,11 +55,12 @@ local function FrameTexture(texture, atlas, layer)
 	end
 end
 
-function ActionButtonRetail_Apply(button)
+function ActionButtonRetail_Apply(button, addRow)
 	if button.retailArt then
 		return;
 	end
 	button.retailArt = true;
+	button.retailAddRow = addRow;
 	local name = button:GetName();
 	button:SetWidth(BUTTON_SIZE);
 	button:SetHeight(BUTTON_SIZE);
@@ -78,7 +80,22 @@ function ActionButtonRetail_Apply(button)
 	end
 
 	ActionButtonRetail_UpdateNormal(button);
-	FrameTexture(button:GetPushedTexture(), "UI-HUD-ActionBar-IconFrame-Down", "OVERLAY");
+	if addRow then
+		local pushed = button:GetPushedTexture();
+		FrameTexture(pushed, "UI-HUD-ActionBar-IconFrame-AddRow-Down", "OVERLAY");
+		if pushed then
+			pushed:SetWidth(51);
+			pushed:SetHeight(51);
+		end
+		-- no bar art under these buttons: the slot background is the button's own
+		local background = button:CreateTexture(nil, "BACKGROUND");
+		background:SetDrawLayer("BACKGROUND", -1);
+		SetAtlasIf(background, "UI-HUD-ActionBar-IconFrame-Background");
+		background:SetAllPoints(button);
+		button.SlotBackground = background;
+	else
+		FrameTexture(button:GetPushedTexture(), "UI-HUD-ActionBar-IconFrame-Down", "OVERLAY");
+	end
 	FrameTexture(button:GetHighlightTexture(), "UI-HUD-ActionBar-IconFrame-Mouseover");
 	FrameTexture(button:GetCheckedTexture(), "UI-HUD-ActionBar-IconFrame-Mouseover");
 	FrameTexture(_G[name .. "Flash"], "UI-HUD-ActionBar-IconFrame-Flash", "ARTWORK");

@@ -501,4 +501,6 @@
 			<OnEvent function="MainActionBar_OnEvent"/>
 		</Scripts>
 	</Frame>
+	<!-- the extra bars: after MainActionBar, they stack on it -->
+	<Script file="MultiActionBars.lua"/>
 </Ui>
