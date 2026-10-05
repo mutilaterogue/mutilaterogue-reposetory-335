@@ -191,6 +191,17 @@ function MainActionBar_OnLoad(self)
 	self.EndCaps:SetFrameLevel(level + 5);
 	self.ActionBarPageNumber:SetFrameLevel(level + 5);
 
+	-- the divider middles: the atlas is a horizontal piece (retail's three slice layout turns it), stand it up
+	for i = 1, NUM_BUTTONS - 1 do
+		local center = _G[self:GetName() .. "Divider" .. i .. "Center"];
+		local info = C_Texture.GetAtlasInfo("_UI-HUD-ActionBar-Frame-Divider-Threeslice-Center");
+		if center and info then
+			local l, r = info.leftTexCoord or info.left, info.rightTexCoord or info.right;
+			local t, b = info.topTexCoord or info.top, info.bottomTexCoord or info.bottom;
+			center:SetTexCoord(l, b, r, b, l, t, r, t);
+		end
+	end
+
 	MainActionBar_HideStockArt();
 
 	for i = 1, NUM_BUTTONS do
