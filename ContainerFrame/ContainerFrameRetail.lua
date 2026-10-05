@@ -504,8 +504,19 @@ end
 
 local tokenWatcher = CreateFrame("Frame");
 tokenWatcher:RegisterEvent("ADDON_LOADED");
+tokenWatcher:RegisterEvent("PLAYER_ENTERING_WORLD");
 tokenWatcher:SetScript("OnEvent", function(self, event, addon)
-	if addon == "Blizzard_TokenUI" then
+	if event == "PLAYER_ENTERING_WORLD" then
+		-- the currencies on the backpack need the token UI (load on demand): with it from the start, as in retail
+		if not IsAddOnLoaded("Blizzard_TokenUI") then
+			if TokenFrame_LoadUI then
+				TokenFrame_LoadUI();
+			else
+				LoadAddOn("Blizzard_TokenUI");
+			end
+		end
+		HookTokenUI();
+	elseif addon == "Blizzard_TokenUI" then
 		HookTokenUI();
 	end
 end);

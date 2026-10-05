@@ -525,6 +525,11 @@ function ContainerFrameCombinedBags_OnShow(self)
 
 	UpdateBagButtons(true);
 	UpdateContainerFramePlacement();
+	-- the currencies shown on the backpack: this window is the backpack (GetBackpackFrame)
+	if ManageBackpackTokenFrame then
+		BackpackTokenFrame_Update();
+		ManageBackpackTokenFrame(self);
+	end
 	PlaySound("igBackPackOpen");
 end
 
