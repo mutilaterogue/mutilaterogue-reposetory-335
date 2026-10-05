@@ -572,11 +572,12 @@ function CR.SetCamera(name)
 	if zoomed == (CR.zoomed or false) then
 		return;
 	end
-	local _, file = GetNameForRace();
-	if not file then
+	-- the background the client picked (Troll -> Orc, Gnome -> Dwarf, Death Knight -> DeathKnight)
+	local background = GetCreateBackgroundModel and GetCreateBackgroundModel();
+	if not background then
 		return;
 	end
-	SetBackgroundModel(CharacterCreate, strupper(file) .. (zoomed and "_ZOOM" or ""));
+	SetBackgroundModel(CharacterCreate, background .. (zoomed and "_ZOOM" or ""));
 	CR.zoomed = zoomed;
 end
 
