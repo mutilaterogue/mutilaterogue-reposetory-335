@@ -26,6 +26,11 @@ local function AddCircleMask(button, left, top, right, bottom)
 	mask:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", right, bottom);
 	icon:AddMaskTexture(mask);
 	button.CircleMask = mask;
+	-- the icon no bigger than the mask: outside its rect the mask repeats its edge pixels, and the circle touches
+	-- the mask's edges at the sides' middles (dots beside the ring)
+	icon:ClearAllPoints();
+	icon:SetPoint("TOPLEFT", button, "TOPLEFT", left, top);
+	icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", right, bottom);
 end
 
 -- BaseBagSlotButtonMixin:UpdateTextures: the slot ring (empty without a bag), its highlight
