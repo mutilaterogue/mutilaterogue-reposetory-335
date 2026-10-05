@@ -1,3 +1,4 @@
+-- (not MultiActionBars.lua: that is the stock file, which this one must not replace)
 -- The extra bars (MultiBarBottomLeft / BottomRight / Right / Left) laid out as in 12.1.5: the retail buttons
 -- without bar art (ActionButtonOverrides.lua: the "add row" frame and the slot background), the bottom bars stacked
 -- over MainActionBar, the right bars standing at the screen's right edge.

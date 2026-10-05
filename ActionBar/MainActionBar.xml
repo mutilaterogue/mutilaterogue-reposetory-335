@@ -502,5 +502,5 @@
 		</Scripts>
 	</Frame>
 	<!-- the extra bars: after MainActionBar, they stack on it -->
-	<Script file="MultiActionBars.lua"/>
+	<Script file="MultiActionBarsRetail.lua"/>
 </Ui>
