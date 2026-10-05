@@ -111,6 +111,11 @@ function ActionButtonRetail_Apply(button, addRow)
 		border:SetBlendMode("BLEND");
 	end
 
+	-- the flyout arrow over the retail frame (both in OVERLAY)
+	if button.FlyoutArrow then
+		button.FlyoutArrow:SetDrawLayer("OVERLAY", 3);
+	end
+
 	local hotkey = _G[name .. "HotKey"];
 	if hotkey then
 		hotkey:SetWidth(32);

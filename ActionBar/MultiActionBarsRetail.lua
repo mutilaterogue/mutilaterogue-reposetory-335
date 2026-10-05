@@ -92,6 +92,11 @@ local function MultiActionBarsRetail_Setup()
 		for i = 1, NUM_BUTTONS do
 			local button = _G[info.name .. "Button" .. i];
 			ActionButtonRetail_Apply(button, true);
+			-- the right bars open their flyouts to the left (MultiBar3 / 4 ButtonTemplate)
+			if not info.horizontal then
+				button:SetAttribute("flyoutDirection", "LEFT");
+				ActionButton_UpdateFlyout(button);
+			end
 			button:ClearAllPoints();
 			if info.horizontal then
 				button:SetPoint("TOPLEFT", bar, "TOPLEFT", (i - 1) * (BUTTON_SIZE + BUTTON_PADDING), 0);
