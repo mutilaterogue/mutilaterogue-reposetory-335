@@ -40,24 +40,60 @@ local embedded = {};
 ---------------------------------------------------------------------------
 -- the stock windows inside this one
 ---------------------------------------------------------------------------
-local function HideOwnArt(frame)
-	-- the window's own frame art and title (regions right on it), its close button
-	for _, region in ipairs({ frame:GetRegions() }) do
-		region:Hide();
-		region.Show = region.Hide;
+-- the 3.3.5 frame art: the corner pieces of the old windows, their portraits (by texture path)
+local OLD_ART_PATTERNS = { "TopLeft", "TopRight", "BotLeft", "BotRight", "BottomLeft", "BottomRight", "Portrait", "PORTRAIT",
+	"Battlefield%-Icon", "UI%-LFG%-FRAME", "UI%-LFR%-FRAME", "UI%-Character%-General", "UI%-Character%-PVP" };
+local RETAIL_FRAME_KEYS = { "NineSlice", "PortraitContainer", "TitleContainer", "Bg", "TopTileStreaks", "CloseButton" };
+
+local function Suppress(object)
+	object:Hide();
+	object.Show = object.Hide;
+end
+
+local function IsOldArt(region)
+	if not region:IsObjectType("Texture") then
+		return false;
 	end
-	local close = _G[frame:GetName() .. "CloseButton"] or frame.CloseButton;
-	if close then
-		close:Hide();
-		close.Show = close.Hide;
-	end
-	-- a retail portrait frame (ChallengesFrame): its border, portrait and title
-	for _, key in ipairs({ "NineSlice", "PortraitContainer", "TitleContainer", "Bg" }) do
-		if frame[key] then
-			frame[key]:Hide();
-			frame[key].Show = frame[key].Hide;
+	local path = region:GetTexture();
+	local name = region:GetName();
+	for _, pattern in ipairs(OLD_ART_PATTERNS) do
+		if (path and path:find(pattern)) or (name and name:find(pattern)) then
+			return true;
 		end
 	end
+	return false;
+end
+
+-- a window and its panels (two levels down): their own frame art, titles and close buttons; the content stays
+local function HideOldFrameArt(frame, depth)
+	local name = frame:GetName();
+	for _, region in ipairs({ frame:GetRegions() }) do
+		local regionName = region:GetName();
+		if IsOldArt(region) or (regionName and regionName:find("FrameLabel$")) then
+			Suppress(region);
+		end
+	end
+	for _, key in ipairs(RETAIL_FRAME_KEYS) do
+		if frame[key] then
+			Suppress(frame[key]);
+		end
+	end
+	if name and _G[name .. "CloseButton"] then
+		Suppress(_G[name .. "CloseButton"]);
+	end
+	if depth > 0 then
+		for _, child in ipairs({ frame:GetChildren() }) do
+			HideOldFrameArt(child, depth - 1);
+		end
+	end
+end
+
+local function HideOwnArt(frame)
+	-- the window's own frame art and title (regions right on it)
+	for _, region in ipairs({ frame:GetRegions() }) do
+		Suppress(region);
+	end
+	HideOldFrameArt(frame, 2);
 end
 
 local function Embed(name, full)
@@ -215,7 +251,7 @@ end
 function PVEFrame_OnLoad(self)
 	PanelTemplates_SetNumTabs(self, 3);
 	PanelTemplates_SetTab(self, 1);
-	UIPanelWindows["PVEFrame"] = { area = "left", pushable = 0, whileDead = 1 };
+	UIPanelWindows["PVEFrame"] = { area = "left", pushable = 0, whileDead = 1, xOffset = "15", yOffset = "-10" };
 	-- every stock window inside this one from the start (a battlemaster may open one before this window ever showed)
 	for _, sections in ipairs(SECTIONS) do
 		for _, section in ipairs(sections) do
