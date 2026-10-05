@@ -384,7 +384,7 @@ local function PlaceTokenFrame()
 end
 
 local function HookTokenUI()
-	if ManageBackpackTokenFrame and not BackpackTokenFrame.retailHooked then
+	if ManageBackpackTokenFrame and BackpackTokenFrame and not BackpackTokenFrame.retailHooked then
 		BackpackTokenFrame.retailHooked = true;
 		hooksecurefunc("ManageBackpackTokenFrame", PlaceTokenFrame);
 		PlaceTokenFrame();
