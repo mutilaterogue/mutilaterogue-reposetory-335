@@ -8,11 +8,12 @@
 local COLUMNS = 4;
 local BUTTON_SIZE = 37;
 local SPACING = 5;
-local PADDING_SIDE = 7;			-- from the frame's right edge to the first column
-local PADDING_TOP = 32;			-- title bar
-local PADDING_TOP_SEARCH = 62;	-- title bar + search row (backpack)
-local PADDING_BOTTOM = 8;
-local PADDING_BOTTOM_MONEY = 32;	-- money row (backpack)
+local PADDING_SIDE = 10;		-- from the frame's sides to the columns
+local PADDING_TOP = 38;			-- title bar and the portrait
+local PADDING_TOP_SEARCH = 66;	-- title bar + search row (backpack)
+local PADDING_BOTTOM = 10;
+local PADDING_BOTTOM_MONEY = 34;	-- money row (backpack)
+local PORTRAIT_SIZE = 30;		-- the bag's portrait (half the panel one)
 
 local STOCK_ART = { "BackgroundTop", "BackgroundMiddle1", "BackgroundMiddle2", "BackgroundBottom", "Background1Slot",
 	"Portrait", "Name" };
@@ -28,6 +29,13 @@ local function Skin(frame)
 	retail:SetAllPoints(frame);
 	retail:SetFrameLevel(frame:GetFrameLevel());
 	retail:EnableMouse(false);
+	-- a small portrait in the corner, the title next to it
+	local portrait = retail:GetPortrait();
+	portrait:SetWidth(PORTRAIT_SIZE);
+	portrait:SetHeight(PORTRAIT_SIZE);
+	portrait:ClearAllPoints();
+	portrait:SetPoint("TOPLEFT", retail, "TOPLEFT", -3, 4);
+	retail:SetTitleOffsets(PORTRAIT_SIZE + 4, -24);
 	-- the stock close button keeps working (it closes the bag the stock way): in the retail one's place
 	retail.CloseButton:Hide();
 	local close = _G[name .. "CloseButton"];
@@ -72,7 +80,11 @@ local function Layout(frame, size, id)
 	local isBackpack = id == 0;
 
 	retail:SetTitle(_G[name .. "Name"]:GetText() or "");
-	retail:SetPortraitToBag(id);
+	if isBackpack then
+		retail:SetPortraitToAsset("Interface\\Buttons\\Button-Backpack-Up");
+	else
+		retail:SetPortraitToBag(id);
+	end
 
 	local rows = math.max(1, math.ceil(size / COLUMNS));
 	local top = isBackpack and PADDING_TOP_SEARCH or PADDING_TOP;
@@ -103,7 +115,7 @@ hooksecurefunc("ContainerFrame_GenerateFrame", Layout);
 hooksecurefunc("ContainerFrame_Update", function(frame)
 	if frame:GetID() == 0 and frame.RetailFrame and BagItemSearchBox.anchorBag == frame then
 		BagItemSearchBox:ClearAllPoints();
-		BagItemSearchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 62, -32);
+		BagItemSearchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING_SIDE + 6, -36);
 		BagItemSearchBox:SetPoint("RIGHT", frame, "RIGHT", -10, 0);
 	end
 end);
