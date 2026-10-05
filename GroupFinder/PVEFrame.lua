@@ -65,8 +65,14 @@ local function IsOldArt(region)
 end
 
 -- a window and its panels (two levels down): their own frame art, titles and close buttons; the content stays
+-- popups of their own (the arena team's members): their frame and close button stay
+local KEEP_FRAMES = { PVPTeamDetails = true };
+
 local function HideOldFrameArt(frame, depth)
 	local name = frame:GetName();
+	if name and KEEP_FRAMES[name] then
+		return;
+	end
 	for _, region in ipairs({ frame:GetRegions() }) do
 		local regionName = region:GetName();
 		if IsOldArt(region) or (regionName and regionName:find("FrameLabel$")) then
