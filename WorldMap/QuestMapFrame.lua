@@ -184,31 +184,6 @@ function QuestMapFrame_OnLoad(self)
 	detailsFrame.ScrollFrame = detailsScroll;
 	detailsFrame.RewardsFrame = rewardsPart;
 
-	-- retail rewards box: the top frame, the tiled middle and the bottom (questlog-reward-*)
-	if QuestMapDetailsRewardsFrameBackground then
-		QuestMapDetailsRewardsFrameBackground:Hide();
-	end
-	local function Piece(atlas, layer)
-		local texture = rewardsPart:CreateTexture(nil, layer or "BACKGROUND");
-		SetAtlasIf(texture, atlas);
-		local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
-		return texture, info and info.height or 20;
-	end
-	local top, topHeight = Piece("questlog-reward-top-frame", "BORDER");
-	top:SetPoint("TOPLEFT", rewardsPart, "TOPLEFT", 25, 0);
-	top:SetPoint("TOPRIGHT", rewardsPart, "TOPRIGHT", 0, 0);
-	top:SetHeight(topHeight);
-	local bottomPiece, bottomHeight = Piece("questlog-reward-bottom", "BORDER");
-	bottomPiece:SetPoint("BOTTOMLEFT", rewardsPart, "BOTTOMLEFT", 25, 0);
-	bottomPiece:SetPoint("BOTTOMRIGHT", rewardsPart, "BOTTOMRIGHT", 0, 0);
-	bottomPiece:SetHeight(bottomHeight);
-	local middle = Piece("questlog-reward-tile-vertical");
-	middle:SetPoint("TOPLEFT", top, "BOTTOMLEFT");
-	middle:SetPoint("BOTTOMRIGHT", bottomPiece, "TOPRIGHT");
-	local header = Piece("questlog-reward-header-top", "ARTWORK");
-	header:SetPoint("TOP", top, "TOP", 0, 0);
-	header:SetWidth(top:GetWidth() > 0 and top:GetWidth() or 260);
-
 	-- retail: the buttons on a dark bar under the details
 	local bar = detailsFrame:CreateTexture(nil, "BORDER");
 	bar:SetPoint("BOTTOMLEFT", 0, 0);
