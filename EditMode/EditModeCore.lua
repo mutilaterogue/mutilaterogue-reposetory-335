@@ -163,6 +163,48 @@ local function GetFramePosition(frame)
 	return left * scale, bottom * scale;
 end
 
+-- the saved place (retail style): the frame's point nearest to it among the screen's 9 (corners, sides, center),
+-- the offset from that same point of UIParent. A frame at the right / top edge stays there when the UI scale
+-- (UIParent's size in UI units) changes; from the bottom left corner it would drift.
+local function GetAnchoredPosition(frame)
+	local left, bottom = GetFramePosition(frame);
+	if not left then
+		return nil;
+	end
+	local scale = GetRelativeScale(frame);
+	local width, height = frame:GetWidth() * scale, frame:GetHeight() * scale;
+	local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight();
+	local centerX, centerY = left + width / 2, bottom + height / 2;
+
+	local h, x;
+	if centerX < screenWidth / 3 then
+		h, x = "LEFT", left;
+	elseif centerX > screenWidth * 2 / 3 then
+		h, x = "RIGHT", left + width - screenWidth;
+	else
+		h, x = "", centerX - screenWidth / 2;
+	end
+	local v, y;
+	if centerY < screenHeight / 3 then
+		v, y = "BOTTOM", bottom;
+	elseif centerY > screenHeight * 2 / 3 then
+		v, y = "TOP", bottom + height - screenHeight;
+	else
+		v, y = "", centerY - screenHeight / 2;
+	end
+	local point = v .. h;
+	if point == "" then
+		point = "CENTER";
+	end
+	return point, x, y;
+end
+
+local function SetAnchoredPosition(frame, point, x, y)
+	local scale = GetRelativeScale(frame);
+	frame:ClearAllPoints();
+	frame:SetPoint(point, UIParent, point, x / scale, y / scale);
+end
+
 -- привязка к сетке: к линиям, которые идут от центра экрана
 local function SnapValue(value, center, spacing)
 	local snapped = center + math.floor((value - center) / spacing + 0.5) * spacing;
@@ -329,9 +371,9 @@ function EditModeCore:StoreSystemPosition(systemName)
 		return;
 	end
 
-	local x, y = GetFramePosition(system.frame);
-	if x then
-		entry.x, entry.y = x, y;
+	local point, x, y = GetAnchoredPosition(system.frame);
+	if point then
+		entry.point, entry.x, entry.y = point, x, y;
 	end
 	self:SaveLayouts();
 end
@@ -369,7 +411,12 @@ function EditModeCore:ApplyLayoutToSystem(systemName)
 	end
 
 	if entry.x and entry.y then
-		SetFramePosition(system.frame, entry.x, entry.y);
+		-- a layout saved before the anchored places: x / y are from the bottom left corner
+		if entry.point then
+			SetAnchoredPosition(system.frame, entry.point, entry.x, entry.y);
+		else
+			SetFramePosition(system.frame, entry.x, entry.y);
+		end
 		self:ClampToScreen(system.frame);
 	end
 end
@@ -1015,7 +1062,24 @@ end
 local loader = CreateFrame("Frame");
 loader:RegisterEvent("PLAYER_LOGIN");
 loader:RegisterEvent("PLAYER_REGEN_DISABLED");
+loader:RegisterEvent("UI_SCALE_CHANGED");
+loader:RegisterEvent("DISPLAY_SIZE_CHANGED");
+loader:RegisterEvent("PLAYER_REGEN_ENABLED");
 loader:SetScript("OnEvent", function(self, event)
+	-- another UI scale / resolution: the screen's size in UI units changed, place the frames again
+	-- (not in combat: some of them are protected; done when it ends)
+	if event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" or event == "PLAYER_REGEN_ENABLED" then
+		if not self.loaded then
+			return;
+		end
+		if InCombatLockdown() then
+			self.pending = true;
+		elseif event ~= "PLAYER_REGEN_ENABLED" or self.pending then
+			self.pending = nil;
+			EditModeCore:ApplyLayout();
+		end
+		return;
+	end
 	if event == "PLAYER_REGEN_DISABLED" then
 		-- как в ретейле: в бою режим закрывается
 		EditModeCore:Exit();
@@ -1045,6 +1109,7 @@ loader:SetScript("OnEvent", function(self, event)
 	end
 
 	EditModeCore:ApplyLayout();
+	self.loaded = true;
 end);
 
 SLASH_EDITMODE1 = "/editmode";
