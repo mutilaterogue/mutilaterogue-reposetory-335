@@ -609,6 +609,10 @@ end
 -- like Sirus: from where the model is to the target in ZOOM_TIME, then left alone
 -- (the client's default is read back with GetPosition when the zoom starts from it)
 function CR.SetCamera(name)
+	-- off: the login screen camera does not follow SetPosition here (Lua only, no DLL patch)
+	if not CR.CAMERA_ENABLED then
+		return;
+	end
 	local model = CharacterCreate;
 	if not (model and model.GetPosition and model.SetPosition) then
 		return;
@@ -783,18 +787,3 @@ After("CharacterCreateEnumerateClasses", function(...) CR.Setup(); CR.LayoutClas
 -- retail has no blue Death Knight buttons: the 3.3.5 swap would put its old panel art over the red buttons
 CharacterCreate_DeathKnightSwap = function() end;
 
--- Sirus (CharacterModelManager.SetBackground): background loaded, SetCamera(0), loaded again.
--- After that the scene keeps camera 0 and SetPosition moves the view (the zoom); without it the
--- background's own camera puts it back and the model only jerks.
-local setBackgroundModel = SetBackgroundModel;
-SetBackgroundModel = function(model, name, ...)
-	setBackgroundModel(model, name, ...);
-	if model == CharacterCreate and model.SetCamera then
-		model:SetCamera(0);
-		SetCharCustomizeBackground("Interface\\Glues\\Models\\UI_" .. name .. "\\UI_" .. name .. ".m2");
-		CR.zoomAmount = 0;
-		if CR.cameraFrame then
-			CR.cameraFrame:Hide();
-		end
-	end
-end;
