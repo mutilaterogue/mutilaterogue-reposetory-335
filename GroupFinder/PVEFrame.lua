@@ -214,10 +214,12 @@ local function ApplyRetailLFD()
 		LFDQueueFrameBackground:Show();
 	end
 	-- the old scroll bar backgrounds; the bar itself in the retail style
-	for _, suffix in ipairs({ "", "Top", "Bottom", "Middle" }) do
-		local tex = _G["LFDQueueFrameRandomScrollFrameScrollBackground" .. suffix];
-		if tex then
-			Suppress(tex);
+	for _, scrollName in ipairs({ "LFDQueueFrameRandomScrollFrame", "LFDQueueFrameSpecificListScrollFrame" }) do
+		for _, suffix in ipairs({ "", "TopLeft", "BottomRight", "Top", "Bottom", "Middle" }) do
+			local tex = _G[scrollName .. "ScrollBackground" .. suffix];
+			if tex then
+				Suppress(tex);
+			end
 		end
 	end
 	-- the retail scroll box size and place (303x239 at -29, 35); its bar restyled on the first show
@@ -453,13 +455,19 @@ function PVEFrame_OnLoad(self)
 	self:SetTabSystem(self.TabSystem);
 	for tab = 1, #TITLES do
 		local tabID = self:AddNamedTab(TAB_NAMES[tab]);
-		_G["PVEFrameTab" .. tab] = self.TabSystem:GetTabButton(tabID);
+		local button = self.TabSystem:GetTabButton(tabID);
+		_G["PVEFrameTab" .. tab] = button;
+		-- the 3.3.5 font string reports its set width, not the text's: size the tab by the text itself
+		local textWidth = button.Text:GetStringWidth();
+		button.Text:SetWidth(textWidth + 10);
+		button:SetTabWidth(math.max(70, textWidth + 30));
 		self:SetTabCallback(tabID, function(isUserAction)
 			if isUserAction then
 				PVEFrame_ShowTab(tab);
 			end
 		end);
 	end
+	self.TabSystem:MarkDirty();
 	self.TabSystem:SetFrameLevel(self:GetFrameLevel() + 25);
 	UIPanelWindows["PVEFrame"] = { area = "left", pushable = 0, whileDead = 1, xOffset = "15", yOffset = "-10" };
 	for _, section in ipairs(SECTIONS[1]) do
