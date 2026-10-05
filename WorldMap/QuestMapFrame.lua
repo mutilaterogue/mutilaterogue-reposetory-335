@@ -129,8 +129,23 @@ end
 
 -- the retail scroll bar (your SharedXML MinimalScrollBar) on a plain scroll frame (ScrollUtil), the wheel too
 function QuestMap_InitScrollBar(scrollFrame)
-	if scrollFrame.ScrollBar and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
-		ScrollUtil.InitScrollFrameWithScrollBar(scrollFrame, scrollFrame.ScrollBar);
+	local bar = scrollFrame.ScrollBar;
+	-- the template's middle pieces have no anchors (retail anchors them with relativeKey, 3.3.5 has none):
+	-- the track's and the thumb's middle between their begin and end
+	local track = bar and bar.Track;
+	if track and track.Middle and track.Begin and track.End then
+		track.Middle:ClearAllPoints();
+		track.Middle:SetPoint("TOPLEFT", track.Begin, "BOTTOMLEFT");
+		track.Middle:SetPoint("BOTTOMRIGHT", track.End, "TOPRIGHT");
+	end
+	local thumb = track and track.Thumb;
+	if thumb and thumb.Middle and thumb.Begin and thumb.End then
+		thumb.Middle:ClearAllPoints();
+		thumb.Middle:SetPoint("TOPLEFT", thumb.Begin, "BOTTOMLEFT");
+		thumb.Middle:SetPoint("BOTTOMRIGHT", thumb.End, "TOPRIGHT");
+	end
+	if bar and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
+		ScrollUtil.InitScrollFrameWithScrollBar(scrollFrame, bar);
 	end
 	scrollFrame:EnableMouseWheel(true);
 	scrollFrame:SetScript("OnMouseWheel", function(self, delta)
