@@ -9,6 +9,7 @@
 
 CharacterCreateRetail = {};
 local CR = CharacterCreateRetail;
+CR.DEMO_NO_ALLIANCE_RINGS = true;	-- TEMP: false brings the Alliance rings back
 
 local RACE_SIZE, RACE_SPACING = 64, 82;
 local CLASS_SIZE, CLASS_SPACING = 52, 80;
@@ -208,6 +209,12 @@ function CR.LayoutRaces(...)
 			local ring = isHorde and "charactercreate-ring-horde" or "charactercreate-ring-alliance";
 			StyleIconButton(button, RACE_SIZE, false, ring);
 			SetAtlasIf(button.CRRing, button.enable and ring or ring .. "-disabled");
+			-- TEMP (demo): no rings on the Alliance column, the bare masked icons show the masks work
+			if CR.DEMO_NO_ALLIANCE_RINGS and not isHorde then
+				button.CRRing:Hide();
+			else
+				button.CRRing:Show();
+			end
 			local atlas = RaceAtlas(file, sex);
 			button.crFile, button.crHorde = strupper(file), isHorde;
 			CR.HookRaceTooltip(button);
