@@ -591,9 +591,7 @@ function CR.SetCamera(name)
 			if CharacterCreate and CharacterCreate.SetPosition then
 				CharacterCreate:SetPosition(position[1], position[2], position[3]);
 			end
-			if done then
-				self:Hide();
-			end
+			-- kept running: the client puts the model back to its place, the position goes on every frame
 		end);
 	end
 	CR.cameraFrame:Show();
