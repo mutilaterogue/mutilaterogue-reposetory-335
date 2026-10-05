@@ -62,6 +62,13 @@ local function Skin(frame)
 	end
 	frame.RetailFrame = retail;
 
+	-- the retail height wins: the stock code sets its own (BACKPACK_HEIGHT and the bag art heights) where this file
+	-- cannot follow it, so any SetHeight of the bag gives the retail one
+	local setHeight = frame.SetHeight;
+	frame.SetHeight = function(self, height)
+		setHeight(self, self.retailHeight or height);
+	end
+
 	-- the sort button (retail BagItemAutoSortButton): sorts the backpack and the bags (ContainerFrameCombined.lua)
 	local sort = CreateFrame("Button", name .. "SortButton", frame);
 	sort:SetWidth(SORT_WIDTH);
@@ -157,7 +164,8 @@ local function Layout(frame, size, id)
 	local bottom = isBackpack and PADDING_BOTTOM_MONEY or PADDING_BOTTOM;
 	local step = BUTTON_SIZE + SPACING;
 	frame:SetWidth(FRAME_WIDTH);
-	frame:SetHeight(rows * BUTTON_SIZE + (rows - 1) * SPACING + top + bottom);
+	frame.retailHeight = rows * BUTTON_SIZE + (rows - 1) * SPACING + top + bottom;
+	frame:SetHeight(frame.retailHeight);
 
 	-- the stock order: Item1 at the bottom right is the last slot
 	for i = 1, size do
@@ -181,17 +189,5 @@ end
 
 hooksecurefunc("ContainerFrame_GenerateFrame", Layout);
 
--- every update: the size again (something puts the backpack's stock height back after the generate), the search box
-hooksecurefunc("ContainerFrame_Update", function(frame)
-	if frame.RetailFrame and frame.retailSize and frame:GetID() == frame.retailID then
-		local isBackpack = frame.retailID == 0;
-		local rows = math.max(1, math.ceil(frame.retailSize / COLUMNS));
-		local height = rows * BUTTON_SIZE + (rows - 1) * SPACING
-			+ (isBackpack and PADDING_TOP_SEARCH or PADDING_TOP) + (isBackpack and PADDING_BOTTOM_MONEY or PADDING_BOTTOM);
-		if math.abs(frame:GetHeight() - height) > 0.5 then
-			frame:SetHeight(height);
-			updateContainerFrameAnchors();
-		end
-	end
-	PlaceSearchBox(frame);
-end);
+-- every update: the search box in its place
+hooksecurefunc("ContainerFrame_Update", PlaceSearchBox);
