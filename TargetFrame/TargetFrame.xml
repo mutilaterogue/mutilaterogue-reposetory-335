@@ -171,8 +171,9 @@
 					</Anchors>
 				</Texture>
 			</Layer>
-			<Layer level="BACKGROUND" textureSubLevel="2">
-				<!-- TargetFrame.lua's borderTexture (_G[name.."TextureFrameTexture"]): the frame art, under the bars -->
+			<Layer level="BORDER">
+				<!-- TargetFrame.lua's borderTexture (_G[name.."TextureFrameTexture"]): the frame art, under the bars, over the
+				     portrait (its own layer: the portrait's round edge goes under the ring) -->
 				<Texture name="$parentTextureFrameTexture" atlas="UI-HUD-UnitFrame-Target-PortraitOn" useAtlasSize="true">
 					<Anchors>
 						<Anchor point="CENTER"/>
