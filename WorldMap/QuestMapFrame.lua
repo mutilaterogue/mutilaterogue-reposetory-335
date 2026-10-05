@@ -150,38 +150,51 @@ function QuestMap_RetailScrollBar(scrollFrame)
 	trackMiddle:SetPoint("TOP", trackTop, "BOTTOM");
 	trackMiddle:SetPoint("BOTTOM", trackBottom, "TOP");
 
-	-- the thumb: the slider's thumb texture is an invisible box (top cap + middle + bottom cap),
-	-- the visible pieces sit inside it so nothing hangs outside or lags behind
+	-- the thumb: the slider keeps an invisible thumb for dragging; the visible thumb (top cap, middle,
+	-- bottom cap) is a frame placed by the bar's value itself, so nothing lags behind or falls apart
+	local THUMB_HEIGHT = 50;
 	local thumb = bar:GetThumbTexture();
 	if thumb then
 		thumb:SetTexture(0, 0, 0, 0);
 		thumb:SetWidth(8);
-		thumb:SetHeight(50);
-		local capTop = bar:CreateTexture(nil, "OVERLAY");
+		thumb:SetHeight(THUMB_HEIGHT);
+		local visual = CreateFrame("Frame", nil, bar);
+		visual:SetWidth(8);
+		visual:SetHeight(THUMB_HEIGHT);
+		visual:SetFrameLevel(bar:GetFrameLevel() + 2);
+		local capTop = visual:CreateTexture(nil, "ARTWORK");
 		SetAtlasIf(capTop, "minimal-scrollbar-thumb-top", true);
-		capTop:SetPoint("TOP", thumb, "TOP");
-		local capBottom = bar:CreateTexture(nil, "OVERLAY");
+		capTop:SetPoint("TOP");
+		local capBottom = visual:CreateTexture(nil, "ARTWORK");
 		SetAtlasIf(capBottom, "minimal-scrollbar-thumb-bottom", true);
-		capBottom:SetPoint("BOTTOM", thumb, "BOTTOM");
-		local middle = bar:CreateTexture(nil, "OVERLAY");
+		capBottom:SetPoint("BOTTOM");
+		local middle = visual:CreateTexture(nil, "ARTWORK");
 		SetAtlasIf(middle, "minimal-scrollbar-thumb-middle");
-		middle:SetWidth(8);
-		middle:SetPoint("TOP", capTop, "BOTTOM");
-		middle:SetPoint("BOTTOM", capBottom, "TOP");
-		-- the middle atlas is 715 px tall: show only its top part, not the whole strip squeezed
+		middle:SetPoint("TOPLEFT", capTop, "BOTTOMLEFT");
+		middle:SetPoint("BOTTOMRIGHT", capBottom, "TOPRIGHT");
+		-- the middle atlas is 715 px tall: only its top part, not the whole strip squeezed
 		local info = C_Texture.GetAtlasInfo("minimal-scrollbar-thumb-middle");
 		if info then
 			local l, r = info.left or info.leftTexCoord, info.right or info.rightTexCoord;
 			local t, bt = info.top or info.topTexCoord, info.bottom or info.bottomTexCoord;
-			middle:SetTexCoord(l, r, t, t + (bt - t) * 6 / 715);
+			middle:SetTexCoord(l, r, t, t + (bt - t) * (THUMB_HEIGHT - 44) / 715);
 		end
-		bar.thumbPieces = { capTop, middle, capBottom };
-		-- nothing to scroll: the 3.3.5 code hides the thumb texture, hide the pieces with it
+		bar.thumbVisual = visual;
+		-- follow the value; hidden when there is nothing to scroll
 		local function Sync()
-			for _, piece in ipairs(bar.thumbPieces) do
-				if thumb:IsShown() then piece:Show(); else piece:Hide(); end
+			local low, high = bar:GetMinMaxValues();
+			if not thumb:IsShown() or high <= low then
+				visual:Hide();
+				return;
 			end
+			local travel = bar:GetHeight() - THUMB_HEIGHT;
+			local offset = travel * (bar:GetValue() - low) / (high - low);
+			visual:ClearAllPoints();
+			visual:SetPoint("TOP", bar, "TOP", 0, -offset);
+			visual:Show();
 		end
+		bar:HookScript("OnValueChanged", Sync);
+		bar:HookScript("OnSizeChanged", Sync);
 		scrollFrame:HookScript("OnScrollRangeChanged", Sync);
 		hooksecurefunc(thumb, "Show", Sync);
 		hooksecurefunc(thumb, "Hide", Sync);
