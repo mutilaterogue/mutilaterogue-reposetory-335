@@ -13,7 +13,10 @@ local PADDING_TOP = 38;			-- title bar and the portrait
 local PADDING_TOP_SEARCH = 66;	-- title bar + search row (backpack)
 local PADDING_BOTTOM = 10;
 local PADDING_BOTTOM_MONEY = 34;	-- money row (backpack)
-local PORTRAIT_SIZE = 30;		-- the bag's portrait (half the panel one)
+local PORTRAIT_SIZE = 40;		-- the bag's portrait, inside the small ring of HeldBagLayout
+
+-- between two stacked bags (stock 3; retail CONTAINER_SPACING 8, and the ring stands over the frame's top)
+VISIBLE_CONTAINER_SPACING = 12;
 
 local STOCK_ART = { "BackgroundTop", "BackgroundMiddle1", "BackgroundMiddle2", "BackgroundBottom", "Background1Slot",
 	"Portrait", "Name" };
@@ -29,13 +32,15 @@ local function Skin(frame)
 	retail:SetAllPoints(frame);
 	retail:SetFrameLevel(frame:GetFrameLevel());
 	retail:EnableMouse(false);
-	-- a small portrait in the corner, the title next to it
+	-- retail ContainerFrameTemplate: layoutType HeldBagLayout (the small portrait ring)
+	retail:SetBorder("HeldBagLayout");
+	-- the portrait inside that ring, the title next to it
 	local portrait = retail:GetPortrait();
 	portrait:SetWidth(PORTRAIT_SIZE);
 	portrait:SetHeight(PORTRAIT_SIZE);
 	portrait:ClearAllPoints();
-	portrait:SetPoint("TOPLEFT", retail, "TOPLEFT", -3, 4);
-	retail:SetTitleOffsets(PORTRAIT_SIZE + 4, -24);
+	portrait:SetPoint("TOPLEFT", retail, "TOPLEFT", -6, 6);
+	retail:SetTitleOffsets(PORTRAIT_SIZE, -24);
 	-- the stock close button keeps working (it closes the bag the stock way): in the retail one's place
 	retail.CloseButton:Hide();
 	local close = _G[name .. "CloseButton"];
