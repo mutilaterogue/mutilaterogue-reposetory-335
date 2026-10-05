@@ -21,7 +21,7 @@
 						<Anchor point="LEFT" x="9" y="1"/>
 					</Anchors>
 				</FontString>
-				<Texture parentKey="CollapseIcon" atlas="common-button-list-minus" useAtlasSize="true">
+				<Texture parentKey="CollapseIcon" atlas="common-button-list-minus-2x" useAtlasSize="true">
 					<Anchors>
 						<Anchor point="RIGHT" x="-8" y="0"/>
 					</Anchors>

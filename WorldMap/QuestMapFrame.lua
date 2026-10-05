@@ -140,8 +140,8 @@ function QuestLogQuests_GetHeaderButton(index)
 	if not headers[index] then
 		local header = CreateFrame("Button", nil, contents, "QuestMapLogHeaderTemplate");
 		-- the retail header bar: a three slice, its highlight the same bar added
-		header.BarSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseexpand", "BACKGROUND", 10, 0, 10, 0);
-		header.HighlightSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseexpand", "HIGHLIGHT", 10, 0, 10, 0);
+		header.BarSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseexpand-2x", "BACKGROUND", 10, 0, 10, 0);
+		header.HighlightSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseexpand-2x", "HIGHLIGHT", 10, 0, 10, 0);
 		for _, piece in ipairs(header.HighlightSlices) do
 			piece:SetBlendMode("ADD");
 			piece:SetAlpha(0.4);
@@ -338,7 +338,7 @@ function QuestLogQuests_Update(poiTable)
 				noHeaders = false;
 				headerIndex = headerIndex + 1;
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
-				SetAtlasIf(button.CollapseIcon, "common-button-list-plus", true);	-- its own size: plus 13x13, minus 13x4
+				SetAtlasIf(button.CollapseIcon, "common-button-list-plus-2x", true);	-- its own size: plus 13x13, minus 13x4
 				button.ButtonText:SetText(headerTitle or "");
 				button:ClearAllPoints();
 				if prevButton then
@@ -357,7 +357,7 @@ function QuestLogQuests_Update(poiTable)
 				noHeaders = false;
 				headerIndex = headerIndex + 1;
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
-				SetAtlasIf(button.CollapseIcon, "common-button-list-minus", true);
+				SetAtlasIf(button.CollapseIcon, "common-button-list-minus-2x", true);
 				button.ButtonText:SetText(headerTitle or "");
 				button:ClearAllPoints();
 				if prevButton then
