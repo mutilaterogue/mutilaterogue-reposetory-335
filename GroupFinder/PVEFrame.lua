@@ -5,7 +5,7 @@
 -- The stock windows keep their logic; their own frame art, title and close button are hidden. Whatever opens them
 -- (key bindings, micro buttons, a battlemaster, /mplus) opens this window on their section.
 
-local RIGHT_X, RIGHT_Y = 210, 46;		-- a stock window's place: its content right of the blue panel
+local RIGHT_X, RIGHT_Y = 210, 46;		-- a stock window's place: its content right of the blue panel (default)
 
 local PORTRAITS = {
 	"Interface\\LFGFrame\\UI-LFG-PORTRAIT",
@@ -14,7 +14,7 @@ local PORTRAITS = {
 };
 
 local TITLES = {
-	LOOKING_FOR_DUNGEON or "Подземелья и рейды",
+	"Поиск группы",
 	PLAYER_V_PLAYER or "Игрок против игрока",
 	"Эпохальные+",
 };
@@ -26,8 +26,9 @@ local SECTIONS = {
 		{ frame = "LFRParentFrame", text = LOOKING_FOR_RAID or "Поиск рейда", icon = "Interface\\Icons\\INV_Helmet_06" },
 	},
 	{
-		{ frame = "PVPParentFrame", tab = 2, text = BATTLEGROUNDS or "Поля боя", icon = "Interface\\Icons\\Achievement_BG_winWSG" },
-		{ frame = "PVPParentFrame", tab = 1, text = (HONOR or "Честь") .. " / " .. (ARENA or "Арена"), icon = "Interface\\Icons\\Achievement_Arena_2v2_7" },
+		-- the PvP window's content starts higher than the dungeon finder's: lower
+		{ frame = "PVPParentFrame", tab = 2, y = 14, text = BATTLEGROUNDS or "Поля боя", icon = "Interface\\Icons\\Achievement_BG_winWSG" },
+		{ frame = "PVPParentFrame", tab = 1, y = 14, text = (HONOR or "Честь") .. " / " .. (ARENA or "Арена"), icon = "Interface\\Icons\\Achievement_Arena_2v2_7" },
 	},
 	{
 		{ frame = "ChallengesFrame", full = true },
@@ -102,7 +103,29 @@ local function HideOwnArt(frame)
 	HideOldFrameArt(frame, 2);
 end
 
-local function Embed(name, full)
+-- what the stock window still has over this window's top (its title, its close button: moved up with it)
+local function HideAboveTop(frame, depth)
+	local top = PVEFrame:GetTop();
+	if not top then
+		return;
+	end
+	for _, region in ipairs({ frame:GetRegions() }) do
+		local bottom = region:IsShown() and region:GetBottom();
+		if bottom and bottom > top - 2 then
+			Suppress(region);
+		end
+	end
+	for _, child in ipairs({ frame:GetChildren() }) do
+		local bottom = child:IsShown() and child:GetBottom();
+		if bottom and bottom > top - 2 then
+			Suppress(child);
+		elseif depth > 0 then
+			HideAboveTop(child, depth - 1);
+		end
+	end
+end
+
+local function Embed(name, full, y)
 	local frame = _G[name];
 	if not frame or embedded[name] then
 		return frame;
@@ -115,7 +138,7 @@ local function Embed(name, full)
 		frame:SetAllPoints(PVEFrame);
 		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 5);
 	else
-		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", RIGHT_X, RIGHT_Y);
+		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", RIGHT_X, y or RIGHT_Y);
 		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 2);
 	end
 	if frame.SetMovable then
@@ -167,7 +190,12 @@ function PVEFrame_ShowSection(index, keepShown)
 		return;
 	end
 	selectedSection = index;
-	local frame = Embed(section.frame, section.full);
+	local frame = Embed(section.frame, section.full, section.y);
+	if frame and not section.full then
+		-- the same window in another section (PvP) may stand elsewhere
+		frame:ClearAllPoints();
+		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", RIGHT_X, section.y or RIGHT_Y);
+	end
 	if not keepShown then
 		HideSections();
 	end
@@ -178,6 +206,9 @@ function PVEFrame_ShowSection(index, keepShown)
 			if stockTab then
 				stockTab:Click();
 			end
+		end
+		if not section.full then
+			HideAboveTop(frame, 2);
 		end
 	end
 	for i = 1, 3 do
@@ -202,8 +233,10 @@ function PVEFrame_ShowTab(tab, section, keepShown)
 	local sections = SECTIONS[tab];
 	if sections[1].full then
 		GroupFinderFrame:Hide();
+		PVEFrameRightInset:Hide();
 	else
 		GroupFinderFrame:Show();
+		PVEFrameRightInset:Show();
 		for i = 1, 3 do
 			local button = _G["GroupFinderFrameGroupButton" .. i];
 			local info = sections[i];
@@ -261,7 +294,7 @@ function PVEFrame_OnLoad(self)
 	-- every stock window inside this one from the start (a battlemaster may open one before this window ever showed)
 	for _, sections in ipairs(SECTIONS) do
 		for _, section in ipairs(sections) do
-			Embed(section.frame, section.full);
+			Embed(section.frame, section.full, section.y);
 		end
 	end
 	-- each section's own toggles: this window instead

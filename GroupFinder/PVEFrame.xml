@@ -176,6 +176,13 @@
 				</Frames>
 			</Frame>
 
+			<!-- the right side's dark inset (retail), under the stock windows' content -->
+			<Frame name="PVEFrameRightInset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="222" y="-24"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="4"/>
+				</Anchors>
+			</Frame>
 			<Button name="PVEFrameTab1" inherits="CharacterFrameTabButtonTemplate" id="1" text="Подземелья и рейды">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="11" y="2"/>
