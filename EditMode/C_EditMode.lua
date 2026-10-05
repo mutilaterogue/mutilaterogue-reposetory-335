@@ -19,7 +19,6 @@ Enum.EditModeAccountSetting = Enum.EditModeAccountSetting or {
 
 C_EditMode = C_EditMode or {};
 
-local DEFAULT_LAYOUT_NAME = "Стандартная";
 local SAVE_VERSION = 1;
 
 local layouts = nil;      -- массив раскладок
@@ -63,14 +62,65 @@ local function Serialize(value, out)
 	end
 end
 
-local function CreateDefaultLayouts()
+-- the built-in layouts, as retail's Modern / Classic presets: every character starts with them (a copy it can edit)
+-- "Современная": the frames where the modern UI puts them; "Классическая": the 3.3.5 places (no system moved)
+local MODERN_LAYOUT_NAME = "Современная";
+local CLASSIC_LAYOUT_NAME = "Классическая";
+local MODERN_SYSTEMS = {
+	{ name = "PlayerFrame", point = "BOTTOMLEFT", x = 549.33340153821, y = 216.0000519743, settings = {} },
+	{ name = "TargetFrame", point = "BOTTOMRIGHT", x = -549.33340153821, y = 216.0000519743, settings = {} },
+	{ name = "CastingBarFrame", point = "BOTTOM", x = 0, y = 200.00005525689, settings = {} },
+	{ name = "ObjectiveTrackerFrame", point = "TOPRIGHT", x = -105.33341822469, y = -205.99996867864, settings = {} },
+	{ name = "BackpackFrame", point = "BOTTOMRIGHT", x = -3.3333581806971, y = 40.000044314931, settings = {} },
+};
+
+local function CopyLayoutTable(value)
+	if type(value) ~= "table" then
+		return value;
+	end
+	local copy = {};
+	for key, inner in pairs(value) do
+		copy[key] = CopyLayoutTable(inner);
+	end
+	return copy;
+end
+
+local function CreateModernLayout()
 	return {
-		{
-			layoutName = DEFAULT_LAYOUT_NAME,
-			layoutType = Enum.EditModeLayoutType.Character,
-			systems = {},
-		},
+		layoutName = MODERN_LAYOUT_NAME,
+		layoutType = Enum.EditModeLayoutType.Preset,
+		systems = CopyLayoutTable(MODERN_SYSTEMS),
 	};
+end
+
+local function CreateClassicLayout()
+	return {
+		layoutName = CLASSIC_LAYOUT_NAME,
+		layoutType = Enum.EditModeLayoutType.Preset,
+		systems = {},
+	};
+end
+
+local function CreateDefaultLayouts()
+	return { CreateModernLayout(), CreateClassicLayout() };
+end
+
+-- a character saved before the presets: they join its layouts (its own ones and its choice stay)
+local function AddMissingPresets()
+	local hasModern, hasClassic;
+	for _, layout in ipairs(layouts) do
+		if layout.layoutName == MODERN_LAYOUT_NAME then
+			hasModern = true;
+		elseif layout.layoutName == CLASSIC_LAYOUT_NAME then
+			hasClassic = true;
+		end
+	end
+	if not hasModern then
+		table.insert(layouts, CreateModernLayout());
+	end
+	if not hasClassic then
+		table.insert(layouts, CreateClassicLayout());
+	end
 end
 
 local function Save()
@@ -138,6 +188,7 @@ local function Load()
 		accountSettings = data.accountSettings;
 	end
 
+	AddMissingPresets();
 	if not layouts[activeLayout] then
 		activeLayout = 1;
 	end
