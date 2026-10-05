@@ -579,7 +579,16 @@ function CR.SetCamera(name)
 	end
 	-- not SetBackgroundModel: it would look up the ambience / lights by the "_ZOOM" name (none);
 	-- the same music goes on, the lights are the race's own
-	local name = background .. (zoomed and "_ZOOM" or "");
+	-- the zoomed copy per race and sex (tools/glue_zoom.py), one for every death knight
+	local name = background;
+	if zoomed then
+		local _, file = GetNameForRace();
+		if background == "DeathKnight" or not file then
+			name = "DeathKnight_ZOOM";
+		else
+			name = file .. (GetSelectedSex() == SEX_FEMALE and "_Female" or "_Male") .. "_ZOOM";
+		end
+	end
 	SetCharCustomizeBackground("Interface\\Glues\\Models\\UI_" .. name .. "\\UI_" .. name .. ".m2");
 	if SetLighting then
 		SetLighting(CharacterCreate, strupper(background));

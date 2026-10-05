@@ -8,10 +8,11 @@ Camera (WotLK, 100 bytes, M2 header cameras at 0x110): type, fov, far, near, pos
 position_base (+36), target track, target_base (+68), roll track. The glue backgrounds keep static
 cameras in the base vectors (the tracks hold zeros), so only the bases are moved. The character stands at
 the background's attachment 0 (attachments at 0xF0, 40 bytes, position at +8):
-  target' = the face: attachment 0 + HEIGHT * FACE up
+  target' = the face: attachment 0 + the face height of the race / sex (ZOOMS) up
   camera' = level with it, on the scene camera's side, at the distance the head view needs (fov, VIEW)
 
-Usage: python tools/glue_zoom.py <...\\Interface\\Glues\\Models> <out dir> [Name ...]
+Usage: python tools/glue_zoom.py <...\\Interface\\Glues\\Models> <out dir> [Human_Male ...]
+Out: UI_<Race>_<Male|Female>_ZOOM (UI_DeathKnight_ZOOM for every death knight).
 """
 import math
 import os
@@ -26,15 +27,23 @@ TARGET_BASE = 68
 
 ATTACHMENTS = 0xF0     # attachment 0 of a glue background: where the character stands (feet)
 ATTACHMENT_SIZE = 40
-FACE = 0.9              # the face at this part of the character's height
-VIEW = 0.45             # the view this part of the character's height tall
-# the character's height per background (the client puts gnomes on Dwarf, trolls on Orc)
-HEIGHT = {
-    "Human": 1.8, "Dwarf": 1.2, "NightElf": 2.2, "Draenei": 2.3, "Orc": 1.8,
-    "Scourge": 1.6, "Tauren": 2.5, "BloodElf": 1.8, "DeathKnight": 1.8,
-}
+VIEW = 0.5              # the view this tall (scene units): head and shoulders
+# one zoomed copy per race and sex: (out name, background, face height above the feet)
+# the client puts gnomes on the Dwarf background, trolls on Orc, every death knight on DeathKnight
+ZOOMS = [
+    ("Human_Male", "Human", 1.75), ("Human_Female", "Human", 1.6),
+    ("Dwarf_Male", "Dwarf", 1.25), ("Dwarf_Female", "Dwarf", 1.2),
+    ("Gnome_Male", "Dwarf", 0.85), ("Gnome_Female", "Dwarf", 0.8),
+    ("NightElf_Male", "NightElf", 2.1), ("NightElf_Female", "NightElf", 1.95),
+    ("Draenei_Male", "Draenei", 2.15), ("Draenei_Female", "Draenei", 1.95),
+    ("Orc_Male", "Orc", 1.6), ("Orc_Female", "Orc", 1.55),
+    ("Troll_Male", "Orc", 1.7), ("Troll_Female", "Orc", 1.85),
+    ("Scourge_Male", "Scourge", 1.5), ("Scourge_Female", "Scourge", 1.45),
+    ("Tauren_Male", "Tauren", 2.0), ("Tauren_Female", "Tauren", 1.9),
+    ("BloodElf_Male", "BloodElf", 1.75), ("BloodElf_Female", "BloodElf", 1.65),
+    ("DeathKnight", "DeathKnight", 1.65),
+]
 
-DEFAULT_NAMES = ["Human", "Dwarf", "NightElf", "Draenei", "Orc", "Scourge", "Tauren", "BloodElf", "DeathKnight"]
 
 
 def find_dir(models, name):
@@ -44,15 +53,14 @@ def find_dir(models, name):
     return None
 
 
-def zoom_camera(data, name):
-    height = HEIGHT.get(name, 1.8)
+def zoom_camera(data, face_height):
     count, offset = struct.unpack_from("<II", data, CAMERAS)
     natt, oatt = struct.unpack_from("<II", data, ATTACHMENTS)
     if not natt:
         print("  no attachment 0 (the character's place)")
         return 0
     feet = struct.unpack_from("<3f", data, oatt + 8)
-    face = (feet[0], feet[1], feet[2] + height * FACE)
+    face = (feet[0], feet[1], feet[2] + face_height)
     for i in range(count):
         base = offset + i * CAMERA_SIZE
         fov = struct.unpack_from("<f", data, base + 4)[0]
@@ -61,7 +69,7 @@ def zoom_camera(data, name):
         # the same side as the scene's camera, level with the face, as far as the head view needs
         dx, dy = pos[0] - feet[0], pos[1] - feet[1]
         length = math.hypot(dx, dy) or 1.0
-        distance = (height * VIEW / 2) / math.tan(fov / 2)
+        distance = (VIEW / 2) / math.tan(fov / 2)
         new_pos = (face[0] + dx / length * distance, face[1] + dy / length * distance, face[2])
         struct.pack_into("<3f", data, base + TARGET_BASE, *face)
         struct.pack_into("<3f", data, base + POSITION_BASE, *new_pos)
@@ -73,25 +81,25 @@ def fmt(v):
     return "(" + ", ".join(f"{x:.3f}" for x in v) + ")"
 
 
-def build(models, out, name):
-    source = find_dir(models, name)
+def build(models, out, name, background, face_height):
+    source = find_dir(models, background)
     if not source:
-        print(f"{name}: UI_{name} not found, skipped")
+        print(f"{name}: UI_{background} not found, skipped")
         return
-    m2 = next((f for f in os.listdir(source) if f.lower() == f"ui_{name}.m2".lower()), None)
+    m2 = next((f for f in os.listdir(source) if f.lower() == f"ui_{background}.m2".lower()), None)
     if not m2:
-        print(f"{name}: no UI_{name}.m2, skipped")
+        print(f"{name}: no UI_{background}.m2, skipped")
         return
-    target = os.path.join(out, f"UI_{name}_ZOOM")
-    os.makedirs(target, exist_ok=True)
-    print(f"{name}:")
+    print(f"{name} (UI_{background}):")
     data = bytearray(open(os.path.join(source, m2), "rb").read())
     if struct.unpack_from("<I", data, 4)[0] != 264:
         print("  not a 3.3.5 M2 (version 264), skipped")
         return
-    if not zoom_camera(data, name):
+    if not zoom_camera(data, face_height):
         print("  no camera, skipped")
         return
+    target = os.path.join(out, f"UI_{name}_ZOOM")
+    os.makedirs(target, exist_ok=True)
     open(os.path.join(target, f"UI_{name}_ZOOM.m2"), "wb").write(data)
     stem = os.path.splitext(m2)[0].lower()
     for f in os.listdir(source):
@@ -105,8 +113,10 @@ def main():
         print(__doc__)
         sys.exit(1)
     models, out = sys.argv[1], sys.argv[2]
-    for name in sys.argv[3:] or DEFAULT_NAMES:
-        build(models, out, name)
+    only = {n.lower() for n in sys.argv[3:]}
+    for name, background, face_height in ZOOMS:
+        if not only or name.lower() in only:
+            build(models, out, name, background, face_height)
 
 
 if __name__ == "__main__":
