@@ -24,13 +24,14 @@ end
 local function ActionButtonRetail_UpdateNormal(button)
 	local normal = button:GetNormalTexture();
 	if normal then
-		SetAtlasIf(normal, button.retailAddRow and "UI-HUD-ActionBar-IconFrame-AddRow" or "UI-HUD-ActionBar-IconFrame");
+		-- a small button: the plain frame at the small size (the add row one stands out of the 30 px icon)
+		local addRow = button.retailAddRow and not button.retailSmall;
+		SetAtlasIf(normal, addRow and "UI-HUD-ActionBar-IconFrame-AddRow" or "UI-HUD-ActionBar-IconFrame");
 		normal:SetDrawLayer("OVERLAY");
 		normal:ClearAllPoints();
 		normal:SetPoint("TOPLEFT");
-		local width = button.retailSmall and 35 or (button.retailAddRow and 51 or 46);
-		normal:SetWidth(width);
-		normal:SetHeight(button.retailSmall and 35 or (button.retailAddRow and 51 or 45));
+		normal:SetWidth(button.retailSmall and 31.6 or (addRow and 51 or 46));
+		normal:SetHeight(button.retailSmall and 30.9 or (addRow and 51 or 45));
 	end
 end
 
@@ -146,8 +147,9 @@ function ActionButtonRetail_ApplySmall(button)
 	ActionButtonRetail_UpdateNormal(button);
 	local pushed = button:GetPushedTexture();
 	if pushed then
-		pushed:SetWidth(35);
-		pushed:SetHeight(35);
+		SetAtlasIf(pushed, "UI-HUD-ActionBar-IconFrame-Down");
+		pushed:SetWidth(31.6);
+		pushed:SetHeight(30.9);
 	end
 	for _, texture in ipairs({ button:GetHighlightTexture(), button:GetCheckedTexture(), _G[name .. "Border"], _G[name .. "Flash"] }) do
 		texture:SetWidth(31.6);
