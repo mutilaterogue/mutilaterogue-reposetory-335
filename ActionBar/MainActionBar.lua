@@ -28,8 +28,9 @@ local function ActionButtonRetail_UpdateNormal(button)
 		normal:SetDrawLayer("OVERLAY");
 		normal:ClearAllPoints();
 		normal:SetPoint("TOPLEFT");
-		normal:SetWidth(button.retailAddRow and 51 or 46);
-		normal:SetHeight(button.retailAddRow and 51 or 45);
+		local width = button.retailSmall and 35 or (button.retailAddRow and 51 or 46);
+		normal:SetWidth(width);
+		normal:SetHeight(button.retailSmall and 35 or (button.retailAddRow and 51 or 45));
 	end
 end
 
@@ -37,7 +38,11 @@ local function ActionButtonRetail_UpdateHotkey(button)
 	local hotkey = _G[button:GetName() .. "HotKey"];
 	if hotkey then
 		hotkey:ClearAllPoints();
-		hotkey:SetPoint("TOPRIGHT", button, "TOPRIGHT", -4, -5);
+		if button.retailSmall then
+			hotkey:SetPoint("TOPRIGHT", button, "TOPRIGHT", -3, -4);
+		else
+			hotkey:SetPoint("TOPRIGHT", button, "TOPRIGHT", -4, -5);
+		end
 	end
 end
 
@@ -120,6 +125,50 @@ function ActionButtonRetail_Apply(button, addRow)
 		cooldown:ClearAllPoints();
 		cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", 3, -3);
 		cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -3, 3);
+	end
+end
+
+-- the small retail button (SmallActionButtonTemplate, 30 x 30: stance, pet, possess): an "add row" button made small
+-- as SmallActionButtonMixin_OnLoad / UpdateButtonArt do
+function ActionButtonRetail_ApplySmall(button)
+	if button.retailSmall then
+		return;
+	end
+	ActionButtonRetail_Apply(button, true);
+	button.retailSmall = true;
+	local name = button:GetName();
+	button:SetWidth(30);
+	button:SetHeight(30);
+	if button.IconMask then
+		button.IconMask:SetWidth(45);
+		button.IconMask:SetHeight(45);
+	end
+	ActionButtonRetail_UpdateNormal(button);
+	local pushed = button:GetPushedTexture();
+	if pushed then
+		pushed:SetWidth(35);
+		pushed:SetHeight(35);
+	end
+	for _, texture in ipairs({ button:GetHighlightTexture(), button:GetCheckedTexture(), _G[name .. "Border"], _G[name .. "Flash"] }) do
+		texture:SetWidth(31.6);
+		texture:SetHeight(30.9);
+	end
+	local hotkey = _G[name .. "HotKey"];
+	if hotkey then
+		hotkey:ClearAllPoints();
+		hotkey:SetPoint("TOPRIGHT", button, "TOPRIGHT", -3, -4);
+	end
+	local count = _G[name .. "Count"];
+	if count then
+		count:ClearAllPoints();
+		count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 1);
+	end
+	local cooldown = _G[name .. "Cooldown"];
+	local icon = _G[name .. "Icon"];
+	if cooldown then
+		cooldown:ClearAllPoints();
+		cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", 1.7, -1.7);
+		cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -1, 1);
 	end
 end
 
