@@ -14,9 +14,6 @@
 	<Button name="QuestMapLogHeaderTemplate" virtual="true">
 		<Size x="292" y="24"/>
 		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture parentKey="Bar" atlas="common-button-list-collapseExpand" setAllPoints="true"/>
-			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="ButtonText" inherits="GameFontHighlightMedium" justifyH="LEFT">
 					<Size x="240" y="12"/>
@@ -29,9 +26,6 @@
 						<Anchor point="RIGHT" x="-8" y="0"/>
 					</Anchors>
 				</Texture>
-			</Layer>
-			<Layer level="HIGHLIGHT">
-				<Texture atlas="common-button-list-collapseExpand" alphaMode="ADD" alpha="0.4" setAllPoints="true"/>
 			</Layer>
 		</Layers>
 		<Scripts>
@@ -88,14 +82,6 @@
 			</Button>
 		</Frames>
 		<Layers>
-			<Layer level="BORDER">
-				<Texture parentKey="HighlightTexture" atlas="questlog-quest-glow-yellow" hidden="true">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-2"/>
-						<Anchor point="BOTTOMRIGHT" x="0" y="2"/>
-					</Anchors>
-				</Texture>
-			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Text" inherits="GameFontNormalLeft" justifyH="LEFT">
 					<Size x="215" y="0"/>
@@ -120,11 +106,11 @@
 				QuestMapLogTitleButton_OnClick(self, button);
 			</OnClick>
 			<OnEnter>
-				self.HighlightTexture:Show();
+				QuestMap_ShowSlices(self.GlowSlices, true);
 				QuestMapLogTitleButton_OnEnter(self);
 			</OnEnter>
 			<OnLeave>
-				self.HighlightTexture:Hide();
+				QuestMap_ShowSlices(self.GlowSlices, false);
 				QuestMapLogTitleButton_OnLeave(self);
 			</OnLeave>
 		</Scripts>
@@ -267,9 +253,6 @@
 					<Anchor point="BOTTOMRIGHT" x="3" y="-4"/>
 				</Anchors>
 				<Layers>
-					<Layer level="BORDER">
-						<Texture atlas="questlog-frame" setAllPoints="true"/>
-					</Layer>
 					<Layer level="ARTWORK">
 						<Texture atlas="questlog-frame-filigree" useAtlasSize="true">
 							<Anchors>

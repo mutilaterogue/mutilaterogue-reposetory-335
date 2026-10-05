@@ -54,6 +54,65 @@ end
 ---------------------------------------------------------------------------
 local questsFrame, contents, detailsFrame, detailsScroll, detailsContents, textPart, rewardsPart, optionsDropDown;
 
+-- sliced atlases (retail draws these with slice margins; 3.3.5 stretches a texture): up to 9 pieces,
+-- the corners at their atlas size, the edges and the middle stretched between them
+function QuestMap_SliceAtlas(frame, atlas, layer, left, top, right, bottom, pieces)
+	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+	if not (info and info.filename and info.width and info.width > 0) then
+		return pieces or {};
+	end
+	if not left and info.sliceData then
+		left, top = info.sliceData.marginLeft, info.sliceData.marginTop;
+		right, bottom = info.sliceData.marginRight, info.sliceData.marginBottom;
+	end
+	left, top, right, bottom = left or 0, top or 0, right or 0, bottom or 0;
+	local u1, u2, v1, v2 = info.leftTexCoord, info.rightTexCoord, info.topTexCoord, info.bottomTexCoord;
+	local du, dv = (u2 - u1) / info.width, (v2 - v1) / info.height;
+	-- columns / rows: { texcoord from, texcoord to, anchor from (side, offset), anchor to }
+	local cols, rows = {}, {};
+	if left > 0 then
+		tinsert(cols, { u1, u1 + left * du, "LEFT", 0, "LEFT", left });
+	end
+	tinsert(cols, { u1 + left * du, u2 - right * du, "LEFT", left, "RIGHT", -right });
+	if right > 0 then
+		tinsert(cols, { u2 - right * du, u2, "RIGHT", -right, "RIGHT", 0 });
+	end
+	if top > 0 then
+		tinsert(rows, { v1, v1 + top * dv, "TOP", 0, "TOP", -top });
+	end
+	tinsert(rows, { v1 + top * dv, v2 - bottom * dv, "TOP", -top, "BOTTOM", bottom });
+	if bottom > 0 then
+		tinsert(rows, { v2 - bottom * dv, v2, "BOTTOM", bottom, "BOTTOM", 0 });
+	end
+	pieces = pieces or {};
+	local index = 0;
+	for _, row in ipairs(rows) do
+		for _, col in ipairs(cols) do
+			index = index + 1;
+			local piece = pieces[index] or frame:CreateTexture(nil, layer or "BACKGROUND");
+			pieces[index] = piece;
+			piece:SetTexture(info.filename);
+			piece:SetTexCoord(col[1], col[2], row[1], row[2]);
+			piece:ClearAllPoints();
+			-- left / right edges, top / bottom edges of the piece
+			piece:SetPoint("TOPLEFT", frame, row[3] .. col[3], col[4], row[4]);
+			piece:SetPoint("BOTTOMRIGHT", frame, row[5] .. col[5], col[6], row[6]);
+			piece:Show();
+		end
+	end
+	return pieces;
+end
+
+function QuestMap_ShowSlices(pieces, shown)
+	for _, piece in ipairs(pieces or {}) do
+		if shown then
+			piece:Show();
+		else
+			piece:Hide();
+		end
+	end
+end
+
 local OBJECTIVE_FRAMES = {};
 function QuestLog_GetObjectiveFrame(index)
 	if not OBJECTIVE_FRAMES[index] then
@@ -65,7 +124,15 @@ end
 function QuestLogQuests_GetHeaderButton(index)
 	local headers = contents.Headers;
 	if not headers[index] then
-		headers[index] = CreateFrame("Button", nil, contents, "QuestMapLogHeaderTemplate");
+		local header = CreateFrame("Button", nil, contents, "QuestMapLogHeaderTemplate");
+		-- the retail header bar: a three slice, its highlight the same bar added
+		header.BarSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseExpand", "BACKGROUND", 10, 0, 10, 0);
+		header.HighlightSlices = QuestMap_SliceAtlas(header, "common-button-list-collapseExpand", "HIGHLIGHT", 10, 0, 10, 0);
+		for _, piece in ipairs(header.HighlightSlices) do
+			piece:SetBlendMode("ADD");
+			piece:SetAlpha(0.4);
+		end
+		headers[index] = header;
 	end
 	return headers[index];
 end
@@ -73,12 +140,20 @@ end
 function QuestLogQuests_GetTitleButton(index)
 	local titles = contents.Titles;
 	if not titles[index] then
-		titles[index] = CreateFrame("Button", nil, contents, "QuestMapLogTitleTemplate");
+		local title = CreateFrame("Button", nil, contents, "QuestMapLogTitleTemplate");
+		-- the hover glow behind the title: sliced so its ends keep their shape
+		title.GlowSlices = QuestMap_SliceAtlas(title, "QuestLog-quest-glow-yellow", "BORDER", 40, 0, 40, 0);
+		QuestMap_ShowSlices(title.GlowSlices, false);
+		titles[index] = title;
 	end
 	return titles[index];
 end
 
 function QuestMapFrame_OnLoad(self)
+	-- the retail metal frame: nine slice by its atlas margins
+	if self.BorderFrame then
+		QuestMap_SliceAtlas(self.BorderFrame, "QuestLog-frame", "BORDER");
+	end
 	questsFrame = QuestScrollFrame;
 	contents = QuestScrollFrameContents;
 	contents.Headers, contents.Titles = {}, {};
