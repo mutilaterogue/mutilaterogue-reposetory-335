@@ -1,6 +1,7 @@
 #include "AddonComm.h"
 #include "ObjectMgr.h"
 #include "Chat.h"
+#include <algorithm>
 #include <sstream>
 
 std::vector<std::string> AddonComm::Split(std::string const& str, char sep)
@@ -92,9 +93,22 @@ void AddonComm::SendRaw(Player* player, std::string const& opcode, std::string c
     std::string head = opcode + CIRCLE_SEP;
     std::string body = payload.substr(head.size());
 
+    // Cut on UTF-8 character boundaries: the client drops a chat message with a broken character
+    // (a Cyrillic letter split between two chunks), so such a chunk never arrived
     size_t chunkSize = CIRCLE_MAXBYTES - 24;
-    uint32 total = uint32((body.size() + chunkSize - 1) / chunkSize);
+    std::vector<std::string> chunks;
+    for (size_t pos = 0; pos < body.size();)
+    {
+        size_t len = std::min(chunkSize, body.size() - pos);
+        while (len > 0 && pos + len < body.size() && (uint8(body[pos + len]) & 0xC0) == 0x80)
+            --len;
+        if (!len)
+            len = std::min(chunkSize, body.size() - pos);
+        chunks.push_back(body.substr(pos, len));
+        pos += len;
+    }
 
+    uint32 total = uint32(chunks.size());
     if (total > CIRCLE_MAXCHUNKS)
     {
         TC_LOG_ERROR("server", "AddonComm: payload too large for opcode %s", opcode.c_str());
@@ -105,7 +119,7 @@ void AddonComm::SendRaw(Player* player, std::string const& opcode, std::string c
     {
         std::ostringstream ss;
         ss << "C" << CIRCLE_SEP << opcode << CIRCLE_SEP << (i + 1) << CIRCLE_SEP << total
-            << CIRCLE_SEP << body.substr(i * chunkSize, chunkSize);
+            << CIRCLE_SEP << chunks[i];
         SendPacket(player, ss.str());
     }
 }
