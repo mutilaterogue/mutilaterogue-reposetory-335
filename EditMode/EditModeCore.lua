@@ -163,7 +163,7 @@ local function GetFramePosition(frame)
 	return left * scale, bottom * scale;
 end
 
--- the saved place (retail style): the frame's point nearest to it among the screen's 9 (corners, sides, center),
+-- the saved place (retail style): the frame's point nearest to the screen's edges (corner, side or center),
 -- the offset from that same point of UIParent. A frame at the right / top edge stays there when the UI scale
 -- (UIParent's size in UI units) changes; from the bottom left corner it would drift.
 local function GetAnchoredPosition(frame)
@@ -176,19 +176,26 @@ local function GetAnchoredPosition(frame)
 	local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight();
 	local centerX, centerY = left + width / 2, bottom + height / 2;
 
+	-- by the nearest edge, not the center: a frame whose size follows the screen or its contents
+	-- (the objective tracker's height, the micro menu's width) keeps that edge where it was
+	local right, top = left + width, bottom + height;
 	local h, x;
-	if centerX < screenWidth / 3 then
-		h, x = "LEFT", left;
-	elseif centerX > screenWidth * 2 / 3 then
-		h, x = "RIGHT", left + width - screenWidth;
+	if math.min(left, screenWidth - right) < screenWidth / 3 then
+		if left <= screenWidth - right then
+			h, x = "LEFT", left;
+		else
+			h, x = "RIGHT", right - screenWidth;
+		end
 	else
 		h, x = "", centerX - screenWidth / 2;
 	end
 	local v, y;
-	if centerY < screenHeight / 3 then
-		v, y = "BOTTOM", bottom;
-	elseif centerY > screenHeight * 2 / 3 then
-		v, y = "TOP", bottom + height - screenHeight;
+	if math.min(bottom, screenHeight - top) < screenHeight / 3 then
+		if bottom <= screenHeight - top then
+			v, y = "BOTTOM", bottom;
+		else
+			v, y = "TOP", top - screenHeight;
+		end
 	else
 		v, y = "", centerY - screenHeight / 2;
 	end
