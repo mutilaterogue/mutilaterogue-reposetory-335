@@ -125,6 +125,54 @@ local function HideAboveTop(frame, depth)
 	end
 end
 
+-- retail LFDFrame.xml / RaidFinderFrame.xml layout: 338x428 right of the blue panel, own inset and backgrounds
+local RETAIL_LAYOUT = { LFDParentFrame = true, LFRParentFrame = true };
+
+local function RetailBackdrop(frame)
+	local role = frame:CreateTexture(nil, "BACKGROUND");
+	role:SetTexture("Interface\\LFGFrame\\UI-LFG-BlueBG");
+	role:SetSize(512, 128);
+	role:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 2, 275);
+
+	local inset = CreateFrame("Frame", frame:GetName() .. "RetailInset", frame, "InsetFrameTemplate");
+	inset:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -60);
+	inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 26);
+	inset:SetFrameLevel(frame:GetFrameLevel());
+	frame.retailInset = inset;
+end
+
+local function ApplyRetailLFD()
+	local frame = LFDParentFrame;
+	RetailBackdrop(frame);
+	if LFDQueueFrameBackground then
+		LFDQueueFrameBackground:ClearAllPoints();
+		LFDQueueFrameBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 26);
+		LFDQueueFrameBackground:Show();
+	end
+	-- the old scroll bar backgrounds; the bar itself in the retail style
+	for _, suffix in ipairs({ "", "Top", "Bottom", "Middle" }) do
+		local tex = _G["LFDQueueFrameRandomScrollFrameScrollBackground" .. suffix];
+		if tex then
+			Suppress(tex);
+		end
+	end
+	if LFDQueueFrameRandomScrollFrame and QuestMap_RetailScrollBar then
+		QuestMap_RetailScrollBar(LFDQueueFrameRandomScrollFrame);
+	end
+	if LFDQueueFrameFindGroupButton then
+		LFDQueueFrameFindGroupButton:SetSize(135, 22);
+		LFDQueueFrameFindGroupButton:ClearAllPoints();
+		LFDQueueFrameFindGroupButton:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4);
+	end
+	if LFDQueueFrameCancelButton then
+		Suppress(LFDQueueFrameCancelButton);
+	end
+end
+
+local function ApplyRetailLFR()
+	RetailBackdrop(LFRParentFrame);
+end
+
 local function Embed(name, full, y)
 	local frame = _G[name];
 	if not frame or embedded[name] then
@@ -137,6 +185,10 @@ local function Embed(name, full, y)
 	if full then
 		frame:SetAllPoints(PVEFrame);
 		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 5);
+	elseif RETAIL_LAYOUT[name] then
+		frame:SetSize(338, 428);
+		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", 224, 0);
+		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 2);
 	else
 		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", RIGHT_X, y or RIGHT_Y);
 		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 2);
@@ -145,6 +197,11 @@ local function Embed(name, full, y)
 		frame:SetMovable(false);
 	end
 	HideOwnArt(frame);
+	if name == "LFDParentFrame" then
+		ApplyRetailLFD();
+	elseif name == "LFRParentFrame" then
+		ApplyRetailLFR();
+	end
 	if name == "PVPParentFrame" then
 		-- the left buttons choose its tab
 		PVPParentFrameTab1:Hide();
@@ -191,10 +248,18 @@ function PVEFrame_ShowSection(index, keepShown)
 	end
 	selectedSection = index;
 	local frame = Embed(section.frame, section.full, section.y);
-	if frame and not section.full then
+	if frame and not section.full and not RETAIL_LAYOUT[section.frame] then
 		-- the same window in another section (PvP) may stand elsewhere
 		frame:ClearAllPoints();
 		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", RIGHT_X, section.y or RIGHT_Y);
+	end
+	-- the retail-laid-out sections bring their own inset
+	if not section.full then
+		if RETAIL_LAYOUT[section.frame] then
+			PVEFrameRightInset:Hide();
+		else
+			PVEFrameRightInset:Show();
+		end
 	end
 	if not keepShown then
 		HideSections();
