@@ -40,11 +40,11 @@
 	</Button>
 
 	<Button name="QuestMapLogTitleTemplate" virtual="true">
-		<Size x="255" y="16"/>
+		<Size x="297" y="16"/>
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Text" inherits="GameFontNormalLeft" justifyH="LEFT">
-					<Size x="175" y="0"/>
+					<Size x="215" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="31" y="-8"/>
 					</Anchors>
@@ -78,7 +78,7 @@
 	</Button>
 
 	<Frame name="QuestMapLogObjectiveTemplate" virtual="true">
-		<Size x="220" y="16"/>
+		<Size x="250" y="16"/>
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Dash" inherits="GameFontHighlightSmall" text="QUEST_DASH">
@@ -87,7 +87,7 @@
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Text" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="205" y="0"/>
+					<Size x="240" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="8" y="0"/>
 					</Anchors>
@@ -169,7 +169,7 @@
 
 	<!-- QuestMapFrame (Legion QuestMapFrame.xml) -->
 	<Frame name="QuestMapFrame" parent="WorldMapFrame" enableMouse="true" hidden="true">
-		<Size x="287" y="468"/>
+		<Size x="330" y="468"/>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture name="$parentBackground" parentKey="Background" atlas="QuestLogBackground" setAllPoints="true"/>
@@ -195,7 +195,7 @@
 				</Anchors>
 				<ScrollChild>
 					<Frame name="QuestScrollFrameContents" parentKey="Contents">
-						<Size x="258" y="10"/>
+						<Size x="300" y="10"/>
 						<Anchors>
 							<Anchor point="TOPLEFT"/>
 						</Anchors>
@@ -262,7 +262,7 @@
 						</ScrollChild>
 					</ScrollFrame>
 					<Button name="$parentAbandonButton" parentKey="AbandonButton" inherits="UIPanelButtonTemplate" text="ABANDON_QUEST_ABBREV">
-						<Size x="95" y="22"/>
+						<Size x="109" y="22"/>
 						<Anchors>
 							<Anchor point="BOTTOMLEFT" x="1" y="1"/>
 						</Anchors>
@@ -273,7 +273,7 @@
 						</Scripts>
 					</Button>
 					<Button name="$parentShareButton" parentKey="ShareButton" inherits="UIPanelButtonTemplate" text="SHARE_QUEST_ABBREV">
-						<Size x="95" y="22"/>
+						<Size x="109" y="22"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentAbandonButton" relativePoint="RIGHT"/>
 						</Anchors>
@@ -284,7 +284,7 @@
 						</Scripts>
 					</Button>
 					<Button name="$parentTrackButton" parentKey="TrackButton" inherits="UIPanelButtonTemplate" text="TRACK_QUEST_ABBREV">
-						<Size x="95" y="22"/>
+						<Size x="109" y="22"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentShareButton" relativePoint="RIGHT"/>
 						</Anchors>

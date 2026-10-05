@@ -12,7 +12,7 @@ if WORLDMAP_SETTINGS and WORLDMAP_SETTINGS.size == 0.573 then
 end
 
 local MAP_WIDTH, MAP_HEIGHT = 702, 468;
-local TOP, BOTTOM, PANEL_WIDTH = 63, 26, 287;
+local TOP, BOTTOM, PANEL_WIDTH = 63, 26, 330;	-- the panel: the 3.3.5 quest text is wider than Legion's
 
 local function SetAtlasIf(texture, atlas)
 	if texture.SetAtlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
@@ -55,6 +55,12 @@ function WorldMapLegionBorder_OnLoad(self)
 
 	-- maximize: the full screen map
 	local maximizeMinimize = self.MaximizeMinimizeFrame;
+	-- next to the close button (the XML anchor resolves before the template's button)
+	if maximizeMinimize and self.CloseButton then
+		maximizeMinimize:ClearAllPoints();
+		maximizeMinimize:SetPoint("RIGHT", self.CloseButton, "LEFT", 2, 0);
+		maximizeMinimize:SetFrameLevel(self.CloseButton:GetFrameLevel());
+	end
 	if maximizeMinimize and maximizeMinimize.SetOnMaximizedCallback then
 		maximizeMinimize:SetOnMaximizedCallback(function()
 			if IsWindowed() then
