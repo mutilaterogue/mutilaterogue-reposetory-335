@@ -144,7 +144,8 @@ end
 ---------------------------------------------------------------------------
 -- the stock windowed map parts the Legion window replaces
 local STOCK_WINDOWED = { "WorldMapFrameMiniBorderLeft", "WorldMapFrameMiniBorderRight", "WorldMapTitleButton",
-	"WorldMapFrameTitle", "WorldMapFrameSizeUpButton", "WorldMapFrameCloseButton" };
+	"WorldMapFrameTitle", "WorldMapFrameSizeUpButton", "WorldMapFrameCloseButton",
+	"WorldMapLevelUpButton", "WorldMapLevelDownButton", "WorldMapZoomOutButton" };
 
 function WorldMapLegion_Layout()
 	local border, panelButton = WorldMapLegionBorder, WorldMapLegionQuestPanelButton;

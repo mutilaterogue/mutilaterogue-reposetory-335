@@ -782,12 +782,53 @@ end
 ---------------------------------------------------------------------------
 -- events and the stock map
 ---------------------------------------------------------------------------
+-- Legion's QuestMapFrame_ResetFilters: the headers of the zones on the shown map open, the others close
+-- (3.3.5 headers are zone names: the zone itself, or the zones of the shown continent; the world: all open)
+local lastMap;
+function QuestMapFrame_ResetFilters()
+	local continent, zone = GetCurrentMapContinent(), GetCurrentMapZone();
+	local mapKey = tostring(continent) .. ":" .. tostring(zone);
+	if mapKey == lastMap then
+		return;
+	end
+	lastMap = mapKey;
+	local onMap;
+	if continent and continent > 0 then
+		onMap = {};
+		if zone and zone > 0 then
+			onMap[(select(zone, GetMapZones(continent)))] = true;
+		else
+			for _, name in ipairs({ GetMapZones(continent) }) do
+				onMap[name] = true;
+			end
+		end
+	end
+	QuestMapFrame.ignoreQuestLogUpdate = true;
+	-- from the end: collapsing a header moves the entries after it
+	for questLogIndex = GetNumQuestLogEntries(), 1, -1 do
+		local title, _, _, _, isHeader, isCollapsed = GetQuestLogTitle(questLogIndex);
+		if isHeader then
+			if not onMap or onMap[title] then
+				if isCollapsed then
+					ExpandQuestHeader(questLogIndex);
+				end
+			elseif not isCollapsed then
+				CollapseQuestHeader(questLogIndex);
+			end
+		end
+	end
+	QuestMapFrame.ignoreQuestLogUpdate = nil;
+end
+
 function QuestMapFrame_OnEvent(self, event, arg1)
 	if event == "UNIT_QUEST_LOG_CHANGED" and arg1 ~= "player" then
 		return;
 	end
-	if not self:IsShown() then
+	if not self:IsShown() or self.ignoreQuestLogUpdate then
 		return;
+	end
+	if event == "WORLD_MAP_UPDATE" and not detailsFrame.questID then
+		QuestMapFrame_ResetFilters();
 	end
 	QuestMapFrame_UpdateAll();
 	if tooltipButton and tooltipButton:IsShown() then
