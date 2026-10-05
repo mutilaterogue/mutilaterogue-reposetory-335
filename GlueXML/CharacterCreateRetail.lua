@@ -617,9 +617,6 @@ function CR.SetCamera(name)
 	if (CR.zoomAmount or 0) == 0 then
 		-- Sirus (CharacterModelManager.SetBackground): the scene's camera 0 fixed, else the background's
 		-- own camera puts the view back every frame and SetPosition only jerks
-		if model.SetCamera then
-			model:SetCamera(0);
-		end
 		CR.defaultPosition = { model:GetPosition() };
 	end
 	if amount == (CR.zoomAmount or 0) then
@@ -785,3 +782,19 @@ After("CharacterCreateEnumerateClasses", function(...) CR.Setup(); CR.LayoutClas
 
 -- retail has no blue Death Knight buttons: the 3.3.5 swap would put its old panel art over the red buttons
 CharacterCreate_DeathKnightSwap = function() end;
+
+-- Sirus (CharacterModelManager.SetBackground): background loaded, SetCamera(0), loaded again.
+-- After that the scene keeps camera 0 and SetPosition moves the view (the zoom); without it the
+-- background's own camera puts it back and the model only jerks.
+local setBackgroundModel = SetBackgroundModel;
+SetBackgroundModel = function(model, name, ...)
+	setBackgroundModel(model, name, ...);
+	if model == CharacterCreate and model.SetCamera then
+		model:SetCamera(0);
+		SetCharCustomizeBackground("Interface\\Glues\\Models\\UI_" .. name .. "\\UI_" .. name .. ".m2");
+		CR.zoomAmount = 0;
+		if CR.cameraFrame then
+			CR.cameraFrame:Hide();
+		end
+	end
+end;
