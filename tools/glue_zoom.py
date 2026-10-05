@@ -22,12 +22,12 @@ CAMERA_SIZE = 100
 POSITION_BASE = 36
 TARGET_BASE = 68
 
-DISTANCE = 0.4      # of the camera's distance to its target
-LIFT = 0.45         # the target up to the face (scene units)
+DISTANCE = 0.6      # of the camera's distance to its target
+LIFT = 0.3          # the target up to the face (scene units)
 # per background (smaller races, other scales); missing names use the defaults above
 TUNING = {
-    "Dwarf": (0.45, 0.2),       # also the gnomes
-    "Tauren": (0.4, 0.6),
+    "Dwarf": (0.65, 0.12),       # also the gnomes
+    "Tauren": (0.6, 0.4),
 }
 
 DEFAULT_NAMES = ["Human", "Dwarf", "NightElf", "Draenei", "Orc", "Scourge", "Tauren", "BloodElf", "DeathKnight"]
