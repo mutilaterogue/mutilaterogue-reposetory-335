@@ -346,16 +346,13 @@ end
 
 -- the separate 3.3.5 bags (bank, keyring) stand to the left of the combined window
 function UpdateContainerFramePlacement()
-	-- the same distance from the screen's edge as the separate bags (ContainerFrameRetail.lua: 20)
-	local edge = 20;
+	-- the same distance from the right bars / the screen's edge as the separate bags (ContainerFrameRetail.lua)
+	local edge = ContainerFrameRetail_GetEdgeOffset and ContainerFrameRetail_GetEdgeOffset() or 20;
 	if frame:IsShown() then
 		if not frame.userPlaced then
 			frame:ClearAllPoints();
 			frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -edge, CONTAINER_OFFSET_Y);
 		end
-		CONTAINER_OFFSET_X = edge + frame:GetWidth() + 12;
-	else
-		CONTAINER_OFFSET_X = edge;
 	end
 	updateContainerFrameAnchors();
 end
@@ -382,8 +379,6 @@ function ContainerFrameCombinedBags_OnLoad(self)
 	local sort = self.SortButton;
 	sort:GetNormalTexture():SetAtlas("bags-button-autosort-up");
 	sort:GetPushedTexture():SetAtlas("bags-button-autosort-down");
-	sort:GetNormalTexture():SetTexCoord(0, 1, 0, 1);
-	sort:GetPushedTexture():SetTexCoord(0, 1, 0, 1);
 	self.PortraitButton:GetHighlightTexture():SetAtlas("bags-roundhighlight");
 
 	local money = self.MoneyFrame;

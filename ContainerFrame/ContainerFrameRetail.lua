@@ -24,10 +24,35 @@ CONTAINER_SPACING = 14;
 VISIBLE_CONTAINER_SPACING = 14;
 CONTAINER_WIDTH = FRAME_WIDTH + 12;
 local OFFSET_LEFT = 20;
-if UIPARENT_MANAGED_FRAME_POSITIONS and UIPARENT_MANAGED_FRAME_POSITIONS["CONTAINER_OFFSET_X"] then
-	UIPARENT_MANAGED_FRAME_POSITIONS["CONTAINER_OFFSET_X"].baseX = OFFSET_LEFT;
+
+-- the bags' distance from the right: past the right action bars when they show (retail
+-- GetInitialContainerFrameOffsetX), else from the screen's edge
+function ContainerFrameRetail_GetEdgeOffset()
+	local left;
+	for _, bar in ipairs({ MultiBarLeft, MultiBarRight }) do
+		if bar and bar:IsShown() and bar:GetLeft() then
+			left = math.min(left or bar:GetLeft(), bar:GetLeft());
+		end
+	end
+	local screenRight = UIParent:GetRight() or GetScreenWidth();
+	return OFFSET_LEFT + (left and (screenRight - left) or 0);
 end
-CONTAINER_OFFSET_X = math.max(CONTAINER_OFFSET_X or 0, OFFSET_LEFT);
+
+-- the stock UIParent_ManageFramePositions would set its own offset (for the stock bar sizes): this one instead,
+-- and past the combined window when it shows (ContainerFrameCombined.lua)
+if UIPARENT_MANAGED_FRAME_POSITIONS then
+	UIPARENT_MANAGED_FRAME_POSITIONS["CONTAINER_OFFSET_X"] = nil;
+end
+local stockUpdateAnchors = updateContainerFrameAnchors;
+function updateContainerFrameAnchors()
+	local offset = ContainerFrameRetail_GetEdgeOffset();
+	local combined = ContainerFrameCombinedBags;
+	if combined and combined:IsShown() then
+		offset = offset + combined:GetWidth() + 12;
+	end
+	CONTAINER_OFFSET_X = offset;
+	stockUpdateAnchors();
+end
 
 local STOCK_ART = { "BackgroundTop", "BackgroundMiddle1", "BackgroundMiddle2", "BackgroundBottom", "Background1Slot",
 	"Portrait", "Name" };
