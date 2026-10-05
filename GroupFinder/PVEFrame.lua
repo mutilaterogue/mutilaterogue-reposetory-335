@@ -1,5 +1,5 @@
 -- The retail group finder window (PVEFrame.xml) on 3.3.5: the stock windows shown inside it.
---   tab 1 "Dungeons and raids": LFDParentFrame (dungeon finder), LFRParentFrame (raid browser)
+--   tab 1 "Dungeons and raids": LFDParentFrame (dungeon finder); raid finder and premade groups: placeholders for now
 --   tab 2 "PvP": PVPParentFrame - its battlegrounds tab (PVPBattlegroundFrame) and its honor / arena tab (PVPFrame)
 --   tab 3 "Mythic+": ChallengesFrame (ChallengesUI), over the whole window
 -- The stock windows keep their logic; their own frame art, title and close button are hidden. Whatever opens them
@@ -23,7 +23,9 @@ local TITLES = {
 local SECTIONS = {
 	{
 		{ frame = "LFDParentFrame", text = LOOKING_FOR_DUNGEON or "Поиск подземелий", icon = "Interface\\Icons\\INV_Helmet_08" },
-		{ frame = "LFRParentFrame", text = LOOKING_FOR_RAID or "Поиск рейда", icon = "Interface\\Icons\\INV_Helmet_06" },
+		-- retail's raid finder and premade groups: not on 3.3.5 yet, a placeholder for now
+		{ frame = "RaidFinderFrame", placeholder = true, text = "Поиск рейда", icon = "Interface\\LFGFrame\\UI-LFR-PORTRAIT" },
+		{ frame = "LFGListPVEStub", placeholder = true, text = "Заранее собранные группы", icon = "Interface\\Icons\\Achievement_General_StayClassy" },
 	},
 	{
 		-- the PvP window's content starts higher than the dungeon finder's: lower
@@ -126,7 +128,7 @@ local function HideAboveTop(frame, depth)
 end
 
 -- retail LFDFrame.xml / RaidFinderFrame.xml layout: 338x428 right of the blue panel, own inset and backgrounds
-local RETAIL_LAYOUT = { LFDParentFrame = true, LFRParentFrame = true };
+local RETAIL_LAYOUT = { LFDParentFrame = true, RaidFinderFrame = true, LFGListPVEStub = true };
 
 local function RetailBackdrop(frame)
 	local role = frame:CreateTexture(nil, "BACKGROUND");
@@ -143,6 +145,7 @@ end
 
 local function ApplyRetailLFD()
 	local frame = LFDParentFrame;
+	HideLFDTitle(frame);
 	RetailBackdrop(frame);
 	if LFDQueueFrameBackground then
 		LFDQueueFrameBackground:ClearAllPoints();
@@ -169,8 +172,38 @@ local function ApplyRetailLFD()
 	end
 end
 
-local function ApplyRetailLFR()
-	RetailBackdrop(LFRParentFrame);
+-- a section that is not done yet: the retail backdrop and a note
+local function CreatePlaceholder(name, title)
+	local frame = CreateFrame("Frame", name, PVEFrame);
+	frame:SetSize(338, 428);
+	RetailBackdrop(frame);
+	local header = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
+	header:SetPoint("TOP", frame, "TOP", 0, -100);
+	header:SetText(title);
+	local note = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
+	note:SetPoint("TOP", header, "BOTTOM", 0, -12);
+	note:SetWidth(280);
+	note:SetText("Будет добавлено в будущем.");
+	frame:Hide();
+	return frame;
+end
+
+-- the dungeon finder's own title and close button (inside its new top, HideAboveTop misses them)
+local function HideLFDTitle(frame)
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType("FontString") then
+			Suppress(region);
+		end
+	end
+	for _, child in ipairs({ frame:GetChildren() }) do
+		if child:IsObjectType("Button") and not child:GetName() or (child:GetName() or ""):find("CloseButton$") then
+			local normal = child:GetNormalTexture();
+			local path = normal and normal:GetTexture();
+			if path and path:find("MinimizeButton") then
+				Suppress(child);
+			end
+		end
+	end
 end
 
 local function Embed(name, full, y)
@@ -179,6 +212,12 @@ local function Embed(name, full, y)
 		return frame;
 	end
 	embedded[name] = true;
+	if frame.isPlaceholder then
+		frame:ClearAllPoints();
+		frame:SetPoint("TOPLEFT", PVEFrame, "TOPLEFT", 224, 0);
+		frame:SetFrameLevel(PVEFrame:GetFrameLevel() + 2);
+		return frame;
+	end
 	UIPanelWindows[name] = nil;		-- this window is the panel now
 	frame:SetParent(PVEFrame);
 	frame:ClearAllPoints();
@@ -199,8 +238,6 @@ local function Embed(name, full, y)
 	HideOwnArt(frame);
 	if name == "LFDParentFrame" then
 		ApplyRetailLFD();
-	elseif name == "LFRParentFrame" then
-		ApplyRetailLFR();
 	end
 	if name == "PVPParentFrame" then
 		-- the left buttons choose its tab
@@ -356,6 +393,11 @@ function PVEFrame_OnLoad(self)
 	PanelTemplates_SetNumTabs(self, 3);
 	PanelTemplates_SetTab(self, 1);
 	UIPanelWindows["PVEFrame"] = { area = "left", pushable = 0, whileDead = 1, xOffset = "15", yOffset = "-10" };
+	for _, section in ipairs(SECTIONS[1]) do
+		if section.placeholder and not _G[section.frame] then
+			CreatePlaceholder(section.frame, section.text).isPlaceholder = true;
+		end
+	end
 	-- every stock window inside this one from the start (a battlemaster may open one before this window ever showed)
 	for _, sections in ipairs(SECTIONS) do
 		for _, section in ipairs(sections) do
