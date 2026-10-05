@@ -11,7 +11,7 @@ CharacterCreateRetail = {};
 local CR = CharacterCreateRetail;
 
 local RACE_SIZE, RACE_SPACING = 64, 82;
-local CLASS_SIZE, CLASS_SPACING = 64, 84;
+local CLASS_SIZE, CLASS_SPACING = 52, 80;
 
 local function HasAtlas(atlas)
 	return atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) ~= nil;
@@ -254,7 +254,7 @@ function CR.LayoutClasses(...)
 				button.CRLabel:SetTextColor(0.5, 0.5, 0.5);
 			end
 			button:ClearAllPoints();
-			button:SetPoint("BOTTOM", CharacterCreateFrame, "BOTTOM", (index - (count + 1) / 2) * CLASS_SPACING, 120);
+			button:SetPoint("BOTTOM", CharacterCreateFrame, "BOTTOM", (index - (count + 1) / 2) * CLASS_SPACING, 64);
 		end
 		index = index + 1;
 	end
@@ -346,16 +346,18 @@ function CR.Setup()
 				local texture = _G[name .. key];
 				if texture and SetAtlasIf(texture, "charactercreate-gendericon-" .. gender) then
 					texture:ClearAllPoints();
-					texture:SetAllPoints(button);
+					texture:SetPoint("TOPLEFT", 1, -1);
+					texture:SetPoint("BOTTOMRIGHT", -1, 1);
 				end
 			end
 			local checked = button:GetCheckedTexture();
 			if checked and SetAtlasIf(checked, "charactercreate-gendericon-" .. gender .. "-selected") then
 				checked:ClearAllPoints();
-				checked:SetAllPoints(button);
+				checked:SetPoint("TOPLEFT", 1, -1);
+				checked:SetPoint("BOTTOMRIGHT", -1, 1);
 				checked:SetBlendMode("BLEND");
 			end
-			AddRoundMask(button, { _G[name .. "NormalTexture"] or false, _G[name .. "PushedTexture"] or false, checked or false }, 46);
+			AddRoundMask(button, { _G[name .. "NormalTexture"] or false, _G[name .. "PushedTexture"] or false, checked or false }, 44);
 			-- the rings of the other icon buttons; the gold symbol stays the chosen one's art
 			AddRings(button, 52);
 			if checked then
@@ -406,12 +408,9 @@ function CR.Setup()
 	CharCreateOkayButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -46, 28);
 	CharCreateOkayButton:SetWidth(230);
 	CharCreateOkayButton:SetHeight(50);
-	if CharacterCreateRotateLeft and CharacterCreateRotateRight then
-		CharacterCreateRotateLeft:ClearAllPoints();
-		CharacterCreateRotateLeft:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -4, 200);
-		CharacterCreateRotateRight:ClearAllPoints();
-		CharacterCreateRotateRight:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 4, 200);
-	end
+	-- no rotate buttons (retail: drag the model)
+	Hide("CharacterCreateRotateLeft");
+	Hide("CharacterCreateRotateRight");
 	if GlueRetailButton_Update then
 		GlueRetailButton_Update(CharCreateBackButton);
 		GlueRetailButton_Update(CharCreateOkayButton);
