@@ -57,8 +57,9 @@ local function Skin(frame)
 	if close then
 		close:Hide();
 		close:SetAlpha(0);
+		-- the stock close: ToggleBag of the bag's id
 		retail.CloseButton:SetScript("OnClick", function()
-			close:Click();
+			ToggleBag(frame:GetID());
 		end);
 	end
 	frame.RetailFrame = retail;
