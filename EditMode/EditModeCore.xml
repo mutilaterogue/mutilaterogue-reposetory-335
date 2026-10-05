@@ -1,0 +1,58 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\UI.xsd">
+	<Script file="EditModeCore.lua"/>
+
+	<!-- Окно Edit Mode. Содержимое (макеты, сетка, привязка, фреймы) строится в EditModeManagerMixin:OnLoad. -->
+	<Frame name="EditModeManagerFrame" parent="UIParent" mixin="EditModeManagerMixin" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="DIALOG">
+		<Size x="420" y="360"/>
+		<Anchors>
+			<Anchor point="TOP" x="0" y="-80"/>
+		</Anchors>
+		<Frames>
+			<Frame name="$parentBorder" parentKey="Border" inherits="DialogBorderTranslucentTemplate"/>
+			<Button parentKey="CloseButton" name="$parentCloseButton">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="1" y="0"/>
+				</Anchors>
+				<NormalTexture atlas="RedButton-Exit"/>
+				<PushedTexture atlas="RedButton-exit-pressed"/>
+				<DisabledTexture atlas="RedButton-Exit-Disabled"/>
+				<HighlightTexture atlas="RedButton-Highlight" alphaMode="ADD"/>
+				<Scripts>
+					<OnClick>EditModeCore:Exit();</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+		</Scripts>
+	</Frame>
+
+	<!-- Окно настроек выбранного фрейма (EditModeSystemSettingsDialog в ретейле). -->
+	<Frame name="EditModeSystemSettingsDialog" parent="UIParent" mixin="EditModeSystemSettingsDialogMixin" toplevel="true" movable="true" enableMouse="true" clampedToScreen="true" hidden="true" frameStrata="DIALOG">
+		<Size x="340" y="200"/>
+		<Anchors>
+			<Anchor point="CENTER" x="300" y="0"/>
+		</Anchors>
+		<Frames>
+			<Frame name="$parentBorder" parentKey="Border" inherits="DialogBorderTranslucentTemplate"/>
+			<Button parentKey="CloseButton" name="$parentCloseButton">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="1" y="0"/>
+				</Anchors>
+				<NormalTexture atlas="RedButton-Exit"/>
+				<PushedTexture atlas="RedButton-exit-pressed"/>
+				<DisabledTexture atlas="RedButton-Exit-Disabled"/>
+				<HighlightTexture atlas="RedButton-Highlight" alphaMode="ADD"/>
+				<Scripts>
+					<OnClick>EditModeCore:ClearSelection();</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+		</Scripts>
+	</Frame>
+</Ui>
