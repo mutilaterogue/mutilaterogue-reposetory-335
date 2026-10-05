@@ -36,6 +36,7 @@ void AddSC_archaeology();
 void AddSC_group_convert();
 void AddSC_talent_custom();
 void AddSC_spec_primary();
+void AddSC_raid_finder();
 
 void AddCustomScripts()
 {
@@ -56,4 +57,5 @@ void AddCustomScripts()
     AddSC_group_convert();
     AddSC_talent_custom();
     AddSC_spec_primary();
+    AddSC_raid_finder();
 }
