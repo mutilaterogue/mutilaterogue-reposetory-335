@@ -15,6 +15,7 @@ local PADDING_BOTTOM = 10;
 local PADDING_BOTTOM_MONEY = 34;	-- money row (backpack)
 local PORTRAIT_SIZE = 40;		-- the bag's portrait, inside the small ring of HeldBagLayout
 
+local SORT_WIDTH = 28;			-- the sort button right of the search box (backpack)
 local FRAME_WIDTH = COLUMNS * BUTTON_SIZE + (COLUMNS - 1) * SPACING + 2 * PADDING_SIDE + 1;
 
 -- updateContainerFrameAnchors: between two stacked bags (stock 3 / 0; retail 8, and the ring stands over the frame's
@@ -61,6 +62,30 @@ local function Skin(frame)
 	end
 	frame.RetailFrame = retail;
 
+	-- the sort button (retail BagItemAutoSortButton): sorts the backpack and the bags (ContainerFrameCombined.lua)
+	local sort = CreateFrame("Button", name .. "SortButton", frame);
+	sort:SetWidth(SORT_WIDTH);
+	sort:SetHeight(26);
+	sort:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING_SIDE + 2, -36);
+	sort:SetFrameLevel(retail:GetFrameLevel() + 10);
+	sort:SetNormalAtlas("bags-button-autosort-up");
+	sort:SetPushedAtlas("bags-button-autosort-down");
+	sort:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
+	sort:SetScript("OnClick", function()
+		PlaySound("igMainMenuOptionCheckBoxOn");
+		if ContainerFrameCombinedBags_SortBags then
+			ContainerFrameCombinedBags_SortBags();
+		end
+	end);
+	sort:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+		GameTooltip:SetText(BAG_CLEANUP_BAGS or "Сортировать сумки", 1, 1, 1);
+		GameTooltip:AddLine(BAG_CLEANUP_BAGS_DESCRIPTION or "Упорядочивает предметы в рюкзаке и сумках.", nil, nil, nil, true);
+		GameTooltip:Show();
+	end);
+	sort:SetScript("OnLeave", GameTooltip_Hide);
+	frame.SortButton = sort;
+
 	-- the stock bag art: the stock code shows it again on every open, so alpha 0
 	for _, key in ipairs(STOCK_ART) do
 		local region = _G[name .. key];
@@ -93,7 +118,7 @@ local function PlaceSearchBox(frame)
 	if frame:GetID() == 0 and frame.RetailFrame and BagItemSearchBox.anchorBag == frame then
 		BagItemSearchBox:ClearAllPoints();
 		BagItemSearchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING_SIDE + 6, -40);
-		BagItemSearchBox:SetPoint("RIGHT", frame, "RIGHT", -PADDING_SIDE, 0);
+		BagItemSearchBox:SetPoint("RIGHT", frame, "RIGHT", -PADDING_SIDE - SORT_WIDTH - 4, 0);
 	end
 end
 
@@ -102,6 +127,12 @@ local function Layout(frame, size, id)
 	local retail = Skin(frame);
 	local name = frame:GetName();
 	local isBackpack = id == 0;
+	frame.retailSize, frame.retailID = size, id;
+	if isBackpack then
+		frame.SortButton:Show();
+	else
+		frame.SortButton:Hide();
+	end
 
 	retail:SetTitle(_G[name .. "Name"]:GetText() or "");
 	if isBackpack then
@@ -139,4 +170,17 @@ end
 
 hooksecurefunc("ContainerFrame_GenerateFrame", Layout);
 
-hooksecurefunc("ContainerFrame_Update", PlaceSearchBox);
+-- every update: the size again (something puts the backpack's stock height back after the generate), the search box
+hooksecurefunc("ContainerFrame_Update", function(frame)
+	if frame.RetailFrame and frame.retailSize and frame:GetID() == frame.retailID then
+		local isBackpack = frame.retailID == 0;
+		local rows = math.max(1, math.ceil(frame.retailSize / COLUMNS));
+		local height = rows * BUTTON_SIZE + (rows - 1) * SPACING
+			+ (isBackpack and PADDING_TOP_SEARCH or PADDING_TOP) + (isBackpack and PADDING_BOTTOM_MONEY or PADDING_BOTTOM);
+		if math.abs(frame:GetHeight() - height) > 0.5 then
+			frame:SetHeight(height);
+			updateContainerFrameAnchors();
+		end
+	end
+	PlaceSearchBox(frame);
+end);
