@@ -447,9 +447,18 @@ int32_t MaskTexture::TextureAddMask(lua_State* L)
     return 0;
 }
 
-// TextureRemoveMask(texture [, mask]): without a mask, all of them
+// TextureRemoveMask(texture [, mask]): without a mask, all of them.
+// TextureRemoveMask() with no texture forgets every mask: XMLExt.lua calls it when a UI loads
+// (ReloadUI, login screen <-> game). The old textures are freed then, and a new texture at a reused
+// address would get a freed mask (garbage mask UV: the texture vanishes).
 int32_t MaskTexture::TextureRemoveMask(lua_State* L)
 {
+    if (reinterpret_cast<LuaType_t>(ADDR_LUA_TYPE)(L, 1) <= 0)	// none / nil
+    {
+        s_masksOf.clear();
+        s_isMask.clear();
+        return 0;
+    }
     void* texture = TextureArg(L, 1);
     if (!texture)
         FrameScript::DisplayError(L, "Usage: TextureRemoveMask(texture [, maskTexture])");

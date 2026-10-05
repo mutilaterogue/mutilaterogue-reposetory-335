@@ -204,7 +204,13 @@ end
 -- Here (not in a separate file) so it loads first, with the XML hooks; the DLL functions
 -- (TextureAddMask & co) are looked up when used.
 ---------------------------------------------------------------------------
-MASKTEXTURE_LUA_VERSION = 3;
+MASKTEXTURE_LUA_VERSION = 4;
+
+-- a fresh UI (ReloadUI, login screen <-> game): the DLL forgets the masks of the old one
+-- (freed textures; their addresses get reused, and a new texture would take a dead mask)
+if TextureRemoveMask then
+	pcall(TextureRemoveMask);
+end
 
 do
 	local helper = CreateFrame("Frame");
