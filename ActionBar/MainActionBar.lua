@@ -21,7 +21,7 @@ end
 
 -- the frame textures the stock code resets (ActionButton_Update sets UI-Quickslot / UI-Quickslot2 as the normal texture)
 -- a button on a bar without bar art (the extra bars) has the bigger "add row" frame (ActionButtonOverrides.lua)
-local function ActionButtonRetail_UpdateNormal(button)
+function ActionButtonRetail_UpdateNormal(button)
 	local normal = button:GetNormalTexture();
 	if normal then
 		-- a small button: the plain frame at the small size (the add row one stands out of the 30 px icon)
@@ -177,6 +177,16 @@ end
 hooksecurefunc("ActionButton_Update", function(self)
 	if self.retailArt then
 		ActionButtonRetail_UpdateNormal(self);
+	end
+end);
+
+-- the empty slots of the extra bars: the stock grid draws their frame at half alpha, retail at full
+hooksecurefunc("ActionButton_ShowGrid", function(button)
+	if button.retailArt then
+		local normal = button:GetNormalTexture();
+		if normal then
+			normal:SetVertexColor(1, 1, 1, 1);
+		end
 	end
 end);
 

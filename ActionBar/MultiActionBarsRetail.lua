@@ -43,6 +43,20 @@ function MultiActionBarsRetail_Layout()
 	ShapeshiftBarFrame:ClearAllPoints();
 	ShapeshiftBarFrame:SetPoint("BOTTOMLEFT", below, "TOPLEFT", 0, BAR_SPACING);
 
+	-- the pet bar: right over the top bottom bar (its buttons stand on PetActionBarRetail, see PetBarRetail_Setup)
+	PetActionBarRetail:ClearAllPoints();
+	PetActionBarRetail:SetPoint("BOTTOMRIGHT", below, "TOPRIGHT", 0, BAR_SPACING);
+
+	-- the totem bar: where the stance bar is (a shaman has no stances). It slides from MainMenuBar's top left
+	-- (MultiCastActionBarFrame.lua): give the slide that place
+	local left, top = below:GetLeft(), below:GetTop();
+	if left and top and MainMenuBar:GetLeft() and MultiCastActionBarFrame then
+		MULTICASTACTIONBAR_XPOS = left - MainMenuBar:GetLeft();
+		MULTICASTACTIONBAR_YPOS = top + BAR_SPACING - MainMenuBar:GetTop();
+		MultiCastActionBarFrame:ClearAllPoints();
+		MultiCastActionBarFrame:SetPoint("BOTTOMLEFT", MainMenuBar, "TOPLEFT", MULTICASTACTIONBAR_XPOS, MULTICASTACTIONBAR_YPOS);
+	end
+
 	-- right bars: at the right edge, centered, MultiBarLeft left of MultiBarRight
 	MultiBarRight:ClearAllPoints();
 	MultiBarRight:SetPoint("RIGHT", UIParent, "RIGHT", -5, 0);
@@ -56,6 +70,7 @@ local function MultiActionBarsRetail_Setup()
 		UIPARENT_MANAGED_FRAME_POSITIONS["MultiBarBottomLeft"] = nil;
 		UIPARENT_MANAGED_FRAME_POSITIONS["MultiBarRight"] = nil;
 		UIPARENT_MANAGED_FRAME_POSITIONS["ShapeshiftBarFrame"] = nil;
+		UIPARENT_MANAGED_FRAME_POSITIONS["MultiCastActionBarFrame"] = nil;
 	end
 
 	for _, info in ipairs(BARS) do
@@ -82,6 +97,7 @@ local function MultiActionBarsRetail_Setup()
 	end
 
 	StanceBarRetail_Setup();
+	PetBarRetail_Setup();
 	MultiActionBarsRetail_Layout();
 end
 
@@ -130,6 +146,32 @@ function StanceBarRetail_Setup()
 	-- ShapeshiftBar_Update moves the first button for a single form: put it back
 	hooksecurefunc("ShapeshiftBar_Update", StanceBarRetail_LayoutButtons);
 	StanceBarRetail_LayoutButtons();
+end
+
+---------------------------------------------------------------------------
+-- the pet bar (PetActionBarFrame): retail PetActionBar.xml, small buttons, no bar art.
+-- The stock frame keeps sliding (PetActionBarFrame.lua) and showing / hiding its buttons; the buttons themselves
+-- stand on PetActionBarRetail (a plain frame), so the slide does not move them.
+---------------------------------------------------------------------------
+
+local petAnchor = CreateFrame("Frame", "PetActionBarRetail", UIParent);
+petAnchor:SetWidth(NUM_PET_ACTION_SLOTS * (SMALL_SIZE + BUTTON_PADDING) - BUTTON_PADDING);
+petAnchor:SetHeight(SMALL_SIZE);
+
+function PetBarRetail_Setup()
+	PetActionBarFrame:EnableMouse(false);	-- the stock frame stays at the old place: no dead mouse area there
+	for i = 1, NUM_PET_ACTION_SLOTS do
+		local button = _G["PetActionButton" .. i];
+		ActionButtonRetail_ApplySmall(button);
+		button:ClearAllPoints();
+		button:SetPoint("TOPLEFT", petAnchor, "TOPLEFT", (i - 1) * (SMALL_SIZE + BUTTON_PADDING), 0);
+	end
+	-- PetActionBar_Update puts UI-Quickslot back as the frame
+	hooksecurefunc("PetActionBar_Update", function()
+		for i = 1, NUM_PET_ACTION_SLOTS do
+			ActionButtonRetail_UpdateNormal(_G["PetActionButton" .. i]);
+		end
+	end);
 end
 
 MultiActionBarsRetail_Setup();
