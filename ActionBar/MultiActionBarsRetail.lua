@@ -118,6 +118,14 @@ function StanceBarRetail_Setup()
 	for i = 1, NUM_SHAPESHIFT_SLOTS do
 		ActionButtonRetail_ApplySmall(_G["ShapeshiftButton" .. i]);
 	end
+	-- UIParent_ManageFramePositions sizes the stance buttons' frames (50 / 64): back to the small retail frame
+	hooksecurefunc("UIParent_ManageFramePositions", function()
+		for i = 1, NUM_SHAPESHIFT_SLOTS do
+			local normal = _G["ShapeshiftButton" .. i .. "NormalTexture"];
+			normal:SetWidth(31.6);
+			normal:SetHeight(30.9);
+		end
+	end);
 	-- ShapeshiftBar_Update moves the first button for a single form: put it back
 	hooksecurefunc("ShapeshiftBar_Update", StanceBarRetail_LayoutButtons);
 	StanceBarRetail_LayoutButtons();
