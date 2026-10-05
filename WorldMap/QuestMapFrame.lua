@@ -228,11 +228,12 @@ function QuestMap_RetailScrollBar(scrollFrame)
 	Arrow(down, "minimal-scrollbar-arrow-bottom");
 	if up then
 		up:ClearAllPoints();
-		up:SetPoint("BOTTOM", bar, "TOP", 0, 2);
+		-- 17 px arrow over an 8 px bar: centred it sits on a half pixel and smears, so whole pixels
+		up:SetPoint("BOTTOMLEFT", bar, "TOPLEFT", -5, 2);
 	end
 	if down then
 		down:ClearAllPoints();
-		down:SetPoint("TOP", bar, "BOTTOM", 0, -2);
+		down:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -5, -2);
 	end
 end
 
