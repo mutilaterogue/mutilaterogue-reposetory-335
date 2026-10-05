@@ -307,7 +307,7 @@ sorter:SetScript("OnUpdate", function(self, elapsed)
 	if from == "wait" and self.steps < SORT_MAX_STEPS then
 		return;
 	end
-	if not from or self.steps >= SORT_MAX_STEPS then
+	if not from or from == "wait" or self.steps >= SORT_MAX_STEPS then
 		self:Hide();
 		return;
 	end
