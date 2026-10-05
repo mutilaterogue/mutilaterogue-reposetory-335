@@ -15,8 +15,18 @@ local PADDING_BOTTOM = 10;
 local PADDING_BOTTOM_MONEY = 34;	-- money row (backpack)
 local PORTRAIT_SIZE = 40;		-- the bag's portrait, inside the small ring of HeldBagLayout
 
--- between two stacked bags (stock 3; retail CONTAINER_SPACING 8, and the ring stands over the frame's top)
-VISIBLE_CONTAINER_SPACING = 12;
+local FRAME_WIDTH = COLUMNS * BUTTON_SIZE + (COLUMNS - 1) * SPACING + 2 * PADDING_SIDE + 1;
+
+-- updateContainerFrameAnchors: between two stacked bags (stock 3 / 0; retail 8, and the ring stands over the frame's
+-- top), between two columns (CONTAINER_WIDTH is the column step), the first bag further left of the screen's edge
+CONTAINER_SPACING = 14;
+VISIBLE_CONTAINER_SPACING = 14;
+CONTAINER_WIDTH = FRAME_WIDTH + 12;
+local OFFSET_LEFT = 20;
+if UIPARENT_MANAGED_FRAME_POSITIONS and UIPARENT_MANAGED_FRAME_POSITIONS["CONTAINER_OFFSET_X"] then
+	UIPARENT_MANAGED_FRAME_POSITIONS["CONTAINER_OFFSET_X"].baseX = OFFSET_LEFT;
+end
+CONTAINER_OFFSET_X = math.max(CONTAINER_OFFSET_X or 0, OFFSET_LEFT);
 
 local STOCK_ART = { "BackgroundTop", "BackgroundMiddle1", "BackgroundMiddle2", "BackgroundBottom", "Background1Slot",
 	"Portrait", "Name" };
@@ -39,7 +49,7 @@ local function Skin(frame)
 	portrait:SetWidth(PORTRAIT_SIZE);
 	portrait:SetHeight(PORTRAIT_SIZE);
 	portrait:ClearAllPoints();
-	portrait:SetPoint("TOPLEFT", retail, "TOPLEFT", -6, 6);
+	portrait:SetPoint("TOPLEFT", retail, "TOPLEFT", -6, 2);
 	retail:SetTitleOffsets(PORTRAIT_SIZE, -24);
 	-- the stock close button keeps working (it closes the bag the stock way): in the retail one's place
 	retail.CloseButton:Hide();
@@ -78,6 +88,15 @@ local function Skin(frame)
 	return retail;
 end
 
+-- the search box (the stock places it in ContainerFrame_Update): under the title, over the slots
+local function PlaceSearchBox(frame)
+	if frame:GetID() == 0 and frame.RetailFrame and BagItemSearchBox.anchorBag == frame then
+		BagItemSearchBox:ClearAllPoints();
+		BagItemSearchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING_SIDE + 6, -40);
+		BagItemSearchBox:SetPoint("RIGHT", frame, "RIGHT", -PADDING_SIDE, 0);
+	end
+end
+
 -- after the stock layout (textures, size, item places): the retail frame, size and places
 local function Layout(frame, size, id)
 	local retail = Skin(frame);
@@ -95,7 +114,7 @@ local function Layout(frame, size, id)
 	local top = isBackpack and PADDING_TOP_SEARCH or PADDING_TOP;
 	local bottom = isBackpack and PADDING_BOTTOM_MONEY or PADDING_BOTTOM;
 	local step = BUTTON_SIZE + SPACING;
-	frame:SetWidth(COLUMNS * BUTTON_SIZE + (COLUMNS - 1) * SPACING + 2 * PADDING_SIDE + 1);
+	frame:SetWidth(FRAME_WIDTH);
 	frame:SetHeight(rows * BUTTON_SIZE + (rows - 1) * SPACING + top + bottom);
 
 	-- the stock order: Item1 at the bottom right is the last slot
@@ -107,6 +126,10 @@ local function Layout(frame, size, id)
 		button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PADDING_SIDE - column * step, bottom + row * step);
 	end
 
+	PlaceSearchBox(frame);
+	-- the stock code placed the bags with the stock sizes (before this): again with these
+	updateContainerFrameAnchors();
+
 	local money = _G[name .. "MoneyFrame"];
 	if money then
 		money:ClearAllPoints();
@@ -116,11 +139,4 @@ end
 
 hooksecurefunc("ContainerFrame_GenerateFrame", Layout);
 
--- the search box (ContainerFrame_Update puts it at the stock place): under the title, as in retail
-hooksecurefunc("ContainerFrame_Update", function(frame)
-	if frame:GetID() == 0 and frame.RetailFrame and BagItemSearchBox.anchorBag == frame then
-		BagItemSearchBox:ClearAllPoints();
-		BagItemSearchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING_SIDE + 6, -36);
-		BagItemSearchBox:SetPoint("RIGHT", frame, "RIGHT", -10, 0);
-	end
-end);
+hooksecurefunc("ContainerFrame_Update", PlaceSearchBox);
