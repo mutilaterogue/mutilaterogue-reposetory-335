@@ -97,8 +97,16 @@
 		</Layers>
 	</Frame>
 
+	<!-- the retail portrait frame without its portrait (ButtonFrameTemplate_HidePortrait): metal nine-slice border,
+	     title, close button; layout ButtonFrameTemplateNoPortraitMinimizable (room for the maximize button) -->
+	<Frame name="RetailPortraitFrameNoPortraitTemplate" inherits="RetailPortraitFrameTemplate" virtual="true">
+		<Scripts>
+			<OnLoad function="RetailPortraitFrameNoPortrait_OnLoad"/>
+		</Scripts>
+	</Frame>
+
 	<!-- the window (Legion WorldMapFrame.BorderFrame + NavBar), shown with the windowed map -->
-	<Frame name="WorldMapLegionBorder" parent="WorldMapFrame" inherits="PortraitFrameTemplate" hidden="true">
+	<Frame name="WorldMapLegionBorder" parent="WorldMapFrame" inherits="RetailPortraitFrameNoPortraitTemplate" hidden="true">
 		<Size x="702" y="560"/>
 		<Anchors>
 			<Anchor point="TOPLEFT" x="0" y="0"/>

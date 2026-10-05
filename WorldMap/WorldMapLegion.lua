@@ -29,29 +29,28 @@ end
 ---------------------------------------------------------------------------
 -- the border
 ---------------------------------------------------------------------------
-function WorldMapLegionBorder_OnLoad(self)
-	-- ButtonFrameTemplate_HidePortrait of this PortraitFrameTemplate
-	if self.portrait then
-		self.portrait:Hide();
+-- RetailPortraitFrameNoPortraitTemplate: the portrait off, the border without its portrait corner
+function RetailPortraitFrameNoPortrait_OnLoad(self)
+	if self.SetBorder then
+		self:SetBorder("ButtonFrameTemplateNoPortraitMinimizable");
 	end
-	if self.portraitFrame then
-		self.portraitFrame:Hide();
+	if self.PortraitContainer then
+		self.PortraitContainer:Hide();
 	end
-	if self.topLeftCorner then
-		self.topLeftCorner:Show();
-		if self.topBorderBar then
-			self.topBorderBar:SetPoint("TOPLEFT", self.topLeftCorner, "TOPRIGHT", 0, 0);
-		end
-		if self.leftBorderBar then
-			self.leftBorderBar:SetPoint("TOPLEFT", self.topLeftCorner, "BOTTOMLEFT", 0, 0);
-		end
+	if self.SetTitleOffsets then
+		self:SetTitleOffsets(0, 0);
 	end
-	self.TitleText:SetText(MAP_AND_QUEST_LOG);
-	self:EnableMouse(true);
+end
 
-	local close = _G[self:GetName() .. "CloseButton"];
-	if close then
-		close:SetScript("OnClick", function() HideUIPanel(WorldMapFrame); end);
+function WorldMapLegionBorder_OnLoad(self)
+	RetailPortraitFrameNoPortrait_OnLoad(self);
+	local title = self.TitleContainer and self.TitleContainer.TitleText or self.TitleText;
+	if title then
+		title:SetText(MAP_AND_QUEST_LOG);
+	end
+	self:EnableMouse(true);
+	if self.CloseButton then
+		self.CloseButton:SetScript("OnClick", function() HideUIPanel(WorldMapFrame); end);
 	end
 
 	-- maximize: the full screen map
@@ -202,6 +201,9 @@ function WorldMapLegion_Layout()
 		panelButton:Hide();
 		WorldMapFrameCloseButton:Show();
 		WorldMapFrameTitle:Show();
+		-- our windowed anchors off: the stock ones back (else the check box stretches between both)
+		WorldMapQuestShowObjectives:ClearAllPoints();
+		WorldMapQuestShowObjectives_AdjustPosition();
 		if WORLDMAP_SETTINGS and WORLDMAP_SETTINGS.size == WORLDMAP_QUESTLIST_SIZE then
 			QuestMapFrame:ClearAllPoints();
 			QuestMapFrame:SetPoint("TOPLEFT", WorldMapDetailFrame, "TOPRIGHT", 1, 0);
