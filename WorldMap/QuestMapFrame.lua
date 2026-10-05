@@ -782,7 +782,7 @@ end
 ---------------------------------------------------------------------------
 -- events and the stock map
 ---------------------------------------------------------------------------
--- Legion's QuestMapFrame_ResetFilters: the headers of the zones on the shown map open, the others close
+-- Legion's QuestMapFrame_ResetFilters: the headers of the zones on the shown map open (the others are left as they are)
 -- (3.3.5 headers are zone names: the zone itself, or the zones of the shown continent; the world: all open)
 local lastMap;
 function QuestMapFrame_ResetFilters()
@@ -808,12 +808,9 @@ function QuestMapFrame_ResetFilters()
 	for questLogIndex = GetNumQuestLogEntries(), 1, -1 do
 		local title, _, _, _, isHeader, isCollapsed = GetQuestLogTitle(questLogIndex);
 		if isHeader then
-			if not onMap or onMap[title] then
-				if isCollapsed then
-					ExpandQuestHeader(questLogIndex);
-				end
-			elseif not isCollapsed then
-				CollapseQuestHeader(questLogIndex);
+			-- only opened: closing the other zones hid the rest of the log (a zone with no quests closed it all)
+			if isCollapsed and (not onMap or onMap[title]) then
+				ExpandQuestHeader(questLogIndex);
 			end
 		end
 	end
