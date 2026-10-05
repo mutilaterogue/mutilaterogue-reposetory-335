@@ -143,35 +143,6 @@ local function RetailBackdrop(frame)
 	frame.retailInset = inset;
 end
 
-local function ApplyRetailLFD()
-	local frame = LFDParentFrame;
-	HideLFDTitle(frame);
-	RetailBackdrop(frame);
-	if LFDQueueFrameBackground then
-		LFDQueueFrameBackground:ClearAllPoints();
-		LFDQueueFrameBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 26);
-		LFDQueueFrameBackground:Show();
-	end
-	-- the old scroll bar backgrounds; the bar itself in the retail style
-	for _, suffix in ipairs({ "", "Top", "Bottom", "Middle" }) do
-		local tex = _G["LFDQueueFrameRandomScrollFrameScrollBackground" .. suffix];
-		if tex then
-			Suppress(tex);
-		end
-	end
-	if LFDQueueFrameRandomScrollFrame and QuestMap_RetailScrollBar then
-		QuestMap_RetailScrollBar(LFDQueueFrameRandomScrollFrame);
-	end
-	if LFDQueueFrameFindGroupButton then
-		LFDQueueFrameFindGroupButton:SetSize(135, 22);
-		LFDQueueFrameFindGroupButton:ClearAllPoints();
-		LFDQueueFrameFindGroupButton:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4);
-	end
-	if LFDQueueFrameCancelButton then
-		Suppress(LFDQueueFrameCancelButton);
-	end
-end
-
 -- a section that is not done yet: the retail backdrop and a note
 local function CreatePlaceholder(name, title)
 	local frame = CreateFrame("Frame", name, PVEFrame);
@@ -203,6 +174,35 @@ local function HideLFDTitle(frame)
 				Suppress(child);
 			end
 		end
+	end
+end
+
+local function ApplyRetailLFD()
+	local frame = LFDParentFrame;
+	HideLFDTitle(frame);
+	RetailBackdrop(frame);
+	if LFDQueueFrameBackground then
+		LFDQueueFrameBackground:ClearAllPoints();
+		LFDQueueFrameBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 26);
+		LFDQueueFrameBackground:Show();
+	end
+	-- the old scroll bar backgrounds; the bar itself in the retail style
+	for _, suffix in ipairs({ "", "Top", "Bottom", "Middle" }) do
+		local tex = _G["LFDQueueFrameRandomScrollFrameScrollBackground" .. suffix];
+		if tex then
+			Suppress(tex);
+		end
+	end
+	if LFDQueueFrameRandomScrollFrame and QuestMap_RetailScrollBar then
+		QuestMap_RetailScrollBar(LFDQueueFrameRandomScrollFrame);
+	end
+	if LFDQueueFrameFindGroupButton then
+		LFDQueueFrameFindGroupButton:SetSize(135, 22);
+		LFDQueueFrameFindGroupButton:ClearAllPoints();
+		LFDQueueFrameFindGroupButton:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4);
+	end
+	if LFDQueueFrameCancelButton then
+		Suppress(LFDQueueFrameCancelButton);
 	end
 end
 
