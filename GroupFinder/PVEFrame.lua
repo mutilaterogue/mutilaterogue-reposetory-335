@@ -214,9 +214,33 @@ local function ApplyRetailLFD()
 			Suppress(tex);
 		end
 	end
-	if LFDQueueFrameRandomScrollFrame and QuestMap_RetailScrollBar then
-		QuestMap_RetailScrollBar(LFDQueueFrameRandomScrollFrame);
+	-- the retail scroll box size and place (303x239 at -29, 35); its bar restyled on the first show
+	local scroll = LFDQueueFrameRandomScrollFrame;
+	if scroll then
+		scroll:SetSize(303, 239);
+		scroll:ClearAllPoints();
+		scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -29, 35);
+		frame:HookScript("OnShow", function()
+			if not scroll.retailBar and QuestMap_RetailScrollBar then
+				scroll.retailBar = true;
+				QuestMap_RetailScrollBar(scroll);
+			end
+		end);
 	end
+	-- the retail top streaks and the button bar along the bottom
+	local streaks = frame:CreateTexture(nil, "BACKGROUND", nil, 1);
+	streaks:SetAtlas("_UI-Frame-TopTileStreaks", true);
+	streaks:SetHorizTile(true);
+	streaks:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -21);
+	streaks:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -21);
+	local corner = frame:CreateTexture(nil, "BORDER");
+	corner:SetAtlas("UI-Frame-BtnCornerRight", true);
+	corner:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 1, -1);
+	local bottom = frame:CreateTexture(nil, "BORDER");
+	bottom:SetAtlas("_UI-Frame-BtnBotTile", true);
+	bottom:SetHorizTile(true);
+	bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -23, 2);
+	bottom:SetPoint("BOTTOMRIGHT", corner, "BOTTOMLEFT");
 	if LFDQueueFrameFindGroupButton then
 		LFDQueueFrameFindGroupButton:SetSize(135, 22);
 		LFDQueueFrameFindGroupButton:ClearAllPoints();
