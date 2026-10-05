@@ -1,7 +1,7 @@
 -- The retail (12.1.5) experience / reputation bars on 3.3.5 (StatusTrackingBarRetail.xml).
 -- Experience: the fill (rested color while rested), the rested prediction ahead of it, the rested pip; gone at max level.
 -- Reputation: the watched faction, colored by standing (ReputationBar.lua); a click opens the reputation tab.
--- The text shows on mouse over, as in retail.
+-- The text: always with "Experience bar" text on (Interface options, CVar xpBarText), else on mouse over.
 
 local BAR_WIDTH = 563;
 local BAR_HEIGHT = 17;
@@ -32,6 +32,14 @@ local function SetFill(texture, atlas, fraction)
 	texture:SetTexCoord(l, l + (r - l) * fraction, t, b);
 	texture:SetWidth(BAR_WIDTH * fraction);
 	texture:Show();
+end
+
+local function UpdateText(bar)
+	if GetCVarBool("xpBarText") or bar:IsMouseOver() then
+		bar.OverlayFrame.Text:Show();
+	else
+		bar.OverlayFrame.Text:Hide();
+	end
 end
 
 local function UpdateExp(bar)
@@ -70,6 +78,7 @@ local function UpdateExp(bar)
 		text = text .. " (+" .. rested .. ")";
 	end
 	bar.OverlayFrame.Text:SetText(text);
+	UpdateText(bar);
 	bar:Show();
 	return true;
 end
@@ -86,6 +95,7 @@ local function UpdateRep(bar)
 	end
 	SetFill(bar.Fill, REP_ATLASES[standing] or REP_ATLASES[4], (value - min) / range);
 	bar.OverlayFrame.Text:SetText(name .. " " .. (_G["FACTION_STANDING_LABEL" .. standing] or "") .. " " .. (value - min) .. " / " .. range);
+	UpdateText(bar);
 	bar:Show();
 	return true;
 end
@@ -129,7 +139,7 @@ function StatusTrackingBarRetail_OnLoad(self)
 	end
 
 	for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "UPDATE_EXHAUSTION",
-		"UPDATE_FACTION", "PLAYER_REGEN_ENABLED", "DISABLE_XP_GAIN", "ENABLE_XP_GAIN" }) do
+		"UPDATE_FACTION", "PLAYER_REGEN_ENABLED", "DISABLE_XP_GAIN", "ENABLE_XP_GAIN", "CVAR_UPDATE" }) do
 		self:RegisterEvent(event);
 	end
 	StatusTrackingBarRetail_Update(self);
@@ -146,7 +156,9 @@ function StatusTrackingBarRetail_OnEnter(self)
 end
 
 function StatusTrackingBarRetail_OnLeave(self)
-	self.OverlayFrame.Text:Hide();
+	if not GetCVarBool("xpBarText") then
+		self.OverlayFrame.Text:Hide();
+	end
 	GameTooltip:Hide();
 end
 
