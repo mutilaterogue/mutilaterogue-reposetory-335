@@ -615,6 +615,11 @@ function CR.SetCamera(name)
 	end
 	local amount = CAMERA[name] or 0;
 	if (CR.zoomAmount or 0) == 0 then
+		-- Sirus (CharacterModelManager.SetBackground): the scene's camera 0 fixed, else the background's
+		-- own camera puts the view back every frame and SetPosition only jerks
+		if model.SetCamera then
+			model:SetCamera(0);
+		end
 		CR.defaultPosition = { model:GetPosition() };
 	end
 	if amount == (CR.zoomAmount or 0) then
