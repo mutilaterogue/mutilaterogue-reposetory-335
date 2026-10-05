@@ -147,6 +147,12 @@ local function RetailBackdrop(frame)
 	inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 26);
 	inset:SetFrameLevel(frame:GetFrameLevel());
 	frame.retailInset = inset;
+	-- the content (roles, list) over the inset, never under it
+	for _, child in ipairs({ frame:GetChildren() }) do
+		if child ~= inset then
+			child:SetFrameLevel(frame:GetFrameLevel() + 3);
+		end
+	end
 end
 
 -- a section that is not done yet: the retail backdrop and a note
@@ -292,6 +298,9 @@ local function Embed(name, full, y)
 		ApplyRetailLFD();
 	end
 	if name == "PVPParentFrame" then
+		-- the 3.3.5 window is taller than this one: it covered the tabs under it
+		frame:SetHeight(PVEFrame:GetHeight() + (y or RIGHT_Y) - 6);
+		frame:SetClampedToScreen(false);
 		-- PVPFrame's unnamed "Player vs. Player" title: this window's title says it
 		for _, region in ipairs({ PVPFrame:GetRegions() }) do
 			if region:IsObjectType("FontString") and region:GetText() == PLAYER_V_PLAYER then
