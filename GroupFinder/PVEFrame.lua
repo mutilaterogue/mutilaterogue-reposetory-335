@@ -298,9 +298,12 @@ local function Embed(name, full, y)
 		ApplyRetailLFD();
 	end
 	if name == "PVPParentFrame" then
-		-- the 3.3.5 window is taller than this one: it covered the tabs under it
-		frame:SetHeight(PVEFrame:GetHeight() + (y or RIGHT_Y) - 6);
-		frame:SetClampedToScreen(false);
+		-- the 3.3.5 windows reach below this one: they no longer catch the clicks meant for the tabs there
+		for _, f in ipairs({ frame, PVPFrame, PVPBattlegroundFrame }) do
+			if f then
+				f:EnableMouse(false);
+			end
+		end
 		-- PVPFrame's unnamed "Player vs. Player" title: this window's title says it
 		for _, region in ipairs({ PVPFrame:GetRegions() }) do
 			if region:IsObjectType("FontString") and region:GetText() == PLAYER_V_PLAYER then
