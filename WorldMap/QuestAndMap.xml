@@ -314,20 +314,11 @@
 				</Scripts>
 			</Button>
 
-			<ScrollFrame name="QuestScrollFrame" parentKey="QuestsFrame" enableMouseWheel="true">
+			<ScrollFrame name="QuestScrollFrame" parentKey="QuestsFrame" inherits="UIPanelScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="1" y="-20"/>
 					<Anchor point="BOTTOMRIGHT" x="-30" y="20"/>
 				</Anchors>
-			<Frames>
-				<!-- the retail scroll bar (SharedXML\ScrollBox\MinimalScrollBar) -->
-				<Frame name="$parentScrollBar" parentKey="ScrollBar" inherits="MinimalScrollBar">
-					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="8" y="2"/>
-						<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT" x="8" y="-4"/>
-					</Anchors>
-				</Frame>
-			</Frames>
 				<ScrollChild>
 					<Frame name="QuestScrollFrameContents" parentKey="Contents">
 						<Size x="300" y="10"/>
@@ -357,20 +348,11 @@
 							</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="QuestMapDetailsScrollFrame" parentKey="ScrollFrame" enableMouseWheel="true">
+					<ScrollFrame name="QuestMapDetailsScrollFrame" parentKey="ScrollFrame" inherits="UIPanelScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" x="4" y="-52"/>
 							<Anchor point="BOTTOMRIGHT" x="-30" y="44"/>
 						</Anchors>
-					<Frames>
-						<!-- the retail scroll bar (SharedXML\ScrollBox\MinimalScrollBar) -->
-						<Frame name="$parentScrollBar" parentKey="ScrollBar" inherits="MinimalScrollBar">
-							<Anchors>
-								<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="8" y="2"/>
-								<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT" x="8" y="-4"/>
-							</Anchors>
-						</Frame>
-					</Frames>
 						<ScrollChild>
 							<Frame name="QuestMapDetailsScrollChild" parentKey="Contents">
 								<Size x="300" y="10"/>
