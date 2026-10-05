@@ -2,7 +2,28 @@
 -- as retail 12.1.5 Blizzard_UnitFrame\Mainline\PlayerFrame.lua does them:
 -- in a vehicle the vehicle frame art (UI-HUD-UnitFrame-Player-PortraitOn-Vehicle) with its combat flash and status
 -- glow, the bars 118 wide at the vehicle art's places; back to the player art, everything at its PlayerFrame.xml place.
--- Replace the two functions in PlayerFrame.lua with these.
+-- Also PlayerFrame_AnimateOut / PlayerFrame_UpdateArt without the 3.3.5 slide out and in: that slide moved the frame
+-- with SetPoint("TOPLEFT", UIParent, "TOPLEFT", -19, ...) (PlayerFrame_AnimPos), which lost the EditMode place and,
+-- with EditMode's own anchor still set, stretched the frame (the art in the middle of the screen). Retail swaps the
+-- art in place.
+-- Replace these four functions in PlayerFrame.lua with these.
+
+function PlayerFrame_AnimateOut(self)
+	self.inSeat = false;
+	self.animFinished = true;
+	self.inSequence = true;
+end
+
+function PlayerFrame_UpdateArt(self)
+	if ( self.animFinished and self.inSeat and self.inSequence ) then
+		if ( UnitHasVehicleUI("player") ) then
+			PlayerFrame_ToVehicleArt(self, UnitVehicleSkin("player"));
+		else
+			PlayerFrame_ToPlayerArt(self);
+		end
+		PlayerFrame_SequenceFinished(self);
+	end
+end
 
 function PlayerFrame_ToVehicleArt(self, vehicleType)
 	PlayerFrame.state = "vehicle";
