@@ -62,9 +62,20 @@ function WorldMapLegionBorder_OnLoad(self)
 		maximizeMinimize:SetFrameLevel(self.CloseButton:GetFrameLevel());
 	end
 	if maximizeMinimize and maximizeMinimize.SetOnMaximizedCallback then
+		-- retail: maximized is the same window over the whole screen (the map bigger, no quest panel)
 		maximizeMinimize:SetOnMaximizedCallback(function()
-			if IsWindowed() then
-				WorldMapFrame_ToggleWindowSize();
+			WorldMapLegion.maximized = true;
+			WorldMapLegion_Layout();
+		end);
+		maximizeMinimize:SetOnMinimizedCallback(function()
+			WorldMapLegion.maximized = false;
+			WorldMapFrame:SetScale(1);
+			-- back where the panel manager puts it
+			if WorldMapFrame:IsShown() then
+				HideUIPanel(WorldMapFrame);
+				ShowUIPanel(WorldMapFrame);
+			else
+				WorldMapLegion_Layout();
 			end
 		end);
 		maximizeMinimize:Minimize(true, true);
@@ -300,6 +311,22 @@ local STOCK_WINDOWED = { "WorldMapFrameMiniBorderLeft", "WorldMapFrameMiniBorder
 	"WorldMapFrameTitle", "WorldMapFrameSizeUpButton", "WorldMapFrameCloseButton",
 	"WorldMapLevelUpButton", "WorldMapLevelDownButton", "WorldMapZoomOutButton" };
 
+-- the panel manager anchors the map when it shows it: the maximized one goes to the middle after that
+local recenter = CreateFrame("Frame");
+recenter:Hide();
+recenter:SetScript("OnUpdate", function(self)
+	self:Hide();
+	if WorldMapLegion.maximized and IsWindowed() then
+		WorldMapFrame:ClearAllPoints();
+		WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
+	end
+end);
+function WorldMapLegion_Recenter()
+	WorldMapFrame:ClearAllPoints();
+	WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0);
+	recenter:Show();
+end
+
 function WorldMapLegion_Layout()
 	local border, panelButton = WorldMapLegionBorder, WorldMapLegionQuestPanelButton;
 	if not (border and QuestMapFrame) then
@@ -308,7 +335,8 @@ function WorldMapLegion_Layout()
 	QuestMapFrame_HideStockParts();
 
 	if IsWindowed() then
-		local open = QuestMapFrame.open;
+		local maximized = WorldMapLegion.maximized;
+		local open = QuestMapFrame.open and not maximized;
 		local width = MAP_WIDTH + (open and PANEL_WIDTH or 0);
 		local height = TOP + MAP_HEIGHT + BOTTOM;
 		WorldMapFrame:SetWidth(width);
@@ -337,8 +365,13 @@ function WorldMapLegion_Layout()
 		WorldMapLegionNavBar:SetWidth(MAP_WIDTH - 180);
 		WorldMapLevelDropDown:ClearAllPoints();
 		WorldMapLevelDropDown:SetPoint("TOPRIGHT", border, "TOPLEFT", MAP_WIDTH - 50, -28);
-		WorldMapQuestShowObjectives:ClearAllPoints();
-		WorldMapQuestShowObjectives:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT", 6, 1);
+		-- retail: the quests are always on the map (no check box)
+		if WatchFrame and not WatchFrame.showObjectives then
+			SetCVar("questPOI", 1);
+			WorldMapQuestShowObjectives:SetChecked(1);
+			WorldMapQuestShowObjectives_Toggle();
+		end
+		WorldMapQuestShowObjectives:Hide();
 
 		QuestMapFrame:ClearAllPoints();
 		QuestMapFrame:SetPoint("TOPLEFT", border, "TOPLEFT", MAP_WIDTH + 1, -TOP);
@@ -348,7 +381,20 @@ function WorldMapLegion_Layout()
 		panelButton:SetPoint("BOTTOMRIGHT", border, "TOPLEFT", MAP_WIDTH - 2, -(TOP + MAP_HEIGHT) + 2);
 		panelButton:SetFrameLevel(WorldMapDetailFrame:GetFrameLevel() + 40);
 		SetAtlasIf(panelButton.Icon, open and "QuestCollapse-Hide-Up" or "QuestCollapse-Show-Up");
-		panelButton:Show();
+		if maximized then
+			panelButton:Hide();
+		else
+			panelButton:Show();
+		end
+
+		-- maximized: the whole window scaled to the screen, in its middle
+		if maximized then
+			local scale = math.min((UIParent:GetWidth() - 40) / width, (UIParent:GetHeight() - 40) / height);
+			WorldMapFrame:SetScale(scale);
+			WorldMapLegion_Recenter();
+		else
+			WorldMapFrame:SetScale(1);
+		end
 
 		if open then
 			QuestMapFrame_Show();
@@ -358,6 +404,8 @@ function WorldMapLegion_Layout()
 		WorldMapLegionNavBar_Update();
 	else
 		SetOnCanvas(false);
+		WorldMapFrame:SetScale(1);
+		WorldMapQuestShowObjectives:Show();
 		border:Hide();
 		panelButton:Hide();
 		WorldMapFrameCloseButton:Show();
@@ -377,7 +425,7 @@ function WorldMapLegion_Layout()
 	QuestMapFrame:SetFrameLevel(WorldMapDetailFrame:GetFrameLevel() + 30);
 	-- the retail border over the list and the details
 	if QuestMapFrame.BorderFrame then
-		QuestMapFrame.BorderFrame:SetFrameLevel(QuestMapFrame:GetFrameLevel() + 20);
+		QuestMapFrame.BorderFrame:SetFrameLevel(QuestMapFrame:GetFrameLevel() + 60);
 	end
 end
 

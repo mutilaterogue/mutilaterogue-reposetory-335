@@ -184,6 +184,38 @@ function QuestMapFrame_OnLoad(self)
 	detailsFrame.ScrollFrame = detailsScroll;
 	detailsFrame.RewardsFrame = rewardsPart;
 
+	-- retail rewards box: the top frame, the tiled middle and the bottom (questlog-reward-*)
+	if QuestMapDetailsRewardsFrameBackground then
+		QuestMapDetailsRewardsFrameBackground:Hide();
+	end
+	local function Piece(atlas, layer)
+		local texture = rewardsPart:CreateTexture(nil, layer or "BACKGROUND");
+		SetAtlasIf(texture, atlas);
+		local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
+		return texture, info and info.height or 20;
+	end
+	local top, topHeight = Piece("questlog-reward-top-frame", "BORDER");
+	top:SetPoint("TOPLEFT", rewardsPart, "TOPLEFT", 25, 0);
+	top:SetPoint("TOPRIGHT", rewardsPart, "TOPRIGHT", 0, 0);
+	top:SetHeight(topHeight);
+	local bottomPiece, bottomHeight = Piece("questlog-reward-bottom", "BORDER");
+	bottomPiece:SetPoint("BOTTOMLEFT", rewardsPart, "BOTTOMLEFT", 25, 0);
+	bottomPiece:SetPoint("BOTTOMRIGHT", rewardsPart, "BOTTOMRIGHT", 0, 0);
+	bottomPiece:SetHeight(bottomHeight);
+	local middle = Piece("questlog-reward-tile-vertical");
+	middle:SetPoint("TOPLEFT", top, "BOTTOMLEFT");
+	middle:SetPoint("BOTTOMRIGHT", bottomPiece, "TOPRIGHT");
+	local header = Piece("questlog-reward-header-top", "ARTWORK");
+	header:SetPoint("TOP", top, "TOP", 0, 0);
+	header:SetWidth(top:GetWidth() > 0 and top:GetWidth() or 260);
+
+	-- retail: the buttons on a dark bar under the details
+	local bar = detailsFrame:CreateTexture(nil, "BORDER");
+	bar:SetPoint("BOTTOMLEFT", 0, 0);
+	bar:SetPoint("BOTTOMRIGHT", 0, 0);
+	bar:SetHeight(25);
+	bar:SetTexture(0, 0, 0, 0.75);
+
 	optionsDropDown = QuestMapQuestOptionsDropDown;
 	optionsDropDown.questID = 0;
 	UIDropDownMenu_Initialize(optionsDropDown, QuestMapQuestOptionsDropDown_Initialize, "MENU");
@@ -940,4 +972,21 @@ hooksecurefunc("WorldMapQuestPOI_OnClick", function(self)
 	if self.quest and self.quest.questId and not IsShiftKeyDown() and QuestMapFrame:IsShown() then
 		QuestMapFrame_ShowQuestDetails(self.quest.questId);
 	end
+end);
+
+-- retail: hovering a quest on the map lights its line in the list
+function QuestMapFrame_HighlightQuest(questID)
+	for _, title in ipairs(contents and contents.Titles or {}) do
+		if title:IsShown() then
+			QuestMap_ShowSlices(title.GlowSlices, questID and title.questID == questID);
+		end
+	end
+end
+hooksecurefunc("WorldMapQuestPOI_OnEnter", function(self)
+	if self.quest and self.quest.questId then
+		QuestMapFrame_HighlightQuest(self.quest.questId);
+	end
+end);
+hooksecurefunc("WorldMapQuestPOI_OnLeave", function()
+	QuestMapFrame_HighlightQuest(nil);
 end);

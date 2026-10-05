@@ -1,6 +1,3 @@
-#include <Misc/Logger.hpp>
-#include <cstdarg>
-#include <cstdio>
 #include <Client/MaskTexture.hpp>
 #include <Client/FrameScript.hpp>
 #include <Misc/Util.hpp>
@@ -90,21 +87,6 @@ namespace
     using LuaToUserdata_t = void* (__cdecl*)(lua_State*, int);
     using LuaSetTop_t = void(__cdecl*)(lua_State*, int);
 
-    // ---------------- debug log (the DLL log, first lines only) ----------------
-    int s_logLines = 0;
-    void MaskLog(const char* format, ...)
-    {
-        if (s_logLines >= 400)
-            return;
-        s_logLines++;
-        char buffer[512];
-        va_list args;
-        va_start(args, format);
-        vsnprintf(buffer, sizeof(buffer), format, args);
-        va_end(args);
-        LOG_INFO << "MaskTexture: " << buffer << "\n";
-    }
-
     // ---------------- state ----------------
     std::unordered_map<const float*, std::vector<void*>> s_masksOf;	// masked texture positions (+0xE0) -> masks
     std::unordered_set<void*> s_isMask;									// textures used as masks: not drawn
@@ -152,7 +134,6 @@ namespace
             create(device, &s_maskShaders[i], GXSH_PIXEL, "Shaders\\Pixel", name, 1);
             snprintf(name, sizeof(name), "UIMaskDesaturate%u", static_cast<unsigned>(i + 1));
             create(device, &s_maskDesatShaders[i], GXSH_PIXEL, "Shaders\\Pixel", name, 1);
-            MaskLog("LoadShaders: device %p mask%u %p desat %p", device, static_cast<unsigned>(i + 1), s_maskShaders[i], s_maskDesatShaders[i]);
         }
     }
 
@@ -239,7 +220,6 @@ namespace
     void __cdecl UiShadersCreateHook()
     {
         reinterpret_cast<UiShaders_t>(ADDR_UI_SHADERS_CREATE)();
-        MaskLog("UiShadersCreateHook");
         LoadShaders();
     }
 
@@ -268,9 +248,6 @@ namespace
         }
 
         // one draw per item: every item sets its pixel shader, in item order
-        static int renders = 0;
-        if (renders++ < 20)
-            MaskLog("BatchRender with masks: batch %p items %u", batch, *At<uint32_t>(batch, BATCH_COUNT));
         int32_t& batching = *reinterpret_cast<int32_t*>(ADDR_BATCHING);
         int32_t oldBatching = batching;
         batching = 0;
@@ -304,10 +281,6 @@ namespace
         while (s_renderItem < count
             && (!items[s_renderItem].gxTex || !items[s_renderItem].numVerts || !items[s_renderItem].numIndices))
         {
-            static int skips = 0;
-            if (skips++ < 40)
-                MaskLog("PixelShaderSet: skipped item %u (gxTex %p verts %u indices %u)", s_renderItem,
-                    items[s_renderItem].gxTex, items[s_renderItem].numVerts, items[s_renderItem].numIndices);
             s_renderItem++;
         }
         BatchItem* item = s_renderItem < count ? &items[s_renderItem] : nullptr;
@@ -334,10 +307,6 @@ namespace
 
         bool desaturated = shader && shader == reinterpret_cast<void**>(ADDR_SHADERS)[1];
         void* maskShader = used ? UsableShader((desaturated ? s_maskDesatShaders : s_maskShaders)[used - 1]) : nullptr;
-        static int sets = 0;
-        if (sets++ < 40)
-            MaskLog("PixelShaderSet: item %u masks %u used %u shader %p maskShader %p",
-                s_renderItem - 1, static_cast<unsigned>(it->second.size()), static_cast<unsigned>(used), shader, maskShader);
         if (!maskShader)
         {
             GxRsSet(device, state, shader);
@@ -421,15 +390,11 @@ void MaskTexture::ApplyPatches()
         LoadShaders();
 
     // the pixel shader hook first: without it the render hook must not run
-    bool pixel = PatchPixelShaderSet();
-    int shaders = 0, renders = 0;
-    if (pixel)
+    if (PatchPixelShaderSet())
     {
-        shaders = PatchAllCalls(ADDR_UI_SHADERS_CREATE, reinterpret_cast<void*>(&UiShadersCreateHook));
-        renders = PatchAllCalls(ADDR_BATCH_RENDER, reinterpret_cast<void*>(&BatchRenderHook));
+        PatchAllCalls(ADDR_UI_SHADERS_CREATE, reinterpret_cast<void*>(&UiShadersCreateHook));
+        PatchAllCalls(ADDR_BATCH_RENDER, reinterpret_cast<void*>(&BatchRenderHook));
     }
-    MaskLog("ApplyPatches: device %p uiShader %p pixelHook %d shaderCreateCalls %d renderCalls %d",
-        Device(), reinterpret_cast<void**>(ADDR_SHADERS)[0], pixel ? 1 : 0, shaders, renders);
 }
 
 // TextureAddMask(texture, mask): up to 3 masks per texture (more are kept but not drawn)
@@ -440,7 +405,6 @@ int32_t MaskTexture::TextureAddMask(lua_State* L)
     if (!texture || !mask || texture == mask)
         FrameScript::DisplayError(L, "Usage: TextureAddMask(texture, maskTexture)");
     s_isMask.insert(mask);
-    MaskLog("TextureAddMask: texture %p mask %p positions %p", texture, mask, At<float>(texture, TEX_POSITIONS));
     auto& masks = s_masksOf[At<float>(texture, TEX_POSITIONS)];
     if (std::find(masks.begin(), masks.end(), mask) == masks.end())
         masks.push_back(mask);
