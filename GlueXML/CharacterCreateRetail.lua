@@ -562,94 +562,22 @@ end
 -- camera (retail zooms on the customization): the scene moved toward the camera, smoothly
 --   x - toward the camera, z - up; tune the targets here
 ---------------------------------------------------------------------------
--- the zoom (Sirus C_CharacterCreation: CHARACTER_CREATE_CAMERA_ZOOMED_SETTINGS minus the faction's
--- CHARACTER_CAMERA_SETTINGS): the model offset from its default position for the face close up
-local ZOOM_OFFSET = {
-	male = {
-		HUMAN = { -5.774, 4.267, -1.155 },
-		DWARF = { -5.509, 4.087, -0.655 },
-		NIGHTELF = { -5.719, 4.217, -1.490 },
-		GNOME = { -5.249, 3.872, -0.095 },
-		DRAENEI = { -5.194, 3.817, -1.475 },
-		ORC = { -4.770, 3.480, -1.280 },
-		SCOURGE = { -5.740, 4.065, -0.895 },
-		TAUREN = { -4.420, 3.220, -0.830 },
-		TROLL = { -4.750, 3.565, -1.220 },
-		BLOODELF = { -5.775, 4.145, -1.145 },
-	},
-	female = {
-		HUMAN = { -5.949, 4.392, -1.045 },
-		DWARF = { -5.534, 4.087, -0.620 },
-		NIGHTELF = { -5.804, 4.302, -1.360 },
-		GNOME = { -5.289, 3.902, -0.045 },
-		DRAENEI = { -5.734, 4.277, -1.415 },
-		ORC = { -5.635, 4.165, -1.115 },
-		SCOURGE = { -5.640, 4.135, -0.905 },
-		TAUREN = { -5.000, 3.670, -1.120 },
-		TROLL = { -5.585, 4.050, -1.430 },
-		BLOODELF = { -5.870, 4.353, -1.020 },
-	},
-};
--- how far toward the face close up: 0 the client's own place, 1 the face
-local CAMERA = { select = 0, body = 0.35, head = 1 };
-local ZOOM_TIME = 0.75;
+-- the camera per stage / category: "head" shows the zoomed background
 local ROW_CAMERA = { "body", "head", "head", "head", "head" };
 
-local function OutCirc(t, from, to, duration)
-	t = t / duration - 1;
-	return from + (to - from) * math.sqrt(1 - t * t);
-end
-
-local function ZoomOffset()
-	local race = GetSelectedRace and _G["CharacterCreateRaceButton" .. GetSelectedRace()];
-	local sex = GetSelectedSex() == SEX_FEMALE and "female" or "male";
-	return race and race.crFile and ZOOM_OFFSET[sex][race.crFile] or ZOOM_OFFSET[sex].HUMAN;
-end
-
--- like Sirus: from where the model is to the target in ZOOM_TIME, then left alone
--- (the client's default is read back with GetPosition when the zoom starts from it)
+-- the face close up like that client (SetFaceCustomizeCamera): no camera moves, the background is swapped
+-- for its zoomed copy Interface\Glues\Models\UI_<RACE>_ZOOM\UI_<RACE>_ZOOM.m2 (those models must be in the MPQ)
 function CR.SetCamera(name)
-	-- off: the login screen camera does not follow SetPosition here (Lua only, no DLL patch)
-	if not CR.CAMERA_ENABLED then
+	local zoomed = name == "head";
+	if zoomed == (CR.zoomed or false) then
 		return;
 	end
-	local model = CharacterCreate;
-	if not (model and model.GetPosition and model.SetPosition) then
+	local _, file = GetNameForRace();
+	if not file then
 		return;
 	end
-	local amount = CAMERA[name] or 0;
-	if (CR.zoomAmount or 0) == 0 then
-		-- Sirus (CharacterModelManager.SetBackground): the scene's camera 0 fixed, else the background's
-		-- own camera puts the view back every frame and SetPosition only jerks
-		CR.defaultPosition = { model:GetPosition() };
-	end
-	if amount == (CR.zoomAmount or 0) then
-		return;
-	end
-	CR.zoomAmount = amount;
-	local default, offset = CR.defaultPosition, ZoomOffset();
-	CR.zoomStart = { model:GetPosition() };
-	CR.zoomEnd = {
-		default[1] + offset[1] * amount,
-		default[2] + offset[2] * amount,
-		default[3] + offset[3] * amount,
-	};
-	CR.zoomElapsed = 0;
-	if not CR.cameraFrame then
-		CR.cameraFrame = CreateFrame("Frame", nil, CharacterCreate);
-		CR.cameraFrame:SetScript("OnUpdate", function(self, elapsed)
-			CR.zoomElapsed = CR.zoomElapsed + (elapsed or 0);
-			local s, e = CR.zoomStart, CR.zoomEnd;
-			if CR.zoomElapsed < ZOOM_TIME then
-				CharacterCreate:SetPosition(OutCirc(CR.zoomElapsed, s[1], e[1], ZOOM_TIME),
-					OutCirc(CR.zoomElapsed, s[2], e[2], ZOOM_TIME), OutCirc(CR.zoomElapsed, s[3], e[3], ZOOM_TIME));
-			else
-				CharacterCreate:SetPosition(e[1], e[2], e[3]);
-				self:Hide();
-			end
-		end);
-	end
-	CR.cameraFrame:Show();
+	SetBackgroundModel(CharacterCreate, strupper(file) .. (zoomed and "_ZOOM" or ""));
+	CR.zoomed = zoomed;
 end
 
 ---------------------------------------------------------------------------
@@ -754,10 +682,7 @@ After("CharacterCustomization_Left", function(id) if CR.stage == 2 then CR.SetCa
 After("CharacterCustomization_Right", function(id) if CR.stage == 2 then CR.SetCamera(ROW_CAMERA[id] or "body"); end end);
 
 After("CharacterCreate_OnShow", function()
-	CR.zoomAmount = 0;	-- the client put the model back to its place
-	if CR.cameraFrame then
-		CR.cameraFrame:Hide();
-	end
+	CR.zoomed = false;	-- the client loads the normal background
 	CR.Setup();
 	if CharacterCreateRandomName then
 		CharacterCreateRandomName.crShown = CharacterCreateRandomName:IsShown();
