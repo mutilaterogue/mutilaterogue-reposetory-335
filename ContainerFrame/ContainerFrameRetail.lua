@@ -68,9 +68,18 @@ local function Skin(frame)
 	sort:SetHeight(26);
 	sort:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING_SIDE + 2, -36);
 	sort:SetFrameLevel(retail:GetFrameLevel() + 10);
-	sort:SetNormalAtlas("bags-button-autosort-up");
-	sort:SetPushedAtlas("bags-button-autosort-down");
-	sort:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
+	local normal = sort:CreateTexture(nil, "ARTWORK");
+	normal:SetAtlas("bags-button-autosort-up");
+	normal:SetAllPoints(sort);
+	sort:SetNormalTexture(normal);
+	local pushed = sort:CreateTexture(nil, "ARTWORK");
+	pushed:SetAtlas("bags-button-autosort-down");
+	pushed:SetAllPoints(sort);
+	sort:SetPushedTexture(pushed);
+	local highlight = sort:CreateTexture(nil, "HIGHLIGHT");
+	highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square");
+	highlight:SetBlendMode("ADD");
+	highlight:SetAllPoints(sort);
 	sort:SetScript("OnClick", function()
 		PlaySound("igMainMenuOptionCheckBoxOn");
 		if ContainerFrameCombinedBags_SortBags then
@@ -128,10 +137,12 @@ local function Layout(frame, size, id)
 	local name = frame:GetName();
 	local isBackpack = id == 0;
 	frame.retailSize, frame.retailID = size, id;
-	if isBackpack then
-		frame.SortButton:Show();
-	else
-		frame.SortButton:Hide();
+	if frame.SortButton then
+		if isBackpack then
+			frame.SortButton:Show();
+		else
+			frame.SortButton:Hide();
+		end
 	end
 
 	retail:SetTitle(_G[name .. "Name"]:GetText() or "");
