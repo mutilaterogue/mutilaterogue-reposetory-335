@@ -1,16 +1,13 @@
--- QuestMapRetail.lua: Legion's QuestMapFrame (7.3.5 FrameXML\QuestMapFrame.lua/.xml) ported to the 3.3.5 world map.
--- In FrameXML.toc after WorldMapFrame.xml (the path where you keep it), e.g. ..\..\WorldMap\QuestMapRetail.lua
+-- QuestMapFrame.lua: Legion's QuestMapFrame (7.3.5 FrameXML\QuestMapFrame.lua) on the 3.3.5 world map.
+-- The frames are in QuestAndMap.xml; the window around the map is WorldMapLegion.lua.
 --
--- Like Legion: a quest panel to the right of the map with the whole quest log (zone headers that collapse,
--- titles in difficulty colors, numbered POIs matching the map, objectives, tags, party counts, watched check),
--- hovering a quest draws its blob, a click opens the details (text in a scroll, rewards in their own box,
--- Back / Abandon / Share / Track), shift-click tracks, right click gives the options menu.
--- 3.3.5 differences: the stock map stays (POIs, blobs, selection); the windowed map gets the panel with an
--- open / close button, the big quest map gets it in place of the stock list and detail boxes.
--- API: GetQuestLogTitle 9 returns (questID 9th), QuestPOI_* by parent name, QUEST_TEMPLATE_MAP1/MAP2,
+-- Like Legion: the whole quest log next to the map (zone headers that collapse, titles in difficulty colors,
+-- numbered POIs matching the map, objectives, tags, party counts, watched check); hovering a quest draws its
+-- blob, a click opens the details (text, rewards, Back / Abandon / Share / Track), shift-click tracks,
+-- right click gives the options menu.
+-- 3.3.5 API: GetQuestLogTitle 9 returns (questID 9th), QuestPOI_* by parent name, QUEST_TEMPLATE_MAP1/MAP2,
 -- DrawQuestBlob, IsUnitOnQuest(index, unit), GetNumPartyMembers.
 
-local PANEL_WIDTH, LIST_WIDTH = 287, 259;
 
 local function SetAtlasIf(texture, atlas, useSize)
 	if texture.SetAtlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
@@ -53,204 +50,14 @@ local function NumGroupMembers()
 end
 
 ---------------------------------------------------------------------------
--- frames (QuestMapFrame.xml)
+-- frames (QuestAndMap.xml)
 ---------------------------------------------------------------------------
-local QuestMapFrame = CreateFrame("Frame", "QuestMapFrame", WorldMapFrame);
-QuestMapFrame:SetWidth(PANEL_WIDTH);
-QuestMapFrame:SetHeight(464);
-QuestMapFrame:EnableMouse(true);
-QuestMapFrame:Hide();
-QuestMapFrame.completedCriteria = {};
-
-QuestMapFrame.VerticalSeparator = QuestMapFrame:CreateTexture(nil, "OVERLAY");
-QuestMapFrame.VerticalSeparator:SetPoint("TOPLEFT", -1, 1);
-QuestMapFrame.VerticalSeparator:SetPoint("BOTTOMLEFT", -1, -1);
-QuestMapFrame.VerticalSeparator:SetWidth(3);
-QuestMapFrame.VerticalSeparator:SetTexture(0.3, 0.25, 0.15, 1);
-
--- the options menu (right click)
-local optionsDropDown = CreateFrame("Frame", "QuestMapQuestOptionsDropDown", QuestMapFrame, "UIDropDownMenuTemplate");
-optionsDropDown:Hide();
-optionsDropDown.questID = 0;
-
--- quest list
-local questsFrame = CreateFrame("ScrollFrame", "QuestScrollFrame", QuestMapFrame, "UIPanelScrollFrameTemplate");
-questsFrame:SetPoint("TOPLEFT", 1, -1);
-questsFrame:SetPoint("BOTTOMRIGHT", -27, 1);
-questsFrame.Background = QuestMapFrame:CreateTexture(nil, "BACKGROUND");
-questsFrame.Background:SetAllPoints(QuestMapFrame);
-SetAtlasIf(questsFrame.Background, "QuestLogBackground");
-local contents = CreateFrame("Frame", "QuestScrollFrameContents", questsFrame);
-contents:SetWidth(LIST_WIDTH - 1);
-contents:SetHeight(10);
-questsFrame:SetScrollChild(contents);
-questsFrame.Contents = contents;
-contents.Headers, contents.Titles = {}, {};
-QuestMapFrame.QuestsFrame = questsFrame;
-
--- details
-local detailsFrame = CreateFrame("Frame", nil, QuestMapFrame);
-detailsFrame:SetAllPoints(QuestMapFrame);
-detailsFrame:Hide();
-QuestMapFrame.DetailsFrame = detailsFrame;
-
-detailsFrame.Background = detailsFrame:CreateTexture(nil, "BACKGROUND");
-detailsFrame.Background:SetAllPoints(detailsFrame);
-if not SetAtlasIf(detailsFrame.Background, "QuestDetailsBackgrounds") then
-	detailsFrame.Background:SetTexture("Interface\\QuestFrame\\QuestBG");
-end
-
-detailsFrame.BackButton = CreateFrame("Button", nil, detailsFrame, "UIPanelButtonTemplate");
-detailsFrame.BackButton:SetWidth(90);
-detailsFrame.BackButton:SetHeight(22);
-detailsFrame.BackButton:SetPoint("TOPLEFT", 6, -6);
-detailsFrame.BackButton:SetText(BACK or "Назад");
-detailsFrame.BackButton:SetScript("OnClick", function()
-	PlaySound("igMainMenuOptionCheckBoxOn");
-	QuestMapFrame_ReturnFromQuestDetails();
-end);
-
-local function DetailsButton(text, width)
-	local button = CreateFrame("Button", nil, detailsFrame, "UIPanelButtonTemplate");
-	button:SetWidth(width);
-	button:SetHeight(22);
-	button:SetText(text);
-	return button;
-end
-detailsFrame.AbandonButton = DetailsButton(ABANDON_QUEST_ABBREV or ABANDON_QUEST, 95);
-detailsFrame.AbandonButton:SetPoint("BOTTOMLEFT", 1, 1);
-detailsFrame.ShareButton = DetailsButton(SHARE_QUEST_ABBREV or SHARE_QUEST, 95);
-detailsFrame.ShareButton:SetPoint("LEFT", detailsFrame.AbandonButton, "RIGHT", 0, 0);
-detailsFrame.TrackButton = DetailsButton(TRACK_QUEST_ABBREV or TRACK_QUEST, 95);
-detailsFrame.TrackButton:SetPoint("LEFT", detailsFrame.ShareButton, "RIGHT", 0, 0);
-detailsFrame.AbandonButton:SetScript("OnClick", function() QuestMapQuestOptions_AbandonQuest(QuestMapFrame_GetDetailQuestID()); end);
-detailsFrame.ShareButton:SetScript("OnClick", function() QuestMapQuestOptions_ShareQuest(QuestMapFrame_GetDetailQuestID()); end);
-detailsFrame.TrackButton:SetScript("OnClick", function()
-	PlaySound("igMainMenuOptionCheckBoxOn");
-	QuestMapQuestOptions_TrackQuest(QuestMapFrame_GetDetailQuestID());
-end);
-
--- the text and the rewards in one scroll (3.3.5 shows them with two templates: MAP1 then MAP2)
-local detailsScroll = CreateFrame("ScrollFrame", "QuestMapDetailsScrollFrame", detailsFrame, "UIPanelScrollFrameTemplate");
-detailsScroll:SetPoint("TOPLEFT", 4, -34);
-detailsScroll:SetPoint("BOTTOMRIGHT", -27, 26);
-local detailsContents = CreateFrame("Frame", "QuestMapDetailsScrollChild", detailsScroll);
-detailsContents:SetWidth(300);
-detailsContents:SetHeight(10);
-detailsScroll:SetScrollChild(detailsContents);
-detailsScroll.Contents = detailsContents;
-detailsFrame.ScrollFrame = detailsScroll;
-
-local textPart = CreateFrame("Frame", "QuestMapDetailsTextFrame", detailsContents);
-textPart:SetPoint("TOPLEFT", -25, 0);	-- MAP1 starts 30 in
-textPart:SetWidth(300);
-textPart:SetHeight(10);
-local rewardsPart = CreateFrame("Frame", "QuestMapDetailsRewardsFrame", detailsContents);
-rewardsPart:SetPoint("TOPLEFT", textPart, "BOTTOMLEFT", 0, 0);
-rewardsPart:SetWidth(300);
-rewardsPart:SetHeight(10);
-rewardsPart.Background = rewardsPart:CreateTexture(nil, "BACKGROUND");
-rewardsPart.Background:SetPoint("TOPLEFT", 25, 0);
-rewardsPart.Background:SetPoint("BOTTOMRIGHT");
-if not SetAtlasIf(rewardsPart.Background, "QuestDetails-RewardsOverlay") then
-	rewardsPart.Background:Hide();
-end
-detailsFrame.RewardsFrame = rewardsPart;
-
--- right click in the details goes back (Legion)
-detailsFrame:EnableMouse(true);
-detailsFrame:SetScript("OnMouseUp", function(self, button)
-	if button == "RightButton" then
-		QuestMapFrame_ReturnFromQuestDetails();
-	end
-end);
-
--- the open / close button on the windowed map (Legion's Open/CloseQuestPanelButton)
-local toggleButton = CreateFrame("Button", "QuestMapFramePanelButton", WorldMapFrame);
-toggleButton:SetWidth(32);
-toggleButton:SetHeight(32);
-toggleButton.Icon = toggleButton:CreateTexture(nil, "ARTWORK");
-toggleButton.Icon:SetAllPoints(toggleButton);
-toggleButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD");
-toggleButton:SetScript("OnClick", function()
-	PlaySound("igMainMenuOptionCheckBoxOn");
-	if QuestMapFrame:IsShown() then
-		QuestMapFrame_Close(true);
-	else
-		QuestMapFrame_Open(true);
-	end
-end);
-toggleButton:SetScript("OnEnter", function(self)
-	GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-	GameTooltip:SetText(QUEST_LOG or "Задания");
-	GameTooltip:Show();
-end);
-toggleButton:SetScript("OnLeave", GameTooltip_Hide);
-toggleButton:Hide();
-
----------------------------------------------------------------------------
--- templates (QuestLogHeaderTemplate, QuestLogTitleTemplate, QuestLogObjectiveTemplate)
----------------------------------------------------------------------------
-local function CreateHeader()
-	local button = CreateFrame("Button", nil, contents);
-	button:SetWidth(16);
-	button:SetHeight(16);
-	button:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-	local text = button:CreateFontString(nil, "ARTWORK", _G.GameFontNormalMed3 and "GameFontNormalMed3" or "GameFontNormal");
-	text:SetPoint("LEFT", button, "RIGHT", 5, 0);
-	text:SetWidth(234);
-	text:SetHeight(10);
-	text:SetJustifyH("LEFT");
-	text:SetTextColor(0.7, 0.7, 0.7);
-	button.ButtonText = text;
-	button.SetText = function(self, value) self.ButtonText:SetText(value); end;
-	button:SetScript("OnClick", QuestMapLogHeaderButton_OnClick);
-	button:SetScript("OnEnter", function(self) self.ButtonText:SetTextColor(1, 1, 1); end);
-	button:SetScript("OnLeave", function(self) self.ButtonText:SetTextColor(0.7, 0.7, 0.7); end);
-	return button;
-end
-
-local function CreateTitle()
-	local button = CreateFrame("Button", nil, contents);
-	button:SetWidth(255);
-	button:SetHeight(16);
-	button:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-	button.Text = button:CreateFontString(nil, "ARTWORK", "GameFontNormalLeft");
-	button.Text:SetWidth(175);
-	button.Text:SetJustifyH("LEFT");
-	button.Text:SetPoint("TOPLEFT", 31, -8);
-	button.Check = button:CreateTexture(nil, "ARTWORK");
-	button.Check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check");
-	button.Check:SetWidth(16);
-	button.Check:SetHeight(16);
-	button.Check:Hide();
-	button.TagTexture = button:CreateTexture(nil, "ARTWORK");
-	button.TagTexture:SetWidth(18);
-	button.TagTexture:SetHeight(18);
-	button.TagTexture:SetPoint("TOP", button.Text, "TOP", 0, 3);
-	button.TagTexture:SetPoint("RIGHT", button, "RIGHT", 0, 0);
-	button.TagTexture:Hide();
-	button:SetScript("OnClick", QuestMapLogTitleButton_OnClick);
-	button:SetScript("OnEnter", QuestMapLogTitleButton_OnEnter);
-	button:SetScript("OnLeave", QuestMapLogTitleButton_OnLeave);
-	return button;
-end
+local questsFrame, contents, detailsFrame, detailsScroll, detailsContents, textPart, rewardsPart, optionsDropDown;
 
 local OBJECTIVE_FRAMES = {};
 function QuestLog_GetObjectiveFrame(index)
 	if not OBJECTIVE_FRAMES[index] then
-		local frame = CreateFrame("Frame", "QLOF" .. index, contents);
-		frame:SetWidth(220);
-		frame:SetHeight(16);
-		frame.Dash = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall");
-		frame.Dash:SetPoint("TOPLEFT");
-		frame.Dash:SetText(QUEST_DASH);
-		frame.Text = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall");
-		frame.Text:SetWidth(205);
-		frame.Text:SetJustifyH("LEFT");
-		frame.Text:SetPoint("TOPLEFT", frame.Dash, "TOPRIGHT");
-		frame.Text:SetTextColor(0.8, 0.8, 0.8);
-		OBJECTIVE_FRAMES[index] = frame;
+		OBJECTIVE_FRAMES[index] = CreateFrame("Frame", "QLOF" .. index, contents, "QuestMapLogObjectiveTemplate");
 	end
 	return OBJECTIVE_FRAMES[index];
 end
@@ -258,7 +65,7 @@ end
 function QuestLogQuests_GetHeaderButton(index)
 	local headers = contents.Headers;
 	if not headers[index] then
-		headers[index] = CreateHeader();
+		headers[index] = CreateFrame("Button", nil, contents, "QuestMapLogHeaderTemplate");
 	end
 	return headers[index];
 end
@@ -266,73 +73,66 @@ end
 function QuestLogQuests_GetTitleButton(index)
 	local titles = contents.Titles;
 	if not titles[index] then
-		titles[index] = CreateTitle();
+		titles[index] = CreateFrame("Button", nil, contents, "QuestMapLogTitleTemplate");
 	end
 	return titles[index];
+end
+
+function QuestMapFrame_OnLoad(self)
+	questsFrame = QuestScrollFrame;
+	contents = QuestScrollFrameContents;
+	contents.Headers, contents.Titles = {}, {};
+	questsFrame.Contents = contents;
+	questsFrame.Background = self.Background;
+	self.QuestsFrame = questsFrame;
+
+	detailsFrame = QuestMapDetailsFrame;
+	self.DetailsFrame = detailsFrame;
+	detailsScroll = QuestMapDetailsScrollFrame;
+	detailsContents = QuestMapDetailsScrollChild;
+	textPart = QuestMapDetailsTextFrame;
+	rewardsPart = QuestMapDetailsRewardsFrame;
+	detailsFrame.ScrollFrame = detailsScroll;
+	detailsFrame.RewardsFrame = rewardsPart;
+
+	optionsDropDown = QuestMapQuestOptionsDropDown;
+	optionsDropDown.questID = 0;
+	UIDropDownMenu_Initialize(optionsDropDown, QuestMapQuestOptionsDropDown_Initialize, "MENU");
+
+	self.open = true;	-- Legion's questLogOpen CVar (none in 3.3.5): open each session
+	self:RegisterEvent("QUEST_LOG_UPDATE");
+	self:RegisterEvent("UNIT_QUEST_LOG_CHANGED");
+	self:RegisterEvent("PARTY_MEMBERS_CHANGED");
+	self:RegisterEvent("QUEST_POI_UPDATE");
+	self:RegisterEvent("WORLD_MAP_UPDATE");
 end
 
 ---------------------------------------------------------------------------
 -- open / close / layout
 ---------------------------------------------------------------------------
-QuestMapFrame.open = true;	-- Legion's questLogOpen CVar (none in 3.3.5): open each session
-
-local function MapMode()
-	if not WORLDMAP_SETTINGS then
-		return nil;
-	end
-	if WORLDMAP_SETTINGS.size == WORLDMAP_WINDOWED_SIZE then
-		return "windowed";
-	elseif WORLDMAP_SETTINGS.size == WORLDMAP_QUESTLIST_SIZE then
-		return "questlist";
-	end
-	return "full";
-end
 
 -- the stock list / detail boxes are replaced by the panel
-local function HideStockQuestParts()
+function QuestMapFrame_HideStockParts()
 	WorldMapQuestScrollFrame:Hide();
 	WorldMapQuestDetailScrollFrame:Hide();
 	WorldMapQuestRewardScrollFrame:Hide();
 	WorldMapTrackQuest:Hide();
 end
+local HideStockQuestParts = QuestMapFrame_HideStockParts;
 
-function QuestMapFrame_Layout()
-	local mode = MapMode();
-	HideStockQuestParts();
-	QuestMapFrame:ClearAllPoints();
-	QuestMapFrame:SetPoint("TOPLEFT", WorldMapDetailFrame, "TOPRIGHT", 1, 0);
-	QuestMapFrame:SetHeight(WorldMapDetailFrame:GetHeight() * WorldMapDetailFrame:GetScale());
-	QuestMapFrame:SetFrameLevel(WorldMapDetailFrame:GetFrameLevel() + 30);
-	toggleButton:ClearAllPoints();
-	toggleButton:SetPoint("BOTTOMRIGHT", WorldMapDetailFrame, "BOTTOMRIGHT", -4 / WorldMapDetailFrame:GetScale(), 4 / WorldMapDetailFrame:GetScale());
-	toggleButton:SetFrameLevel(WorldMapDetailFrame:GetFrameLevel() + 40);
-
-	local show = (mode == "windowed" and QuestMapFrame.open) or mode == "questlist";
-	if mode == "windowed" then
-		toggleButton:Show();
-		SetAtlasIf(toggleButton.Icon, show and "QuestLog-icon-shrink" or "QuestLog-icon-Expand");
-	else
-		toggleButton:Hide();
-	end
-	if show then
-		QuestMapFrame_Show();
-	else
-		QuestMapFrame_Hide();
-	end
-end
-
+-- opened: the panel shows with the windowed map (WorldMapLegion_Layout places it)
 function QuestMapFrame_Open(userAction)
 	if userAction then
 		QuestMapFrame.open = true;
 	end
-	QuestMapFrame_Layout();
+	WorldMapLegion_Layout();
 end
 
 function QuestMapFrame_Close(userAction)
 	if userAction then
 		QuestMapFrame.open = false;
 	end
-	QuestMapFrame_Layout();
+	WorldMapLegion_Layout();
 end
 
 function QuestMapFrame_Show()
@@ -451,7 +251,7 @@ function QuestLogQuests_Update(poiTable)
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
 				button:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up");
 				button:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight");
-				button:SetText(headerTitle or "");
+				button.ButtonText:SetText(headerTitle or "");
 				button:SetHitRectInsets(0, -button.ButtonText:GetWidth(), 0, 0);
 				button:ClearAllPoints();
 				if prevButton then
@@ -472,7 +272,7 @@ function QuestLogQuests_Update(poiTable)
 				button = QuestLogQuests_GetHeaderButton(headerIndex);
 				button:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up");
 				button:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight");
-				button:SetText(headerTitle or "");
+				button.ButtonText:SetText(headerTitle or "");
 				button:SetHitRectInsets(0, -button.ButtonText:GetWidth(), 0, 0);
 				button:ClearAllPoints();
 				if prevButton then
@@ -838,7 +638,6 @@ function QuestMapQuestOptionsDropDown_Initialize(self)
 	info.disabled = nil;
 	UIDropDownMenu_AddButton(info, UIDROPDOWNMENU_MENU_LEVEL);
 end
-UIDropDownMenu_Initialize(optionsDropDown, QuestMapQuestOptionsDropDown_Initialize, "MENU");
 
 ---------------------------------------------------------------------------
 -- list buttons
@@ -983,12 +782,7 @@ end
 ---------------------------------------------------------------------------
 -- events and the stock map
 ---------------------------------------------------------------------------
-QuestMapFrame:RegisterEvent("QUEST_LOG_UPDATE");
-QuestMapFrame:RegisterEvent("UNIT_QUEST_LOG_CHANGED");
-QuestMapFrame:RegisterEvent("PARTY_MEMBERS_CHANGED");
-QuestMapFrame:RegisterEvent("QUEST_POI_UPDATE");
-QuestMapFrame:RegisterEvent("WORLD_MAP_UPDATE");
-QuestMapFrame:SetScript("OnEvent", function(self, event, arg1)
+function QuestMapFrame_OnEvent(self, event, arg1)
 	if event == "UNIT_QUEST_LOG_CHANGED" and arg1 ~= "player" then
 		return;
 	end
@@ -999,18 +793,7 @@ QuestMapFrame:SetScript("OnEvent", function(self, event, arg1)
 	if tooltipButton and tooltipButton:IsShown() then
 		QuestMapLogTitleButton_OnEnter(tooltipButton);
 	end
-end);
-QuestMapFrame:SetScript("OnMouseUp", function(self, button)
-	if button == "RightButton" and WorldMapZoomOutButton_OnClick then
-		WorldMapZoomOutButton_OnClick();
-	end
-end);
-
-hooksecurefunc("WorldMap_ToggleSizeUp", QuestMapFrame_Layout);
-hooksecurefunc("WorldMap_ToggleSizeDown", QuestMapFrame_Layout);
-hooksecurefunc("WorldMapFrame_SetQuestMapView", QuestMapFrame_Layout);
-hooksecurefunc("WorldMapFrame_SetFullMapView", QuestMapFrame_Layout);
-WorldMapFrame:HookScript("OnShow", QuestMapFrame_Layout);
+end
 
 -- the stock selection puts the QuestInfo parts into its boxes: back into the panel; the list follows the map
 hooksecurefunc("WorldMapFrame_SelectQuestFrame", function()
