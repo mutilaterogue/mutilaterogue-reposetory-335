@@ -150,7 +150,8 @@ local function ApplyZoom()
 	canvas:SetScale(zoom);
 	canvas:ClearAllPoints();
 	canvas:SetPoint("TOPLEFT", WorldMapLegionScrollHolder, "TOPLEFT", -panX / zoom, panY / zoom);
-	if WorldMapBlobFrame_CalculateHitTranslations then
+	-- not laid out yet (the map switching size while hidden): no center to work from
+	if WorldMapBlobFrame_CalculateHitTranslations and WorldMapBlobFrame:GetCenter() then
 		WorldMapBlobFrame_CalculateHitTranslations();
 	end
 	if WorldMapFrame_SetPOIMaxBounds then
