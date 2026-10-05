@@ -62,12 +62,25 @@ function QuestMap_SliceAtlas(frame, atlas, layer, left, top, right, bottom, piec
 	if not (file and info.width and info.width > 0) then
 		return pieces or {};
 	end
-	if not left and info.sliceData then
-		left, top = info.sliceData.marginLeft, info.sliceData.marginTop;
-		right, bottom = info.sliceData.marginRight, info.sliceData.marginBottom;
+	-- the margins: given, else the atlas' slice data (sliceData, or slice={l, t, r, b} in AtlasInfo)
+	if not left then
+		local slice = info.sliceData;
+		if slice then
+			left, top, right, bottom = slice.marginLeft, slice.marginTop, slice.marginRight, slice.marginBottom;
+		else
+			local raw = AtlasInfo and AtlasInfo[file] and AtlasInfo[file][atlas];
+			slice = raw and raw.slice;
+			if slice then
+				left, top, right, bottom = slice[1], slice[2], slice[3], slice[4];
+			end
+		end
 	end
 	left, top, right, bottom = left or 0, top or 0, right or 0, bottom or 0;
-	local u1, u2, v1, v2 = info.leftTexCoord, info.rightTexCoord, info.topTexCoord, info.bottomTexCoord;
+	local u1, u2 = info.leftTexCoord or info.left, info.rightTexCoord or info.right;
+	local v1, v2 = info.topTexCoord or info.top, info.bottomTexCoord or info.bottom;
+	if not (u1 and u2 and v1 and v2) then
+		return pieces or {};
+	end
 	local du, dv = (u2 - u1) / info.width, (v2 - v1) / info.height;
 	-- columns / rows: { texcoord from, texcoord to, anchor from (side, offset), anchor to }
 	local cols, rows = {}, {};
@@ -153,7 +166,7 @@ end
 function QuestMapFrame_OnLoad(self)
 	-- the retail metal frame: nine slice by its atlas margins
 	if self.BorderFrame then
-		QuestMap_SliceAtlas(self.BorderFrame, "QuestLog-frame", "BORDER");
+		QuestMap_SliceAtlas(self.BorderFrame, "QuestLog-frame", "BORDER", 53, 53, 53, 53);
 	end
 	questsFrame = QuestScrollFrame;
 	contents = QuestScrollFrameContents;
