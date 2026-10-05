@@ -179,11 +179,14 @@ function RaidFinderFrame_OnLoad(self)
 	self.Info.Queue:SetTextColor(1, 1, 1);
 end
 
--- the inset under the content: set on every show, PVEFrame changes this frame's level when it takes it in
+-- the dark inset (as the dungeon finder's, made the same way): under the content, its level set on every show,
+-- PVEFrame changes this frame's level when it takes it in
 local function LayerInset(self)
-	self.Inset:ClearAllPoints();
-	self.Inset:SetPoint("TOPLEFT", self, "TOPLEFT", 4, -60);
-	self.Inset:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -6, 26);
+	if not self.Inset then
+		self.Inset = CreateFrame("Frame", "RaidFinderFrameInset", self, "InsetFrameTemplate");
+		self.Inset:SetPoint("TOPLEFT", self, "TOPLEFT", 4, -60);
+		self.Inset:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -6, 26);
+	end
 	self.Inset:SetFrameLevel(self:GetFrameLevel());
 	for _, child in ipairs({ self:GetChildren() }) do
 		if child ~= self.Inset then

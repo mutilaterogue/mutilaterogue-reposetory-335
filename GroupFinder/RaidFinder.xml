@@ -46,12 +46,6 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" x="4" y="-60"/>
-					<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
-				</Anchors>
-			</Frame>
 
 			<!-- roles: ids as the stock LFG role buttons (1 damage, 2 tank, 3 healer) -->
 			<Button name="$parentRoleButtonTank" parentKey="RoleTank" inherits="RaidFinderRoleButtonTemplate" id="2">
@@ -89,8 +83,8 @@
 			<!-- the raid and the queue, in the inset -->
 			<Frame name="$parentInfo" parentKey="Info">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="10" y="-12"/>
-					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-10" y="10"/>
+					<Anchor point="TOPLEFT" x="16" y="-178"/>
+					<Anchor point="BOTTOMRIGHT" x="-16" y="36"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
