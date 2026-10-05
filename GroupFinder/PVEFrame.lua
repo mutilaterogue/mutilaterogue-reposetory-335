@@ -448,6 +448,7 @@ end
 
 function PVEFrame_OnLoad(self)
 	-- retail tabs: TabSystem, each tab opens its first section
+	Mixin(self, TabSystemOwnerMixin);
 	TabSystemOwnerMixin.OnLoad(self);
 	self:SetTabSystem(self.TabSystem);
 	for tab = 1, #TITLES do
