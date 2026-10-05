@@ -52,13 +52,14 @@ local function Skin(frame)
 	portrait:ClearAllPoints();
 	portrait:SetPoint("TOPLEFT", retail, "TOPLEFT", -6, 2);
 	retail:SetTitleOffsets(PORTRAIT_SIZE, -24);
-	-- the stock close button keeps working (it closes the bag the stock way): in the retail one's place
-	retail.CloseButton:Hide();
+	-- the retail close button (over the raised border; the stock one ends up under it), closing the bag the stock way
 	local close = _G[name .. "CloseButton"];
 	if close then
-		close:ClearAllPoints();
-		close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 5, 5);
-		close:SetFrameLevel(retail:GetFrameLevel() + 10);
+		close:Hide();
+		close:SetAlpha(0);
+		retail.CloseButton:SetScript("OnClick", function()
+			close:Click();
+		end);
 	end
 	frame.RetailFrame = retail;
 
