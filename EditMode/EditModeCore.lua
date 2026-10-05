@@ -416,6 +416,11 @@ function EditModeCore:ApplyLayoutToSystem(systemName)
 			SetAnchoredPosition(system.frame, entry.point, entry.x, entry.y);
 		else
 			SetFramePosition(system.frame, entry.x, entry.y);
+			-- and from now on anchored (kept with the next save)
+			local point, x, y = GetAnchoredPosition(system.frame);
+			if point then
+				entry.point, entry.x, entry.y = point, x, y;
+			end
 		end
 		self:ClampToScreen(system.frame);
 	end
