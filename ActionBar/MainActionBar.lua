@@ -258,8 +258,8 @@ local function MainActionBar_HideStockArt()
 			region:Hide();
 		end
 	end
-	-- the stock bar was the stone strip under the buttons; now it holds only the experience bar, at the screen's bottom
-	MainMenuBar:SetHeight(MainMenuExpBar:GetHeight());
+	-- the stock bar was the stone strip under the buttons; now it holds the retail experience / reputation bars
+	-- (StatusTrackingBarRetail.lua sets its height)
 end
 
 function MainActionBar_OnLoad(self)

@@ -1,0 +1,99 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!-- The retail (12.1.5) experience / reputation bars (Blizzard_ActionBar\StatusTrackingBar.xml, StatusTrackingBarTemplate.xml,
+	     ExpBar.xml): two containers at the screen's bottom under the main action bar, the main one at the bottom.
+	     The stock MainMenuExpBar / ReputationWatchBar are hidden (StatusTrackingBarRetail.lua). -->
+	<Script file="StatusTrackingBarRetail.lua"/>
+
+	<!-- one bar: the retail frame (571 x 17) over a 563 x 9 bar; the fill is a texture cut to the value
+	     (a 3.3.5 StatusBar would squeeze an atlas, not cut it) -->
+	<Frame name="StatusTrackingBarRetailTemplate" enableMouse="true" virtual="true">
+		<Size x="571" y="17"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="Background" atlas="UI-HUD-ExperienceBar-Background">
+					<Size x="563" y="9"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<!-- the rested part ahead of the experience (UI-HUD-ExperienceBar-Fill-Prediction) -->
+				<Texture name="$parentPrediction" parentKey="Prediction" atlas="UI-HUD-ExperienceBar-Fill-Prediction" hidden="true">
+					<Size x="1" y="9"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentBackground" relativePoint="LEFT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentFill" parentKey="Fill">
+					<Size x="1" y="9"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentBackground" relativePoint="LEFT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="BarFrameTexture" atlas="UI-HUD-ExperienceBar-Frame">
+					<Size x="571" y="17"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="OverlayFrame" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString parentKey="Text" inherits="TextStatusBarText" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="1"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnEnter function="StatusTrackingBarRetail_OnEnter"/>
+			<OnLeave function="StatusTrackingBarRetail_OnLeave"/>
+		</Scripts>
+	</Frame>
+
+	<Frame name="StatusTrackingBarRetailManager" parent="MainMenuBar">
+		<Size x="571" y="34"/>
+		<Anchors>
+			<Anchor point="BOTTOM"/>
+		</Anchors>
+		<Frames>
+			<Frame name="StatusTrackingBarRetailExp" parentKey="ExpBar" inherits="StatusTrackingBarRetailTemplate" hidden="true">
+				<Frames>
+					<!-- the rested pip at the prediction's end (ExpBar.xml ExhaustionTick) -->
+					<Button parentKey="ExhaustionTick" hidden="true">
+						<Size x="10" y="14"/>
+						<Scripts>
+							<OnEnter function="StatusTrackingBarRetail_ExhaustionTick_OnEnter"/>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+						<NormalTexture atlas="UI-HUD-ExperienceBar-Frame-Pip"/>
+						<HighlightTexture atlas="UI-HUD-ExperienceBar-Frame-Pip-Mouseover" alphaMode="ADD"/>
+					</Button>
+				</Frames>
+			</Frame>
+			<Frame name="StatusTrackingBarRetailRep" parentKey="RepBar" inherits="StatusTrackingBarRetailTemplate" hidden="true">
+				<Scripts>
+					<OnMouseUp>
+						ToggleCharacter("ReputationFrame");
+					</OnMouseUp>
+				</Scripts>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="StatusTrackingBarRetail_OnLoad"/>
+			<OnEvent function="StatusTrackingBarRetail_Update"/>
+		</Scripts>
+	</Frame>
+</Ui>
