@@ -150,18 +150,42 @@ function QuestMap_RetailScrollBar(scrollFrame)
 	trackMiddle:SetPoint("TOP", trackTop, "BOTTOM");
 	trackMiddle:SetPoint("BOTTOM", trackBottom, "TOP");
 
-	-- the thumb: the slider's thumb is the middle, the caps hang on it
+	-- the thumb: the slider's thumb texture is an invisible box (top cap + middle + bottom cap),
+	-- the visible pieces sit inside it so nothing hangs outside or lags behind
 	local thumb = bar:GetThumbTexture();
 	if thumb then
-		SetAtlasIf(thumb, "minimal-scrollbar-thumb-middle");
+		thumb:SetTexture(0, 0, 0, 0);
 		thumb:SetWidth(8);
-		thumb:SetHeight(28);
+		thumb:SetHeight(50);
 		local capTop = bar:CreateTexture(nil, "OVERLAY");
-		SetAtlasIf(capTop, "minimal-scrollbar-small-thumb-top", true);
-		capTop:SetPoint("BOTTOM", thumb, "TOP");
+		SetAtlasIf(capTop, "minimal-scrollbar-thumb-top", true);
+		capTop:SetPoint("TOP", thumb, "TOP");
 		local capBottom = bar:CreateTexture(nil, "OVERLAY");
-		SetAtlasIf(capBottom, "minimal-scrollbar-small-thumb-bottom", true);
-		capBottom:SetPoint("TOP", thumb, "BOTTOM");
+		SetAtlasIf(capBottom, "minimal-scrollbar-thumb-bottom", true);
+		capBottom:SetPoint("BOTTOM", thumb, "BOTTOM");
+		local middle = bar:CreateTexture(nil, "OVERLAY");
+		SetAtlasIf(middle, "minimal-scrollbar-thumb-middle");
+		middle:SetWidth(8);
+		middle:SetPoint("TOP", capTop, "BOTTOM");
+		middle:SetPoint("BOTTOM", capBottom, "TOP");
+		-- the middle atlas is 715 px tall: show only its top part, not the whole strip squeezed
+		local info = C_Texture.GetAtlasInfo("minimal-scrollbar-thumb-middle");
+		if info then
+			local l, r = info.left or info.leftTexCoord, info.right or info.rightTexCoord;
+			local t, bt = info.top or info.topTexCoord, info.bottom or info.bottomTexCoord;
+			middle:SetTexCoord(l, r, t, t + (bt - t) * 6 / 715);
+		end
+		bar.thumbPieces = { capTop, middle, capBottom };
+		-- nothing to scroll: the 3.3.5 code hides the thumb texture, hide the pieces with it
+		local function Sync()
+			for _, piece in ipairs(bar.thumbPieces) do
+				if thumb:IsShown() then piece:Show(); else piece:Hide(); end
+			end
+		end
+		scrollFrame:HookScript("OnScrollRangeChanged", Sync);
+		hooksecurefunc(thumb, "Show", Sync);
+		hooksecurefunc(thumb, "Hide", Sync);
+		Sync();
 	end
 
 	-- the arrows
