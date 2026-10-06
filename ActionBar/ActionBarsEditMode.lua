@@ -56,6 +56,10 @@ local function LayoutBar(bar)
 				x, y = across * step, -along * step;
 			end
 			button:SetScale(scale);
+			-- (the flyout arrow over the retail frame again: the layer order got lost with the re-layout)
+			if button.FlyoutArrow then
+				button.FlyoutArrow:SetDrawLayer("OVERLAY", 3);
+			end
 			button:ClearAllPoints();
 			-- the offsets are in the button's own (scaled) units
 			button:SetPoint("TOPLEFT", bar, "TOPLEFT", x / scale, y / scale);
@@ -205,6 +209,15 @@ local function Register()
 	if EditModeManagerFrame and EditModeManagerFrame.RefreshFrameList then
 		EditModeManagerFrame:RefreshFrameList();
 	end
+end
+
+-- the stock flyout update shows the arrow again: over the frame
+if ActionButton_UpdateFlyout then
+	hooksecurefunc("ActionButton_UpdateFlyout", function(button)
+		if button.FlyoutArrow then
+			button.FlyoutArrow:SetDrawLayer("OVERLAY", 3);
+		end
+	end);
 end
 
 local eventFrame = CreateFrame("Frame");
