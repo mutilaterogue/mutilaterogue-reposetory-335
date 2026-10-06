@@ -21,14 +21,15 @@
  *       "RF_LEAVE"
  *       "RF_ANSWER" : 1 / 0             (accept / decline the proposal)
  *       "RF_STATUS"                     -> S->C "RF_STATUS" (below)
+ *       "RF_LEAVE_RAID"                 (leave the raid finder's raid: out of the group, back to where he queued)
  *  S->C "RF_STATUS" : state : raidId : roles : seconds queued : tanks : healers : damage : tanks needed : healers needed : damage needed
- *              state 0 none, 1 queued, 2 proposal; the counts are the players queued for that raid by role
+ *              state 0 none, 1 queued, 2 proposal, 3 in the raid finder's raid; the counts are the players queued for that raid by role
  *       "RF_PROPOSAL" : raidId : seconds left : accepted : total : my answer (0 none, 1 accepted)
  *       "RF_RESULT" : message
  *
  * GM: .rf list (the queues), .rf reload (the raid table)
  *
- * Setup: sql/world_raid_finder.sql, AddSC_raid_finder() in custom_script_loader.cpp.
+ * Setup: core/Group_solo.patch (a raid of one stays a group), sql/world_raid_finder.sql, AddSC_raid_finder() in custom_script_loader.cpp.
  */
 
 #include "ScriptMgr.h"
@@ -75,6 +76,7 @@ namespace
         STATE_NONE     = 0,
         STATE_QUEUED   = 1,
         STATE_PROPOSAL = 2,
+        STATE_IN_RAID  = 3,     // in a raid the raid finder made (the client offers "leave the raid")
     };
 
     struct Raid
@@ -117,6 +119,7 @@ namespace
     // where the raid finder took a player from: back there when he leaves its raid group (retail)
     struct Return
     {
+        uint32 RaidId = 0;
         uint32 RaidMapId = 0;
         WorldLocation Pos;
     };
@@ -201,7 +204,11 @@ namespace
         auto itr = s_queue.find(player->GetGUID());
         if (itr == s_queue.end())
         {
-            sAddonComm->Send(player, "RF_STATUS", uint32(STATE_NONE), 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            auto back = s_returns.find(player->GetGUID());
+            if (back != s_returns.end() && player->GetGroup())
+                sAddonComm->Send(player, "RF_STATUS", uint32(STATE_IN_RAID), back->second.RaidId, 0, 0, 0, 0, 0, 0, 0, 0);
+            else
+                sAddonComm->Send(player, "RF_STATUS", uint32(STATE_NONE), 0, 0, 0, 0, 0, 0, 0, 0, 0);
             return;
         }
         Queued const& entry = itr->second;
@@ -347,6 +354,7 @@ namespace
             return;
         }
         sGroupMgr->AddGroup(group);
+        group->SetAllowSolo(true);      // core/Group_solo.patch: the raid stays a raid down to its last member
         group->ConvertToRaid();
         group->SetRaidDifficultyID(Difficulty(raid->Difficulty));
         for (size_t i = 1; i < players.size(); ++i)
@@ -364,6 +372,7 @@ namespace
         {
             player->SetRaidDifficultyID(Difficulty(raid->Difficulty));
             Return& back = s_returns[player->GetGUID()];
+            back.RaidId = raid->Id;
             back.RaidMapId = raid->MapId;
             back.Pos.WorldRelocate(*player);
             Result(player, "\xd0\xa0\xd0\xb5\xd0\xb9\xd0\xb4 \xd1\x81\xd0\xbe\xd0\xb1\xd1\x80\xd0\xb0\xd0\xbd: " + raid->Name + ".");
@@ -547,6 +556,17 @@ namespace
         FormRaid(proposal->second);
     }
 
+    // leave the raid finder's raid (the client's party menu does not see a group of one): out of the group and back
+    void HandleLeaveRaid(Player* player, std::vector<std::string> const& /*args*/)
+    {
+        if (!s_returns.count(player->GetGUID()))
+            return;
+        s_pendingReturn.push_back(player->GetGUID());
+        if (player->GetGroup())
+            player->RemoveFromGroup(GROUP_REMOVEMETHOD_LEAVE);
+        SendStatus(player);
+    }
+
     void HandleStatus(Player* player, std::vector<std::string> const& /*args*/)
     {
         SendStatus(player);
@@ -595,6 +615,7 @@ public:
         sAddonComm->Register(std::string("RF_LEAVE"), &HandleLeave);
         sAddonComm->Register(std::string("RF_ANSWER"), &HandleAnswer);
         sAddonComm->Register(std::string("RF_STATUS"), &HandleStatus);
+        sAddonComm->Register(std::string("RF_LEAVE_RAID"), &HandleLeaveRaid);
     }
 
     void OnLogout(Player* player) override

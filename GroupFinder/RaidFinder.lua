@@ -15,7 +15,7 @@ local DIFFICULTY_NAMES = {
 	[3] = "25 игроков (героич.)",
 };
 
-local STATE_NONE, STATE_QUEUED, STATE_PROPOSAL = 0, 1, 2;
+local STATE_NONE, STATE_QUEUED, STATE_PROPOSAL, STATE_IN_RAID = 0, 1, 2, 3;
 
 local raids = {};			-- { id, name, mapId, difficulty, size, minLevel, minItemLevel, saved }
 local selectedRaid;
@@ -79,6 +79,10 @@ local function UpdateInfo()
 	if status.state == STATE_NONE then
 		info.QueueTitle:SetText("");
 		info.Queue:SetText("");
+	elseif status.state == STATE_IN_RAID then
+		local inRaid = FindRaid(status.raidId);
+		info.QueueTitle:SetText("Вы в рейде");
+		info.Queue:SetText(inRaid and inRaid.name or "");
 	else
 		local queuedRaid = FindRaid(status.raidId);
 		info.QueueTitle:SetText(status.state == STATE_PROPOSAL and "Рейд собран" or "В очереди");
@@ -92,7 +96,7 @@ end
 local function UpdateButtons()
 	local frame = RaidFinderFrame;
 	local queued = status.state ~= STATE_NONE;
-	frame.FindGroupButton:SetText(queued and LEAVE_QUEUE or FIND_A_GROUP);
+	frame.FindGroupButton:SetText(status.state == STATE_IN_RAID and "Покинуть рейд" or (queued and LEAVE_QUEUE or FIND_A_GROUP));
 	local raid = selectedRaid and FindRaid(selectedRaid);
 	if queued or (raid and not raid.saved and GetRoles() > 0) then
 		frame.FindGroupButton:Enable();
@@ -206,7 +210,7 @@ function RaidFinderFrame_OnShow(self)
 		frame.elapsed = frame.elapsed + elapsed;
 		if frame.elapsed >= 1 then
 			frame.elapsed = 0;
-			if status.state ~= STATE_NONE then
+			if status.state == STATE_QUEUED or status.state == STATE_PROPOSAL then
 				UpdateInfo();
 			end
 		end
@@ -218,7 +222,9 @@ function RaidFinderFrame_OnHide(self)
 end
 
 function RaidFinderFindGroupButton_OnClick(self)
-	if status.state ~= STATE_NONE then
+	if status.state == STATE_IN_RAID then
+		Send("RF_LEAVE_RAID");
+	elseif status.state ~= STATE_NONE then
 		Send("RF_LEAVE");
 	elseif selectedRaid then
 		Send("RF_JOIN", selectedRaid, GetRoles());
@@ -318,7 +324,7 @@ local function RegisterComm()
 			tanksNeeded = tonumber(tanksNeeded) or 0, healersNeeded = tonumber(healersNeeded) or 0, damageNeeded = tonumber(damageNeeded) or 0,
 		};
 		statusTime = GetTime();
-		if status.state ~= STATE_NONE then
+		if status.state == STATE_QUEUED or status.state == STATE_PROPOSAL then
 			-- the queue's raid and roles on the frame
 			selectedRaid = status.raidId;
 			for id, role in pairs(ROLE_BY_ID) do
