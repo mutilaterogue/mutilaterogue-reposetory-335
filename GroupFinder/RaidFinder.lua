@@ -1,6 +1,8 @@
 -- Raid Finder (RaidFinder.xml) - the client of the server's raid queue (server/raid_finder.cpp, AddonComm):
---   C->S "RF_LIST", "RF_JOIN" : raidId : roles, "RF_LEAVE", "RF_ANSWER" : 1/0, "RF_STATUS"
---   S->C "RF_LIST", "RF_STATUS", "RF_PROPOSAL", "RF_RESULT"
+--   C->S "RF_LIST", "RF_JOIN" : raidId : roles, "RF_ROLES" : roles, "RF_LEAVE", "RF_ANSWER" : 1/0, "RF_STATUS",
+--        "RF_LEAVE_RAID"
+--   S->C "RF_LIST", "RF_STATUS", "RF_ROLE_CHECK", "RF_PROPOSAL", "RF_RESULT"
+-- In a group the leader queues it: every member gets a role check (popup, or the roles here and "Confirm roles").
 -- Roles as the server's bit mask: 1 tank, 2 healer, 4 damage.
 
 local ROLE_TANK, ROLE_HEALER, ROLE_DAMAGE = 1, 2, 4;
@@ -15,13 +17,14 @@ local DIFFICULTY_NAMES = {
 	[3] = "25 игроков (героич.)",
 };
 
-local STATE_NONE, STATE_QUEUED, STATE_PROPOSAL, STATE_IN_RAID = 0, 1, 2, 3;
+local STATE_NONE, STATE_QUEUED, STATE_PROPOSAL, STATE_IN_RAID, STATE_ROLE_CHECK = 0, 1, 2, 3, 4;
 
 local raids = {};			-- { id, name, mapId, difficulty, size, minLevel, minItemLevel, saved }
 local selectedRaid;
 local status = { state = STATE_NONE };
 local statusTime;			-- GetTime() of the last status: the queue timer counts on from it
 local proposal;
+local roleCheck;			-- { raidId, leader, expires }: our answer is still due
 local checkedRoles = { [1] = true };	-- by button id, damage by default
 
 local function Send(...)
@@ -92,6 +95,11 @@ local function UpdateInfo()
 		local inRaid = FindRaid(status.raidId);
 		info.QueueTitle:SetText("Вы в рейде");
 		info.Queue:SetText(inRaid and inRaid.name or "");
+	elseif status.state == STATE_ROLE_CHECK then
+		local checkRaid = FindRaid(status.raidId);
+		info.QueueTitle:SetText("Проверка ролей");
+		info.Queue:SetText((checkRaid and checkRaid.name or "") .. "\n" .. (status.roles == 0
+			and "Выберите роли и нажмите «Подтвердить роли»." or "Ждём остальных участников группы."));
 	else
 		local queuedRaid = FindRaid(status.raidId);
 		info.QueueTitle:SetText(status.state == STATE_PROPOSAL and "Рейд собран" or "В очереди");
@@ -105,9 +113,28 @@ end
 local function UpdateButtons()
 	local frame = RaidFinderFrame;
 	local queued = status.state ~= STATE_NONE;
-	frame.FindGroupButton:SetText(status.state == STATE_IN_RAID and "Покинуть рейд" or (queued and LEAVE_QUEUE or FIND_A_GROUP));
+	local picking = status.state == STATE_ROLE_CHECK and status.roles == 0;
+	local text;
+	if status.state == STATE_IN_RAID then
+		text = "Покинуть рейд";
+	elseif picking then
+		text = "Подтвердить роли";
+	elseif queued then
+		text = LEAVE_QUEUE;
+	elseif GetNumPartyMembers() > 0 or GetNumRaidMembers() > 0 then
+		text = "Встать группой";
+	else
+		text = FIND_A_GROUP;
+	end
+	frame.FindGroupButton:SetText(text);
 	local raid = selectedRaid and FindRaid(selectedRaid);
-	if queued or (raid and not raid.saved and GetRoles() > 0) then
+	if picking then
+		if GetRoles() > 0 then
+			frame.FindGroupButton:Enable();
+		else
+			frame.FindGroupButton:Disable();
+		end
+	elseif queued or (raid and not raid.saved and GetRoles() > 0) then
 		frame.FindGroupButton:Enable();
 	else
 		frame.FindGroupButton:Disable();
@@ -127,7 +154,8 @@ local function UpdateRoleButtons()
 		canTank, canHeal, canDamage = GetAvailableRoles();
 	end
 	local can = { [1] = canDamage, [2] = canTank, [3] = canHeal };
-	local queued = status.state ~= STATE_NONE;
+	-- in a role check our roles are still ours to pick
+	local queued = status.state ~= STATE_NONE and not (status.state == STATE_ROLE_CHECK and status.roles == 0);
 	for _, button in ipairs({ RaidFinderFrame.RoleTank, RaidFinderFrame.RoleHealer, RaidFinderFrame.RoleDamage }) do
 		local id = button:GetID();
 		if not can[id] then
@@ -230,9 +258,17 @@ function RaidFinderFrame_OnHide(self)
 	self:SetScript("OnUpdate", nil);
 end
 
+local function AnswerRoleCheck(roles)
+	roleCheck = nil;
+	StaticPopup_Hide("RAID_FINDER_ROLE_CHECK");
+	Send("RF_ROLES", roles);
+end
+
 function RaidFinderFindGroupButton_OnClick(self)
 	if status.state == STATE_IN_RAID then
 		Send("RF_LEAVE_RAID");
+	elseif status.state == STATE_ROLE_CHECK and status.roles == 0 then
+		AnswerRoleCheck(GetRoles());
 	elseif status.state ~= STATE_NONE then
 		Send("RF_LEAVE");
 	elseif selectedRaid then
@@ -286,6 +322,118 @@ local function ShowProposal()
 		StaticPopup_Show("RAID_FINDER_PROPOSAL", ProposalText());
 	end
 	PlaySound("ReadyCheck");
+end
+
+---------------------------------------------------------------------------
+-- the role check: the leader queues the group, every member picks roles
+---------------------------------------------------------------------------
+local ROLE_TEXT = { [ROLE_TANK] = "Танк", [ROLE_HEALER] = "Лекарь", [ROLE_DAMAGE] = "Боец" };
+
+local function RolesText(roles)
+	local list = {};
+	for _, role in ipairs({ ROLE_TANK, ROLE_HEALER, ROLE_DAMAGE }) do
+		if bit.band(roles, role) ~= 0 then
+			table.insert(list, ROLE_TEXT[role]);
+		end
+	end
+	return #list > 0 and table.concat(list, ", ") or "не выбраны";
+end
+
+StaticPopupDialogs["RAID_FINDER_ROLE_CHECK"] = {
+	text = "%s",
+	button1 = ACCEPT,
+	button2 = DECLINE,
+	button3 = "Выбрать роли",
+	OnAccept = function()
+		local roles = GetRoles();
+		AnswerRoleCheck(roles > 0 and roles or ROLE_DAMAGE);
+	end,
+	OnCancel = function(self, data, reason)
+		if reason ~= "timeout" then
+			AnswerRoleCheck(0);
+		end
+	end,
+	OnAlt = function()
+		-- the roles in the raid finder, then "Confirm roles" there
+		if PVEFrame_Open then
+			PVEFrame_Open(1, 2);
+		end
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = false,
+	showAlert = 1,
+};
+
+local function ShowRoleCheck()
+	local raid = FindRaid(roleCheck.raidId);
+	StaticPopup_Show("RAID_FINDER_ROLE_CHECK", string.format("%s ставит группу в очередь: %s\nВаши роли: %s",
+		roleCheck.leader, raid and raid.name or "", RolesText(GetRoles())));
+	PlaySound("ReadyCheck");
+end
+
+---------------------------------------------------------------------------
+-- the minimap button: the queue at a glance (RaidFinder.xml)
+---------------------------------------------------------------------------
+local function UpdateMinimapButton()
+	local button = RaidFinderMinimapButton;
+	if not button then
+		return;
+	end
+	local shown = status.state == STATE_QUEUED or status.state == STATE_PROPOSAL or status.state == STATE_ROLE_CHECK;
+	if shown then
+		-- next to the stock dungeon finder's eye when that one is shown too
+		button:ClearAllPoints();
+		if MiniMapLFGFrame and MiniMapLFGFrame:IsShown() then
+			button:SetPoint("RIGHT", MiniMapLFGFrame, "LEFT", 4, 0);
+		else
+			button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 25, -100);
+		end
+		button:Show();
+		if status.state == STATE_QUEUED then
+			EyeTemplate_StartAnimating(button.eye);
+		else
+			EyeTemplate_StopAnimating(button.eye);
+		end
+	else
+		EyeTemplate_StopAnimating(button.eye);
+		button:Hide();
+	end
+end
+
+function RaidFinderMinimapButton_OnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+	local raid = FindRaid(status.raidId);
+	GameTooltip:SetText("Поиск рейда", 1, 1, 1);
+	if raid then
+		GameTooltip:AddLine(raid.name);
+	end
+	if status.state == STATE_ROLE_CHECK then
+		GameTooltip:AddLine("Проверка ролей", 1, 0.82, 0);
+	elseif status.state == STATE_PROPOSAL then
+		GameTooltip:AddLine("Рейд собран: подтвердите готовность", 0, 1, 0);
+	else
+		local elapsed = status.seconds + (statusTime and (GetTime() - statusTime) or 0);
+		GameTooltip:AddLine("Время в очереди: " .. FormatTime(elapsed), 1, 1, 1);
+		GameTooltip:AddLine(string.format("Танки: %d / %d", status.tanks, status.tanksNeeded), 1, 1, 1);
+		GameTooltip:AddLine(string.format("Лекари: %d / %d", status.healers, status.healersNeeded), 1, 1, 1);
+		GameTooltip:AddLine(string.format("Бойцы: %d / %d", status.damage, status.damageNeeded), 1, 1, 1);
+		GameTooltip:AddLine("Ваши роли: " .. RolesText(status.roles), 0.5, 0.5, 0.5);
+	end
+	GameTooltip:AddLine("ЛКМ: открыть, ПКМ: покинуть очередь", 0.5, 0.5, 0.5);
+	GameTooltip:Show();
+end
+
+function RaidFinderMinimapButton_OnClick(self, button)
+	if button == "RightButton" then
+		if status.state == STATE_ROLE_CHECK and status.roles == 0 then
+			AnswerRoleCheck(0);
+		else
+			Send("RF_LEAVE");
+		end
+	elseif PVEFrame_Open then
+		PVEFrame_Open(1, 2);
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -344,10 +492,28 @@ local function RegisterComm()
 			proposal = nil;
 			StaticPopup_Hide("RAID_FINDER_PROPOSAL");
 		end
+		if status.state ~= STATE_ROLE_CHECK or status.roles ~= 0 then
+			roleCheck = nil;
+			StaticPopup_Hide("RAID_FINDER_ROLE_CHECK");
+		end
+		UpdateMinimapButton();
+		Update();
+	end);
+
+	Comm_Register("RF_ROLE_CHECK", function(raidId, leader, secondsLeft)
+		if not raidId then
+			return;
+		end
+		roleCheck = { raidId = tonumber(raidId) or 0, leader = leader or "", expires = GetTime() + (tonumber(secondsLeft) or 0) };
+		selectedRaid = roleCheck.raidId;
+		ShowRoleCheck();
 		Update();
 	end);
 
 	Comm_Register("RF_PROPOSAL", function(raidId, secondsLeft, accepted, total, answered)
+		if not raidId then
+			return;
+		end
 		proposal = {
 			raidId = tonumber(raidId) or 0, secondsLeft = tonumber(secondsLeft) or 0,
 			accepted = tonumber(accepted) or 0, total = tonumber(total) or 0, answered = answered == "1",
@@ -364,8 +530,14 @@ end
 
 local commFrame = CreateFrame("Frame");
 commFrame:RegisterEvent("PLAYER_LOGIN");
-commFrame:SetScript("OnEvent", function(self)
-	self:UnregisterAllEvents();
+commFrame:RegisterEvent("PARTY_MEMBERS_CHANGED");
+commFrame:SetScript("OnEvent", function(self, event)
+	if event == "PARTY_MEMBERS_CHANGED" then
+		-- "Find Group" / "Queue as a group"
+		Update();
+		return;
+	end
+	self:UnregisterEvent("PLAYER_LOGIN");
 	if Comm_Register then
 		RegisterComm();
 	end
