@@ -156,6 +156,7 @@
 				</Anchors>
 			</Frame>
 			<Frame name="$parentRaid" parentKey="Raid" inherits="QueueStatusEntryTemplate"/>
+			<Frame name="$parentLFGList" parentKey="LFGList" inherits="QueueStatusEntryTemplate"/>
 		</Frames>
 	</Frame>
 </Ui>

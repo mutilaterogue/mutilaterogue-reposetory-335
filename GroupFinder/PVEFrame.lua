@@ -1,5 +1,5 @@
 -- The retail group finder window (PVEFrame.xml) on 3.3.5: the stock windows shown inside it.
---   tab 1 "Dungeons and raids": LFDParentFrame (dungeon finder), RaidFinderFrame (RaidFinder.xml), premade groups: a placeholder
+--   tab 1 "Dungeons and raids": LFDParentFrame (dungeon finder), RaidFinderFrame (RaidFinder.xml), LFGListFrame (LFGListFrame.xml)
 --   tab 2 "PvP": PVPParentFrame - its battlegrounds tab (PVPBattlegroundFrame) and its honor / arena tab (PVPFrame)
 --   tab 3 "Mythic+": ChallengesFrame (ChallengesUI), over the whole window
 -- The stock windows keep their logic; their own frame art, title and close button are hidden. Whatever opens them
@@ -29,9 +29,9 @@ local TAB_NAMES = {
 local SECTIONS = {
 	{
 		{ frame = "LFDParentFrame", text = LOOKING_FOR_DUNGEON or "Поиск подземелий", icon = "Interface\\Icons\\INV_Helmet_08" },
-		-- the raid finder: RaidFinder.xml (the server's raid queue); premade groups: a placeholder for now
+		-- the raid finder: RaidFinder.xml (the server's raid queue); premade groups: LFGListFrame.xml
 		{ frame = "RaidFinderFrame", text = "Поиск рейда", icon = "Interface\\LFGFrame\\UI-LFR-PORTRAIT" },
-		{ frame = "LFGListPVEStub", placeholder = true, text = "Заранее собранные группы", icon = "Interface\\Icons\\Achievement_General_StayClassy" },
+		{ frame = "LFGListFrame", text = "Заранее собранные группы", icon = "Interface\\Icons\\Achievement_General_StayClassy" },
 	},
 	{
 		-- the PvP window's content starts higher than the dungeon finder's: lower
@@ -134,7 +134,7 @@ local function HideAboveTop(frame, depth)
 end
 
 -- retail LFDFrame.xml / RaidFinderFrame.xml layout: 338x428 right of the blue panel, own inset and backgrounds
-local RETAIL_LAYOUT = { LFDParentFrame = true, RaidFinderFrame = true, LFGListPVEStub = true };
+local RETAIL_LAYOUT = { LFDParentFrame = true, RaidFinderFrame = true, LFGListFrame = true };
 
 local function RetailBackdrop(frame)
 	local role = frame:CreateTexture(nil, "BACKGROUND");

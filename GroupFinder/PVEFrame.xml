@@ -5,6 +5,7 @@
 	     (LFDParentFrame, LFRParentFrame, PVPParentFrame) and ChallengesFrame are shown inside it (PVEFrame.lua).
 	     FrameXML.toc: GroupFinder\PVEFrame.xml at the end (after LFD / LFR / PVP and ChallengesUI). -->
 	<Include file="RaidFinder.xml"/>
+	<Include file="LFGListFrame.xml"/>
 	<Include file="QueueStatus.xml"/>
 	<Script file="PVEFrame.lua"/>
 

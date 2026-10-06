@@ -1,6 +1,7 @@
 -- The retail queue status button (QueueStatus.xml): one eye left of the micro menu for every queue.
 --   dungeon finder: the stock MiniMapLFGFrame lies invisible over the eye - its clicks and its dropdown as before;
 --   raid finder:    RaidFinder_GetQueueInfo() (RaidFinder.lua).
+--   premade groups: LFGList_GetQueueInfo() (LFGList.lua) - our listed group, our applications.
 -- On mouse over the retail status frame (QueueStatusFrame): an entry for each queue, retail role icons.
 -- The eye plays the retail flipbooks frame by frame: the opening one and searching while queued, the found one with
 -- its shards and glows for a proposal, the mouse over one on mouse over.
@@ -302,11 +303,34 @@ local function SetRaidEntry(entry)
 	return true;
 end
 
+-- premade groups (LFGList_GetQueueInfo, LFGList.lua): our listed group or our applications
+local function LFGListActive(info)
+	return info and (info.listed or info.applied > 0 or info.invited > 0);
+end
+
+local function SetLFGListEntry(entry)
+	local info = LFGList_GetQueueInfo and LFGList_GetQueueInfo();
+	if not LFGListActive(info) then
+		entry:Hide();
+		return false;
+	end
+	local title = "Заранее собранные группы";
+	if info.listed then
+		local status = info.numApplicants > 0 and string.format("Заявок: %d", info.numApplicants) or "Ваша группа в списке.";
+		SetEntry(entry, title, info.listed.name, nil, nil, nil, nil, status);
+	elseif info.invited > 0 then
+		SetEntry(entry, title, nil, nil, nil, nil, nil, "Вас приглашают в группу!");
+	else
+		SetEntry(entry, title, nil, nil, nil, nil, nil, string.format("Заявок подано: %d", info.applied));
+	end
+	return true;
+end
+
 local function UpdateStatusFrame()
 	local frame = QueueStatusFrame;
 	local height = 4;
 	local previous;
-	for _, pair in ipairs({ { frame.Dungeon, SetDungeonEntry }, { frame.Raid, SetRaidEntry } }) do
+	for _, pair in ipairs({ { frame.Dungeon, SetDungeonEntry }, { frame.Raid, SetRaidEntry }, { frame.LFGList, SetLFGListEntry } }) do
 		local entry, set = pair[1], pair[2];
 		if set(entry) then
 			entry:ClearAllPoints();
@@ -378,7 +402,9 @@ end
 function QueueStatus_Update()
 	local button = QueueStatusButton;
 	local raid = RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo();
-	if not lfdShown and not raid then
+	local lfgList = LFGList_GetQueueInfo and LFGList_GetQueueInfo();
+	local lfgListActive = LFGListActive(lfgList);
+	if not lfdShown and not raid and not lfgListActive then
 		PlayState(nil);
 		button:Hide();
 		HideStatus();
@@ -388,10 +414,10 @@ function QueueStatus_Update()
 
 	local mode = lfdShown and GetLFGMode and GetLFGMode();
 	local newState;
-	if (raid and raid.state == "proposal") or mode == "proposal" then
+	if (raid and raid.state == "proposal") or mode == "proposal" or (lfgList and lfgList.invited > 0) then
 		newState = "found";
 	elseif (raid and (raid.state == "queued" or raid.state == "rolecheck"))
-		or mode == "queued" or mode == "listed" or mode == "rolecheck" then
+		or mode == "queued" or mode == "listed" or mode == "rolecheck" or lfgListActive then
 		newState = "searching";
 	end
 	PlayState(newState);
@@ -491,6 +517,27 @@ end
 local raidMenu = CreateFrame("Frame", "QueueStatusButtonDropDown", UIParent, "UIDropDownMenuTemplate");
 
 function QueueStatusButton_OnClick(self, button)
+	-- the raid finder first; premade groups when only they are active
+	local raid = RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo();
+	local lfgList = not raid and LFGList_GetQueueInfo and LFGList_GetQueueInfo();
+	if lfgList and LFGListActive(lfgList) then
+		if button == "RightButton" then
+			local menu = { { text = "Заранее собранные группы", isTitle = 1, notCheckable = 1 } };
+			if lfgList.listed then
+				table.insert(menu, { text = "Исключить из списка", func = C_LFGList.RemoveListing, notCheckable = 1 });
+			else
+				table.insert(menu, { text = "Отменить заявки", notCheckable = 1, func = function()
+					for _, id in ipairs(C_LFGList.GetApplications()) do
+						C_LFGList.CancelApplication(id);
+					end
+				end });
+			end
+			EasyMenu(menu, raidMenu, self, 0, 0, "MENU");
+		elseif PVEFrame_Open then
+			PVEFrame_Open(1, 3);
+		end
+		return;
+	end
 	if button == "RightButton" then
 		EasyMenu({
 			{ text = "Поиск рейда", isTitle = 1, notCheckable = 1 },
