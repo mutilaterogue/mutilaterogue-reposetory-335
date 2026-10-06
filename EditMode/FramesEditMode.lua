@@ -5,7 +5,8 @@
 --   Cast bar (CastingBarFrame):    lock to the player frame      -> PlayerFrame_AttachCastBar / DetachCastBar
 --   Minimap (MinimapCluster):      rotate minimap                -> CVar rotateMinimap
 --   Chat (ChatFrame1):             width, height
---   Objective tracker:             height
+--   Objective tracker:             height, opacity, text size
+--   Target / focus:                buffs on top, cast bar on the side (TargetFrame.lua)
 --   Loot frame:                    not editable while the loot opens at the cursor
 -- Loaded by EditModeCore.xml after EditModeCore.lua.
 
@@ -192,6 +193,40 @@ loader:SetScript("OnEvent", function()
 		},
 	});
 
+	-- target / focus: retail "Buffs on top" and "Cast bar on the side" (TargetFrame.lua reads frame.buffsOnTop /
+	-- frame.castBarOnSide)
+	for _, name in ipairs({ "TargetFrame", "FocusFrame" }) do
+		local unitFrame = _G[name];
+		if unitFrame then
+			local function Refresh(frame)
+				if frame.unit and UnitExists(frame.unit) and TargetFrame_UpdateAuras then
+					TargetFrame_UpdateAuras(frame);
+				end
+				if frame.spellbar and Target_Spellbar_AdjustPosition then
+					Target_Spellbar_AdjustPosition(frame.spellbar);
+				end
+			end
+			EditModeCore:AddSettings(name, {
+				{
+					key = "buffsOnTop", type = "check", default = 0,
+					label = Label(HUD_EDIT_MODE_SETTING_UNIT_FRAME_BUFFS_ON_TOP, "Эффекты сверху"),
+					apply = function(frame, value)
+						frame.buffsOnTop = value == 1;
+						Refresh(frame);
+					end,
+				},
+				{
+					key = "castBarOnSide", type = "check", default = 0,
+					label = Label(HUD_EDIT_MODE_SETTING_UNIT_FRAME_CAST_BAR_ON_SIDE, "Индикатор применения заклинаний сбоку"),
+					apply = function(frame, value)
+						frame.castBarOnSide = value == 1;
+						Refresh(frame);
+					end,
+				},
+			});
+		end
+	end
+
 	-- objective tracker: retail height
 	if ObjectiveTrackerFrame then
 		EditModeCore:AddSettings("ObjectiveTrackerFrame", {
@@ -200,6 +235,26 @@ loader:SetScript("OnEvent", function()
 				default = math.floor(ObjectiveTrackerFrame:GetHeight() + 0.5),
 				label = Label(HUD_EDIT_MODE_SETTING_OBJECTIVE_TRACKER_HEIGHT, "Высота"),
 				apply = function(frame, value) frame:SetHeight(value); end,
+			},
+			-- retail: the background's opacity and the text size (ObjectiveTrackerManager:SetOpacity / SetTextSize)
+			{
+				key = "opacity", type = "slider", min = 0, max = 100, step = 5, default = 0,
+				label = Label(HUD_EDIT_MODE_SETTING_OBJECTIVE_TRACKER_OPACITY, "Непрозрачность"),
+				format = function(value) return value .. "%"; end,
+				apply = function(frame, value)
+					if ObjectiveTrackerManager and ObjectiveTrackerManager.SetOpacity then
+						ObjectiveTrackerManager:SetOpacity(value);
+					end
+				end,
+			},
+			{
+				key = "textSize", type = "slider", min = 12, max = 20, step = 1, default = 12,
+				label = Label(HUD_EDIT_MODE_SETTING_OBJECTIVE_TRACKER_TEXT_SIZE, "Размер текста"),
+				apply = function(frame, value)
+					if ObjectiveTrackerManager and ObjectiveTrackerManager.SetTextSize then
+						ObjectiveTrackerManager:SetTextSize(value);
+					end
+				end,
 			},
 		});
 	end

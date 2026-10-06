@@ -7,6 +7,9 @@ MAX_BOSS_FRAMES = 4;
 -- the retail places: under the frame art (TargetFrameContainer.FrameTexture's bottom + 9)
 local AURA_START_X = 25;
 local AURA_START_Y = 26;
+-- retail "Buffs on top" (Edit Mode, EditMode\FramesEditMode.lua: frame.buffsOnTop): the auras over the frame,
+-- the rows growing up; the first row's bottom this far under the frame's top
+local AURA_TOP_START_Y = -10;
 local AURA_OFFSET_Y = 3;
 local LARGE_AURA_SIZE = 21;
 local SMALL_AURA_SIZE = 17;
@@ -551,6 +554,23 @@ end
 
 function TargetFrame_UpdateBuffAnchor(self, buffName, index, numDebuffs, anchorIndex, size, offsetX, offsetY)
 	local buff = _G[buffName..index];
+	if ( self.buffsOnTop and ( index == 1 or anchorIndex ~= (index-1) ) ) then
+		-- over the frame: the first row at its top, a new row over the one before
+		if ( index == 1 ) then
+			if ( UnitIsFriend("player", self.unit) or numDebuffs == 0 ) then
+				buff:SetPoint("BOTTOMLEFT", self, "TOPLEFT", AURA_START_X, AURA_TOP_START_Y);
+			else
+				buff:SetPoint("BOTTOMLEFT", self.debuffs, "TOPLEFT", 0, offsetY);
+			end
+			self.buffs:SetPoint("BOTTOMLEFT", buff, "BOTTOMLEFT", 0, 0);
+		else
+			buff:SetPoint("BOTTOMLEFT", _G[buffName..anchorIndex], "TOPLEFT", 0, offsetY);
+		end
+		self.buffs:SetPoint("TOPLEFT", buff, "TOPLEFT", 0, AURA_OFFSET_Y);
+		buff:SetWidth(size);
+		buff:SetHeight(size);
+		return;
+	end
 	if ( index == 1 ) then
 		if ( UnitIsFriend("player", self.unit) or numDebuffs == 0 ) then
 			-- unit is friendly or there are no debuffs...buffs start on top
@@ -580,6 +600,23 @@ end
 function TargetFrame_UpdateDebuffAnchor(self, debuffName, index, numBuffs, anchorIndex, size, offsetX, offsetY)
 	local buff = _G[debuffName..index];
 	local isFriend = UnitIsFriend("player", self.unit);
+	if ( self.buffsOnTop and ( index == 1 or anchorIndex ~= (index-1) ) ) then
+		-- over the frame (see TargetFrame_UpdateBuffAnchor)
+		if ( index == 1 ) then
+			if ( isFriend and numBuffs > 0 ) then
+				buff:SetPoint("BOTTOMLEFT", self.buffs, "TOPLEFT", 0, offsetY);
+			else
+				buff:SetPoint("BOTTOMLEFT", self, "TOPLEFT", AURA_START_X, AURA_TOP_START_Y);
+			end
+			self.debuffs:SetPoint("BOTTOMLEFT", buff, "BOTTOMLEFT", 0, 0);
+		else
+			buff:SetPoint("BOTTOMLEFT", _G[debuffName..anchorIndex], "TOPLEFT", 0, offsetY);
+		end
+		self.debuffs:SetPoint("TOPLEFT", buff, "TOPLEFT", 0, AURA_OFFSET_Y);
+		buff:SetWidth(size);
+		buff:SetHeight(size);
+		return;
+	end
 	if ( index == 1 ) then
 		if ( isFriend and numBuffs > 0 ) then
 			-- unit is friendly and there are buffs...debuffs start on bottom
@@ -883,6 +920,19 @@ end
 function Target_Spellbar_AdjustPosition(self)
 	-- this may need to be reworked, but it covers all cases within 3 conditionals
 	local parentFrame = self:GetParent();
+	-- retail "Cast bar on the side" (Edit Mode): left of the frame, at the bars' height
+	if ( parentFrame.castBarOnSide ) then
+		self:ClearAllPoints();
+		self:SetPoint("RIGHT", parentFrame, "LEFT", -12, 0);
+		return;
+	end
+	-- the auras over the frame: nothing under it but the target of target
+	if ( parentFrame.buffsOnTop ) then
+		self:ClearAllPoints();
+		self:SetPoint("TOPLEFT", parentFrame, "BOTTOMLEFT", 25, parentFrame.haveToT and -21 or 7);
+		return;
+	end
+	self:ClearAllPoints();
 	if ( parentFrame.haveToT ) then
 		if ( parentFrame.auraRows <= 1 ) then
 			self:SetPoint("TOPLEFT", parentFrame, "BOTTOMLEFT", 25, -21 );
