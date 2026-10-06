@@ -1,7 +1,8 @@
 Groups of one (retail: the raid finder / premade groups make a group for a single player).
 Apply by hand (context from your tree: Groups/Group.h, Groups/Group.cpp, Handlers/GroupHandler.cpp).
 
-Why: the 3.3.5 client sees a group with nobody else in it as "not in a group" and sends CMSG_GROUP_DISBAND
+Why: LFGPlayerScript::OnMapChanged disbands any group of one on every map change (the raid finder's raid
+was gone as soon as the player was moved into it), and the 3.3.5 client sees a group with nobody else in it as "not in a group" and sends CMSG_GROUP_DISBAND
 (leave) - the group was gone at once and the raid kicked the player out ("you are not in the instance's group").
 A group marked SetAllowSolo(true) (server/raid_finder.cpp) ignores that leave while its only member is inside,
 and is not disbanded when a member leaves and only one is left.
@@ -44,3 +45,16 @@ Leaving such a group alone goes through the script ("RF_LEAVE_RAID"), not the cl
 +        return;
 +
      /** error handling **/
+
+--- a/src/server/game/DungeonFinding/LFGScripts.cpp
++++ b/src/server/game/DungeonFinding/LFGScripts.cpp
+@@ void LFGPlayerScript::OnMapChanged(Player* player)  (the "else" branch at the end)
+     else
+     {
+         Group* group = player->GetGroup();
+-        if (group && group->GetMembersCount() == 1)
++        // custom: a solo-allowed group (raid finder) is not the dungeon finder's last-member group
++        if (group && group->GetMembersCount() == 1 && !group->IsSoloAllowed())
+         {
+             sLFGMgr->LeaveLfg(group->GetGUID());
+             group->Disband();
