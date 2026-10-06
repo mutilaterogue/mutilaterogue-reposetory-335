@@ -12,11 +12,16 @@ local FLIPBOOKS = {
 local lfdShown = false;		-- the stock dungeon finder's eye is "shown" (it is invisible here)
 local flipbook, flipbookTime = nil, 0;
 
+-- the file and the rect of an atlas: set it on the eye and read them back (SetAtlas, AtlasHelper.lua)
 local function AtlasRect(atlas)
-	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas);
-	if info then
-		return info.file, info.left, info.right, info.top, info.bottom;
+	local eye = QueueStatusButton.Eye;
+	eye:SetAtlas(atlas);
+	local file = eye:GetTexture();
+	local ulx, uly, llx, lly, urx, ury = eye:GetTexCoord();
+	if not file or not ulx then
+		return;
 	end
+	return file, ulx, urx, uly, lly;
 end
 
 -- a flipbook (nil: the still eye)
@@ -40,7 +45,6 @@ local function SetFlipbook(name)
 	flipbook = { name = name, book = book, left = left, top = top,
 		width = (right - left) / book.columns, height = (bottom - top) / book.rows };
 	flipbookTime = 0;
-	eye:SetTexture(file);
 end
 
 ---------------------------------------------------------------------------
