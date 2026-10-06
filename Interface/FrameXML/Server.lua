@@ -99,16 +99,34 @@ end
 
 function Comm_SendChunked(opcode, body)
 	local chunkSize = COMM_MAXBYTES - 24;
-	local total     = ceil(strlen(body) / chunkSize);
 
+	-- cut on UTF-8 character boundaries (a Cyrillic letter split between two chunks breaks both)
+	local parts = {};
+	local pos, size = 1, strlen(body);
+	while pos <= size do
+		local len = math.min(chunkSize, size - pos + 1);
+		while len > 0 and pos + len <= size do
+			local byte = strbyte(body, pos + len);
+			if byte < 128 or byte >= 192 then
+				break;
+			end
+			len = len - 1;
+		end
+		if len == 0 then
+			len = math.min(chunkSize, size - pos + 1);
+		end
+		tinsert(parts, strsub(body, pos, pos + len - 1));
+		pos = pos + len;
+	end
+
+	local total = getn(parts);
 	if total > COMM_MAXCHUNKS then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff5555Comm:|r payload too large, dropped (opcode " .. tostring(opcode) .. ")");
 		return;
 	end
 
 	for i = 1, total do
-		local part = strsub(body, (i - 1) * chunkSize + 1, i * chunkSize);
-		SendServerMessage(COMM_PREFIX, "C", opcode, i, total, part);
+		SendServerMessage(COMM_PREFIX, "C", opcode, i, total, parts[i]);
 	end
 end
 

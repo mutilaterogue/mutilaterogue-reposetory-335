@@ -13,6 +13,7 @@
  * (the first tank leads), its raid difficulty set, everybody teleported to the raid's entrance.
  * A decline or a timeout: that player is out of the queue, the others are back in at their old place.
  * Saved to that raid (this difficulty), below the level / item level, in a group: cannot join.
+ * Leaving the raid group (or its disband) inside the raid: back to where the player queued (retail).
  *
  * AddonComm (client: GroupFinder\RaidFinder.lua):
  *  C->S "RF_LIST"                      -> S->C "RF_LIST" : id;name;mapId;difficulty;size;minLevel;minItemLevel;saved,...
@@ -112,6 +113,15 @@ namespace
     std::map<ObjectGuid, Queued> s_queue;
     std::map<uint32, Proposal> s_proposals;
     uint32 s_nextProposal = 1;
+
+    // where the raid finder took a player from: back there when he leaves its raid group (retail)
+    struct Return
+    {
+        uint32 RaidMapId = 0;
+        WorldLocation Pos;
+    };
+    std::map<ObjectGuid, Return> s_returns;
+    std::vector<ObjectGuid> s_pendingReturn;   // left the group: teleported on the next world update
 
     std::string Sanitize(std::string text)
     {
@@ -353,6 +363,9 @@ namespace
         for (Player* player : players)
         {
             player->SetRaidDifficultyID(Difficulty(raid->Difficulty));
+            Return& back = s_returns[player->GetGUID()];
+            back.RaidMapId = raid->MapId;
+            back.Pos.WorldRelocate(*player);
             Result(player, "Рейд собран: " + raid->Name + ".");
             SendStatus(player);
             TeleportToRaid(player, *raid);
@@ -390,6 +403,25 @@ namespace
             return count == 0;
         };
         return take(ROLE_TANK, raid.Tanks) && take(ROLE_HEALER, raid.Healers) && take(ROLE_DAMAGE, raid.Damage);
+    }
+
+    // out of the raid finder's group: back to where he queued, if still in that raid
+    void UpdateReturns()
+    {
+        for (ObjectGuid const& guid : s_pendingReturn)
+        {
+            auto itr = s_returns.find(guid);
+            if (itr == s_returns.end())
+                continue;
+            Return back = itr->second;
+            s_returns.erase(itr);
+            Player* player = ObjectAccessor::FindConnectedPlayer(guid);
+            if (!player || !player->IsInWorld() || player->GetGroup() || player->GetMapId() != back.RaidMapId)
+                continue;
+            Result(player, "Вы покинули рейд.");
+            player->TeleportTo(back.Pos);
+        }
+        s_pendingReturn.clear();
     }
 
     void UpdateQueues()
@@ -543,6 +575,8 @@ public:
 
     void OnUpdate(uint32 diff) override
     {
+        if (!s_pendingReturn.empty())
+            UpdateReturns();
         timer += diff;
         if (timer < UPDATE_INTERVAL)
             return;
@@ -579,6 +613,26 @@ public:
             }
         }
         LeaveQueue(player->GetGUID(), false);
+    }
+};
+
+class raid_finder_group : public GroupScript
+{
+public:
+    raid_finder_group() : GroupScript("raid_finder_group") {}
+
+    void OnRemoveMember(Group* /*group*/, ObjectGuid guid, RemoveMethod /*method*/, ObjectGuid /*kicker*/, char const* /*reason*/) override
+    {
+        if (s_returns.count(guid))
+            s_pendingReturn.push_back(guid);
+    }
+
+    void OnDisband(Group* group) override
+    {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->GetSource())
+                if (s_returns.count(member->GetGUID()))
+                    s_pendingReturn.push_back(member->GetGUID());
     }
 };
 
@@ -628,5 +682,6 @@ void AddSC_raid_finder()
 {
     new raid_finder_world();
     new raid_finder_player();
+    new raid_finder_group();
     new raid_finder_commands();
 }
