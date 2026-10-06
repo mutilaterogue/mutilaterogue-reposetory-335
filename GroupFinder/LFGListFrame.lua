@@ -636,13 +636,6 @@ function LFGListFrame_OnLoad(self)
 	creation.Name:SetScript("OnTabPressed", function() creation.Description:SetFocus(); end);
 	creation.Description:SetScript("OnTabPressed", function() creation.Name:SetFocus(); end);
 
-	local dialog = LFGListApplicationDialog;
-	for role, key in pairs({ [ROLE_TANK] = "Tank", [ROLE_HEALER] = "Healer", [ROLE_DAMAGE] = "Damager" }) do
-		dialog[key].role = role;
-		dialog[key].roleName = role == ROLE_TANK and (TANK or "Танк") or role == ROLE_HEALER and (HEALER or "Лекарь") or (DAMAGER or "Боец");
-		dialog[key].Icon:SetAtlas(ROLE_ATLAS[role]);
-	end
-	dialog.Description.Instructions:SetText("Комментарий (необязательно)");
 
 	LFGList_RegisterCallback(OnLFGListEvent);
 	self:RegisterEvent("PARTY_MEMBERS_CHANGED");
@@ -661,6 +654,18 @@ function LFGListFrame_OnLoad(self)
 			LFGListEntryCreation_UpdateValidState();
 		end
 	end);
+end
+
+-- the sign up dialog is made after LFGListFrame (LFGListFrame.xml): its own OnLoad
+function LFGListApplicationDialog_OnLoad(self)
+	tinsert(UISpecialFrames, self:GetName());
+	local dialog = self;
+	for role, key in pairs({ [ROLE_TANK] = "Tank", [ROLE_HEALER] = "Healer", [ROLE_DAMAGE] = "Damager" }) do
+		dialog[key].role = role;
+		dialog[key].roleName = role == ROLE_TANK and (TANK or "Танк") or role == ROLE_HEALER and (HEALER or "Лекарь") or (DAMAGER or "Боец");
+		dialog[key].Icon:SetAtlas(ROLE_ATLAS[role]);
+	end
+	dialog.Description.Instructions:SetText("Комментарий (необязательно)");
 end
 
 function LFGListFrame_OnShow(self)

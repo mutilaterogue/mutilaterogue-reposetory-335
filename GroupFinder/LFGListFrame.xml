@@ -697,9 +697,7 @@
 			</Button>
 		</Frames>
 		<Scripts>
-			<OnLoad>
-				tinsert(UISpecialFrames, self:GetName());
-			</OnLoad>
+			<OnLoad function="LFGListApplicationDialog_OnLoad"/>
 		</Scripts>
 	</Frame>
 </Ui>
