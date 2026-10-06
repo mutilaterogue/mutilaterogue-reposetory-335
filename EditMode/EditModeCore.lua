@@ -833,7 +833,7 @@ function EditModeManagerMixin:OnLoad()
 	-- макет
 	self.LayoutLabel = self.Content:CreateFontString(nil, "ARTWORK", "GameFontNormal");
 	self.LayoutLabel:SetPoint("TOPLEFT", self, "TOPLEFT", 20, -48);
-	self.LayoutLabel:SetText(L.LAYOUT .. ":");
+	self.LayoutLabel:SetText((L.LAYOUT:gsub(":$", "")) .. ":");
 
 	self.LayoutDropdown = CreateFrame("Frame", "EditModeManagerFrameLayoutDropdown", self, "UIDropDownMenuTemplate");
 	self.LayoutDropdown:SetPoint("LEFT", self.LayoutLabel, "RIGHT", -8, -2);
