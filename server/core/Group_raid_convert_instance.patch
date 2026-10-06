@@ -4,6 +4,9 @@ Apply by hand (context from your tree: Handlers/GroupHandler.cpp).
 
 --- a/src/server/game/Handlers/GroupHandler.cpp
 +++ b/src/server/game/Handlers/GroupHandler.cpp
+@@ the includes at the top (Map is only forward-declared there: "incomplete type Map" without it)
++#include "Map.h"
+
 @@ void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket & /*recvData*/)
      if (_player->InBattleground())
          return;
