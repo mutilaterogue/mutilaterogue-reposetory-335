@@ -276,7 +276,8 @@ end
 ---------------------------------------------------------------------------
 -- comm
 ---------------------------------------------------------------------------
-if Comm_Register then
+-- registered at login: this file may load before Server.lua (Comm_Register) in FrameXML.toc
+local function RegisterComm()
 	Comm_Register("RF_LIST", function(list)
 		wipe(raids);
 		if list and list ~= "-" then
@@ -339,8 +340,13 @@ if Comm_Register then
 	end);
 end
 
-if Comm_OnLogin then
-	Comm_OnLogin(function()
-		Send("RF_STATUS");
-	end);
-end
+local commFrame = CreateFrame("Frame");
+commFrame:RegisterEvent("PLAYER_LOGIN");
+commFrame:SetScript("OnEvent", function(self)
+	self:UnregisterAllEvents();
+	if Comm_Register then
+		RegisterComm();
+	end
+	Send("RF_LIST");
+	Send("RF_STATUS");
+end);
