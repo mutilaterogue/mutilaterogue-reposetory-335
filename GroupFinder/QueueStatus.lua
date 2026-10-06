@@ -339,6 +339,21 @@ local function ShowStatus()
 	end
 end
 
+-- the retail tooltip look (TooltipBackdropTemplate: NineSlice TooltipDefaultLayout, Tooltip-NineSlice-* atlases)
+-- straight on the frame - SharedTooltipTemplates is not loaded on 3.3.5 yet
+local function ApplyTooltipBorder()
+	local frame = QueueStatusFrame;
+	if frame.tooltipBorder or not (NineSliceUtil and NineSliceUtil.ApplyLayoutByName) then
+		return;
+	end
+	frame.tooltipBorder = true;
+	NineSliceUtil.ApplyLayoutByName(frame, "TooltipDefaultLayout");
+	local background = TOOLTIP_DEFAULT_BACKGROUND_COLOR or { r = 0.09, g = 0.09, b = 0.19 };
+	if frame.Center then
+		frame.Center:SetVertexColor(background.r, background.g, background.b, 1);
+	end
+end
+
 local function HideStatus()
 	QueueStatusFrame:Hide();
 end
@@ -457,6 +472,7 @@ function QueueStatusButton_OnLoad(self)
 	self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
 	self:RegisterEvent("PLAYER_LOGIN");
 	self:SetScript("OnEvent", function(frame, event)
+		ApplyTooltipBorder();
 		PlaceButton();
 		AdoptStockEye();
 		QueueStatus_Update();

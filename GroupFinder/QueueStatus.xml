@@ -143,8 +143,8 @@
 		</Frames>
 	</Frame>
 
-	<!-- retail QueueStatusFrame: every queue on mouse over of the eye -->
-	<Frame name="QueueStatusFrame" parent="UIParent" frameStrata="TOOLTIP" hidden="true" clampedToScreen="true" inherits="TooltipBackdropTemplate">
+	<!-- retail QueueStatusFrame: every queue on mouse over of the eye; its tooltip border (TooltipDefaultLayout) in QueueStatus.lua -->
+	<Frame name="QueueStatusFrame" parent="UIParent" frameStrata="TOOLTIP" hidden="true" clampedToScreen="true">
 		<Size x="275" y="150"/>
 		<Anchors>
 			<Anchor point="BOTTOMRIGHT" relativeTo="QueueStatusButton" relativePoint="TOPLEFT" x="0" y="0"/>
