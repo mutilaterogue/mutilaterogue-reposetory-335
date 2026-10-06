@@ -621,14 +621,21 @@ class raid_finder_group : public GroupScript
 public:
     raid_finder_group() : GroupScript("raid_finder_group") {}
 
-    void OnRemoveMember(Group* /*group*/, ObjectGuid guid, RemoveMethod /*method*/, ObjectGuid /*kicker*/, char const* /*reason*/) override
+    // only a real leave or kick sends him back: the core also removes members on its own (a group of one
+    // is broken up), and that must not throw a player out of the raid he was just moved into
+    void OnRemoveMember(Group* /*group*/, ObjectGuid guid, RemoveMethod method, ObjectGuid /*kicker*/, char const* /*reason*/) override
     {
+        if (method != GROUP_REMOVEMETHOD_LEAVE && method != GROUP_REMOVEMETHOD_KICK)
+            return;
         if (s_returns.count(guid))
             s_pendingReturn.push_back(guid);
     }
 
     void OnDisband(Group* group) override
     {
+        // a raid of one (testing with tanks = healers = 0, damage = 1) is disbanded by the core: he stays
+        if (group->GetMembersCount() <= 1)
+            return;
         for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
             if (Player* member = ref->GetSource())
                 if (s_returns.count(member->GetGUID()))
