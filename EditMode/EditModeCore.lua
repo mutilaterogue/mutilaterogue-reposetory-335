@@ -10,6 +10,8 @@
 -- доп. настройка: { key = "alpha", type = "slider", label = "...", min, max, step, default,
 --                   format = function(v) end, apply = function(frame, v) end }
 --             или { key = "x", type = "check", label = "...", default = 0/1, apply = ... }
+--             или { key = "x", type = "dropdown", label = "...", options = { { value, text }, ... }, default, apply = ... }
+-- options (5th argument): { category = "frames" / "combat" / "misc" (the list in the window), noScale = true }
 
 EDIT_MODE_GRID_SPACING = 32;
 EDIT_MODE_SNAP_DISTANCE = 12;
@@ -20,7 +22,11 @@ local L = {
 	SHOW_GRID = HUD_EDIT_MODE_SHOW_GRID or "Сетка",
 	GRID_SPACING = HUD_EDIT_MODE_GRID_SPACING or "Шаг сетки",
 	ENABLE_SNAP = HUD_EDIT_MODE_ENABLE_SNAP or "Привязка элементов",
-	FRAMES = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_FRAMES or "Фреймы",
+	FRAMES = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_FRAMES or "Рамки интерфейса",
+	COMBAT = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_COMBAT or "Бой",
+	MISC = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_MISC or "Разное",
+	EXPAND = HUD_EDIT_MODE_EXPAND_OPTIONS or "Развернуть список",
+	COLLAPSE = HUD_EDIT_MODE_COLLAPSE_OPTIONS or "Свернуть список",
 	REVERT_ALL = HUD_EDIT_MODE_REVERT_ALL_CHANGES or "Отменить все изменения",
 	SAVE = HUD_EDIT_MODE_SAVE_LAYOUT or "Сохранить",
 	RESET_POSITION = HUD_EDIT_MODE_RESET_POSITION or "Сбросить позицию",
@@ -313,10 +319,11 @@ end
 ---------------------------------------------------------------------------
 -- системы
 ---------------------------------------------------------------------------
-function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettings)
+function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettings, options)
 	if not frame or self.systems[systemName] then
 		return;
 	end
+	options = options or {};
 
 	-- исходная позиция и размер - для "Сбросить позицию" и макетов без записи об этом фрейме
 	local defaultPoints = {};
@@ -325,8 +332,10 @@ function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettin
 	end
 
 	local settings = {};
-	for _, setting in ipairs(COMMON_SETTINGS) do
-		table.insert(settings, setting);
+	if not options.noScale then
+		for _, setting in ipairs(COMMON_SETTINGS) do
+			table.insert(settings, setting);
+		end
 	end
 	for _, setting in ipairs(extraSettings or {}) do
 		table.insert(settings, setting);
@@ -336,6 +345,7 @@ function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettin
 		name = systemName,
 		frame = frame,
 		displayName = displayName or systemName,
+		category = options.category or "frames",
 		settings = settings,
 		defaultPoints = defaultPoints,
 		defaultScale = frame:GetScale(),
@@ -351,6 +361,12 @@ end
 
 function EditModeCore:GetSystem(systemName)
 	return self.systems[systemName];
+end
+
+-- the active layout places this frame (its own code must not move it then)
+function EditModeCore:HasPosition(systemName)
+	local entry = self.systems[systemName] and GetLayoutEntry(systemName, false);
+	return entry and entry.x and entry.y and true or false;
 end
 
 function EditModeCore:GetSettingValue(systemName, setting)
@@ -425,16 +441,20 @@ function EditModeCore:ApplyLayoutToSystem(systemName)
 	local entry = GetLayoutEntry(systemName, false);
 	RestoreDefaultPosition(system);
 
-	if not entry then
-		return;
-	end
-
-	-- сначала настройки (размер влияет на координаты), потом позиция
+	-- сначала настройки (размер влияет на координаты), потом позиция; the settings without a saved value get
+	-- their default (a reset or another layout puts a bar's buttons back), the size stays as the frame has it
 	for _, setting in ipairs(system.settings) do
-		local value = entry.settings[setting.key];
+		local value = entry and entry.settings[setting.key];
+		if value == nil and setting.key ~= "scale" then
+			value = setting.default;
+		end
 		if value ~= nil and setting.apply then
 			setting.apply(system.frame, value);
 		end
+	end
+
+	if not entry then
+		return;
 	end
 
 	if entry.x and entry.y then
@@ -810,6 +830,54 @@ local function CreateContent(dialog)
 	return content;
 end
 
+-- a dropdown: the label left, the choice right (retail EditModeSettingDropdown)
+local function CreateDropdown(parent, label, options, onChange)
+	local holder = CreateFrame("Frame", nil, parent);
+	holder:SetHeight(32);
+
+	holder.Label = holder:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
+	holder.Label:SetPoint("LEFT", holder, "LEFT", 0, 0);
+	holder.Label:SetWidth(110);
+	holder.Label:SetJustifyH("LEFT");
+	holder.Label:SetText(label);
+
+	local dropdown = CreateFrame("Frame", NextName("EditModeDropdown"), holder, "UIDropDownMenuTemplate");
+	dropdown:SetPoint("LEFT", holder.Label, "RIGHT", -12, -2);
+	UIDropDownMenu_SetWidth(dropdown, 150);
+	holder.Dropdown = dropdown;
+
+	local function TextOf(value)
+		for _, option in ipairs(options) do
+			if option[1] == value then
+				return option[2];
+			end
+		end
+		return "";
+	end
+
+	UIDropDownMenu_Initialize(dropdown, function(_, level)
+		for _, option in ipairs(options) do
+			local info = UIDropDownMenu_CreateInfo();
+			info.text = option[2];
+			info.value = option[1];
+			info.checked = holder.value == option[1];
+			info.func = function(button)
+				holder.value = button.value;
+				UIDropDownMenu_SetText(dropdown, TextOf(button.value));
+				onChange(button.value);
+			end;
+			UIDropDownMenu_AddButton(info, level);
+		end
+	end);
+
+	holder.SetValueSilently = function(_, value)
+		holder.value = value;
+		UIDropDownMenu_SetText(dropdown, TextOf(value));
+	end
+
+	return holder;
+end
+
 ---------------------------------------------------------------------------
 -- окно режима
 ---------------------------------------------------------------------------
@@ -866,6 +934,7 @@ function EditModeManagerMixin:OnLoad()
 	self.FramesLabel = self.Content:CreateFontString(nil, "ARTWORK", "GameFontNormal");
 	self.FramesLabel:SetPoint("TOPLEFT", self.GridSlider, "BOTTOMLEFT", -6, -10);
 	self.FramesLabel:SetText(L.FRAMES);
+	self.framesTop = 152;		-- the label's distance from the window's top (the layout, grid and snap rows above it)
 
 	self.frameChecks = {};
 
@@ -920,38 +989,94 @@ function EditModeManagerMixin:InitLayoutDropdown(level)
 	end, #info.layouts <= 1);
 end
 
+-- the frames by the retail categories: "Frames" always, "Combat" and "Misc" under "Expand list"
+local CATEGORIES = { { key = "frames", label = L.FRAMES }, { key = "combat", label = L.COMBAT }, { key = "misc", label = L.MISC } };
+
+local function PlainText(text)
+	-- the retail strings carry |A:atlas|a arrows the 3.3.5 client does not draw
+	return (text:gsub("%s*|A.-|a", ""));
+end
+
 function EditModeManagerMixin:RefreshFrameList()
-	local previous = self.FramesLabel;
-	local column, row = 0, 0;
-
-	for index, systemName in ipairs(EditModeCore.order) do
-		local system = EditModeCore.systems[systemName];
-		local check = self.frameChecks[index];
-		if not check then
-			check = CreateCheck(self, "", function(button)
-				SetAccountSetting("hide:" .. button.systemName, (not button:GetChecked()) and 1 or 0);
-				if not button:GetChecked() and EditModeCore.selected == button.systemName then
-					EditModeCore:ClearSelection();
-				end
-				EditModeCore:UpdateOverlays();
-			end);
-			self.frameChecks[index] = check;
-		end
-		check.systemName = systemName;
-		check.text:SetText(system.displayName);
-		check.text:SetWidth(160);
-		check.text:SetJustifyH("LEFT");
-
-		check:ClearAllPoints();
-		check:SetPoint("TOPLEFT", self.FramesLabel, "BOTTOMLEFT", column * 190, -4 - row * 24);
-		column = column + 1;
-		if column == 2 then
-			column, row = 0, row + 1;
-		end
+	local expanded = GetAccountSetting("expandedList") == 1;
+	self.categoryLabels = self.categoryLabels or {};
+	if not self.ExpandButton then
+		self.ExpandButton = CreateButton(self, "", 180, function()
+			SetAccountSetting("expandedList", GetAccountSetting("expandedList") == 1 and 0 or 1);
+			self:Refresh();
+		end);
 	end
 
-	local rows = math.ceil(#EditModeCore.order / 2);
-	self:SetHeight(212 + rows * 24);
+	local checkIndex = 0;
+	local y = 0;            -- down from FramesLabel's top
+	for categoryIndex, category in ipairs(CATEGORIES) do
+		local shown = categoryIndex == 1 or expanded;
+		local label = categoryIndex == 1 and self.FramesLabel or self.categoryLabels[category.key];
+		if not label then
+			label = self.Content:CreateFontString(nil, "ARTWORK", "GameFontNormal");
+			label:SetText(category.label);
+			self.categoryLabels[category.key] = label;
+		end
+
+		local names = {};
+		for _, systemName in ipairs(EditModeCore.order) do
+			if EditModeCore.systems[systemName].category == category.key then
+				table.insert(names, systemName);
+			end
+		end
+
+		if shown and #names > 0 then
+			if categoryIndex > 1 then
+				label:ClearAllPoints();
+				label:SetPoint("TOPLEFT", self.FramesLabel, "TOPLEFT", 0, -y);
+				y = y + 18;
+			else
+				y = y + 18;
+			end
+			label:Show();
+			for index, systemName in ipairs(names) do
+				checkIndex = checkIndex + 1;
+				local check = self.frameChecks[checkIndex];
+				if not check then
+					check = CreateCheck(self, "", function(button)
+						SetAccountSetting("hide:" .. button.systemName, (not button:GetChecked()) and 1 or 0);
+						if not button:GetChecked() and EditModeCore.selected == button.systemName then
+							EditModeCore:ClearSelection();
+						end
+						EditModeCore:UpdateOverlays();
+					end);
+					self.frameChecks[checkIndex] = check;
+				end
+				check.systemName = systemName;
+				check.text:SetText(EditModeCore.systems[systemName].displayName);
+				check.text:SetWidth(160);
+				check.text:SetJustifyH("LEFT");
+				check:ClearAllPoints();
+				local column = (index - 1) % 2;
+				check:SetPoint("TOPLEFT", self.FramesLabel, "TOPLEFT", column * 213, -y);
+				check:Show();
+				if column == 1 or index == #names then
+					y = y + 24;
+				end
+			end
+			y = y + 6;
+		elseif categoryIndex > 1 then
+			label:Hide();
+		end
+
+		-- "Expand list" under the frames
+		if categoryIndex == 1 then
+			self.ExpandButton:SetText(PlainText(expanded and L.COLLAPSE or L.EXPAND));
+			self.ExpandButton:ClearAllPoints();
+			self.ExpandButton:SetPoint("TOP", self, "TOP", 0, -(self.framesTop + y));
+			y = y + 28;
+		end
+	end
+	for i = checkIndex + 1, #self.frameChecks do
+		self.frameChecks[i]:Hide();
+	end
+
+	self:SetHeight(self.framesTop + y + 46);
 end
 
 function EditModeManagerMixin:Refresh()
@@ -1056,6 +1181,14 @@ function EditModeSystemSettingsDialogMixin:BuildControls(system)
 			end);
 			control.Refresh = function()
 				control:SetChecked(EditModeCore:GetSettingValue(system.name, setting) == 1);
+			end
+		elseif setting.type == "dropdown" then
+			control = CreateDropdown(self, setting.label, setting.options, function(value)
+				EditModeCore:SetSettingValue(system.name, setting.key, value);
+			end);
+			control:SetWidth(300);
+			control.Refresh = function()
+				control:SetValueSilently(EditModeCore:GetSettingValue(system.name, setting));
 			end
 		else
 			control = CreateSlider(self, setting.label, setting.min, setting.max, setting.step, setting.format or tostring, function(value)
