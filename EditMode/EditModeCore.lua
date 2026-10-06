@@ -873,7 +873,9 @@ local function CreateSlider(parent, label, minValue, maxValue, step, format, onC
 end
 
 local function CreateButton(parent, text, width, onClick)
-	local button = CreateFrame("Button", NextName("EditModeButton"), parent, "UIPanelButtonTemplate");
+	-- the retail red three-slice button (ThreeSliceButton.xml), the stock one if that file is not loaded
+	local template = ThreeSliceButtonMixin and "UIPanelButtonRetailTemplate" or "UIPanelButtonTemplate";
+	local button = CreateFrame("Button", NextName("EditModeButton"), parent, template);
 	button:SetWidth(width);
 	button:SetHeight(22);
 	button:SetText(text);
