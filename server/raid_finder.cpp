@@ -644,8 +644,11 @@ public:
 
     // only a real leave or kick sends him back: the core also removes members on its own (a group of one
     // is broken up), and that must not throw a player out of the raid he was just moved into
-    void OnRemoveMember(Group* /*group*/, ObjectGuid guid, RemoveMethod method, ObjectGuid /*kicker*/, char const* /*reason*/) override
+    void OnRemoveMember(Group* group, ObjectGuid guid, RemoveMethod method, ObjectGuid /*kicker*/, char const* /*reason*/) override
     {
+        if (s_returns.count(guid))
+            TC_LOG_INFO("scripts", "raid_finder: {} removed from group {} (method {}, members {}, solo allowed {})",
+                guid.ToString(), group->GetGUID().ToString(), uint32(method), group->GetMembersCount(), group->IsSoloAllowed());
         if (method != GROUP_REMOVEMETHOD_LEAVE && method != GROUP_REMOVEMETHOD_KICK)
             return;
         if (s_returns.count(guid))
@@ -654,6 +657,11 @@ public:
 
     void OnDisband(Group* group) override
     {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->GetSource())
+                if (s_returns.count(member->GetGUID()))
+                    TC_LOG_INFO("scripts", "raid_finder: group {} of {} disbanded (members {})",
+                        group->GetGUID().ToString(), member->GetName(), group->GetMembersCount());
         // a raid of one (testing with tanks = healers = 0, damage = 1) is disbanded by the core: he stays
         if (group->GetMembersCount() <= 1)
             return;
