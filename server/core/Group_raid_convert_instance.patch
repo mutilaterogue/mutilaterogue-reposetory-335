@@ -1,0 +1,17 @@
+No "convert to raid" inside a dungeon (a Mythic+ key run included): retail does not let a party become a raid there.
+The client menu (PlayerFrame\PlayerFrameMenu.lua) hides the button inside; this refuses it on the server too.
+Apply by hand (context from your tree: Handlers/GroupHandler.cpp).
+
+--- a/src/server/game/Handlers/GroupHandler.cpp
++++ b/src/server/game/Handlers/GroupHandler.cpp
+@@ void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket & /*recvData*/)
+     if (_player->InBattleground())
+         return;
+ 
++    // custom: not inside a dungeon or a raid instance
++    if (_player->GetMap()->IsDungeon())
++        return;
++
+     // error handling
+     if (!group->IsLeader(GetPlayer()->GetGUID()) || group->GetMembersCount() < 2)
+         return;

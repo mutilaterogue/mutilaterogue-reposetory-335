@@ -1,6 +1,6 @@
 /*
  * Raid -> party for the client (3.3.5 has no ConvertToParty).
- * AddonComm: C->S "GROUP_TO_PARTY" - the leader of a raid of up to 5 members.
+ * AddonComm: C->S "GROUP_TO_PARTY" - the leader of a raid of up to 5 members, not the raid finder's raid.
  * Needs core/Group_convert_to_party.patch (Group::ConvertToParty). AddSC_group_convert() in custom_script_loader.cpp.
  */
 
@@ -17,6 +17,9 @@ namespace
         if (!group || !group->isRaidGroup() || group->isBGGroup() || !group->IsLeader(player->GetGUID()))
             return;
         if (group->GetMembersCount() > MAX_GROUP_SIZE)
+            return;
+        // the raid finder's raid stays a raid (core/Group_solo.patch)
+        if (group->IsSoloAllowed())
             return;
         group->ConvertToParty();
     }

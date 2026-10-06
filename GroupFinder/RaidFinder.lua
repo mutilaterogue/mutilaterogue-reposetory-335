@@ -53,6 +53,15 @@ local function FormatTime(seconds)
 	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60);
 end
 
+-- for the player frame menu (PlayerFrameMenu.lua): in the raid finder's raid / leave it
+function RaidFinder_IsInRaid()
+	return status.state == STATE_IN_RAID;
+end
+
+function RaidFinder_LeaveRaid()
+	Send("RF_LEAVE_RAID");
+end
+
 ---------------------------------------------------------------------------
 -- the frame
 ---------------------------------------------------------------------------

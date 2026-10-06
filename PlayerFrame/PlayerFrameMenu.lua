@@ -38,6 +38,16 @@ local function IsLeader()
 	return IsRaidLeader() or IsPartyLeader();
 end
 
+local function InInstance()
+	local _, instanceType = IsInInstance();
+	return instanceType == "party" or instanceType == "raid";
+end
+
+-- the raid finder's raid (GroupFinder\RaidFinder.lua): it stays a raid, and the client's leave does not reach it
+local function InRaidFinder()
+	return RaidFinder_IsInRaid and RaidFinder_IsInRaid();
+end
+
 local function CanChangeDifficulty()
 	return not InGroup() or IsLeader();
 end
@@ -109,15 +119,23 @@ local function AddGroupSection(root)
 
 	if IsLeader() then
 		if inRaid then
-			if GetNumRaidMembers() <= MEMBERS_PER_RAID_GROUP then
+			-- not the raid finder's raid
+			if GetNumRaidMembers() <= MEMBERS_PER_RAID_GROUP and not InRaidFinder() then
 				root:CreateButton(L.CONVERT_TO_PARTY, function() ConvertToParty(); end);
 			end
-		else
+		elseif not InInstance() then
+			-- not inside a dungeon (a Mythic+ key run included): the server refuses it there too
 			root:CreateButton(L.CONVERT_TO_RAID, function() ConvertToRaid(); end);
 		end
 	end
 
-	root:CreateButton(PARTY_LEAVE, function() LeaveParty(); end);
+	root:CreateButton(PARTY_LEAVE, function()
+		if InRaidFinder() then
+			RaidFinder_LeaveRaid();
+		else
+			LeaveParty();
+		end
+	end);
 end
 
 local function AddInstanceSection(root)
