@@ -294,9 +294,7 @@ function RaidFinderFrame_OnShow(self)
 		frame.elapsed = frame.elapsed + elapsed;
 		if frame.elapsed >= 1 then
 			frame.elapsed = 0;
-			if (status.state == STATE_QUEUED or status.state == STATE_PROPOSAL) and GameTooltip:IsOwned(RaidFinderMinimapButton) then
-				RaidFinderMinimapButton_OnEnter(RaidFinderMinimapButton);
-			end
+			-- (the queue's own timer is at the queue status button)
 		end
 	end);
 end
@@ -420,66 +418,43 @@ local function ShowRoleCheck()
 end
 
 ---------------------------------------------------------------------------
--- the minimap button: the queue at a glance (RaidFinder.xml)
+-- for the queue status button (QueueStatus.lua): the raid finder's queue
 ---------------------------------------------------------------------------
-local function UpdateMinimapButton()
-	local button = RaidFinderMinimapButton;
-	if not button then
-		return;
-	end
-	local shown = status.state == STATE_QUEUED or status.state == STATE_PROPOSAL or status.state == STATE_ROLE_CHECK;
-	if shown then
-		-- next to the stock dungeon finder's eye when that one is shown too
-		button:ClearAllPoints();
-		if MiniMapLFGFrame and MiniMapLFGFrame:IsShown() then
-			button:SetPoint("RIGHT", MiniMapLFGFrame, "LEFT", 4, 0);
-		else
-			button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 25, -100);
-		end
-		button:Show();
-		if status.state == STATE_QUEUED then
-			EyeTemplate_StartAnimating(button.eye);
-		else
-			EyeTemplate_StopAnimating(button.eye);
-		end
-	else
-		EyeTemplate_StopAnimating(button.eye);
-		button:Hide();
-	end
-end
-
-function RaidFinderMinimapButton_OnEnter(self)
-	GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-	local raid = FindRaid(status.raidId);
-	GameTooltip:SetText("Поиск рейда", 1, 1, 1);
-	if raid then
-		GameTooltip:AddLine(raid.name);
-	end
-	if status.state == STATE_ROLE_CHECK then
-		GameTooltip:AddLine("Проверка ролей", 1, 0.82, 0);
+-- nil when not queued; else { state = "queued" / "proposal" / "rolecheck", name, seconds, roles,
+-- tanks, healers, damage, tanksNeeded, healersNeeded, damageNeeded }
+function RaidFinder_GetQueueInfo()
+	local state;
+	if status.state == STATE_QUEUED then
+		state = "queued";
 	elseif status.state == STATE_PROPOSAL then
-		GameTooltip:AddLine("Рейд собран: подтвердите готовность", 0, 1, 0);
+		state = "proposal";
+	elseif status.state == STATE_ROLE_CHECK then
+		state = "rolecheck";
 	else
-		local elapsed = status.seconds + (statusTime and (GetTime() - statusTime) or 0);
-		GameTooltip:AddLine("Время в очереди: " .. FormatTime(elapsed), 1, 1, 1);
-		GameTooltip:AddLine(string.format("Танки: %d / %d", status.tanks, status.tanksNeeded), 1, 1, 1);
-		GameTooltip:AddLine(string.format("Лекари: %d / %d", status.healers, status.healersNeeded), 1, 1, 1);
-		GameTooltip:AddLine(string.format("Бойцы: %d / %d", status.damage, status.damageNeeded), 1, 1, 1);
-		GameTooltip:AddLine("Ваши роли: " .. RolesText(status.roles), 0.5, 0.5, 0.5);
+		return nil;
 	end
-	GameTooltip:AddLine("ЛКМ: открыть, ПКМ: покинуть очередь", 0.5, 0.5, 0.5);
-	GameTooltip:Show();
+	local raid = FindRaid(status.raidId);
+	return {
+		state = state, name = raid and raid.name or "",
+		seconds = status.seconds + (statusTime and (GetTime() - statusTime) or 0),
+		roles = status.roles,
+		tanks = status.tanks, healers = status.healers, damage = status.damage,
+		tanksNeeded = status.tanksNeeded, healersNeeded = status.healersNeeded, damageNeeded = status.damageNeeded,
+	};
 end
 
-function RaidFinderMinimapButton_OnClick(self, button)
-	if button == "RightButton" then
-		if status.state == STATE_ROLE_CHECK and status.roles == 0 then
-			AnswerRoleCheck(0);
-		else
-			Send("RF_LEAVE");
-		end
-	elseif PVEFrame_Open then
-		PVEFrame_Open(1, 2);
+-- right click on the queue status button: out of the queue (or decline the role check)
+function RaidFinder_LeaveQueue()
+	if status.state == STATE_ROLE_CHECK and status.roles == 0 then
+		AnswerRoleCheck(0);
+	else
+		Send("RF_LEAVE");
+	end
+end
+
+local function UpdateQueueStatus()
+	if QueueStatus_Update then
+		QueueStatus_Update();
 	end
 end
 
@@ -544,7 +519,7 @@ local function RegisterComm()
 			roleCheck = nil;
 			StaticPopup_Hide("RAID_FINDER_ROLE_CHECK");
 		end
-		UpdateMinimapButton();
+		UpdateQueueStatus();
 		Update();
 	end);
 

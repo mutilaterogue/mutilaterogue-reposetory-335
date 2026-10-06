@@ -158,39 +158,4 @@
 			<OnHide function="RaidFinderFrame_OnHide"/>
 		</Scripts>
 	</Frame>
-	<!-- the queue status at the minimap (as the stock dungeon finder's eye, MiniMapLFGFrame): queued, role check, proposal -->
-	<Button name="RaidFinderMinimapButton" parent="Minimap" inherits="MiniMapButtonTemplate" hidden="true" frameStrata="MEDIUM">
-		<Size x="33" y="33"/>
-		<Anchors>
-			<Anchor point="TOPLEFT" x="25" y="-100"/>
-		</Anchors>
-		<Layers>
-			<Layer level="OVERLAY">
-				<Texture name="$parentBorder" file="Interface\Minimap\MiniMap-TrackingBorder">
-					<Size x="52" y="52"/>
-					<Anchors>
-						<Anchor point="TOPLEFT" x="1" y="-1"/>
-					</Anchors>
-				</Texture>
-			</Layer>
-		</Layers>
-		<Frames>
-			<Frame name="$parentIcon" parentKey="eye" inherits="EyeTemplate" hidden="false">
-				<Size x="30" y="30"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" x="2" y="-2"/>
-				</Anchors>
-			</Frame>
-		</Frames>
-		<HighlightTexture alphaMode="ADD" file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight"/>
-		<Scripts>
-			<OnLoad>
-				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-				self:SetFrameLevel(self:GetFrameLevel() + 1);
-			</OnLoad>
-			<OnClick function="RaidFinderMinimapButton_OnClick"/>
-			<OnEnter function="RaidFinderMinimapButton_OnEnter"/>
-			<OnLeave function="GameTooltip_Hide"/>
-		</Scripts>
-	</Button>
 </Ui>

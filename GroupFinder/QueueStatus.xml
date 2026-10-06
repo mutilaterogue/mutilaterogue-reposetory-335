@@ -1,0 +1,154 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!-- The retail queue status button (Blizzard_QueueStatusFrame: QueueStatusButton) - the eye left of the micro menu
+	     instead of the 3.3.5 eye at the minimap: one button for the dungeon finder (the stock MiniMapLFGFrame is moved
+	     onto it) and the raid finder (RaidFinder.lua). On mouse over the dungeon finder's LFDSearchStatus and the raid
+	     finder's RaidFinderSearchStatus (laid out as LFDSearchStatus) stand left of it. Included by PVEFrame.xml. -->
+	<Script file="QueueStatus.lua"/>
+
+	<Button name="QueueStatusButton" parent="UIParent" hidden="true" frameStrata="MEDIUM">
+		<Size x="45" y="45"/>
+		<Anchors>
+			<Anchor point="BOTTOMRIGHT" x="-300" y="4"/>  <!-- QueueStatus.lua: left of the micro menu -->
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Highlight" atlas="groupfinder-eye-highlight" alphaMode="ADD" hidden="true">
+					<Size x="96" y="96"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- the eye: groupfinder-eye-flipbook-* played frame by frame in QueueStatus.lua -->
+				<Texture parentKey="Eye">
+					<Size x="44" y="44"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Frame" atlas="groupfinder-eye-frame" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="QueueStatusButton_OnLoad"/>
+			<OnEnter function="QueueStatusButton_OnEnter"/>
+			<OnLeave function="QueueStatusButton_OnLeave"/>
+			<OnClick function="QueueStatusButton_OnClick"/>
+			<OnUpdate function="QueueStatusButton_OnUpdate"/>
+		</Scripts>
+	</Button>
+
+	<!-- a role of the raid finder's queue: the role icon, "queued / needed" under it -->
+	<Frame name="RaidFinderSearchStatusRoleTemplate" virtual="true">
+		<Size x="55" y="70"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentTexture" parentKey="texture" file="Interface\LFGFrame\UI-LFG-ICON-ROLES">
+					<Size x="55" y="55"/>
+					<Anchors>
+						<Anchor point="TOP"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentCount" parentKey="count" inherits="GameFontHighlight" justifyH="CENTER">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentTexture" relativePoint="BOTTOM" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<!-- not enough queued for this role yet: dimmed, as the dungeon finder's empty slots -->
+				<Texture parentKey="cover" file="Interface\LFGFrame\UI-LFG-ICON-ROLES" alpha="0.5" hidden="true">
+					<Size x="55" y="55"/>
+					<Anchors>
+						<Anchor point="TOP"/>
+					</Anchors>
+					<TexCoords left="0" right="0.2617" top="0.5234" bottom="0.7851"/>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- the raid finder's queue, laid out as LFDSearchStatus -->
+	<Frame name="RaidFinderSearchStatus" parent="UIParent" frameStrata="TOOLTIP" hidden="true">
+		<Size x="300" y="170"/>
+		<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+			<EdgeSize>
+				<AbsValue val="16"/>
+			</EdgeSize>
+			<TileSize>
+				<AbsValue val="16"/>
+			</TileSize>
+			<BackgroundInsets>
+				<AbsInset left="5" right="5" top="5" bottom="5"/>
+			</BackgroundInsets>
+		</Backdrop>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="$parentTitle" parentKey="title" inherits="GameFontHighlight">
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-15"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentElapsedWaitTime" parentKey="elapsedWait" inherits="GameFontNormal" justifyH="CENTER">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="38"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentLookingFor" parentKey="lookingFor" inherits="GameFontHighlight" justifyH="CENTER" text="SEARCHING_FOR_GROUPS_NEEDS">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="14"/>
+					</Anchors>
+				</FontString>
+				<Texture name="$parentRoleIcon1" inherits="LFDSearchStatusRoleIconTemplate">
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentLookingFor" relativePoint="RIGHT" x="2" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRoleIcon2" inherits="LFDSearchStatusRoleIconTemplate">
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentRoleIcon1" relativePoint="RIGHT" x="2" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRoleIcon3" inherits="LFDSearchStatusRoleIconTemplate">
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentRoleIcon2" relativePoint="RIGHT" x="2" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="$parentHealer" parentKey="Healer" inherits="RaidFinderSearchStatusRoleTemplate">
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-38"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentTank" parentKey="Tank" inherits="RaidFinderSearchStatusRoleTemplate">
+				<Anchors>
+					<Anchor point="RIGHT" relativeTo="$parentHealer" relativePoint="LEFT" x="-25" y="0"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentDamage" parentKey="Damage" inherits="RaidFinderSearchStatusRoleTemplate">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentHealer" relativePoint="RIGHT" x="25" y="0"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				self:SetBackdropBorderColor(TOOLTIP_DEFAULT_COLOR.r, TOOLTIP_DEFAULT_COLOR.g, TOOLTIP_DEFAULT_COLOR.b);
+				self:SetBackdropColor(TOOLTIP_DEFAULT_BACKGROUND_COLOR.r, TOOLTIP_DEFAULT_BACKGROUND_COLOR.g, TOOLTIP_DEFAULT_BACKGROUND_COLOR.b);
+				self.Tank.texture:SetTexCoord(GetTexCoordsForRole("TANK"));
+				self.Healer.texture:SetTexCoord(GetTexCoordsForRole("HEALER"));
+				self.Damage.texture:SetTexCoord(GetTexCoordsForRole("DAMAGER"));
+			</OnLoad>
+		</Scripts>
+	</Frame>
+</Ui>
