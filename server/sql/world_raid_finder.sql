@@ -25,3 +25,26 @@ INSERT INTO `raid_finder_dungeon` (`id`, `map_id`, `difficulty`, `name`, `tanks`
 (6, 649, 1, 'Испытание крестоносца', 2, 6, 17, 80, 213),
 (7, 631, 1, 'Цитадель Ледяной Короны', 2, 6, 17, 80, 232),
 (8, 724, 1, 'Рубиновое святилище', 2, 6, 17, 80, 245);
+
+-- Boss rewards: to every member of the raid finder's raid on the map when a boss dies (once per boss and instance).
+-- boss_entry 0 - every boss of the raid; money in copper; an item goes by mail when the bags are full.
+DROP TABLE IF EXISTS `raid_finder_reward`;
+CREATE TABLE `raid_finder_reward` (
+  `raid_id` INT UNSIGNED NOT NULL,
+  `boss_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 - every boss',
+  `money` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'copper',
+  `item_id` INT UNSIGNED NOT NULL DEFAULT 0,
+  `item_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`raid_id`, `boss_entry`, `item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- every boss: 50 gold and an emblem (47241 Emblem of Triumph, 49426 Emblem of Frost)
+INSERT INTO `raid_finder_reward` (`raid_id`, `boss_entry`, `money`, `item_id`, `item_count`) VALUES
+(1, 0, 500000, 47241, 1),
+(2, 0, 500000, 47241, 1),
+(3, 0, 500000, 47241, 1),
+(4, 0, 500000, 47241, 1),
+(5, 0, 500000, 47241, 1),
+(6, 0, 500000, 47241, 1),
+(7, 0, 500000, 49426, 1),
+(8, 0, 500000, 49426, 1);
