@@ -1,6 +1,6 @@
 -- The retail action bars and the other HUD frames in Edit Mode (EditMode\EditModeCore.lua):
 --   action bars 1-5 (MainActionBar, MultiBarBottomLeft / BottomRight / Right / Left), the stance bar, the pet bar,
---   the status bars (experience / reputation), the buffs, the pet frame and the boss frames.
+--   the status bars (experience / reputation), the pet frame and the boss frames (the buffs: EditMode\AuraFramesEditMode.lua).
 -- Bars 2-5 get the retail action bar settings (EditModeSettingDisplayInfo.lua): orientation, rows, number of icons,
 -- icon size, icon padding, when the bar is shown. Their own auto layout (MultiActionBarsRetail_Layout) leaves alone
 -- a bar the layout places (EditModeCore:HasPosition).
@@ -194,9 +194,6 @@ local function Register()
 	end
 	if StatusTrackingBarRetailManager then
 		EditModeCore:RegisterSystem("StatusTrackingBarRetailManager", StatusTrackingBarRetailManager, Label(HUD_EDIT_MODE_EXPERIENCE_BAR_LABEL, "Индикатор опыта"), nil, { category = "misc" });
-	end
-	if BuffFrame then
-		EditModeCore:RegisterSystem("BuffFrame", BuffFrame, Label(HUD_EDIT_MODE_BUFF_FRAME_LABEL, "Рамка эффекта+"), nil, { category = "combat" });
 	end
 	if PetFrame then
 		EditModeCore:RegisterSystem("PetFrame", PetFrame, Label(HUD_EDIT_MODE_PET_FRAME_LABEL, "Рамка питомца"));

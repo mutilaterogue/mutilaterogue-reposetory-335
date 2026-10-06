@@ -80,16 +80,32 @@ local function IsExpanded()
 	return GetCVar("expandBagBar") ~= "0";
 end
 
--- BagsBarMixin:Layout + the expand state
+-- BagsBarMixin:Layout + the expand state, by the Edit Mode bag settings (EditMode\FramesEditMode.lua):
+-- orientation 0 horizontal / 1 vertical, direction 0 left / 1 right (horizontal), 0 up / 1 down (vertical)
 function BagsBarRetail_Layout()
 	local expanded = IsExpanded();
+	local settings = BackpackFrame.editModeSettings or {};
+	local vertical = settings.orientation == 1;
+	local forward = settings.direction == 1;		-- right / down
+
+	-- the backpack at the end the bags grow away from, the arrow next to it, then the bags
+	local start, toward, back;
+	if vertical then
+		start = forward and "TOP" or "BOTTOM";
+		toward, back = forward and "TOP" or "BOTTOM", forward and "BOTTOM" or "TOP";
+	else
+		start = forward and "LEFT" or "RIGHT";
+		toward, back = forward and "LEFT" or "RIGHT", forward and "RIGHT" or "LEFT";
+	end
 	MainMenuBarBackpackButton:ClearAllPoints();
-	MainMenuBarBackpackButton:SetPoint("RIGHT", BackpackFrame, "RIGHT");
+	MainMenuBarBackpackButton:SetPoint(start, BackpackFrame, start);
+	BagBarExpandToggle:ClearAllPoints();
+	BagBarExpandToggle:SetPoint(toward, MainMenuBarBackpackButton, back);
 	local previous = BagBarExpandToggle;
 	for _, name in ipairs(BAG_SLOTS) do
 		local button = _G[name];
 		button:ClearAllPoints();
-		button:SetPoint("RIGHT", previous, "LEFT");
+		button:SetPoint(toward, previous, back);
 		if expanded then
 			button:Show();
 		else
@@ -97,8 +113,14 @@ function BagsBarRetail_Layout()
 		end
 		previous = button;
 	end
-	BackpackFrame:SetWidth(BACKPACK_SIZE + TOGGLE_WIDTH + #BAG_SLOTS * BAG_SIZE);
-	BackpackFrame:SetHeight(BACKPACK_SIZE);
+	local long = BACKPACK_SIZE + TOGGLE_WIDTH + #BAG_SLOTS * BAG_SIZE;
+	if vertical then
+		BackpackFrame:SetWidth(BACKPACK_SIZE);
+		BackpackFrame:SetHeight(long);
+	else
+		BackpackFrame:SetWidth(long);
+		BackpackFrame:SetHeight(BACKPACK_SIZE);
+	end
 
 	-- the arrow points where the bags go: left to open them, right to put them away (the atlas points left)
 	local info = C_Texture.GetAtlasInfo("bag-arrow");

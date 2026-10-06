@@ -11,7 +11,8 @@
 --                   format = function(v) end, apply = function(frame, v) end }
 --             или { key = "x", type = "check", label = "...", default = 0/1, apply = ... }
 --             или { key = "x", type = "dropdown", label = "...", options = { { value, text }, ... }, default, apply = ... }
--- options (5th argument): { category = "frames" / "combat" / "misc" (the list in the window), noScale = true }
+-- options (5th argument): { category = "frames" / "combat" / "misc" (the list in the window), noScale = true,
+--                          keepPosition = true (stock code moves the frame by itself: put it back at once) }
 
 EDIT_MODE_GRID_SPACING = 32;
 EDIT_MODE_SNAP_DISTANCE = 12;
@@ -354,6 +355,20 @@ function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettin
 
 	self:ApplyLayoutToSystem(systemName);
 
+	-- the stock code places some frames itself (UIParent_ManageFramePositions: durability, vehicle seats; the
+	-- loot frame at the cursor): whenever it moves one the layout places, the layout's place again
+	if options.keepPosition then
+		local system = self.systems[systemName];
+		hooksecurefunc(frame, "SetPoint", function()
+			if system.applying or not self:HasPosition(systemName) or (system.overlay and system.overlay.moving) then
+				return;
+			end
+			system.applying = true;
+			self:ApplyLayoutToSystem(systemName);
+			system.applying = nil;
+		end);
+	end
+
 	if EditModeManagerFrame and EditModeManagerFrame.RefreshFrameList then
 		EditModeManagerFrame:RefreshFrameList();
 	end
@@ -361,6 +376,25 @@ end
 
 function EditModeCore:GetSystem(systemName)
 	return self.systems[systemName];
+end
+
+-- more settings for a frame registered already (FramesEditMode.lua: the retail settings of the core's frames)
+function EditModeCore:AddSettings(systemName, settings)
+	local system = self.systems[systemName];
+	if not system then
+		return;
+	end
+	for _, setting in ipairs(settings) do
+		table.insert(system.settings, setting);
+	end
+	-- the settings dialog builds its controls again
+	if system.dialogControls then
+		for _, control in ipairs(system.dialogControls) do
+			control:Hide();
+		end
+		system.dialogControls = nil;
+	end
+	self:ApplyLayoutToSystem(systemName);
 end
 
 -- the active layout places this frame (its own code must not move it then)
@@ -437,6 +471,14 @@ function EditModeCore:ApplyLayoutToSystem(systemName)
 	if not system then
 		return;
 	end
+	-- (its own SetPoint calls must not start the keepPosition hook)
+	local wasApplying = system.applying;
+	system.applying = true;
+	self:ApplyLayoutToSystemNow(system, systemName);
+	system.applying = wasApplying;
+end
+
+function EditModeCore:ApplyLayoutToSystemNow(system, systemName)
 
 	local entry = GetLayoutEntry(systemName, false);
 	RestoreDefaultPosition(system);
