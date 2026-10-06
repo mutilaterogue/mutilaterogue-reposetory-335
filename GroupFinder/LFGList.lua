@@ -195,10 +195,11 @@ end
 
 local function ListingArgs(info)
 	return info.activityID or 0, tonumber(info.itemLevel) or 0, info.autoAccept and 1 or 0, info.privateGroup and 1 or 0,
-		Encode(info.name or ""), Encode(info.comment or "");
+		Encode(info.name or ""), Encode(info.comment or ""), Encode(info.voiceChat or ""), tonumber(info.minRating) or 0;
 end
 
--- info: { activityID, name, comment, itemLevel, autoAccept, privateGroup }
+-- info: { activityID, name, comment, itemLevel, autoAccept, privateGroup, voiceChat, minRating }
+-- (a mythic+ activity: the name may be empty - the server names it "+level dungeon" after the leader's keystone)
 function C_LFGList.CreateListing(info)
 	Send("LG_CREATE", ListingArgs(info));
 end
@@ -371,7 +372,7 @@ local function RegisterComm()
 		Fire("LFG_LIST_AVAILABILITY_UPDATE");
 	end);
 
-	Comm_Register("LG_ENTRY", function(id, activityID, itemLevel, autoAccept, private, name, comment, seconds)
+	Comm_Register("LG_ENTRY", function(id, activityID, itemLevel, autoAccept, private, name, comment, seconds, voiceChat, minRating, keyLevel)
 		if not id then return; end
 		id = tonumber(id) or 0;
 		if id == 0 then
@@ -381,6 +382,7 @@ local function RegisterComm()
 				listingID = id, activityID = tonumber(activityID), requiredItemLevel = tonumber(itemLevel) or 0,
 				autoAccept = autoAccept == "1", privateGroup = private == "1", name = Decode(name), comment = Decode(comment),
 				duration = tonumber(seconds) or 0, expires = GetTime() + (tonumber(seconds) or 0),
+				voiceChat = Decode(voiceChat), requiredDungeonScore = tonumber(minRating) or 0, keyLevel = tonumber(keyLevel) or 0,
 			};
 		end
 		Fire("LFG_LIST_ACTIVE_ENTRY_UPDATE", entry ~= nil);
@@ -420,12 +422,13 @@ local function RegisterComm()
 		wipe(applicants); wipe(applicantOrder);
 		local hasNew = false;
 		for _, item in ipairs(Split(list)) do
-			local id, name, class, level, itemLevel, roles, status, comment, isNew = strsplit(";", item);
+			local id, name, class, level, itemLevel, roles, status, comment, isNew, rating = strsplit(";", item);
 			id = tonumber(id);
 			applicants[id] = {
 				applicantID = id, name = Decode(name), classID = tonumber(class) or 0, level = tonumber(level) or 0,
 				itemLevel = tonumber(itemLevel) or 0, roles = tonumber(roles) or 0, status = tonumber(status) or 1,
 				applicationStatus = STATUS_NAMES[tonumber(status) or 1], comment = Decode(comment), isNew = isNew == "1",
+				dungeonScore = tonumber(rating) or 0,
 			};
 			hasNew = hasNew or applicants[id].isNew;
 			table.insert(applicantOrder, id);
@@ -443,7 +446,7 @@ local function RegisterComm()
 		wipe(results); wipe(resultOrder);
 		for _, item in ipairs(Split(list)) do
 			local id, activityID, leaderName, leaderClass, name, comment, itemLevel, age, autoAccept, numMembers,
-				tanks, healers, damage, myStatus, members = strsplit(";", item);
+				tanks, healers, damage, myStatus, members, keyLevel, leaderRating, minRating, voiceChat = strsplit(";", item);
 			id = tonumber(id);
 			local result = {
 				searchResultID = id, activityID = tonumber(activityID), leaderName = Decode(leaderName),
@@ -452,11 +455,13 @@ local function RegisterComm()
 				autoAccept = autoAccept == "1", numMembers = tonumber(numMembers) or 0,
 				tanks = tonumber(tanks) or 0, healers = tonumber(healers) or 0, damage = tonumber(damage) or 0,
 				applicationStatus = tonumber(myStatus) or 0, members = {},
+				keyLevel = tonumber(keyLevel) or 0, leaderOverallDungeonScore = tonumber(leaderRating) or 0,
+				requiredDungeonScore = tonumber(minRating) or 0, voiceChat = voiceChat == "1",
 			};
 			if members and members ~= "-" then
 				for member in string.gmatch(members, "[^/]+") do
-					local class, role = strsplit(".", member);
-					table.insert(result.members, { classID = tonumber(class) or 0, role = tonumber(role) or ROLE_DAMAGE });
+					local class, role, isLeader = strsplit(".", member);
+					table.insert(result.members, { classID = tonumber(class) or 0, role = tonumber(role) or ROLE_DAMAGE, isLeader = isLeader == "1" });
 				end
 			end
 			results[id] = result;

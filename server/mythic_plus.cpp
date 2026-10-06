@@ -2356,6 +2356,22 @@ bool MythicPlus_TalentsLocked(Player const* player)
     return run && run->Level && (run->State == RUN_COUNTDOWN || run->State == RUN_ACTIVE);
 }
 
+// premade groups (premade_groups.cpp): the keystone and the season rating of a character
+bool MythicPlus_GetKeystone(ObjectGuid::LowType guid, uint32& mapId, uint32& level)
+{
+    auto itr = s_keys.find(guid);
+    if (itr == s_keys.end() || !itr->second.MapId)
+        return false;
+    mapId = itr->second.MapId;
+    level = itr->second.Level;
+    return true;
+}
+
+uint32 MythicPlus_GetRating(ObjectGuid::LowType guid)
+{
+    return GetRating(guid);
+}
+
 // ---------------------------------------------------------------- Font of Power
 // ---------------------------------------------------------------- completion chest: personal loot
 // every player of the run opens it once and gets their own roll of gameobject_loot_template CHEST_ENTRY

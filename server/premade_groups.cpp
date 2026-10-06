@@ -27,8 +27,9 @@
  *  C->S "LG_DATA"                          -> "LG_CATS" : id;name,...
  *                                             "LG_GROUPS" : id;categoryId;name,...
  *                                             "LG_ACTS" : id;categoryId;groupId;name;shortName;minLevel;maxPlayers;itemLevel;mapId;difficulty,...
- *       "LG_CREATE" : activityId : itemLevel : autoAccept : private : name : comment
- *       "LG_UPDATE" : activityId : itemLevel : autoAccept : private : name : comment
+ *       "LG_CREATE" : activityId : itemLevel : autoAccept : private : name : comment : voiceChat : minRating
+ *       "LG_UPDATE" : activityId : itemLevel : autoAccept : private : name : comment : voiceChat : minRating
+ *                     (mythic+ activity: the name may be empty - "+level dungeon" from the leader's keystone)
  *       "LG_DELIST"
  *       "LG_SEARCH" : categoryId : filter  -> "LG_RESULTS" : result,...  (below)
  *       "LG_APPLY" : listingId : roles : comment
@@ -38,13 +39,14 @@
  *       "LG_ANSWER" : listingId : 1 / 0     (accept / decline the invite)
  *       "LG_STATUS"                         -> "LG_ENTRY", "LG_APPS", "LG_APPLICANTS"
  *  S->C "LG_ENTRY" : listingId : activityId : itemLevel : autoAccept : private : name : comment : seconds left
+ *                    : voiceChat : minRating : keyLevel
  *                    ("LG_ENTRY" : 0 - not listed)
  *       "LG_APPS" : listingId;status;seconds left;roles,...      (my applications)
  *       "LG_APP" : listingId : status : seconds left : roles      (one of them changed)
- *       "LG_APPLICANTS" : applicationId;name;class;level;itemLevel;roles;status;comment;new,...   (my group's)
+ *       "LG_APPLICANTS" : applicationId;name;class;level;itemLevel;roles;status;comment;new;rating,...   (my group's)
  *       "LG_RESULTS" : listingId;activityId;leaderName;leaderClass;name;comment;itemLevel;age;autoAccept;
- *                      numMembers;tanks;healers;damage;myStatus;members,...
- *                      members: class.role/class.role/...
+ *                      numMembers;tanks;healers;damage;myStatus;members;keyLevel;leaderRating;minRating;hasVoiceChat,...
+ *                      members: class.role.isLeader/class.role.isLeader/...
  *       "LG_RESULT" : message
  *
  * GM: .lg list, .lg reload
@@ -76,6 +78,10 @@
 
 using namespace Trinity::ChatCommands;
 
+// mythic_plus.cpp
+bool MythicPlus_GetKeystone(ObjectGuid::LowType guid, uint32& mapId, uint32& level);
+uint32 MythicPlus_GetRating(ObjectGuid::LowType guid);
+
 namespace
 {
     // ---------------------------------------------------------------- config
@@ -87,6 +93,7 @@ namespace
     constexpr size_t MAX_NAME         = 31;             // bytes (retail: 31 characters)
     constexpr size_t MAX_COMMENT      = 255;
     constexpr uint32 MAX_RESULTS      = 100;
+    constexpr uint32 DIFFICULTY_MYTHIC_PLUS = 3;        // premade_activity.difficulty of a keystone activity
 
     enum Role : uint8
     {
@@ -151,6 +158,10 @@ namespace
         time_t Created = 0;
         time_t Expires = 0;
         bool MadeGroup = false;     // the module made the group of one for its leader
+        std::string VoiceChat;
+        uint32 MinRating = 0;       // mythic+ rating the applicants need (0 - any)
+        uint32 KeyLevel = 0;        // mythic+: the leader's keystone level for this dungeon (0 - none)
+        uint32 LeaderRating = 0;
     };
 
     struct Application
@@ -163,6 +174,7 @@ namespace
         uint8 Status = STATUS_APPLIED;
         time_t Expires = 0;
         bool New = true;            // not seen by the leader yet (retail: the "new" applicants)
+        uint32 Rating = 0;          // mythic+ rating when he applied
     };
 
     std::vector<Category> s_categories;
@@ -447,7 +459,8 @@ namespace
             return;
         }
         sAddonComm->Send(player, "LG_ENTRY", listing->Id, listing->ActivityId, listing->ItemLevel, listing->AutoAccept ? 1 : 0,
-            listing->Private ? 1 : 0, Encode(listing->Name), Encode(listing->Comment), SecondsLeft(listing->Expires));
+            listing->Private ? 1 : 0, Encode(listing->Name), Encode(listing->Comment), SecondsLeft(listing->Expires),
+            Encode(listing->VoiceChat), listing->MinRating, listing->KeyLevel);
     }
 
     void SendApplications(Player* player)
@@ -489,7 +502,7 @@ namespace
                     continue;
                 list << (first ? "" : ",") << app.Id << ';' << Encode(applicant->GetName()) << ';' << uint32(applicant->GetClass()) << ';'
                      << uint32(applicant->GetLevel()) << ';' << uint32(applicant->GetAverageItemLevel()) << ';' << uint32(app.Roles) << ';'
-                     << uint32(app.Status) << ';' << Encode(app.Comment) << ';' << (app.New ? 1 : 0);
+                     << uint32(app.Status) << ';' << Encode(app.Comment) << ';' << (app.New ? 1 : 0) << ';' << app.Rating;
                 first = false;
             }
         }
@@ -646,9 +659,26 @@ namespace
             return false;
         }
         std::string name = Truncate(TextArg(args, 4), MAX_NAME);
+        uint32 keyLevel = 0;
+        if (activity->Difficulty == DIFFICULTY_MYTHIC_PLUS)
+        {
+            uint32 keyMap = 0, level = 0;
+            if (MythicPlus_GetKeystone(player->GetGUID().GetCounter(), keyMap, level) && keyMap == activity->MapId)
+                keyLevel = level;
+            // retail: a keystone group is named after the key
+            if (name.empty())
+                name = Truncate(keyLevel ? Trinity::StringFormat("+{} {}", keyLevel, activity->Name) : activity->Name, MAX_NAME);
+        }
         if (name.empty())
         {
             Result(player, "\xd0\x92\xd0\xb2\xd0\xb5\xd0\xb4\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xbd\xd0\xb0\xd0\xb7\xd0\xb2\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xb3\xd1\x80\xd1\x83\xd0\xbf\xd0\xbf\xd1\x8b.");
+            return false;
+        }
+        uint32 rating = MythicPlus_GetRating(player->GetGUID().GetCounter());
+        uint32 minRating = Arg(args, 7);
+        if (minRating && minRating > rating)
+        {
+            Result(player, "\xd0\xa2\xd1\x80\xd0\xb5\xd0\xb1\xd1\x83\xd0\xb5\xd0\xbc\xd1\x8b\xd0\xb9 \xd1\x80\xd0\xb5\xd0\xb9\xd1\x82\xd0\xb8\xd0\xbd\xd0\xb3 \xd0\xb2\xd1\x8b\xd1\x88\xd0\xb5 \xd0\xb2\xd0\xb0\xd1\x88\xd0\xb5\xd0\xb3\xd0\xbe.");
             return false;
         }
         Group* group = player->GetGroup();
@@ -663,6 +693,10 @@ namespace
         listing.Private = Arg(args, 3) != 0;
         listing.Name = name;
         listing.Comment = Truncate(TextArg(args, 5), MAX_COMMENT);
+        listing.VoiceChat = Truncate(TextArg(args, 6), MAX_NAME);
+        listing.MinRating = minRating;
+        listing.KeyLevel = keyLevel;
+        listing.LeaderRating = rating;
         return true;
     }
 
@@ -680,7 +714,8 @@ namespace
                 uint8 role = MainRole(FromLfgRoles(slot.roles));
                 ++(role == ROLE_TANK ? tanks : role == ROLE_HEALER ? healers : damage);
                 Player* member = ObjectAccessor::FindConnectedPlayer(slot.guid);
-                members << (first ? "" : "/") << uint32(member ? member->GetClass() : 0) << '.' << uint32(role);
+                members << (first ? "" : "/") << uint32(member ? member->GetClass() : 0) << '.' << uint32(role) << '.'
+                        << (slot.guid == group->GetLeaderGUID() ? 1 : 0);
                 first = false;
             }
         }
@@ -690,7 +725,8 @@ namespace
               << uint32(leader ? leader->GetClass() : 0) << ';' << Encode(listing.Name) << ';' << Encode(listing.Comment) << ';'
               << listing.ItemLevel << ';' << uint32(GameTime::GetGameTime() - listing.Created) << ';' << (listing.AutoAccept ? 1 : 0) << ';'
               << (group ? group->GetMembersCount() : 0) << ';' << tanks << ';' << healers << ';' << damage << ';'
-              << uint32(app ? app->Status : STATUS_NONE) << ';' << (first ? std::string("-") : members.str());
+              << uint32(app ? app->Status : STATUS_NONE) << ';' << (first ? std::string("-") : members.str()) << ';'
+              << listing.KeyLevel << ';' << listing.LeaderRating << ';' << listing.MinRating << ';' << (listing.VoiceChat.empty() ? 0 : 1);
         return entry.str();
     }
 
@@ -851,6 +887,12 @@ namespace
             Result(player, "\xd0\x92\xd0\xb0\xd1\x88 \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c \xd0\xbf\xd1\x80\xd0\xb5\xd0\xb4\xd0\xbc\xd0\xb5\xd1\x82\xd0\xbe\xd0\xb2 \xd0\xbd\xd0\xb8\xd0\xb6\xd0\xb5 \xd1\x82\xd1\x80\xd0\xb5\xd0\xb1\xd1\x83\xd0\xb5\xd0\xbc\xd0\xbe\xd0\xb3\xd0\xbe.");
             return;
         }
+        uint32 rating = MythicPlus_GetRating(player->GetGUID().GetCounter());
+        if (listing->MinRating && rating < listing->MinRating)
+        {
+            Result(player, "\xd0\x92\xd0\xb0\xd1\x88 \xd1\x80\xd0\xb5\xd0\xb9\xd1\x82\xd0\xb8\xd0\xbd\xd0\xb3 \xd0\xbd\xd0\xb8\xd0\xb6\xd0\xb5 \xd1\x82\xd1\x80\xd0\xb5\xd0\xb1\xd1\x83\xd0\xb5\xd0\xbc\xd0\xbe\xd0\xb3\xd0\xbe.");
+            return;
+        }
         Group* group = GetListingGroup(*listing);
         if (!group || group->GetMembersCount() >= MaxPlayers(*listing))
         {
@@ -859,6 +901,7 @@ namespace
         }
 
         Application app;
+        app.Rating = rating;
         app.Id = s_nextApplication++;
         app.ListingId = listing->Id;
         app.PlayerGuid = player->GetGUID();

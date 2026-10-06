@@ -1,12 +1,14 @@
 -- Premade Groups window (LFGListFrame.xml), retail LFGListFrame on 3.3.5 over C_LFGList (LFGList.lua):
---   CategorySelection - the categories, "Find Group" / "Start Group";
---   SearchPanel       - the listed groups of the category, the sign up dialog (LFGListApplicationDialog);
+--   CategorySelection - the categories, "Start Group" / "Find Group";
+--   SearchPanel       - the listed groups of the category (search, filter, refresh), the sign up dialog;
 --   EntryCreation     - list our group (or change its listing);
 --   ApplicationViewer - our listed group and its applicants (invite / decline).
 
-local NUM_RESULT_ROWS, RESULT_HEIGHT = 8, 36;
+local NUM_RESULT_ROWS, RESULT_HEIGHT = 7, 36;
 local NUM_APPLICANT_ROWS, APPLICANT_HEIGHT = 6, 34;
 local ROLE_TANK, ROLE_HEALER, ROLE_DAMAGE = 1, 2, 4;
+local PARTY_SIZE = 5;
+local DIFFICULTY_MYTHIC_PLUS = 3;	-- premade_activity.difficulty of a keystone activity
 
 -- the retail art of a category (groupfinder-button-* / groupfinder-background-*)
 local CATEGORY_ART = { [1] = "questing", [2] = "dungeons", [3] = "raids-legion", [4] = "arenas", [6] = "custom-pve" };
@@ -16,18 +18,38 @@ local CLASS_FILES = {
 	[7] = "SHAMAN", [8] = "MAGE", [9] = "WARLOCK", [11] = "DRUID",
 };
 
+-- the roles a class can take on 3.3.5 (retail grays the others out)
+local CLASS_ROLES = {
+	WARRIOR = ROLE_TANK + ROLE_DAMAGE, PALADIN = ROLE_TANK + ROLE_HEALER + ROLE_DAMAGE, HUNTER = ROLE_DAMAGE,
+	ROGUE = ROLE_DAMAGE, PRIEST = ROLE_HEALER + ROLE_DAMAGE, DEATHKNIGHT = ROLE_TANK + ROLE_DAMAGE,
+	SHAMAN = ROLE_HEALER + ROLE_DAMAGE, MAGE = ROLE_DAMAGE, WARLOCK = ROLE_DAMAGE,
+	DRUID = ROLE_TANK + ROLE_HEALER + ROLE_DAMAGE,
+};
+
+local ROLE_ORDER = { ROLE_TANK, ROLE_HEALER, ROLE_DAMAGE };
+local ROLE_KEYS = { [ROLE_TANK] = "Tank", [ROLE_HEALER] = "Healer", [ROLE_DAMAGE] = "Damager" };
+local ROLE_NAMES = { [ROLE_TANK] = TANK or "Танк", [ROLE_HEALER] = HEALER or "Лекарь", [ROLE_DAMAGE] = DAMAGER or "Боец" };
+-- the member icons of a result / an applicant
 local ROLE_ATLAS = {
 	[ROLE_TANK] = "groupfinder-icon-role-large-tank",
 	[ROLE_HEALER] = "groupfinder-icon-role-large-heal",
 	[ROLE_DAMAGE] = "groupfinder-icon-role-large-dps",
 };
+local ROLE_MICRO_ATLAS = {
+	[ROLE_TANK] = "groupfinder-icon-role-micro-tank",
+	[ROLE_HEALER] = "groupfinder-icon-role-micro-heal",
+	[ROLE_DAMAGE] = "groupfinder-icon-role-micro-dps",
+};
+-- the sign up dialog's big role icons
+local ROLE_DIALOG_ATLAS = { [ROLE_TANK] = "UI-LFG-RoleIcon-Tank", [ROLE_HEALER] = "UI-LFG-RoleIcon-Healer", [ROLE_DAMAGE] = "UI-LFG-RoleIcon-DPS" };
 
 local frame;
 local selectedCategory;
 local selectedResult;
 local editing = false;			-- EntryCreation changes our listing
 local creationGroup, creationActivity;
-local dialogRoles = { [ROLE_DAMAGE] = true };
+local dialogRoles = {};
+local filters = {};				-- needTank, needHealer, needDamage, voiceChat
 local categoryButtons = {};
 local resultRows, applicantRows = {}, {};
 
@@ -52,9 +74,18 @@ local function FormatTime(seconds)
 	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60);
 end
 
+local function GetActivity(activityID)
+	return activityID and C_LFGList.GetActivityInfoTable(activityID);
+end
+
 local function ActivityName(activityID)
-	local activity = activityID and C_LFGList.GetActivityInfoTable(activityID);
+	local activity = GetActivity(activityID);
 	return activity and activity.fullName or "";
+end
+
+local function IsMythicPlus(activityID)
+	local activity = GetActivity(activityID);
+	return activity and activity.difficultyID == DIFFICULTY_MYTHIC_PLUS;
 end
 
 local function InGroup()
@@ -70,6 +101,11 @@ local function CanManageGroup()
 		return IsPartyLeader();
 	end
 	return true;
+end
+
+local function PlayerRoles()
+	local _, classFile = UnitClass("player");
+	return CLASS_ROLES[classFile] or ROLE_DAMAGE;
 end
 
 local function ShowPanel(panel)
@@ -98,7 +134,7 @@ local function LayerInset(self)
 end
 
 -- the retail mouse over art (an atlas: set here, not in the XML)
-function LFGList_AddHighlight(self, atlas, width, height)
+function LFGList_AddHighlight(self, atlas, width, height, alpha)
 	local highlight = self:CreateTexture(nil, "HIGHLIGHT");
 	if width then
 		highlight:SetSize(width, height);
@@ -108,15 +144,28 @@ function LFGList_AddHighlight(self, atlas, width, height)
 	end
 	highlight:SetAtlas(atlas);
 	highlight:SetBlendMode("ADD");
+	highlight:SetAlpha(alpha or 1);
 end
 
 function LFGListEditBox_OnTextChanged(self)
+	local empty = self:GetText() == "";
 	if self.Instructions then
-		self.Instructions:SetShown(self:GetText() == "");
+		self.Instructions:SetShown(empty);
 	end
-	if self.onTextChanged then
-		self.onTextChanged(self);
+	if self.ClearButton then
+		self.ClearButton:SetShown(not empty);
 	end
+	local owner = self.onTextChanged and self or self:GetParent();
+	if owner.onTextChanged then
+		owner.onTextChanged(owner);
+	end
+end
+
+function LFGListSearchBoxClear_OnClick(self)
+	local box = self:GetParent();
+	box:SetText("");
+	box:ClearFocus();
+	LFGListSearchPanel_DoSearch();
 end
 
 ---------------------------------------------------------------------------
@@ -177,8 +226,7 @@ end
 -- the search
 ---------------------------------------------------------------------------
 function LFGListSearchPanel_DoSearch()
-	local panel = frame.SearchPanel;
-	C_LFGList.Search(selectedCategory, panel.SearchBox:GetText());
+	C_LFGList.Search(selectedCategory, frame.SearchPanel.SearchBox:GetText());
 	LFGListSearchPanel_UpdateResults();
 end
 
@@ -187,18 +235,112 @@ function LFGListSearchPanelSearchBox_OnEnterPressed(self)
 	LFGListSearchPanel_DoSearch();
 end
 
-local function UpdateRoleCount(roleFrame, atlas, count)
-	roleFrame.Icon:SetAtlas(atlas);
-	roleFrame.Count:SetText(count);
-	roleFrame.Icon:SetDesaturated(count == 0);
+-- the filter (retail: "needs a tank / healer / damage", voice chat): on the received results
+local function PassesFilters(info)
+	local activity = GetActivity(info.activityID);
+	local party = not activity or activity.maxNumPlayers <= PARTY_SIZE;
+	if party then
+		if filters.needTank and info.tanks >= 1 then return false; end
+		if filters.needHealer and info.healers >= 1 then return false; end
+		if filters.needDamage and info.damage >= 3 then return false; end
+	end
+	if filters.voiceChat and not info.voiceChat then
+		return false;
+	end
+	return true;
+end
+
+local function FilteredResults()
+	local _, ids = C_LFGList.GetSearchResults();
+	local out = {};
+	for _, id in ipairs(ids) do
+		local info = C_LFGList.GetSearchResultInfo(id);
+		if info and PassesFilters(info) then
+			table.insert(out, id);
+		end
+	end
+	return out;
+end
+
+local function FiltersDefault()
+	return not (filters.needTank or filters.needHealer or filters.needDamage or filters.voiceChat);
+end
+
+local function SetupFilterButton(button)
+	local function Checkbox(root, text, key)
+		root:CreateCheckbox(text, function() return filters[key]; end, function()
+			filters[key] = not filters[key] or nil;
+			LFGListSearchPanel_UpdateResults();
+		end);
+	end
+	button:SetupMenu(function(dropdown, root)
+		Checkbox(root, "Нужен танк", "needTank");
+		Checkbox(root, "Нужен лекарь", "needHealer");
+		Checkbox(root, "Нужен боец", "needDamage");
+		Checkbox(root, "С голосовым чатом", "voiceChat");
+	end);
+	button:SetIsDefaultCallback(FiltersDefault);
+	button:SetDefaultCallback(function() wipe(filters); end);
+	button:SetUpdateCallback(LFGListSearchPanel_UpdateResults);
+end
+
+-- the members: five slots of a party (tanks, healers, damage, then the empty ones), the role counts of a raid
+local function UpdateDataDisplay(display, info)
+	local activity = GetActivity(info.activityID);
+	local party = not activity or activity.maxNumPlayers <= PARTY_SIZE;
+	for i = 1, PARTY_SIZE do
+		display["Slot" .. i]:SetShown(party);
+	end
+	display.Tank:SetShown(not party);
+	display.Healer:SetShown(not party);
+	display.Damager:SetShown(not party);
+	if not party then
+		for role, key in pairs(ROLE_KEYS) do
+			local count = role == ROLE_TANK and info.tanks or role == ROLE_HEALER and info.healers or info.damage;
+			display[key].Icon:SetAtlas(ROLE_MICRO_ATLAS[role]);
+			display[key].Count:SetText(count);
+		end
+		return;
+	end
+	local members = {};
+	for _, member in ipairs(info.members) do
+		table.insert(members, member);
+	end
+	table.sort(members, function(a, b)
+		if a.role ~= b.role then
+			return a.role < b.role;
+		end
+		return a.isLeader and not b.isLeader;
+	end);
+	for i = 1, PARTY_SIZE do
+		local slot = display["Slot" .. i];
+		local member = members[i];
+		if member then
+			slot.Icon:SetAtlas(ROLE_ATLAS[member.role] or ROLE_ATLAS[ROLE_DAMAGE]);
+			slot.Leader:SetShown(member.isLeader);
+		else
+			slot.Icon:SetAtlas("groupfinder-icon-emptyslot");
+			slot.Leader:Hide();
+		end
+	end
 end
 
 function LFGListSearchPanel_UpdateResults()
 	local panel = frame.SearchPanel;
-	local count, ids = C_LFGList.GetSearchResults();
+	local total = C_LFGList.GetSearchResults();
+	local ids = FilteredResults();
+	local count = #ids;
 	local searching = C_LFGList.IsSearching();
 	panel.Searching:SetShown(searching and count == 0);
 	panel.NoResults:SetShown(not searching and count == 0);
+	if searching then
+		panel.ResultCount:SetText("");
+	elseif count < total then
+		panel.ResultCount:SetText(string.format("Найдено групп: %d (показано %d)", total, count));
+	else
+		panel.ResultCount:SetText(string.format("Найдено групп: %d", total));
+	end
+	panel.FilterButton:ValidateResetState();
 
 	FauxScrollFrame_Update(panel.ScrollFrame, count, NUM_RESULT_ROWS, RESULT_HEIGHT);
 	local offset = FauxScrollFrame_GetOffset(panel.ScrollFrame);
@@ -210,28 +352,25 @@ function LFGListSearchPanel_UpdateResults()
 			row.resultID = id;
 			local _, status, _, secondsLeft = C_LFGList.GetApplicationInfo(id);
 			local applied, invited = status == "applied", status == "invited";
+			local pending = applied or invited;
 			row.Name:SetText(info.name);
-			if applied or invited then
+			if pending then
 				row.Name:SetTextColor(0.1, 1, 0.1);
 			else
 				row.Name:SetTextColor(1, 0.82, 0);
 			end
 			row.ActivityName:SetText(ActivityName(info.activityID));
-			row.PendingLabel:SetShown(applied or invited);
+			row.PendingLabel:SetShown(pending);
 			row.PendingLabel:SetText(invited and "Приглашение" or "В ожидании");
-			row.ExpirationTime:SetShown(applied or invited);
+			row.ExpirationTime:SetShown(pending);
 			row.ExpirationTime:SetText(FormatTime(secondsLeft));
 			row.CancelButton:SetShown(applied);
-			row.ResultBG:SetShown(applied or invited);
+			row.ResultBG:SetShown(pending);
 			row.ResultBG:SetAtlas(invited and "groupfinder-highlightbar-yellow" or "groupfinder-highlightbar-green");
-			row.ResultBG:SetAlpha(0.4);
-			-- the role counts give way to the status
-			row.Tank:SetShown(not (applied or invited));
-			row.Healer:SetShown(not (applied or invited));
-			row.Damager:SetShown(not (applied or invited));
-			UpdateRoleCount(row.Tank, "groupfinder-icon-role-micro-tank", info.tanks);
-			UpdateRoleCount(row.Healer, "groupfinder-icon-role-micro-heal", info.healers);
-			UpdateRoleCount(row.Damager, "groupfinder-icon-role-micro-dps", info.damage);
+			-- the members give way to the status
+			row.DataDisplay:SetShown(not pending);
+			row.VoiceChat:SetShown(info.voiceChat and not pending);
+			UpdateDataDisplay(row.DataDisplay, info);
 			row.Selected:SetShown(id == selectedResult);
 			row:Show();
 		else
@@ -242,6 +381,7 @@ function LFGListSearchPanel_UpdateResults()
 	-- "Sign Up": a group chosen, not applied to yet, and no group of our own
 	local _, status = C_LFGList.GetApplicationInfo(selectedResult or 0);
 	panel.SignUpButton:SetEnabled(selectedResult ~= nil and status == "none" and not InGroup());
+	panel.StartGroupButton:SetEnabled(CanManageGroup());
 end
 
 function LFGListSearchEntry_OnClick(self, button)
@@ -274,11 +414,23 @@ function LFGListSearchEntry_OnEnter(self)
 		GameTooltip:AddLine(info.comment, 0.75, 0.75, 0.75, true);
 	end
 	GameTooltip:AddLine(" ");
+	if info.keyLevel > 0 then
+		GameTooltip:AddLine(string.format("Ключ: +%d", info.keyLevel), 1, 1, 1);
+	end
 	if info.requiredItemLevel > 0 then
 		GameTooltip:AddLine(string.format("Мин. уровень предметов: %d", info.requiredItemLevel), 1, 1, 1);
 	end
+	if info.requiredDungeonScore > 0 then
+		GameTooltip:AddLine(string.format("Мин. рейтинг М+: %d", info.requiredDungeonScore), 1, 1, 1);
+	end
+	if info.voiceChat then
+		GameTooltip:AddLine("Голосовой чат", 1, 1, 1);
+	end
 	if info.leaderName ~= "" then
 		GameTooltip:AddLine("Лидер: " .. ClassColored(info.leaderName, info.leaderClassID), 1, 1, 1);
+		if IsMythicPlus(info.activityID) or info.leaderOverallDungeonScore > 0 then
+			GameTooltip:AddLine(string.format("Рейтинг лидера: %d", info.leaderOverallDungeonScore), 1, 1, 1);
+		end
 	end
 	local age = info.age + (GetTime() - info.ageTime);
 	GameTooltip:AddLine("Создана: " .. FormatTime(age) .. " назад", 0.5, 0.5, 0.5);
@@ -303,15 +455,39 @@ end
 ---------------------------------------------------------------------------
 local function UpdateApplicationDialog()
 	local dialog = LFGListApplicationDialog;
-	for role, key in pairs({ [ROLE_TANK] = "Tank", [ROLE_HEALER] = "Healer", [ROLE_DAMAGE] = "Damager" }) do
-		dialog[key].CheckButton:SetChecked(dialogRoles[role]);
+	local available = PlayerRoles();
+	local any = false;
+	for role, key in pairs(ROLE_KEYS) do
+		local button = dialog[key];
+		local can = bit.band(available, role) ~= 0;
+		if not can then
+			dialogRoles[role] = nil;
+		end
+		button.CheckButton:SetChecked(dialogRoles[role]);
+		if can then
+			button.CheckButton:Enable();
+		else
+			button.CheckButton:Disable();
+		end
+		button.Icon:SetAtlas(ROLE_DIALOG_ATLAS[role] .. (can and "" or "-Disabled"));
+		button.available = can;
+		any = any or dialogRoles[role];
 	end
-	dialog.SignUpButton:SetEnabled((dialogRoles[ROLE_TANK] or dialogRoles[ROLE_HEALER] or dialogRoles[ROLE_DAMAGE]) and true or false);
+	dialog.SignUpButton:SetEnabled(any and true or false);
 end
 
 function LFGListApplicationDialogRole_OnClick(self)
 	dialogRoles[self:GetParent().role] = self:GetChecked() and true or nil;
 	UpdateApplicationDialog();
+end
+
+function LFGListRoleButton_OnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:SetText(self.roleName);
+	if not self.available then
+		GameTooltip:AddLine("Ваш класс не может выполнять эту роль.", 1, 0.1, 0.1, true);
+	end
+	GameTooltip:Show();
 end
 
 function LFGListSearchPanelSignUp_OnClick()
@@ -322,41 +498,97 @@ function LFGListSearchPanelSignUp_OnClick()
 	local dialog = LFGListApplicationDialog;
 	dialog.resultID = selectedResult;
 	dialog.GroupName:SetText(info.name);
-	dialog.Description:SetText("");
+	local requirements = {};
+	if info.requiredItemLevel > 0 then
+		table.insert(requirements, string.format("уровень предметов %d", info.requiredItemLevel));
+	end
+	if info.requiredDungeonScore > 0 then
+		table.insert(requirements, string.format("рейтинг М+ %d", info.requiredDungeonScore));
+	end
+	dialog.Requirement:SetText(#requirements > 0 and ("Требуется: " .. table.concat(requirements, ", ")) or "");
+	dialog.Description.EditBox:SetText("");
+	-- the roles of the last sign up (or the first one the class can take)
+	if not next(dialogRoles) then
+		local available = PlayerRoles();
+		for _, role in ipairs({ ROLE_DAMAGE, ROLE_HEALER, ROLE_TANK }) do
+			if bit.band(available, role) ~= 0 then
+				dialogRoles[role] = true;
+				break;
+			end
+		end
+	end
 	UpdateApplicationDialog();
 	dialog:Show();
 end
 
 function LFGListApplicationDialogSignUp_OnClick(self)
 	local dialog = self:GetParent();
-	C_LFGList.ApplyToGroup(dialog.resultID, dialog.Description:GetText(),
+	C_LFGList.ApplyToGroup(dialog.resultID, dialog.Description.EditBox:GetText(),
 		dialogRoles[ROLE_TANK], dialogRoles[ROLE_HEALER], dialogRoles[ROLE_DAMAGE]);
 	dialog:Hide();
+end
+
+-- the sign up dialog is made after LFGListFrame (LFGListFrame.xml): its own OnLoad
+function LFGListApplicationDialog_OnLoad(self)
+	tinsert(UISpecialFrames, self:GetName());
+	-- the retail dialog border (NineSlice "Dialog"; DialogBorderTemplate)
+	if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
+		NineSliceUtil.ApplyLayoutByName(self, "Dialog");
+	end
+	for role, key in pairs(ROLE_KEYS) do
+		self[key].role = role;
+		self[key].CheckButton.role = role;
+		self[key].roleName = ROLE_NAMES[role];
+	end
+	self.Description.EditBox.Instructions:SetText("Комментарий (необязательно)");
 end
 
 ---------------------------------------------------------------------------
 -- the group creation
 ---------------------------------------------------------------------------
 local function FirstActivity(categoryID, groupID)
-	return C_LFGList.GetAvailableActivities(categoryID, groupID)[1];
+	local level = UnitLevel("player");
+	local activities = C_LFGList.GetAvailableActivities(categoryID, groupID);
+	for _, activityID in ipairs(activities) do
+		local activity = GetActivity(activityID);
+		if activity and level >= activity.minLevel then
+			return activityID;
+		end
+	end
+	return activities[1];
+end
+
+local function HasGroups()
+	return #C_LFGList.GetAvailableActivityGroups(selectedCategory) > 0;
 end
 
 function LFGListEntryCreation_UpdateValidState()
 	local panel = frame.EntryCreation;
-	local name = panel.Name:GetText();
+	local mythicPlus = IsMythicPlus(creationActivity);
 	panel.ItemLevelBox:SetShown(panel.ItemLevel:GetChecked() and true or false);
-	panel.ListGroupButton:SetEnabled(creationActivity ~= nil and name ~= "" and CanManageGroup());
+	-- the rating: keystone activities only
+	panel.Rating:SetShown(mythicPlus and true or false);
+	panel.RatingBox:SetShown(mythicPlus and panel.Rating:GetChecked() and true or false);
+	panel.VoiceChatBox:SetShown(panel.VoiceChat:GetChecked() and true or false);
+	-- a keystone group may have no name: "+level dungeon" from the leader's key
+	panel.Name.Instructions:SetText(mythicPlus and "По ключу (необязательно)" or "Название группы (обязательно)");
+	local nameOk = mythicPlus or panel.Name:GetText() ~= "";
+	panel.ListGroupButton:SetEnabled(creationActivity ~= nil and nameOk and CanManageGroup());
 end
 
-local function UpdateCreationDropDowns()
+local function UpdateCreationDropdowns()
 	local panel = frame.EntryCreation;
-	local groups = C_LFGList.GetAvailableActivityGroups(selectedCategory);
-	panel.GroupDropDown:SetShown(#groups > 0);
-	if #groups > 0 then
-		UIDropDownMenu_SetText(panel.GroupDropDown, creationGroup and C_LFGList.GetActivityGroupInfo(creationGroup) or "");
+	local hasGroups = HasGroups();
+	panel.GroupDropdown:SetShown(hasGroups);
+	panel.ActivityDropdown:ClearAllPoints();
+	if hasGroups then
+		panel.ActivityDropdown:SetPoint("TOPLEFT", panel, "TOPLEFT", 22, -110);
+		panel.GroupDropdown:GenerateMenu();
+	else
+		panel.ActivityDropdown:SetPoint("TOPLEFT", panel, "TOPLEFT", 22, -82);
 	end
-	local activity = creationActivity and C_LFGList.GetActivityInfoTable(creationActivity);
-	UIDropDownMenu_SetText(panel.ActivityDropDown, activity and (#groups > 0 and activity.shortName or activity.fullName) or "");
+	panel.ActivityDropdown:GenerateMenu();
+	local activity = GetActivity(creationActivity);
 	if activity and activity.ilvlSuggestion > 0 then
 		panel.ItemLevel.Label:SetText(string.format("Мин. уровень предметов (реком. %d)", activity.ilvlSuggestion));
 	else
@@ -365,37 +597,33 @@ local function UpdateCreationDropDowns()
 	LFGListEntryCreation_UpdateValidState();
 end
 
-local function GroupDropDown_Initialize()
-	for _, groupID in ipairs(C_LFGList.GetAvailableActivityGroups(selectedCategory)) do
-		local info = UIDropDownMenu_CreateInfo();
-		info.text = C_LFGList.GetActivityGroupInfo(groupID);
-		info.checked = groupID == creationGroup;
-		info.func = function()
-			creationGroup = groupID;
-			creationActivity = FirstActivity(selectedCategory, groupID);
-			UpdateCreationDropDowns();
-		end;
-		UIDropDownMenu_AddButton(info);
-	end
-end
-
-local function ActivityDropDown_Initialize()
-	local hasGroups = #C_LFGList.GetAvailableActivityGroups(selectedCategory) > 0;
-	for _, activityID in ipairs(C_LFGList.GetAvailableActivities(selectedCategory, hasGroups and creationGroup or 0)) do
-		local activity = C_LFGList.GetActivityInfoTable(activityID);
-		local info = UIDropDownMenu_CreateInfo();
-		info.text = hasGroups and activity.shortName or activity.fullName;
-		info.checked = activityID == creationActivity;
-		if UnitLevel("player") < activity.minLevel then
-			info.disabled = true;
-			info.text = info.text .. string.format(" (%d+)", activity.minLevel);
+local function SetupCreationDropdowns(panel)
+	panel.GroupDropdown:SetupMenu(function(dropdown, root)
+		for _, groupID in ipairs(C_LFGList.GetAvailableActivityGroups(selectedCategory)) do
+			root:CreateRadio(C_LFGList.GetActivityGroupInfo(groupID), function() return groupID == creationGroup; end, function()
+				creationGroup = groupID;
+				creationActivity = FirstActivity(selectedCategory, groupID);
+				UpdateCreationDropdowns();
+			end);
 		end
-		info.func = function()
-			creationActivity = activityID;
-			UpdateCreationDropDowns();
-		end;
-		UIDropDownMenu_AddButton(info);
-	end
+	end);
+	panel.ActivityDropdown:SetupMenu(function(dropdown, root)
+		local hasGroups = HasGroups();
+		local level = UnitLevel("player");
+		for _, activityID in ipairs(C_LFGList.GetAvailableActivities(selectedCategory, hasGroups and creationGroup or 0)) do
+			local activity = GetActivity(activityID);
+			local text = hasGroups and activity.shortName or activity.fullName;
+			if level < activity.minLevel then
+				text = string.format("|cff808080%s (%d+)|r", text, activity.minLevel);
+			end
+			root:CreateRadio(text, function() return activityID == creationActivity; end, function()
+				if level >= activity.minLevel then
+					creationActivity = activityID;
+				end
+				UpdateCreationDropdowns();
+			end);
+		end
+	end);
 end
 
 -- an empty form for the category, or our listing to change
@@ -403,14 +631,18 @@ local function ShowEntryCreation(entry)
 	local panel = frame.EntryCreation;
 	editing = entry ~= nil;
 	if entry then
-		local activity = C_LFGList.GetActivityInfoTable(entry.activityID);
+		local activity = GetActivity(entry.activityID);
 		selectedCategory = activity and activity.categoryID or selectedCategory;
 		creationActivity = entry.activityID;
 		creationGroup = activity and activity.groupFinderActivityGroupID ~= 0 and activity.groupFinderActivityGroupID or nil;
 		panel.Name:SetText(entry.name);
-		panel.Description:SetText(entry.comment);
+		panel.Description.EditBox:SetText(entry.comment);
 		panel.ItemLevel:SetChecked(entry.requiredItemLevel > 0);
 		panel.ItemLevelBox:SetText(entry.requiredItemLevel > 0 and entry.requiredItemLevel or "");
+		panel.Rating:SetChecked(entry.requiredDungeonScore > 0);
+		panel.RatingBox:SetText(entry.requiredDungeonScore > 0 and entry.requiredDungeonScore or "");
+		panel.VoiceChat:SetChecked(entry.voiceChat ~= "");
+		panel.VoiceChatBox:SetText(entry.voiceChat);
 		panel.AutoAccept:SetChecked(entry.autoAccept);
 		panel.PrivateGroup:SetChecked(entry.privateGroup);
 		panel.ListGroupButton:SetText("Применить");
@@ -418,9 +650,13 @@ local function ShowEntryCreation(entry)
 		creationGroup = C_LFGList.GetAvailableActivityGroups(selectedCategory)[1];
 		creationActivity = FirstActivity(selectedCategory, creationGroup or 0);
 		panel.Name:SetText("");
-		panel.Description:SetText("");
+		panel.Description.EditBox:SetText("");
 		panel.ItemLevel:SetChecked(false);
 		panel.ItemLevelBox:SetText("");
+		panel.Rating:SetChecked(false);
+		panel.RatingBox:SetText("");
+		panel.VoiceChat:SetChecked(false);
+		panel.VoiceChatBox:SetText("");
 		panel.AutoAccept:SetChecked(false);
 		panel.PrivateGroup:SetChecked(false);
 		panel.ListGroupButton:SetText("Внести в список");
@@ -428,10 +664,10 @@ local function ShowEntryCreation(entry)
 	local info = C_LFGList.GetLfgCategoryInfo(selectedCategory);
 	panel.Label:SetText(info and info.name or "");
 	ShowPanel(panel);
-	UpdateCreationDropDowns();
+	UpdateCreationDropdowns();
 end
 
-function LFGListCategorySelectionStartGroup_OnClick()
+function LFGListStartGroup_OnClick()
 	ShowEntryCreation(nil);
 end
 
@@ -446,16 +682,19 @@ end
 
 function LFGListEntryCreationListGroup_OnClick()
 	local panel = frame.EntryCreation;
+	local mythicPlus = IsMythicPlus(creationActivity);
 	local info = {
 		activityID = creationActivity,
 		name = panel.Name:GetText(),
-		comment = panel.Description:GetText(),
+		comment = panel.Description.EditBox:GetText(),
 		itemLevel = panel.ItemLevel:GetChecked() and (tonumber(panel.ItemLevelBox:GetText()) or 0) or 0,
+		minRating = mythicPlus and panel.Rating:GetChecked() and (tonumber(panel.RatingBox:GetText()) or 0) or 0,
+		voiceChat = panel.VoiceChat:GetChecked() and panel.VoiceChatBox:GetText() or "",
 		autoAccept = panel.AutoAccept:GetChecked() and true or false,
 		privateGroup = panel.PrivateGroup:GetChecked() and true or false,
 	};
 	panel.Name:ClearFocus();
-	panel.Description:ClearFocus();
+	panel.Description.EditBox:ClearFocus();
 	if editing and C_LFGList.HasActiveEntryInfo() then
 		C_LFGList.UpdateListing(info);
 	else
@@ -472,6 +711,8 @@ function LFGListApplicationViewer_UpdateApplicants()
 	local panel = frame.ApplicationViewer;
 	local manage = CanManageGroup();
 	local ids = manage and C_LFGList.GetApplicants() or {};
+	local entry = C_LFGList.GetActiveEntryInfo();
+	local mythicPlus = entry and IsMythicPlus(entry.activityID);
 	panel.NotLeader:SetShown(not manage);
 	panel.NoApplicants:SetShown(manage and #ids == 0);
 
@@ -485,9 +726,13 @@ function LFGListApplicationViewer_UpdateApplicants()
 			local classFile = CLASS_FILES[info.classID];
 			row.ClassIcon:SetAtlas("groupfinder-icon-class-" .. string.lower(classFile or "warrior"));
 			row.Name:SetText(ClassColored(info.name, info.classID));
-			row.Info:SetText(string.format("%d ур., %d предм.", info.level, info.itemLevel));
+			if mythicPlus then
+				row.Info:SetText(string.format("%d предм., рейтинг %d", info.itemLevel, info.dungeonScore));
+			else
+				row.Info:SetText(string.format("%d ур., %d предм.", info.level, info.itemLevel));
+			end
 			local index = 1;
-			for _, role in ipairs({ ROLE_TANK, ROLE_HEALER, ROLE_DAMAGE }) do
+			for _, role in ipairs(ROLE_ORDER) do
 				if bit.band(info.roles, role) ~= 0 then
 					row["Role" .. index]:SetAtlas(ROLE_ATLAS[role]);
 					row["Role" .. index]:Show();
@@ -509,6 +754,13 @@ function LFGListApplicationViewer_UpdateApplicants()
 	end
 end
 
+local function UpdateExpiration()
+	local entry = C_LFGList.GetActiveEntryInfo();
+	if entry then
+		frame.ApplicationViewer.Expiration:SetText("Исключение из списка через " .. FormatTime(entry.expires - GetTime()));
+	end
+end
+
 function LFGListApplicationViewer_Show()
 	local panel = frame.ApplicationViewer;
 	local entry = C_LFGList.GetActiveEntryInfo();
@@ -516,13 +768,25 @@ function LFGListApplicationViewer_Show()
 		LFGListFrame_ShowCategorySelection();
 		return;
 	end
-	local activity = C_LFGList.GetActivityInfoTable(entry.activityID);
+	local activity = GetActivity(entry.activityID);
 	panel.InfoBackground:SetAtlas("groupfinder-background-" .. (CATEGORY_ART[activity and activity.categoryID or 6] or "custom-pve"));
 	panel.EntryName:SetText(entry.name);
 	panel.ActivityName:SetText(activity and activity.fullName or "");
 	panel.Description:SetText(entry.comment);
-	panel.ItemLevel:SetText(entry.requiredItemLevel > 0 and string.format("Уровень предметов: %d", entry.requiredItemLevel) or "");
+	local requirements = {};
+	if entry.keyLevel > 0 then
+		table.insert(requirements, string.format("ключ +%d", entry.keyLevel));
+	end
+	if entry.requiredItemLevel > 0 then
+		table.insert(requirements, string.format("уровень предметов %d", entry.requiredItemLevel));
+	end
+	if entry.requiredDungeonScore > 0 then
+		table.insert(requirements, string.format("рейтинг %d", entry.requiredDungeonScore));
+	end
+	panel.Requirements:SetText(table.concat(requirements, ", "));
 	panel.AutoAcceptText:SetShown(entry.autoAccept);
+	panel.VoiceChatIcon:SetShown(entry.voiceChat ~= "");
+	UpdateExpiration();
 	local manage = CanManageGroup();
 	panel.RemoveEntryButton:SetEnabled(manage);
 	panel.EditButton:SetEnabled(manage);
@@ -563,6 +827,14 @@ function LFGListApplicant_OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 25, 0);
 	GameTooltip:SetText(ClassColored(info.name, info.classID));
 	GameTooltip:AddLine(string.format("Уровень %d, уровень предметов %d", info.level, info.itemLevel), 1, 1, 1);
+	GameTooltip:AddLine(string.format("Рейтинг М+: %d", info.dungeonScore), 1, 1, 1);
+	local roles = {};
+	for _, role in ipairs(ROLE_ORDER) do
+		if bit.band(info.roles, role) ~= 0 then
+			table.insert(roles, ROLE_NAMES[role]);
+		end
+	end
+	GameTooltip:AddLine("Роли: " .. table.concat(roles, ", "), 1, 1, 1);
 	if info.comment ~= "" then
 		GameTooltip:AddLine(" ");
 		GameTooltip:AddLine("\"" .. info.comment .. "\"", 0.75, 0.75, 0.75, true);
@@ -581,7 +853,7 @@ local function OnLFGListEvent(event, ...)
 		if frame.CategorySelection:IsShown() then
 			UpdateCategorySelection();
 		elseif frame.EntryCreation:IsShown() then
-			UpdateCreationDropDowns();
+			UpdateCreationDropdowns();
 		end
 	elseif event == "LFG_LIST_ACTIVE_ENTRY_UPDATE" then
 		if C_LFGList.HasActiveEntryInfo() then
@@ -619,23 +891,21 @@ function LFGListFrame_OnLoad(self)
 		applicantRows[i] = row;
 	end
 
-	local search = self.SearchPanel.SearchBox;
-	search.Instructions:SetText(SEARCH or "Поиск");
+	self.SearchPanel.SearchBox.Instructions:SetText(SEARCH or "Поиск");
+	SetupFilterButton(self.SearchPanel.FilterButton);
 
 	local creation = self.EntryCreation;
-	UIDropDownMenu_SetWidth(creation.GroupDropDown, 260);
-	UIDropDownMenu_Initialize(creation.GroupDropDown, GroupDropDown_Initialize);
-	UIDropDownMenu_SetWidth(creation.ActivityDropDown, 260);
-	UIDropDownMenu_Initialize(creation.ActivityDropDown, ActivityDropDown_Initialize);
-	creation.Name.Instructions:SetText("Название группы (обязательно)");
-	creation.Description.Instructions:SetText("Подробности (необязательно)");
+	SetupCreationDropdowns(creation);
+	creation.Description.EditBox.Instructions:SetText("Подробности (необязательно)");
 	creation.Name.onTextChanged = LFGListEntryCreation_UpdateValidState;
 	creation.ItemLevel.Label:SetText("Минимальный уровень предметов");
+	creation.Rating.Label:SetText("Минимальный рейтинг М+");
+	creation.VoiceChat.Label:SetText("Голосовой чат");
+	creation.VoiceChatBox.Instructions:SetText("Канал / сервер");
 	creation.AutoAccept.Label:SetText("Автоматически принимать заявки");
 	creation.PrivateGroup.Label:SetText("Частная группа (не видна в поиске)");
-	creation.Name:SetScript("OnTabPressed", function() creation.Description:SetFocus(); end);
-	creation.Description:SetScript("OnTabPressed", function() creation.Name:SetFocus(); end);
-
+	creation.Name:SetScript("OnTabPressed", function() creation.Description.EditBox:SetFocus(); end);
+	creation.Description.EditBox:SetScript("OnTabPressed", function() creation.Name:SetFocus(); end);
 
 	LFGList_RegisterCallback(OnLFGListEvent);
 	self:RegisterEvent("PARTY_MEMBERS_CHANGED");
@@ -656,18 +926,6 @@ function LFGListFrame_OnLoad(self)
 	end);
 end
 
--- the sign up dialog is made after LFGListFrame (LFGListFrame.xml): its own OnLoad
-function LFGListApplicationDialog_OnLoad(self)
-	tinsert(UISpecialFrames, self:GetName());
-	local dialog = self;
-	for role, key in pairs({ [ROLE_TANK] = "Tank", [ROLE_HEALER] = "Healer", [ROLE_DAMAGE] = "Damager" }) do
-		dialog[key].role = role;
-		dialog[key].roleName = role == ROLE_TANK and (TANK or "Танк") or role == ROLE_HEALER and (HEALER or "Лекарь") or (DAMAGER or "Боец");
-		dialog[key].Icon:SetAtlas(ROLE_ATLAS[role]);
-	end
-	dialog.Description.Instructions:SetText("Комментарий (необязательно)");
-end
-
 function LFGListFrame_OnShow(self)
 	LayerInset(self);
 	C_LFGList.RequestAvailableActivities();
@@ -682,7 +940,7 @@ function LFGListFrame_OnHide(self)
 	LFGListApplicationDialog:Hide();
 end
 
--- the application timers
+-- the timers: our applications, our listing
 function LFGListFrame_OnUpdate(self, elapsed)
 	self.timer = (self.timer or 0) + elapsed;
 	if self.timer < 1 then
@@ -691,5 +949,7 @@ function LFGListFrame_OnUpdate(self, elapsed)
 	self.timer = 0;
 	if self.SearchPanel:IsShown() then
 		LFGListSearchPanel_UpdateResults();
+	elseif self.ApplicationViewer:IsShown() then
+		UpdateExpiration();
 	end
 end
