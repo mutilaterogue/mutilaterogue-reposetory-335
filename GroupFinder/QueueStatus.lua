@@ -2,52 +2,133 @@
 --   dungeon finder: the stock MiniMapLFGFrame lies invisible over the eye - its clicks, its dropdown and its
 --                   LFDSearchStatus as before, only placed here;
 --   raid finder:    RaidFinder_GetQueueInfo() (RaidFinder.lua), RaidFinderSearchStatus on mouse over.
--- The eye plays the retail flipbooks frame by frame: searching while queued, found for a proposal.
+-- The eye plays the retail flipbooks frame by frame: the opening one and searching while queued, the found one with
+-- its shards and glows for a proposal, the mouse over one on mouse over.
 
+-- the retail flipbooks (Blizzard_QueueStatusFrame\QueueStatusFrame.xml, EyeTemplate)
 local FLIPBOOKS = {
+	initial = { atlas = "groupfinder-eye-flipbook-initial", rows = 5, columns = 11, frames = 52, duration = 1.5, once = true },
 	searching = { atlas = "groupfinder-eye-flipbook-searching", rows = 8, columns = 11, frames = 80, duration = 2 },
+	foundInitial = { atlas = "groupfinder-eye-flipbook-found-initial", rows = 7, columns = 11, frames = 70, duration = 2, once = true },
 	found = { atlas = "groupfinder-eye-flipbook-found-loop", rows = 4, columns = 11, frames = 41, duration = 1.5 },
-	-- retail mouse over: the eye looks at the cursor once, then back to what it played
+	-- the mouse over: the eye looks at the cursor once, then back to what it played
 	mouseover = { atlas = "groupfinder-eye-flipbook-mouseover", rows = 1, columns = 12, frames = 12, duration = 0.4, once = true },
+	-- the shards flying off when the group is found
+	shards = { atlas = "groupfinder-eye-flipbook-foundfx", rows = 5, columns = 15, frames = 75, duration = 2, once = true },
 };
+-- after a one-shot: the loop it leads into
+local NEXT = { initial = "searching", foundInitial = "found" };
 
 local lfdShown = false;		-- the stock dungeon finder's eye is "shown" (it is invisible here)
-local flipbook, flipbookTime = nil, 0;
-local stateFlipbook;		-- what the queue state plays (the mouse over returns to it)
+local state;				-- "searching" / "found" / nil: what the queues want the eye to play
+local players = {};			-- texture -> { name, book, rect, time }
+local fades = {};			-- texture -> { from, to, duration, time }
+local rects = {};			-- atlas -> { file, left, top, width, height } of one flipbook frame
 
--- the file and the rect of an atlas: set it on the eye and read them back (SetAtlas, AtlasHelper.lua)
-local function AtlasRect(atlas)
-	local eye = QueueStatusButton.Eye;
-	eye:SetAtlas(atlas);
-	local file = eye:GetTexture();
-	local ulx, uly, llx, lly, urx, ury = eye:GetTexCoord();
-	if not file or not ulx then
-		return;
+-- an atlas' file and the size of one frame, read once from a scratch texture (SetAtlas, AtlasHelper.lua) -
+-- the eye itself never shows the whole sheet
+local function FrameRect(book)
+	local rect = rects[book.atlas];
+	if rect == nil then
+		local scratch = QueueStatusButton.Scratch;
+		scratch:SetAtlas(book.atlas);
+		local file = scratch:GetTexture();
+		local ulx, uly, llx, lly, urx = scratch:GetTexCoord();
+		rect = file and ulx and { file = file, left = ulx, top = uly,
+			width = (urx - ulx) / book.columns, height = (lly - uly) / book.rows } or false;
+		rects[book.atlas] = rect;
 	end
-	return file, ulx, urx, uly, lly;
+	return rect or nil;
 end
 
--- a flipbook (nil: the still eye)
-local function SetFlipbook(name)
-	local eye = QueueStatusButton.Eye;
-	if flipbook and name and flipbook.name == name then
+local function ShowFrame(texture, player, frame)
+	local column = frame % player.book.columns;
+	local row = math.floor(frame / player.book.columns);
+	local rect = player.rect;
+	local left = rect.left + column * rect.width;
+	local top = rect.top + row * rect.height;
+	texture:SetTexCoord(left, left + rect.width, top, top + rect.height);
+end
+
+-- play a flipbook on a texture (nil: stop; the eye shows the still eye then)
+local function Play(texture, name)
+	local book = name and FLIPBOOKS[name];
+	local rect = book and FrameRect(book);
+	if not rect then
+		players[texture] = nil;
+		if texture == QueueStatusButton.Eye then
+			texture:SetAtlas("groupfinder-eye-single");
+		else
+			texture:Hide();
+		end
 		return;
 	end
-	if not name then
-		flipbook = nil;
-		eye:SetAtlas("groupfinder-eye-single");
+	local player = { name = name, book = book, rect = rect, time = 0 };
+	players[texture] = player;
+	texture:SetTexture(rect.file);
+	ShowFrame(texture, player, 0);		-- the first frame at once: never the whole sheet
+	texture:Show();
+end
+
+local function Fade(texture, from, to, duration)
+	texture:SetAlpha(from);
+	texture:Show();
+	fades[texture] = { from = from, to = to, duration = duration, time = 0 };
+end
+
+-- the eye to what the state plays: the retail opening one-shots when it changes
+local function PlayState(newState)
+	local button = QueueStatusButton;
+	if newState == state then
 		return;
 	end
-	local book = FLIPBOOKS[name];
-	local file, left, right, top, bottom = AtlasRect(book.atlas);
-	if not file then
-		flipbook = nil;
-		eye:SetAtlas("groupfinder-eye-single");
-		return;
+	local old = state;
+	state = newState;
+	if newState == "searching" then
+		Play(button.Eye, old == nil and "initial" or "searching");
+		if old == nil then
+			Fade(button.GlowBack, 1, 0, 1);
+			Fade(button.GlowFront, 1, 0, 1);
+			Fade(button.CircShine, 1, 0, 2);
+		end
+	elseif newState == "found" then
+		Play(button.Eye, "foundInitial");
+		Play(button.Shards, "shards");
+		Fade(button.GlowBack, 1, 0.2, 2);
+		Fade(button.GlowFront, 1, 0, 1.5);
+	else
+		Play(button.Eye, nil);
 	end
-	flipbook = { name = name, book = book, left = left, top = top,
-		width = (right - left) / book.columns, height = (bottom - top) / book.rows };
-	flipbookTime = 0;
+end
+
+local function UpdateAnimations(elapsed)
+	for texture, player in pairs(players) do
+		local book = player.book;
+		player.time = player.time + elapsed;
+		if book.once and player.time >= book.duration then
+			-- a one-shot ended: its loop, or (the mouse over) back to the state's own
+			local nextName = NEXT[player.name];
+			if texture == QueueStatusButton.Eye then
+				Play(texture, nextName or state);
+			else
+				Play(texture, nil);
+			end
+		else
+			local frame = math.floor((player.time % book.duration) / book.duration * book.frames);
+			ShowFrame(texture, player, math.min(frame, book.frames - 1));
+		end
+	end
+	for texture, fade in pairs(fades) do
+		fade.time = fade.time + elapsed;
+		local progress = math.min(fade.time / fade.duration, 1);
+		texture:SetAlpha(fade.from + (fade.to - fade.from) * progress);
+		if progress >= 1 then
+			fades[texture] = nil;
+			if fade.to <= 0 then
+				texture:Hide();
+			end
+		end
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -120,7 +201,10 @@ local function PlaceStatus()
 end
 
 local function ShowStatus()
-	SetFlipbook("mouseover");
+	local eye = players[QueueStatusButton.Eye];
+	if not (eye and eye.book.once) then
+		Play(QueueStatusButton.Eye, "mouseover");
+	end
 	UpdateRaidStatus();
 	if RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo() then
 		RaidFinderSearchStatus:Show();
@@ -143,22 +227,7 @@ function QueueStatusButton_OnUpdate(self, elapsed)
 			UpdateRaidStatus();
 		end
 	end
-	if not flipbook then
-		return;
-	end
-	local book = flipbook.book;
-	flipbookTime = flipbookTime + elapsed;
-	if book.once and flipbookTime >= book.duration then
-		SetFlipbook(stateFlipbook);
-		return;
-	end
-	flipbookTime = flipbookTime % book.duration;
-	local frame = math.floor(flipbookTime / book.duration * book.frames);
-	local column = frame % book.columns;
-	local row = math.floor(frame / book.columns);
-	local left = flipbook.left + column * flipbook.width;
-	local top = flipbook.top + row * flipbook.height;
-	self.Eye:SetTexCoord(left, left + flipbook.width, top, top + flipbook.height);
+	UpdateAnimations(elapsed);
 end
 
 ---------------------------------------------------------------------------
@@ -168,6 +237,7 @@ function QueueStatus_Update()
 	local button = QueueStatusButton;
 	local raid = RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo();
 	if not lfdShown and not raid then
+		PlayState(nil);
 		button:Hide();
 		HideStatus();
 		return;
@@ -175,20 +245,16 @@ function QueueStatus_Update()
 	button:Show();
 
 	local mode = lfdShown and GetLFGMode and GetLFGMode();
+	local newState;
 	if (raid and raid.state == "proposal") or mode == "proposal" then
-		stateFlipbook = "found";
+		newState = "found";
 	elseif (raid and (raid.state == "queued" or raid.state == "rolecheck"))
 		or mode == "queued" or mode == "listed" or mode == "rolecheck" then
-		stateFlipbook = "searching";
-	else
-		stateFlipbook = nil;
+		newState = "searching";
 	end
-	-- (a mouse over playing: it returns to the state's own when it ends)
-	if not (flipbook and flipbook.book.once) then
-		SetFlipbook(stateFlipbook);
-	end
+	PlayState(newState);
 	-- the glow: only when the group is found (retail pulses it then)
-	button.Highlight:SetShown(stateFlipbook == "found");
+	button.Highlight:SetShown(newState == "found");
 
 	if RaidFinderSearchStatus:IsShown() then
 		UpdateRaidStatus();

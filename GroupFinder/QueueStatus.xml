@@ -20,12 +20,47 @@
 					</Anchors>
 				</Texture>
 			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture parentKey="GlowBack" atlas="groupfinder-eye-backglow" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
 			<Layer level="ARTWORK">
 				<!-- the eye: groupfinder-eye-flipbook-* played frame by frame in QueueStatus.lua -->
 				<Texture parentKey="Eye">
 					<Size x="44" y="44"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<!-- only to read an atlas' file and coords from (never shown) -->
+				<Texture parentKey="Scratch" hidden="true">
+					<Size x="1" y="1"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="CircShine" atlas="groupfinder-eye-circshine" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="GlowFront" atlas="groupfinder-eye-frontglow" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<!-- the found shards (groupfinder-eye-flipbook-foundfx) -->
+				<Texture parentKey="Shards" hidden="true">
+					<Size x="75" y="75"/>
+					<Anchors>
+						<Anchor point="CENTER" x="-1" y="37"/>
 					</Anchors>
 				</Texture>
 			</Layer>
