@@ -20,6 +20,11 @@ local BARS = {
 
 local layoutPending;
 
+-- a frame the Edit Mode layout places itself (ActionBarsEditMode.lua): not moved here
+local function Placed(name)
+	return EditModeCore and EditModeCore.HasPosition and EditModeCore:HasPosition(name);
+end
+
 function MultiActionBarsRetail_Layout()
 	-- the bars hold secure buttons: no moving them in combat
 	if InCombatLockdown() then
@@ -32,20 +37,26 @@ function MultiActionBarsRetail_Layout()
 	local below = MainActionBar;
 	for _, name in ipairs({ "MultiBarBottomLeft", "MultiBarBottomRight" }) do
 		local bar = _G[name];
-		bar:ClearAllPoints();
-		bar:SetPoint("BOTTOMLEFT", below, "TOPLEFT", 0, BAR_SPACING);
-		if bar:IsShown() then
-			below = bar;
+		if not Placed(name) then
+			bar:ClearAllPoints();
+			bar:SetPoint("BOTTOMLEFT", below, "TOPLEFT", 0, BAR_SPACING);
+			if bar:IsShown() then
+				below = bar;
+			end
 		end
 	end
 
 	-- the stance bar (StanceBar): small buttons over the top bottom bar, at its left
-	ShapeshiftBarFrame:ClearAllPoints();
-	ShapeshiftBarFrame:SetPoint("BOTTOMLEFT", below, "TOPLEFT", 0, BAR_SPACING);
+	if not Placed("ShapeshiftBarFrame") then
+		ShapeshiftBarFrame:ClearAllPoints();
+		ShapeshiftBarFrame:SetPoint("BOTTOMLEFT", below, "TOPLEFT", 0, BAR_SPACING);
+	end
 
 	-- the pet bar: right over the top bottom bar (its buttons stand on PetActionBarRetail, see PetBarRetail_Setup)
-	PetActionBarRetail:ClearAllPoints();
-	PetActionBarRetail:SetPoint("BOTTOMRIGHT", below, "TOPRIGHT", 0, BAR_SPACING);
+	if not Placed("PetActionBarRetail") then
+		PetActionBarRetail:ClearAllPoints();
+		PetActionBarRetail:SetPoint("BOTTOMRIGHT", below, "TOPRIGHT", 0, BAR_SPACING);
+	end
 
 	-- the totem bar: where the stance bar is (a shaman has no stances). It slides from MainMenuBar's top left
 	-- (MultiCastActionBarFrame.lua): give the slide that place
@@ -59,16 +70,21 @@ function MultiActionBarsRetail_Layout()
 
 	-- right bars: at the right edge, centered, MultiBarLeft left of MultiBarRight
 	-- centered on the screen's height, but never over the minimap (a big UI scale leaves little height)
-	MultiBarRight:ClearAllPoints();
-	local screenHeight = UIParent:GetHeight();
-	local minimapBottom = MinimapCluster and MinimapCluster:GetBottom();
-	if minimapBottom and (screenHeight + BAR_LENGTH) / 2 > minimapBottom - BAR_SPACING then
-		MultiBarRight:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -5, minimapBottom - BAR_SPACING - screenHeight);
-	else
-		MultiBarRight:SetPoint("RIGHT", UIParent, "RIGHT", -5, 0);
+	if not Placed("MultiBarRight") then
+		MultiBarRight:ClearAllPoints();
+		local screenHeight = UIParent:GetHeight();
+		local minimapBottom = MinimapCluster and MinimapCluster:GetBottom();
+		local length = MultiBarRight:GetHeight();
+		if minimapBottom and (screenHeight + length) / 2 > minimapBottom - BAR_SPACING then
+			MultiBarRight:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -5, minimapBottom - BAR_SPACING - screenHeight);
+		else
+			MultiBarRight:SetPoint("RIGHT", UIParent, "RIGHT", -5, 0);
+		end
 	end
-	MultiBarLeft:ClearAllPoints();
-	MultiBarLeft:SetPoint("TOPRIGHT", MultiBarRight, "TOPLEFT", -BAR_SPACING, 0);
+	if not Placed("MultiBarLeft") then
+		MultiBarLeft:ClearAllPoints();
+		MultiBarLeft:SetPoint("TOPRIGHT", MultiBarRight, "TOPLEFT", -BAR_SPACING, 0);
+	end
 end
 
 local function MultiActionBarsRetail_Setup()

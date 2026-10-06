@@ -1282,9 +1282,9 @@ loader:SetScript("OnEvent", function(self, event)
 		{ "FocusFrame", FocusFrame, HUD_EDIT_MODE_FOCUS_FRAME_LABEL },
 		{ "PartyMemberFrame1", PartyMemberFrame1, HUD_EDIT_MODE_PARTY_FRAMES_LABEL },
 		{ "CompactRaidFrameContainer", CompactRaidFrameContainer, HUD_EDIT_MODE_RAID_FRAMES_LABEL },
-		{ "MinimapCluster", MinimapCluster, HUD_EDIT_MODE_MINIMAP_LABEL },
-		{ "ObjectiveTrackerFrame", ObjectiveTrackerFrame, HUD_EDIT_MODE_OBJECTIVE_TRACKER_LABEL },
-		{ "CastingBarFrame", CastingBarFrame, HUD_EDIT_MODE_CAST_BAR_LABEL },
+		{ "MinimapCluster", MinimapCluster, HUD_EDIT_MODE_MINIMAP_LABEL, nil, { category = "misc" } },
+		{ "ObjectiveTrackerFrame", ObjectiveTrackerFrame, HUD_EDIT_MODE_OBJECTIVE_TRACKER_LABEL, nil, { category = "misc" } },
+		{ "CastingBarFrame", CastingBarFrame, HUD_EDIT_MODE_CAST_BAR_LABEL, nil, { category = "combat" } },
 		-- retail: the queue eye is part of the micro menu - its size is a setting of the menu, not a system
 		{ "MicroMenuFrame", MicroMenuFrame, HUD_EDIT_MODE_MICRO_MENU_LABEL, {
 			{
@@ -1296,14 +1296,14 @@ loader:SetScript("OnEvent", function(self, event)
 					end
 				end,
 			},
-		} },
-		{ "BackpackFrame", BackpackFrame, HUD_EDIT_MODE_BAGS_LABEL },
-		{ "ChatFrame1", ChatFrame1, HUD_EDIT_MODE_CHAT_FRAME_LABEL },
-		{ "LossOfControlFrame", LossOfControlFrame, HUD_EDIT_MODE_LOSS_OF_CONTROL_LABEL },
+		}, { category = "misc" } },
+		{ "BackpackFrame", BackpackFrame, HUD_EDIT_MODE_BAGS_LABEL, nil, { category = "misc" } },
+		{ "ChatFrame1", ChatFrame1, HUD_EDIT_MODE_CHAT_FRAME_LABEL, nil, { category = "misc" } },
+		{ "LossOfControlFrame", LossOfControlFrame, HUD_EDIT_MODE_LOSS_OF_CONTROL_LABEL, nil, { category = "combat" } },
 	};
 
 	for _, entry in ipairs(defaults) do
-		EditModeCore:RegisterSystem(entry[1], entry[2], entry[3], entry[4]);
+		EditModeCore:RegisterSystem(entry[1], entry[2], entry[3], entry[4], entry[5]);
 	end
 
 	EditModeCore:ApplyLayout();

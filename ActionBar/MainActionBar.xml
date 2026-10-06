@@ -503,6 +503,7 @@
 	</Frame>
 	<!-- the extra bars: after MainActionBar, they stack on it -->
 	<Script file="MultiActionBarsRetail.lua"/>
+	<Script file="ActionBarsEditMode.lua"/>
 	<!-- the experience / reputation bars: under the main action bar -->
 	<Include file="StatusTrackingBarRetail.xml"/>
 	<!-- the bags bar -->
