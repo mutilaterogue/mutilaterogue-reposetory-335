@@ -74,109 +74,88 @@
 		</Scripts>
 	</Button>
 
-	<!-- a role of the raid finder's queue: the role icon, "queued / needed" under it -->
-	<Frame name="RaidFinderSearchStatusRoleTemplate" virtual="true">
-		<Size x="55" y="70"/>
+	<!-- retail QueueStatusRoleCountTemplate: a role icon, "found / needed" under it -->
+	<Frame name="QueueStatusRoleCountTemplate" virtual="true">
+		<Size x="40" y="40"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<Texture name="$parentTexture" parentKey="texture" file="Interface\LFGFrame\UI-LFG-ICON-ROLES">
-					<Size x="55" y="55"/>
+				<Texture parentKey="RoleIcon" setAllPoints="true"/>
+				<FontString name="$parentCount" parentKey="Count" inherits="GameFontHighlight">
 					<Anchors>
-						<Anchor point="TOP"/>
-					</Anchors>
-				</Texture>
-				<FontString name="$parentCount" parentKey="count" inherits="GameFontHighlight" justifyH="CENTER">
-					<Anchors>
-						<Anchor point="TOP" relativeTo="$parentTexture" relativePoint="BOTTOM" x="0" y="-2"/>
+						<Anchor point="TOP" relativePoint="BOTTOM" x="0" y="-2"/>
 					</Anchors>
 				</FontString>
-			</Layer>
-			<Layer level="OVERLAY">
-				<!-- not enough queued for this role yet: dimmed, as the dungeon finder's empty slots -->
-				<Texture parentKey="cover" file="Interface\LFGFrame\UI-LFG-ICON-ROLES" alpha="0.5" hidden="true">
-					<Size x="55" y="55"/>
-					<Anchors>
-						<Anchor point="TOP"/>
-					</Anchors>
-					<TexCoords left="0" right="0.2617" top="0.5234" bottom="0.7851"/>
-				</Texture>
 			</Layer>
 		</Layers>
 	</Frame>
 
-	<!-- the raid finder's queue, laid out as LFDSearchStatus -->
-	<Frame name="RaidFinderSearchStatus" parent="UIParent" frameStrata="TOOLTIP" hidden="true">
-		<Size x="300" y="170"/>
-		<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
-			<EdgeSize>
-				<AbsValue val="16"/>
-			</EdgeSize>
-			<TileSize>
-				<AbsValue val="16"/>
-			</TileSize>
-			<BackgroundInsets>
-				<AbsInset left="5" right="5" top="5" bottom="5"/>
-			</BackgroundInsets>
-		</Backdrop>
+	<!-- retail QueueStatusEntryTemplate: one queue in the status frame (the height set in QueueStatus.lua) -->
+	<Frame name="QueueStatusEntryTemplate" virtual="true">
+		<Size x="275" y="150"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentTitle" parentKey="title" inherits="GameFontHighlight">
+				<FontString parentKey="Title" inherits="GameFontHighlightLarge" justifyH="LEFT" justifyV="TOP">
 					<Anchors>
-						<Anchor point="TOP" x="0" y="-15"/>
+						<Anchor point="TOPLEFT" x="10" y="-10"/>
+						<Anchor point="RIGHT" x="-10" y="0"/>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentElapsedWaitTime" parentKey="elapsedWait" inherits="GameFontNormal" justifyH="CENTER">
-					<Anchors>
-						<Anchor point="BOTTOM" x="0" y="38"/>
-					</Anchors>
+				<FontString parentKey="SubTitle" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+					<Size x="260" y="0"/>
 				</FontString>
-				<FontString name="$parentLookingFor" parentKey="lookingFor" inherits="GameFontHighlight" justifyH="CENTER" text="SEARCHING_FOR_GROUPS_NEEDS">
-					<Anchors>
-						<Anchor point="BOTTOM" x="0" y="14"/>
-					</Anchors>
+				<FontString parentKey="Status" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+					<Size x="260" y="0"/>
 				</FontString>
-				<Texture name="$parentRoleIcon1" inherits="LFDSearchStatusRoleIconTemplate">
+				<!-- your roles, at the top right -->
+				<Texture parentKey="RoleIcon1">
+					<Size x="23" y="23"/>
 					<Anchors>
-						<Anchor point="LEFT" relativeTo="$parentLookingFor" relativePoint="RIGHT" x="2" y="0"/>
+						<Anchor point="TOPRIGHT" x="-7" y="-8"/>
 					</Anchors>
 				</Texture>
-				<Texture name="$parentRoleIcon2" inherits="LFDSearchStatusRoleIconTemplate">
-					<Anchors>
-						<Anchor point="LEFT" relativeTo="$parentRoleIcon1" relativePoint="RIGHT" x="2" y="0"/>
-					</Anchors>
+				<Texture parentKey="RoleIcon2">
+					<Size x="23" y="23"/>
 				</Texture>
-				<Texture name="$parentRoleIcon3" inherits="LFDSearchStatusRoleIconTemplate">
+				<Texture parentKey="RoleIcon3">
+					<Size x="23" y="23"/>
+				</Texture>
+				<FontString parentKey="TimeInQueue" inherits="GameFontNormal" justifyH="LEFT"/>
+				<FontString parentKey="AverageWait" inherits="GameFontNormal" justifyH="LEFT"/>
+				<!-- between the entries (hidden on the first) -->
+				<Texture parentKey="EntrySeparator">
+					<Size x="275" y="2"/>
 					<Anchors>
-						<Anchor point="LEFT" relativeTo="$parentRoleIcon2" relativePoint="RIGHT" x="2" y="0"/>
+						<Anchor point="TOPLEFT" x="4" y="0"/>
+						<Anchor point="TOPRIGHT" x="-4" y="0"/>
 					</Anchors>
+					<Color r="0.25" g="0.25" b="0.25"/>
 				</Texture>
 			</Layer>
 		</Layers>
 		<Frames>
-			<Frame name="$parentHealer" parentKey="Healer" inherits="RaidFinderSearchStatusRoleTemplate">
+			<Frame parentKey="HealersFound" inherits="QueueStatusRoleCountTemplate">
 				<Anchors>
-					<Anchor point="TOP" x="0" y="-38"/>
+					<Anchor point="TOP"/>
 				</Anchors>
 			</Frame>
-			<Frame name="$parentTank" parentKey="Tank" inherits="RaidFinderSearchStatusRoleTemplate">
-				<Anchors>
-					<Anchor point="RIGHT" relativeTo="$parentHealer" relativePoint="LEFT" x="-25" y="0"/>
-				</Anchors>
-			</Frame>
-			<Frame name="$parentDamage" parentKey="Damage" inherits="RaidFinderSearchStatusRoleTemplate">
-				<Anchors>
-					<Anchor point="LEFT" relativeTo="$parentHealer" relativePoint="RIGHT" x="25" y="0"/>
-				</Anchors>
-			</Frame>
+			<Frame parentKey="TanksFound" inherits="QueueStatusRoleCountTemplate"/>
+			<Frame parentKey="DamagersFound" inherits="QueueStatusRoleCountTemplate"/>
 		</Frames>
-		<Scripts>
-			<OnLoad>
-				self:SetBackdropBorderColor(TOOLTIP_DEFAULT_COLOR.r, TOOLTIP_DEFAULT_COLOR.g, TOOLTIP_DEFAULT_COLOR.b);
-				self:SetBackdropColor(TOOLTIP_DEFAULT_BACKGROUND_COLOR.r, TOOLTIP_DEFAULT_BACKGROUND_COLOR.g, TOOLTIP_DEFAULT_BACKGROUND_COLOR.b);
-				self.Tank.texture:SetTexCoord(GetTexCoordsForRole("TANK"));
-				self.Healer.texture:SetTexCoord(GetTexCoordsForRole("HEALER"));
-				self.Damage.texture:SetTexCoord(GetTexCoordsForRole("DAMAGER"));
-			</OnLoad>
-		</Scripts>
+	</Frame>
+
+	<!-- retail QueueStatusFrame: every queue on mouse over of the eye -->
+	<Frame name="QueueStatusFrame" parent="UIParent" frameStrata="TOOLTIP" hidden="true" clampedToScreen="true" inherits="TooltipBackdropTemplate">
+		<Size x="275" y="150"/>
+		<Anchors>
+			<Anchor point="BOTTOMRIGHT" relativeTo="QueueStatusButton" relativePoint="TOPLEFT" x="0" y="0"/>
+		</Anchors>
+		<Frames>
+			<Frame name="$parentDungeon" parentKey="Dungeon" inherits="QueueStatusEntryTemplate">
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-2"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentRaid" parentKey="Raid" inherits="QueueStatusEntryTemplate"/>
+		</Frames>
 	</Frame>
 </Ui>

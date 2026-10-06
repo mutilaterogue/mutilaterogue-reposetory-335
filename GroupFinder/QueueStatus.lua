@@ -1,7 +1,7 @@
 -- The retail queue status button (QueueStatus.xml): one eye left of the micro menu for every queue.
---   dungeon finder: the stock MiniMapLFGFrame lies invisible over the eye - its clicks, its dropdown and its
---                   LFDSearchStatus as before, only placed here;
---   raid finder:    RaidFinder_GetQueueInfo() (RaidFinder.lua), RaidFinderSearchStatus on mouse over.
+--   dungeon finder: the stock MiniMapLFGFrame lies invisible over the eye - its clicks and its dropdown as before;
+--   raid finder:    RaidFinder_GetQueueInfo() (RaidFinder.lua).
+-- On mouse over the retail status frame (QueueStatusFrame): an entry for each queue, retail role icons.
 -- The eye plays the retail flipbooks frame by frame: the opening one and searching while queued, the found one with
 -- its shards and glows for a proposal, the mouse over one on mouse over.
 
@@ -132,72 +132,197 @@ local function UpdateAnimations(elapsed)
 end
 
 ---------------------------------------------------------------------------
--- the raid finder's status (RaidFinderSearchStatus)
+-- the status frame (retail QueueStatusFrame): an entry for every queue
 ---------------------------------------------------------------------------
-local function SetRoleCount(role, have, need)
-	role.count:SetFormattedText("%d / %d", have, need);
-	if have >= need then
-		role.count:SetTextColor(0, 1, 0);
-		role.cover:Hide();
-		role.texture:SetDesaturated(false);
-	else
-		role.count:SetTextColor(1, 1, 1);
-		role.cover:Show();
-		role.texture:SetDesaturated(true);
-	end
+local ROLE_ATLAS = { TANK = "UI-LFG-RoleIcon-Tank", HEALER = "UI-LFG-RoleIcon-Healer", DAMAGER = "UI-LFG-RoleIcon-DPS" };
+
+-- retail GetIconForRole: the disabled one while the role still needs players
+local function RoleAtlas(role, disabled)
+	return ROLE_ATLAS[role] .. (disabled and "-Disabled" or "");
 end
 
-local function UpdateRaidStatus()
-	local status = RaidFinderSearchStatus;
-	local info = RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo();
-	if not info then
-		status:Hide();
+local function InitEntry(entry)
+	if entry.initialized then
 		return;
 	end
-	if info.state == "rolecheck" then
-		status.title:SetText("Проверка ролей: " .. info.name);
-	elseif info.state == "proposal" then
-		status.title:SetText("Рейд собран: " .. info.name);
-	else
-		status.title:SetText("Формирование рейда: " .. info.name);
-	end
-	SetRoleCount(status.Tank, info.tanks, info.tanksNeeded);
-	SetRoleCount(status.Healer, info.healers, info.healersNeeded);
-	SetRoleCount(status.Damage, info.damage, info.damageNeeded);
-
-	local elapsed = info.seconds;
-	status.elapsedWait:SetFormattedText(TIME_IN_QUEUE, (elapsed >= 60) and SecondsToTime(elapsed) or LESS_THAN_ONE_MINUTE);
-
-	-- "you are queued as": the role icons
-	local index = 1;
-	for _, entry in ipairs({ { 1, "TANK" }, { 2, "HEALER" }, { 4, "DAMAGER" } }) do
-		if bit.band(info.roles, entry[1]) ~= 0 then
-			local icon = _G["RaidFinderSearchStatusRoleIcon" .. index];
-			icon:SetTexCoord(GetTexCoordsForRole(entry[2]));
-			icon:Show();
-			index = index + 1;
-		end
-	end
-	for i = index, 3 do
-		_G["RaidFinderSearchStatusRoleIcon" .. i]:Hide();
-	end
-	status.lookingFor:ClearAllPoints();
-	status.lookingFor:SetPoint("BOTTOM", status, "BOTTOM", -27 * (index - 1) / 2, 14);
+	entry.initialized = true;
+	entry.RoleIcon2:SetPoint("RIGHT", entry.RoleIcon1, "LEFT", 0, 0);
+	entry.RoleIcon3:SetPoint("RIGHT", entry.RoleIcon2, "LEFT", 0, 0);
+	entry.TanksFound:SetPoint("RIGHT", entry.HealersFound, "LEFT", -10, 0);
+	entry.DamagersFound:SetPoint("LEFT", entry.HealersFound, "RIGHT", 10, 0);
 end
 
--- left of the eye, above the dungeon finder's status when that one is shown too
-local function PlaceStatus()
-	local anchor = QueueStatusButton;
-	if LFDSearchStatus and LFDSearchStatus:IsShown() then
-		LFDSearchStatus:ClearAllPoints();
-		LFDSearchStatus:SetPoint("BOTTOMRIGHT", anchor, "TOPLEFT", 0, 0);
-		anchor = LFDSearchStatus;
-		RaidFinderSearchStatus:ClearAllPoints();
-		RaidFinderSearchStatus:SetPoint("BOTTOMRIGHT", anchor, "TOPRIGHT", 0, 2);
-	else
-		RaidFinderSearchStatus:ClearAllPoints();
-		RaidFinderSearchStatus:SetPoint("BOTTOMRIGHT", anchor, "TOPLEFT", 0, 0);
+local function TimeText(seconds)
+	return string.format(TIME_IN_QUEUE, (seconds >= 60) and SecondsToTime(seconds) or LESS_THAN_ONE_MINUTE);
+end
+
+-- title, your roles, the found / needed of every role, the time (retail QueueStatusEntry_SetFullDisplay);
+-- counts nil: a status line instead (QueueStatusEntry_SetMinimalDisplay)
+local function SetEntry(entry, title, subTitle, roles, counts, seconds, averageWait, status)
+	InitEntry(entry);
+	local height = 14;
+	entry.Title:SetText(title);
+
+	-- your roles at the top right, the title left of them
+	local nextIcon, leftmost = 1, nil;
+	if roles then
+		for _, role in ipairs({ "DAMAGER", "HEALER", "TANK" }) do
+			if roles[role] then
+				local icon = entry["RoleIcon" .. nextIcon];
+				icon:SetAtlas(RoleAtlas(role, false));
+				icon:Show();
+				leftmost = icon;
+				nextIcon = nextIcon + 1;
+			end
+		end
 	end
+	for i = nextIcon, 3 do
+		entry["RoleIcon" .. i]:Hide();
+	end
+	entry.Title:ClearAllPoints();
+	entry.Title:SetPoint("TOPLEFT", entry, "TOPLEFT", 10, -10);
+	if leftmost then
+		entry.Title:SetPoint("RIGHT", leftmost, "LEFT", -5, 0);
+	else
+		entry.Title:SetPoint("RIGHT", entry, "RIGHT", -10, 0);
+	end
+	height = height + entry.Title:GetHeight();
+
+	local below = entry.Title;
+	if subTitle then
+		entry.SubTitle:ClearAllPoints();
+		entry.SubTitle:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -5);
+		entry.SubTitle:SetText(subTitle);
+		entry.SubTitle:Show();
+		height = height + entry.SubTitle:GetHeight() + 5;
+		below = entry.SubTitle;
+	else
+		entry.SubTitle:Hide();
+	end
+
+	if status then
+		entry.Status:ClearAllPoints();
+		entry.Status:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -5);
+		entry.Status:SetText(status);
+		entry.Status:Show();
+		height = height + entry.Status:GetHeight() + 5;
+	else
+		entry.Status:Hide();
+	end
+
+	if counts then
+		entry.HealersFound:ClearAllPoints();
+		entry.HealersFound:SetPoint("TOP", entry, "TOP", 0, -(height + 5));
+		for _, row in ipairs({ { entry.TanksFound, "TANK", counts.tanks, counts.tanksNeeded },
+				{ entry.HealersFound, "HEALER", counts.healers, counts.healersNeeded },
+				{ entry.DamagersFound, "DAMAGER", counts.damage, counts.damageNeeded } }) do
+			local frame, role, found, total = row[1], row[2], row[3], row[4];
+			frame.Count:SetFormattedText(PLAYERS_FOUND_OUT_OF_MAX or "%d/%d", math.min(found, total), total);
+			frame.RoleIcon:SetAtlas(RoleAtlas(role, found < total));
+			frame:Show();
+		end
+		height = height + 68;
+	else
+		entry.TanksFound:Hide();
+		entry.HealersFound:Hide();
+		entry.DamagersFound:Hide();
+	end
+
+	if averageWait and averageWait > 0 then
+		entry.AverageWait:ClearAllPoints();
+		entry.AverageWait:SetPoint("TOPLEFT", entry, "TOPLEFT", 10, -(height + 5));
+		entry.AverageWait:SetFormattedText(LFG_STATISTIC_AVERAGE_WAIT, SecondsToTime(averageWait, false, false, 1));
+		entry.AverageWait:Show();
+		height = height + entry.AverageWait:GetHeight();
+	else
+		entry.AverageWait:Hide();
+	end
+
+	if seconds then
+		entry.TimeInQueue:ClearAllPoints();
+		entry.TimeInQueue:SetPoint("TOPLEFT", entry, "TOPLEFT", 10, -(height + 5));
+		entry.TimeInQueue:SetText(TimeText(seconds));
+		entry.TimeInQueue:Show();
+		height = height + entry.TimeInQueue:GetHeight();
+	else
+		entry.TimeInQueue:Hide();
+	end
+
+	entry:SetHeight(height + 14);
+	entry:Show();
+end
+
+-- the dungeon finder (GetLFGMode / GetLFGQueueStats / GetLFGRoles)
+local function SetDungeonEntry(entry)
+	local mode, submode = GetLFGMode();
+	if not lfdShown or not mode then
+		entry:Hide();
+		return false;
+	end
+	local _, tank, healer, damage = GetLFGRoles();
+	local roles = { TANK = tank, HEALER = healer, DAMAGER = damage };
+	local title = LOOKING_FOR_DUNGEON or "Поиск подземелий";
+	if mode == "queued" then
+		local hasData, _, tankNeeds, healerNeeds, dpsNeeds, _, instanceName, _, _, _, _, myWait, queuedTime = GetLFGQueueStats();
+		if hasData then
+			SetEntry(entry, title, instanceName, roles,
+				{ tanks = 1 - tankNeeds, tanksNeeded = 1, healers = 1 - healerNeeds, healersNeeded = 1, damage = 3 - dpsNeeds, damageNeeded = 3 },
+				GetTime() - queuedTime, myWait);
+		else
+			SetEntry(entry, title, nil, roles, nil, 0, nil, "Поиск…");
+		end
+	elseif mode == "proposal" then
+		SetEntry(entry, title, nil, roles, nil, nil, nil, "Группа найдена!");
+	elseif mode == "rolecheck" then
+		SetEntry(entry, title, nil, roles, nil, nil, nil, "Проверка ролей…");
+	elseif mode == "lfgparty" or mode == "abandonedInDungeon" then
+		SetEntry(entry, title, nil, nil, nil, nil, nil, "Вы в подземелье.");
+	else
+		SetEntry(entry, title, nil, roles, nil, nil, nil, "В очереди.");
+	end
+	return true;
+end
+
+-- the raid finder (RaidFinder_GetQueueInfo, RaidFinder.lua)
+local function SetRaidEntry(entry)
+	local info = RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo();
+	if not info then
+		entry:Hide();
+		return false;
+	end
+	local roles = { TANK = bit.band(info.roles, 1) ~= 0, HEALER = bit.band(info.roles, 2) ~= 0, DAMAGER = bit.band(info.roles, 4) ~= 0 };
+	local title = "Поиск рейда";
+	if info.state == "rolecheck" then
+		SetEntry(entry, title, info.name, roles, nil, nil, nil, "Проверка ролей…");
+	elseif info.state == "proposal" then
+		SetEntry(entry, title, info.name, roles, nil, nil, nil, "Рейд собран!");
+	else
+		SetEntry(entry, title, info.name, roles, info, info.seconds);
+	end
+	return true;
+end
+
+local function UpdateStatusFrame()
+	local frame = QueueStatusFrame;
+	local height = 4;
+	local previous;
+	for _, pair in ipairs({ { frame.Dungeon, SetDungeonEntry }, { frame.Raid, SetRaidEntry } }) do
+		local entry, set = pair[1], pair[2];
+		if set(entry) then
+			entry:ClearAllPoints();
+			if previous then
+				entry:SetPoint("TOP", previous, "BOTTOM", 0, 0);
+				entry.EntrySeparator:Show();
+			else
+				entry:SetPoint("TOP", frame, "TOP", 0, -2);
+				entry.EntrySeparator:Hide();
+			end
+			height = height + entry:GetHeight();
+			previous = entry;
+		end
+	end
+	frame:SetHeight(height);
+	return previous ~= nil;
 end
 
 local function ShowStatus()
@@ -205,15 +330,17 @@ local function ShowStatus()
 	if not (eye and eye.book.once) then
 		Play(QueueStatusButton.Eye, "mouseover");
 	end
-	UpdateRaidStatus();
-	if RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo() then
-		RaidFinderSearchStatus:Show();
+	-- (the stock dungeon finder's eye puts its own line in the game tooltip: the status frame says it all)
+	if GameTooltip:IsOwned(MiniMapLFGFrame) then
+		GameTooltip:Hide();
 	end
-	PlaceStatus();
+	if UpdateStatusFrame() then
+		QueueStatusFrame:Show();
+	end
 end
 
 local function HideStatus()
-	RaidFinderSearchStatus:Hide();
+	QueueStatusFrame:Hide();
 end
 
 local statusTimer = 0;
@@ -223,8 +350,8 @@ function QueueStatusButton_OnUpdate(self, elapsed)
 	statusTimer = statusTimer + elapsed;
 	if statusTimer >= 1 then
 		statusTimer = 0;
-		if RaidFinderSearchStatus:IsShown() then
-			UpdateRaidStatus();
+		if QueueStatusFrame:IsShown() then
+			UpdateStatusFrame();
 		end
 	end
 	UpdateAnimations(elapsed);
@@ -256,11 +383,8 @@ function QueueStatus_Update()
 	-- the glow: only when the group is found (retail pulses it then)
 	button.Highlight:SetShown(newState == "found");
 
-	if RaidFinderSearchStatus:IsShown() then
-		UpdateRaidStatus();
-		if not raid then
-			RaidFinderSearchStatus:Hide();
-		end
+	if QueueStatusFrame:IsShown() and not UpdateStatusFrame() then
+		HideStatus();
 	end
 end
 
@@ -310,8 +434,10 @@ local function AdoptStockEye()
 	-- its mouse over: the eye's glow and the raid finder's status next to its own
 	stock:HookScript("OnEnter", ShowStatus);
 	stock:HookScript("OnLeave", HideStatus);
+	-- its old status window: the retail status frame shows the dungeon finder instead
 	if LFDSearchStatus then
-		LFDSearchStatus:HookScript("OnShow", PlaceStatus);
+		LFDSearchStatus:Hide();
+		LFDSearchStatus.Show = LFDSearchStatus.Hide;
 	end
 	-- its dropdown: the raid finder's queue too
 	if MiniMapLFGFrameDropDown_Update then
