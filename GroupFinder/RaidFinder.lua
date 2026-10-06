@@ -279,6 +279,10 @@ end
 -- registered at login: this file may load before Server.lua (Comm_Register) in FrameXML.toc
 local function RegisterComm()
 	Comm_Register("RF_LIST", function(list)
+		-- our own request comes back as an addon whisper with no body: not the server's list
+		if not list then
+			return;
+		end
 		wipe(raids);
 		if list and list ~= "-" then
 			for entry in string.gmatch(list, "[^,]+") do
@@ -304,6 +308,9 @@ local function RegisterComm()
 	end);
 
 	Comm_Register("RF_STATUS", function(state, raidId, roles, seconds, tanks, healers, damage, tanksNeeded, healersNeeded, damageNeeded)
+		if not state then
+			return;
+		end
 		status = {
 			state = tonumber(state) or STATE_NONE, raidId = tonumber(raidId) or 0, roles = tonumber(roles) or 0,
 			seconds = tonumber(seconds) or 0,
