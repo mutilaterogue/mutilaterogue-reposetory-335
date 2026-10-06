@@ -21,7 +21,8 @@
  * Leaving the raid group (or its disband) inside the raid: back to where the player queued (retail).
  *
  * AddonComm (client: GroupFinder\RaidFinder.lua):
- *  C->S "RF_LIST"                      -> S->C "RF_LIST" : id;name;mapId;difficulty;size;minLevel;minItemLevel;saved,...
+ *  C->S "RF_LIST"                      -> S->C "RF_LIST" : id;name;mapId;difficulty;size;minLevel;minItemLevel;saved;money;itemId;itemCount,...
+ *                                         (money / item: the reward of every boss, boss_entry 0)
  *       "RF_JOIN" : raidId : roles      (roles: 1 tank, 2 healer, 4 damage - a bit mask; the group leader: his own roles)
  *       "RF_ROLES" : roles              (the answer to a role check; 0 - decline)
  *       "RF_LEAVE"                      (out of the queue: with the whole queued group)
@@ -358,6 +359,22 @@ namespace
             first = false;
             list << raid.Id << ';' << Sanitize(raid.Name) << ';' << raid.MapId << ';' << uint32(raid.Difficulty) << ';'
                  << raid.Size() << ';' << raid.MinLevel << ';' << raid.MinItemLevel << ';' << (IsSaved(player, raid) ? 1 : 0);
+
+            // the reward of every boss (boss_entry 0): money summed, the first item - shown in the raid finder
+            uint32 money = 0, itemId = 0, itemCount = 0;
+            auto rewards = s_rewards.find(raid.Id);
+            if (rewards != s_rewards.end())
+                for (Reward const& reward : rewards->second)
+                    if (!reward.BossEntry)
+                    {
+                        money += reward.Money;
+                        if (!itemId && reward.ItemId)
+                        {
+                            itemId = reward.ItemId;
+                            itemCount = reward.ItemCount;
+                        }
+                    }
+            list << ';' << money << ';' << itemId << ';' << itemCount;
         }
         sAddonComm->Send(player, "RF_LIST", first ? std::string("-") : list.str());
     }

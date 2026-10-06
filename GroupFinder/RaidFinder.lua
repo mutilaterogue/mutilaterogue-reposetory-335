@@ -68,6 +68,70 @@ end
 ---------------------------------------------------------------------------
 -- the frame
 ---------------------------------------------------------------------------
+-- the rewards of every boss (world.raid_finder_reward with boss_entry 0): an item and money
+local function UpdateRewards(info, raid)
+	local hasItem = raid and raid.itemId > 0;
+	local hasMoney = raid and raid.money > 0;
+	info.RewardsTitle:SetShown(hasItem or hasMoney);
+	info.RewardsDescription:SetShown(hasItem or hasMoney);
+
+	local item = info.Item;
+	if hasItem then
+		local name, link, quality, _, _, _, _, _, _, texture = GetItemInfo(raid.itemId);
+		item.link = link or ("item:" .. raid.itemId);
+		item.itemId = raid.itemId;
+		_G[item:GetName() .. "IconTexture"]:SetTexture(texture or GetItemIcon(raid.itemId));
+		local nameText = _G[item:GetName() .. "Name"];
+		nameText:SetText(name or "");
+		if quality then
+			local color = ITEM_QUALITY_COLORS[quality];
+			nameText:SetTextColor(color.r, color.g, color.b);
+		end
+		local count = _G[item:GetName() .. "Count"];
+		if count then
+			count:SetText(raid.itemCount > 1 and raid.itemCount or "");
+			count:SetShown(raid.itemCount > 1);
+		end
+		item:Show();
+		-- not in the item cache yet: once more a little later
+		if not name then
+			item.retry = 0.5;
+			item:SetScript("OnUpdate", function(self, elapsed)
+				self.retry = self.retry - elapsed;
+				if self.retry <= 0 then
+					self:SetScript("OnUpdate", nil);
+					UpdateRewards(info, raid);
+				end
+			end);
+		end
+	else
+		item:Hide();
+	end
+
+	info.MoneyLabel:ClearAllPoints();
+	if hasItem then
+		info.MoneyLabel:SetPoint("TOPLEFT", item, "BOTTOMLEFT", 20, -10);
+	else
+		info.MoneyLabel:SetPoint("TOPLEFT", info.RewardsDescription, "BOTTOMLEFT", 20, -10);
+	end
+	info.MoneyLabel:SetShown(hasMoney);
+	if hasMoney then
+		MoneyFrame_Update(info.MoneyFrame:GetName(), raid.money);
+		info.MoneyFrame:Show();
+	else
+		info.MoneyFrame:Hide();
+	end
+end
+
+function RaidFinderRewardItem_OnEnter(self)
+	if not self.itemId then
+		return;
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:SetHyperlink("item:" .. self.itemId);
+	GameTooltip:Show();
+end
+
 local function UpdateInfo()
 	local frame = RaidFinderFrame;
 	local info = frame.Info;
@@ -88,26 +152,8 @@ local function UpdateInfo()
 		info.Description:SetText(table.concat(lines, "\n"));
 	end
 
-	if status.state == STATE_NONE then
-		info.QueueTitle:SetText("");
-		info.Queue:SetText("");
-	elseif status.state == STATE_IN_RAID then
-		local inRaid = FindRaid(status.raidId);
-		info.QueueTitle:SetText("Вы в рейде");
-		info.Queue:SetText(inRaid and inRaid.name or "");
-	elseif status.state == STATE_ROLE_CHECK then
-		local checkRaid = FindRaid(status.raidId);
-		info.QueueTitle:SetText("Проверка ролей");
-		info.Queue:SetText((checkRaid and checkRaid.name or "") .. "\n" .. (status.roles == 0
-			and "Выберите роли и нажмите «Подтвердить роли»." or "Ждём остальных участников группы."));
-	else
-		local queuedRaid = FindRaid(status.raidId);
-		info.QueueTitle:SetText(status.state == STATE_PROPOSAL and "Рейд собран" or "В очереди");
-		local elapsed = status.seconds + (statusTime and (GetTime() - statusTime) or 0);
-		info.Queue:SetText(string.format("%s\nВремя в очереди: %s\nТанки: %d / %d\nЛекари: %d / %d\nБойцы: %d / %d",
-			queuedRaid and queuedRaid.name or "", FormatTime(elapsed),
-			status.tanks, status.tanksNeeded, status.healers, status.healersNeeded, status.damage, status.damageNeeded));
-	end
+	-- the boss rewards (as the dungeon finder's "Rewards"); the queue itself is at the minimap button
+	UpdateRewards(info, raid);
 end
 
 local function UpdateButtons()
@@ -212,12 +258,13 @@ function RaidFinderFrame_OnLoad(self)
 	UIDropDownMenu_SetWidth(self.RaidDropDown, 180);
 	UIDropDownMenu_Initialize(self.RaidDropDown, RaidDropDown_Initialize);
 	self.Info.Description:SetWidth(290);
-	self.Info.Queue:SetWidth(290);
+	self.Info.RewardsDescription:SetWidth(290);
 	-- the dark inset: light text, gold headers (retail)
 	self.Info.Title:SetTextColor(1, 0.82, 0);
-	self.Info.QueueTitle:SetTextColor(1, 0.82, 0);
+	self.Info.RewardsTitle:SetTextColor(1, 0.82, 0);
 	self.Info.Description:SetTextColor(1, 1, 1);
-	self.Info.Queue:SetTextColor(1, 1, 1);
+	self.Info.RewardsDescription:SetTextColor(1, 1, 1);
+	self.Info.MoneyLabel:SetTextColor(1, 1, 1);
 end
 
 -- the dark inset (as the dungeon finder's, made the same way): under the content, its level set on every show,
@@ -247,8 +294,8 @@ function RaidFinderFrame_OnShow(self)
 		frame.elapsed = frame.elapsed + elapsed;
 		if frame.elapsed >= 1 then
 			frame.elapsed = 0;
-			if status.state == STATE_QUEUED or status.state == STATE_PROPOSAL then
-				UpdateInfo();
+			if (status.state == STATE_QUEUED or status.state == STATE_PROPOSAL) and GameTooltip:IsOwned(RaidFinderMinimapButton) then
+				RaidFinderMinimapButton_OnEnter(RaidFinderMinimapButton);
 			end
 		end
 	end);
@@ -449,11 +496,12 @@ local function RegisterComm()
 		wipe(raids);
 		if list and list ~= "-" then
 			for entry in string.gmatch(list, "[^,]+") do
-				local id, name, mapId, difficulty, size, minLevel, minItemLevel, saved = strsplit(";", entry);
+				local id, name, mapId, difficulty, size, minLevel, minItemLevel, saved, money, itemId, itemCount = strsplit(";", entry);
 				table.insert(raids, {
 					id = tonumber(id), name = name or "", mapId = tonumber(mapId) or 0, difficulty = tonumber(difficulty) or 0,
 					size = tonumber(size) or 0, minLevel = tonumber(minLevel) or 0, minItemLevel = tonumber(minItemLevel) or 0,
 					saved = saved == "1",
+					money = tonumber(money) or 0, itemId = tonumber(itemId) or 0, itemCount = tonumber(itemCount) or 0,
 				});
 			end
 		end

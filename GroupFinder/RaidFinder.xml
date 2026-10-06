@@ -100,19 +100,46 @@
 								<Anchor point="RIGHT"/>
 							</Anchors>
 						</FontString>
-						<FontString name="$parentQueueTitle" parentKey="QueueTitle" inherits="QuestTitleFontBlackShadow" justifyH="LEFT">
+						<FontString name="$parentRewardsTitle" parentKey="RewardsTitle" inherits="QuestTitleFontBlackShadow" justifyH="LEFT" text="LFD_REWARDS">
 							<Anchors>
 								<Anchor point="TOPLEFT" relativeTo="$parentDescription" relativePoint="BOTTOMLEFT" x="0" y="-14"/>
 							</Anchors>
 						</FontString>
-						<FontString name="$parentQueue" parentKey="Queue" inherits="QuestFont" justifyH="LEFT" justifyV="TOP">
+						<FontString name="$parentRewardsDescription" parentKey="RewardsDescription" inherits="QuestFont" justifyH="LEFT" justifyV="TOP" text="За каждого побеждённого босса вы получите:">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeTo="$parentQueueTitle" relativePoint="BOTTOMLEFT" x="0" y="-6"/>
+								<Anchor point="TOPLEFT" relativeTo="$parentRewardsTitle" relativePoint="BOTTOMLEFT" x="0" y="-5"/>
 								<Anchor point="RIGHT"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentMoneyLabel" parentKey="MoneyLabel" inherits="QuestFont" justifyH="LEFT" text="MONEY_COLON">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentRewardsDescription" relativePoint="BOTTOMLEFT" x="20" y="-56"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
+				<Frames>
+					<!-- the boss reward item (as the dungeon finder's reward button) -->
+					<Button name="$parentItem" parentKey="Item" inherits="LargeItemButtonTemplate" hidden="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentRewardsDescription" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+						</Anchors>
+						<Scripts>
+							<OnEnter function="RaidFinderRewardItem_OnEnter"/>
+							<OnLeave function="GameTooltip_Hide"/>
+							<OnClick>
+								if self.link then
+									HandleModifiedItemClick(self.link);
+								end
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Frame name="$parentMoneyFrame" parentKey="MoneyFrame" inherits="MoneyFrameTemplate">
+						<Anchors>
+							<Anchor point="LEFT" relativeTo="$parentMoneyLabel" relativePoint="RIGHT" x="10" y="0"/>
+						</Anchors>
+					</Frame>
+				</Frames>
 			</Frame>
 
 			<Button name="$parentFindGroupButton" parentKey="FindGroupButton" inherits="UIPanelButtonTemplate" text="FIND_A_GROUP">
