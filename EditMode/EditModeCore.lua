@@ -669,6 +669,9 @@ function EditModeCore:UpdateOverlays()
 		local system = self.systems[systemName];
 		if self.active and IsSystemEditable(systemName) then
 			system.overlay = system.overlay or CreateOverlay(system);
+			-- over the frame's buttons whatever their level (after a /reload the bars' buttons came out over it)
+			system.overlay:SetFrameStrata("HIGH");
+			system.overlay:SetFrameLevel(math.max(100, system.frame:GetFrameLevel() + 20));
 			system.overlay:Show();
 			SetOverlayState(system.overlay, self.selected == systemName and "selected" or "normal");
 		elseif system.overlay then
