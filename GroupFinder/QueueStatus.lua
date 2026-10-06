@@ -7,10 +7,13 @@
 local FLIPBOOKS = {
 	searching = { atlas = "groupfinder-eye-flipbook-searching", rows = 8, columns = 11, frames = 80, duration = 2 },
 	found = { atlas = "groupfinder-eye-flipbook-found-loop", rows = 4, columns = 11, frames = 41, duration = 1.5 },
+	-- retail mouse over: the eye looks at the cursor once, then back to what it played
+	mouseover = { atlas = "groupfinder-eye-flipbook-mouseover", rows = 1, columns = 12, frames = 12, duration = 0.4, once = true },
 };
 
 local lfdShown = false;		-- the stock dungeon finder's eye is "shown" (it is invisible here)
 local flipbook, flipbookTime = nil, 0;
+local stateFlipbook;		-- what the queue state plays (the mouse over returns to it)
 
 -- the file and the rect of an atlas: set it on the eye and read them back (SetAtlas, AtlasHelper.lua)
 local function AtlasRect(atlas)
@@ -117,7 +120,7 @@ local function PlaceStatus()
 end
 
 local function ShowStatus()
-	QueueStatusButton.Highlight:Show();
+	SetFlipbook("mouseover");
 	UpdateRaidStatus();
 	if RaidFinder_GetQueueInfo and RaidFinder_GetQueueInfo() then
 		RaidFinderSearchStatus:Show();
@@ -126,7 +129,6 @@ local function ShowStatus()
 end
 
 local function HideStatus()
-	QueueStatusButton.Highlight:Hide();
 	RaidFinderSearchStatus:Hide();
 end
 
@@ -145,7 +147,12 @@ function QueueStatusButton_OnUpdate(self, elapsed)
 		return;
 	end
 	local book = flipbook.book;
-	flipbookTime = (flipbookTime + elapsed) % book.duration;
+	flipbookTime = flipbookTime + elapsed;
+	if book.once and flipbookTime >= book.duration then
+		SetFlipbook(stateFlipbook);
+		return;
+	end
+	flipbookTime = flipbookTime % book.duration;
 	local frame = math.floor(flipbookTime / book.duration * book.frames);
 	local column = frame % book.columns;
 	local row = math.floor(frame / book.columns);
@@ -169,13 +176,19 @@ function QueueStatus_Update()
 
 	local mode = lfdShown and GetLFGMode and GetLFGMode();
 	if (raid and raid.state == "proposal") or mode == "proposal" then
-		SetFlipbook("found");
+		stateFlipbook = "found";
 	elseif (raid and (raid.state == "queued" or raid.state == "rolecheck"))
 		or mode == "queued" or mode == "listed" or mode == "rolecheck" then
-		SetFlipbook("searching");
+		stateFlipbook = "searching";
 	else
-		SetFlipbook(nil);
+		stateFlipbook = nil;
 	end
+	-- (a mouse over playing: it returns to the state's own when it ends)
+	if not (flipbook and flipbook.book.once) then
+		SetFlipbook(stateFlipbook);
+	end
+	-- the glow: only when the group is found (retail pulses it then)
+	button.Highlight:SetShown(stateFlipbook == "found");
 
 	if RaidFinderSearchStatus:IsShown() then
 		UpdateRaidStatus();
