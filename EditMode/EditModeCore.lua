@@ -12,7 +12,8 @@
 --             или { key = "x", type = "check", label = "...", default = 0/1, apply = ... }
 --             или { key = "x", type = "dropdown", label = "...", options = { { value, text }, ... }, default, apply = ... }
 -- options (5th argument): { category = "frames" / "combat" / "misc" (the list in the window), noScale = true,
---                          keepPosition = true (stock code moves the frame by itself: put it back at once) }
+--                          keepPosition = true (stock code moves the frame by itself: put it back at once),
+--                          disabledReason = function() return "why" or nil end (retail: the system can not be edited now) }
 
 EDIT_MODE_GRID_SPACING = 32;
 EDIT_MODE_SNAP_DISTANCE = 12;
@@ -26,6 +27,12 @@ local L = {
 	FRAMES = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_FRAMES or "Рамки интерфейса",
 	COMBAT = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_COMBAT or "Бой",
 	MISC = HUD_EDIT_MODE_SETTINGS_CATEGORY_TITLE_MISC or "Разное",
+	SHARE = HUD_EDIT_MODE_SHARE_LAYOUT or "Поделиться",
+	IMPORT = HUD_EDIT_MODE_IMPORT_LAYOUT or "Импорт",
+	IMPORT_TITLE = HUD_EDIT_MODE_IMPORT_LAYOUT_DIALOG_TITLE or "Импорт макета",
+	IMPORT_INSTRUCTIONS = HUD_EDIT_MODE_IMPORT_LAYOUT_INSTRUCTIONS or "Вставьте код макета сюда",
+	COPY_NOTICE = "Скопируйте код макета (Ctrl+C):",
+	IMPORT_ERROR = "Это не код макета.",
 	EXPAND = HUD_EDIT_MODE_EXPAND_OPTIONS or "Развернуть список",
 	COLLAPSE = HUD_EDIT_MODE_COLLAPSE_OPTIONS or "Свернуть список",
 	REVERT_ALL = HUD_EDIT_MODE_REVERT_ALL_CHANGES or "Отменить все изменения",
@@ -347,6 +354,7 @@ function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettin
 		frame = frame,
 		displayName = displayName or systemName,
 		category = options.category or "frames",
+		disabledReason = options.disabledReason,
 		settings = settings,
 		defaultPoints = defaultPoints,
 		defaultScale = frame:GetScale(),
@@ -360,7 +368,8 @@ function EditModeCore:RegisterSystem(systemName, frame, displayName, extraSettin
 	if options.keepPosition then
 		local system = self.systems[systemName];
 		hooksecurefunc(frame, "SetPoint", function()
-			if system.applying or not self:HasPosition(systemName) or (system.overlay and system.overlay.moving) then
+			if system.applying or not self:HasPosition(systemName) or (system.overlay and system.overlay.moving)
+				or (system.disabledReason and system.disabledReason()) then
 				return;
 			end
 			system.applying = true;
@@ -702,8 +711,14 @@ local function CreateOverlay(system)
 	return overlay;
 end
 
+-- why the system can not be edited now (retail: the loot frame while it opens at the cursor), or nil
+local function DisabledReason(systemName)
+	local system = EditModeCore.systems[systemName];
+	return system and system.disabledReason and system.disabledReason();
+end
+
 local function IsSystemEditable(systemName)
-	return GetAccountSetting("hide:" .. systemName) ~= 1;
+	return GetAccountSetting("hide:" .. systemName) ~= 1 and not DisabledReason(systemName);
 end
 
 function EditModeCore:UpdateOverlays()
@@ -1027,6 +1042,12 @@ function EditModeManagerMixin:InitLayoutDropdown(level)
 	AddAction(L.RENAME_LAYOUT, function()
 		StaticPopup_Show("EDIT_MODE_NAME_LAYOUT", nil, nil, { mode = "rename" });
 	end);
+	AddAction(L.SHARE, function()
+		StaticPopup_Show("EDIT_MODE_SHARE_LAYOUT", nil, nil, { text = EditModeCore:ExportLayout() });
+	end);
+	AddAction(L.IMPORT, function()
+		StaticPopup_Show("EDIT_MODE_IMPORT_LAYOUT");
+	end);
 	AddAction(L.DELETE_LAYOUT, function()
 		C_EditMode.DeleteLayout(C_EditMode.GetLayouts().activeLayout);
 		EditModeCore:SetActiveLayout(C_EditMode.GetLayouts().activeLayout);
@@ -1094,6 +1115,30 @@ function EditModeManagerMixin:RefreshFrameList()
 				end
 				check.systemName = systemName;
 				check.text:SetText(EditModeCore.systems[systemName].displayName);
+				-- a disabled system: grey, its reason in the tooltip (retail)
+				local reason = DisabledReason(systemName);
+				check.disabledReason = reason;
+				if reason then
+					check:Disable();
+					check.text:SetTextColor(0.5, 0.5, 0.5);
+				else
+					check:Enable();
+					check.text:SetTextColor(1, 1, 1);
+				end
+				if not check.tooltipHooked then
+					check.tooltipHooked = true;
+					if check.SetMotionScriptsWhileDisabled then
+						check:SetMotionScriptsWhileDisabled(true);
+					end
+					check:HookScript("OnEnter", function(button)
+						if button.disabledReason then
+							GameTooltip:SetOwner(button, "ANCHOR_RIGHT");
+							GameTooltip:SetText(button.disabledReason, 1, 1, 1, 1, true);
+							GameTooltip:Show();
+						end
+					end);
+					check:HookScript("OnLeave", GameTooltip_Hide);
+				end
 				check.text:SetWidth(160);
 				check.text:SetJustifyH("LEFT");
 				check:ClearAllPoints();
@@ -1134,7 +1179,7 @@ function EditModeManagerMixin:Refresh()
 
 	self:RefreshFrameList();
 	for _, check in ipairs(self.frameChecks) do
-		check:SetChecked(IsSystemEditable(check.systemName));
+		check:SetChecked(GetAccountSetting("hide:" .. check.systemName) ~= 1);
 	end
 end
 
@@ -1163,6 +1208,11 @@ StaticPopupDialogs["EDIT_MODE_NAME_LAYOUT"] = {
 		local info = C_EditMode.GetLayouts();
 		if data.mode == "rename" then
 			C_EditMode.RenameLayout(info.activeLayout, name);
+		elseif data.mode == "import" then
+			C_EditMode.AddLayout(name);
+			GetActiveLayout().systems = data.systems;
+			EditModeCore:SaveLayouts();
+			EditModeCore:SetActiveLayout(C_EditMode.GetLayouts().activeLayout);
 		else
 			C_EditMode.AddLayout(name, data.mode == "copy" and info.activeLayout or nil);
 			EditModeCore:SetActiveLayout(C_EditMode.GetLayouts().activeLayout);
@@ -1173,6 +1223,110 @@ StaticPopupDialogs["EDIT_MODE_NAME_LAYOUT"] = {
 		local parent = self:GetParent();
 		StaticPopupDialogs["EDIT_MODE_NAME_LAYOUT"].OnAccept(parent, parent.data);
 		parent:Hide();
+	end,
+	EditBoxOnEscapePressed = function(self)
+		self:GetParent():Hide();
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+};
+
+---------------------------------------------------------------------------
+-- share / import a layout as a string (retail "Share" / "Import")
+--   EM1^name~point~x~y~key:value;key:value^...   (numbers only: points, offsets, settings)
+---------------------------------------------------------------------------
+local EXPORT_PREFIX = "EM1";
+
+local function Number(value)
+	return (string.format("%.2f", value):gsub("%.?0+$", ""));
+end
+
+function EditModeCore:ExportLayout()
+	local layout = GetActiveLayout();
+	local parts = { EXPORT_PREFIX };
+	for _, entry in ipairs(layout and layout.systems or {}) do
+		local settings = {};
+		for key, value in pairs(entry.settings or {}) do
+			if type(value) == "number" then
+				table.insert(settings, key .. ":" .. Number(value));
+			end
+		end
+		table.insert(parts, table.concat({ entry.name, entry.point or "", entry.x and Number(entry.x) or "",
+			entry.y and Number(entry.y) or "", table.concat(settings, ";") }, "~"));
+	end
+	return table.concat(parts, "^");
+end
+
+-- the systems of a shared string, or nil
+function EditModeCore:ParseLayout(text)
+	text = (text or ""):gsub("%s", "");
+	local parts = { strsplit("^", text) };
+	if parts[1] ~= EXPORT_PREFIX then
+		return nil;
+	end
+	local systems = {};
+	for i = 2, #parts do
+		local name, point, x, y, settings = strsplit("~", parts[i]);
+		if not name or name == "" or not name:match("^[%w_]+$") then
+			return nil;
+		end
+		local entry = { name = name, settings = {} };
+		if point and point ~= "" and tonumber(x) and tonumber(y) then
+			entry.point, entry.x, entry.y = point, tonumber(x), tonumber(y);
+		end
+		for pair in string.gmatch(settings or "", "[^;]+") do
+			local key, value = pair:match("^([%w_]+):(-?[%d%.]+)$");
+			if key then
+				entry.settings[key] = tonumber(value);
+			end
+		end
+		table.insert(systems, entry);
+	end
+	return systems;
+end
+
+StaticPopupDialogs["EDIT_MODE_SHARE_LAYOUT"] = {
+	text = L.COPY_NOTICE,
+	button1 = OKAY,
+	hasEditBox = 1,
+	hasWideEditBox = 1,
+	maxLetters = 0,
+	OnShow = function(self, data)
+		local editBox = _G[self:GetName() .. "WideEditBox"] or _G[self:GetName() .. "EditBox"];
+		editBox:SetText(data and data.text or "");
+		editBox:HighlightText();
+		editBox:SetFocus();
+	end,
+	EditBoxOnEscapePressed = function(self)
+		self:GetParent():Hide();
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+};
+
+StaticPopupDialogs["EDIT_MODE_IMPORT_LAYOUT"] = {
+	text = L.IMPORT_TITLE .. "\n" .. L.IMPORT_INSTRUCTIONS,
+	button1 = ACCEPT,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	hasWideEditBox = 1,
+	maxLetters = 0,
+	OnShow = function(self)
+		local editBox = _G[self:GetName() .. "WideEditBox"] or _G[self:GetName() .. "EditBox"];
+		editBox:SetText("");
+		editBox:SetFocus();
+	end,
+	OnAccept = function(self)
+		local editBox = _G[self:GetName() .. "WideEditBox"] or _G[self:GetName() .. "EditBox"];
+		local systems = EditModeCore:ParseLayout(editBox:GetText());
+		if not systems then
+			UIErrorsFrame:AddMessage(L.IMPORT_ERROR, 1, 0.1, 0.1);
+			return;
+		end
+		-- then its name, as a new layout
+		StaticPopup_Show("EDIT_MODE_NAME_LAYOUT", nil, nil, { mode = "import", systems = systems });
 	end,
 	EditBoxOnEscapePressed = function(self)
 		self:GetParent():Hide();

@@ -159,6 +159,44 @@ local function ActionBarSettings(defaultOrientation)
 	};
 end
 
+-- the stance / pet bar: retail orientation, rows, icon size, icon padding (small buttons, MultiActionBarsRetail.lua)
+local function SmallBarSettings(relayout, maxRows)
+	local function apply(key)
+		return function(frame, value)
+			frame.editModeSettings = frame.editModeSettings or {};
+			frame.editModeSettings[key] = value;
+			relayout();
+		end
+	end
+	return {
+		{
+			key = "orientation", type = "dropdown", default = ORIENTATION_HORIZONTAL,
+			label = Label(HUD_EDIT_MODE_SETTING_ACTION_BAR_ORIENTATION, "Ориентация"),
+			options = {
+				{ ORIENTATION_HORIZONTAL, Label(HUD_EDIT_MODE_SETTING_ACTION_BAR_ORIENTATION_HORIZONTAL, "Горизонтально") },
+				{ ORIENTATION_VERTICAL, Label(HUD_EDIT_MODE_SETTING_ACTION_BAR_ORIENTATION_VERTICAL, "Вертикально") },
+			},
+			apply = apply("orientation"),
+		},
+		{
+			key = "rows", type = "slider", min = 1, max = maxRows, step = 1, default = 1,
+			label = Label(HUD_EDIT_MODE_SETTING_ACTION_BAR_NUM_ROWS, "Ряды: #"),
+			apply = apply("rows"),
+		},
+		{
+			key = "iconSize", type = "slider", min = 0.5, max = 2, step = 0.1, default = 1,
+			label = Label(HUD_EDIT_MODE_SETTING_ACTION_BAR_ICON_SIZE, "Размер значков"),
+			format = function(value) return string.format("%d%%", math.floor(value * 100 + 0.5)); end,
+			apply = apply("iconSize"),
+		},
+		{
+			key = "iconPadding", type = "slider", min = 2, max = 10, step = 1, default = 2,
+			label = Label(HUD_EDIT_MODE_SETTING_ACTION_BAR_ICON_PADDING, "Отступ между значками"),
+			apply = apply("iconPadding"),
+		},
+	};
+end
+
 ---------------------------------------------------------------------------
 -- registration
 ---------------------------------------------------------------------------
@@ -192,9 +230,17 @@ local function Register()
 		end
 	end
 
-	EditModeCore:RegisterSystem("ShapeshiftBarFrame", ShapeshiftBarFrame, Label(HUD_EDIT_MODE_STANCE_BAR_LABEL, "Индикатор стойки"), nil, { category = "combat" });
+	EditModeCore:RegisterSystem("ShapeshiftBarFrame", ShapeshiftBarFrame, Label(HUD_EDIT_MODE_STANCE_BAR_LABEL, "Индикатор стойки"),
+		SmallBarSettings(StanceBarRetail_LayoutButtons, 4), { category = "combat", noScale = true });
 	if PetActionBarRetail then
-		EditModeCore:RegisterSystem("PetActionBarRetail", PetActionBarRetail, Label(HUD_EDIT_MODE_PET_ACTION_BAR_LABEL, "Панель питомца"), nil, { category = "combat" });
+		EditModeCore:RegisterSystem("PetActionBarRetail", PetActionBarRetail, Label(HUD_EDIT_MODE_PET_ACTION_BAR_LABEL, "Панель питомца"),
+			SmallBarSettings(PetBarRetail_LayoutButtons, 2), { category = "combat", noScale = true });
+	end
+	-- the totem bar slides from MainMenuBar (MultiCastActionBarFrame.lua sets its point while it slides):
+	-- the layout's place kept (keepPosition)
+	if MultiCastActionBarFrame then
+		EditModeCore:RegisterSystem("MultiCastActionBarFrame", MultiCastActionBarFrame, Label(HUD_EDIT_MODE_TOTEM_ACTION_BAR_LABEL, "Панель тотемов"),
+			nil, { category = "combat", keepPosition = true });
 	end
 	if StatusTrackingBarRetailManager then
 		EditModeCore:RegisterSystem("StatusTrackingBarRetailManager", StatusTrackingBarRetailManager, Label(HUD_EDIT_MODE_EXPERIENCE_BAR_LABEL, "Индикатор опыта"), nil, { category = "misc" });

@@ -5,6 +5,8 @@
 --   Cast bar (CastingBarFrame):    lock to the player frame      -> PlayerFrame_AttachCastBar / DetachCastBar
 --   Minimap (MinimapCluster):      rotate minimap                -> CVar rotateMinimap
 --   Chat (ChatFrame1):             width, height
+--   Objective tracker:             height
+--   Loot frame:                    not editable while the loot opens at the cursor
 -- Loaded by EditModeCore.xml after EditModeCore.lua.
 
 local function Label(text, fallback)
@@ -190,6 +192,18 @@ loader:SetScript("OnEvent", function()
 		},
 	});
 
+	-- objective tracker: retail height
+	if ObjectiveTrackerFrame then
+		EditModeCore:AddSettings("ObjectiveTrackerFrame", {
+			{
+				key = "height", type = "slider", min = 200, max = 1000, step = 10,
+				default = math.floor(ObjectiveTrackerFrame:GetHeight() + 0.5),
+				label = Label(HUD_EDIT_MODE_SETTING_OBJECTIVE_TRACKER_HEIGHT, "Высота"),
+				apply = function(frame, value) frame:SetHeight(value); end,
+			},
+		});
+	end
+
 	-- chat: retail width / height
 	EditModeCore:AddSettings("ChatFrame1", {
 		{
@@ -214,8 +228,13 @@ loader:SetScript("OnEvent", function()
 			nil, { category = "misc", keepPosition = true });
 	end
 	if LootFrame then
+		-- retail: not editable while the loot opens at the cursor (CVar lootUnderMouse)
 		EditModeCore:RegisterSystem("LootFrame", LootFrame, Label(HUD_EDIT_MODE_LOOT_FRAME_LABEL, "Окно добычи"),
-			nil, { category = "misc", keepPosition = true });
+			nil, { category = "misc", keepPosition = true, disabledReason = function()
+				if GetCVar("lootUnderMouse") == "1" then
+					return "Отключите \"Открывать окно добычи под курсором\" (Интерфейс > Управление), чтобы изменить положение окна добычи.";
+				end
+			end });
 	end
 
 	LayoutMicroMenu();

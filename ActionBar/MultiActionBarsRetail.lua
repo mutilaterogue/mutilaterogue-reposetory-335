@@ -61,7 +61,7 @@ function MultiActionBarsRetail_Layout()
 	-- the totem bar: where the stance bar is (a shaman has no stances). It slides from MainMenuBar's top left
 	-- (MultiCastActionBarFrame.lua): give the slide that place
 	local left, top = below:GetLeft(), below:GetTop();
-	if left and top and MainMenuBar:GetLeft() and MultiCastActionBarFrame then
+	if left and top and MainMenuBar:GetLeft() and MultiCastActionBarFrame and not Placed("MultiCastActionBarFrame") then
 		MULTICASTACTIONBAR_XPOS = left - MainMenuBar:GetLeft();
 		MULTICASTACTIONBAR_YPOS = top + BAR_SPACING - MainMenuBar:GetTop();
 		MultiCastActionBarFrame:ClearAllPoints();
@@ -135,19 +135,54 @@ end
 
 local SMALL_SIZE = 30;
 
+-- small buttons on a frame by its Edit Mode settings (ActionBarsEditMode.lua: orientation, rows, icon size,
+-- icon padding; one row of 100% / 2 px without them); the frame sized to the shown ones
+function SmallBarRetail_LayoutButtons(frame, prefix, total, shown)
+	local settings = frame.editModeSettings or {};
+	local scale = settings.iconSize or 1;
+	local padding = settings.iconPadding or BUTTON_PADDING;
+	local lines = math.max(1, math.min(settings.rows or 1, math.max(shown, 1)));
+	local perLine = math.ceil(math.max(shown, 1) / lines);
+	local horizontal = (settings.orientation or 0) == 0;
+	local step = SMALL_SIZE * scale + padding;
+	for i = 1, total do
+		local button = _G[prefix .. i];
+		local index = i - 1;
+		local along, across = index % perLine, math.floor(index / perLine);
+		local x, y;
+		if horizontal then
+			x, y = along * step, -across * step;
+		else
+			x, y = across * step, -along * step;
+		end
+		button:SetScale(scale);
+		button:ClearAllPoints();
+		button:SetPoint("TOPLEFT", frame, "TOPLEFT", x / scale, y / scale);
+	end
+	local long, short = perLine * step - padding, lines * step - padding;
+	if horizontal then
+		frame:SetWidth(long);
+		frame:SetHeight(short);
+	else
+		frame:SetWidth(short);
+		frame:SetHeight(long);
+	end
+end
+
 function StanceBarRetail_LayoutButtons()
 	if InCombatLockdown() then
 		layoutPending = true;
 		return;
 	end
-	local numForms = GetNumShapeshiftForms();
-	for i = 1, NUM_SHAPESHIFT_SLOTS do
-		local button = _G["ShapeshiftButton" .. i];
-		button:ClearAllPoints();
-		button:SetPoint("TOPLEFT", ShapeshiftBarFrame, "TOPLEFT", (i - 1) * (SMALL_SIZE + BUTTON_PADDING), 0);
+	SmallBarRetail_LayoutButtons(ShapeshiftBarFrame, "ShapeshiftButton", NUM_SHAPESHIFT_SLOTS, GetNumShapeshiftForms());
+end
+
+function PetBarRetail_LayoutButtons()
+	if InCombatLockdown() then
+		layoutPending = true;
+		return;
 	end
-	ShapeshiftBarFrame:SetWidth(math.max(1, numForms) * (SMALL_SIZE + BUTTON_PADDING) - BUTTON_PADDING);
-	ShapeshiftBarFrame:SetHeight(SMALL_SIZE);
+	SmallBarRetail_LayoutButtons(PetActionBarRetail, "PetActionButton", NUM_PET_ACTION_SLOTS, NUM_PET_ACTION_SLOTS);
 end
 
 function StanceBarRetail_Setup()
@@ -189,11 +224,9 @@ petAnchor:SetHeight(SMALL_SIZE);
 function PetBarRetail_Setup()
 	PetActionBarFrame:EnableMouse(false);	-- the stock frame stays at the old place: no dead mouse area there
 	for i = 1, NUM_PET_ACTION_SLOTS do
-		local button = _G["PetActionButton" .. i];
-		ActionButtonRetail_ApplySmall(button);
-		button:ClearAllPoints();
-		button:SetPoint("TOPLEFT", petAnchor, "TOPLEFT", (i - 1) * (SMALL_SIZE + BUTTON_PADDING), 0);
+		ActionButtonRetail_ApplySmall(_G["PetActionButton" .. i]);
 	end
+	PetBarRetail_LayoutButtons();
 	-- PetActionBar_Update puts UI-Quickslot back as the frame
 	hooksecurefunc("PetActionBar_Update", function()
 		for i = 1, NUM_PET_ACTION_SLOTS do
@@ -212,6 +245,7 @@ eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED");
 eventFrame:SetScript("OnEvent", function(self, event)
 	if event ~= "PLAYER_REGEN_ENABLED" or layoutPending then
 		StanceBarRetail_LayoutButtons();
+		PetBarRetail_LayoutButtons();
 		MultiActionBarsRetail_Layout();
 	end
 end);
