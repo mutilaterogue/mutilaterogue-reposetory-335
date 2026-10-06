@@ -15,7 +15,7 @@ EDIT_MODE_GRID_SPACING = 32;
 EDIT_MODE_SNAP_DISTANCE = 12;
 
 local L = {
-	TITLE = HUD_EDIT_MODE_MENU or "Режим редактирования",
+	TITLE = HUD_EDIT_MODE_TITLE or "Настройка интерфейса",
 	LAYOUT = HUD_EDIT_MODE_LAYOUT or "Макет",
 	SHOW_GRID = HUD_EDIT_MODE_SHOW_GRID or "Сетка",
 	GRID_SPACING = HUD_EDIT_MODE_GRID_SPACING or "Шаг сетки",
@@ -31,7 +31,8 @@ local L = {
 	DELETE_LAYOUT = HUD_EDIT_MODE_DELETE_LAYOUT or "Удалить макет",
 	NAME_LAYOUT = HUD_EDIT_MODE_NAME_LAYOUT_DIALOG_TITLE or "Название макета",
 	SIZE = "Размер",
-	CLICK_TO_EDIT = HUD_EDIT_MODE_INSTRUCTIONS_CLICK_TO_EDIT or "Нажмите на элемент, чтобы изменить его.",
+	CLICK_TO_EDIT = HUD_EDIT_MODE_INSTRUCTIONS_CLICK_TO_EDIT or "Щелкните, чтобы изменить",
+	EYE_SIZE = HUD_EDIT_MODE_SETTING_MICRO_MENU_EYE_SIZE or "Размер глаза",
 };
 
 EditModeCore = {
@@ -521,79 +522,90 @@ end
 ---------------------------------------------------------------------------
 -- накладки поверх фреймов (подсветка / выделение)
 ---------------------------------------------------------------------------
-local HIGHLIGHT_ATLAS = "editmode-actionbar-highlight-nineslice-center";
-local SELECTED_ATLAS = "editmode-actionbar-selected-nineslice-center";
+-- retail EditModeSystemSelectionLayout (EditModeSystemTemplates.lua): editmode-actionbar-highlight / -selected nine slices
+local SELECTION_LAYOUT = {
+	["TopRightCorner"] = { atlas = "%s-nineslice-corner", mirrorLayout = true, x = 8, y = 8 },
+	["TopLeftCorner"] = { atlas = "%s-nineslice-corner", mirrorLayout = true, x = -8, y = 8 },
+	["BottomLeftCorner"] = { atlas = "%s-nineslice-corner", mirrorLayout = true, x = -8, y = -8 },
+	["BottomRightCorner"] = { atlas = "%s-nineslice-corner", mirrorLayout = true, x = 8, y = -8 },
+	["TopEdge"] = { atlas = "_%s-nineslice-edgetop" },
+	["BottomEdge"] = { atlas = "_%s-nineslice-edgebottom" },
+	["LeftEdge"] = { atlas = "!%s-nineslice-edgeleft" },
+	["RightEdge"] = { atlas = "!%s-nineslice-edgeright" },
+	["Center"] = { atlas = "%s-nineslice-center", x = -8, y = 8, x1 = 8, y1 = -8 },
+};
+local HIGHLIGHT_KIT = "editmode-actionbar-highlight";
+local SELECTED_KIT = "editmode-actionbar-selected";
+local PIECES = { "TopLeftCorner", "TopRightCorner", "BottomLeftCorner", "BottomRightCorner", "TopEdge", "BottomEdge", "LeftEdge", "RightEdge", "Center" };
+
+-- retail: the label shows the frame's name when selected, "click to edit" while the mouse is over it
+local function UpdateOverlayLabel(overlay)
+	if overlay.state == "selected" then
+		overlay.Label:SetText(overlay.system.displayName);
+		overlay.Label:Show();
+	elseif overlay.hovered then
+		overlay.Label:SetText(L.CLICK_TO_EDIT);
+		overlay.Label:Show();
+	else
+		overlay.Label:Hide();
+	end
+end
 
 local function SetOverlayState(overlay, state)
-	overlay.state = state;
-	if state == "selected" then
-		if not C_Texture.GetAtlasInfo(SELECTED_ATLAS) then
-			overlay.Background:SetTexture(1, 0.8, 0.1, 0.3);
-		else
-			overlay.Background:SetAtlas(SELECTED_ATLAS);
-			overlay.Background:SetVertexColor(1, 1, 1, 0.9);
-		end
-		overlay.Border:SetTexture(1, 0.82, 0, 0.9);
-		overlay.Label:SetTextColor(1, 1, 1);
-	else
-		if C_Texture.GetAtlasInfo(HIGHLIGHT_ATLAS) then
-			overlay.Background:SetAtlas(HIGHLIGHT_ATLAS);
-			overlay.Background:SetVertexColor(1, 1, 1, state == "hover" and 0.9 or 0.55);
-		else
-			overlay.Background:SetTexture(0.1, 0.4, 1, state == "hover" and 0.45 or 0.25);
-		end
-		overlay.Border:SetTexture(0.3, 0.6, 1, state == "hover" and 0.9 or 0.5);
-		overlay.Label:SetTextColor(1, 0.82, 0);
+	if overlay.state ~= state then
+		NineSliceUtil.ApplyLayout(overlay, SELECTION_LAYOUT, state == "selected" and SELECTED_KIT or HIGHLIGHT_KIT);
 	end
+	overlay.state = state;
+	UpdateOverlayLabel(overlay);
 end
 
 local function CreateOverlay(system)
 	local overlay = CreateFrame("Button", "EditModeOverlay" .. system.name, UIParent);
+	overlay.system = system;
 	overlay:SetFrameStrata("HIGH");
+	overlay:SetToplevel(true);
 	overlay:EnableMouse(true);
 	overlay:RegisterForDrag("LeftButton");
 	overlay:RegisterForClicks("LeftButtonUp");
 	overlay:Hide();
 
-	overlay.Background = overlay:CreateTexture(nil, "BACKGROUND");
-	overlay.Background:SetAllPoints();
-
-	-- рамка в 1 пиксель: 4 линии
-	overlay.Border = overlay:CreateTexture(nil, "BORDER");
-	overlay.Border:SetPoint("TOPLEFT");
-	overlay.Border:SetPoint("TOPRIGHT");
-	overlay.Border:SetHeight(1);
-	overlay.edges = { overlay.Border };
-	for _, points in ipairs({ { "BOTTOMLEFT", "BOTTOMRIGHT", "H" }, { "TOPLEFT", "BOTTOMLEFT", "V" }, { "TOPRIGHT", "BOTTOMRIGHT", "V" } }) do
-		local edge = overlay:CreateTexture(nil, "BORDER");
-		edge:SetPoint(points[1]);
-		edge:SetPoint(points[2]);
-		if points[3] == "H" then edge:SetHeight(1) else edge:SetWidth(1) end
-		table.insert(overlay.edges, edge);
-	end
-	local setBorder = overlay.Border.SetTexture;
-	overlay.Border.SetTexture = function(self, ...)
-		for _, edge in ipairs(overlay.edges) do
-			setBorder(edge, ...);
+	-- the mouse over: the highlight nine slice once more, added (retail MouseOverHighlight, alpha 0.4)
+	overlay.MouseOverHighlight = CreateFrame("Frame", nil, overlay);
+	overlay.MouseOverHighlight:SetAllPoints();
+	overlay.MouseOverHighlight:SetAlpha(0.4);
+	overlay.MouseOverHighlight:Hide();
+	NineSliceUtil.ApplyLayout(overlay.MouseOverHighlight, SELECTION_LAYOUT, HIGHLIGHT_KIT);
+	for _, piece in ipairs(PIECES) do
+		if overlay.MouseOverHighlight[piece] then
+			overlay.MouseOverHighlight[piece]:SetBlendMode("ADD");
 		end
 	end
 
-	overlay.Label = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormal");
-	overlay.Label:SetPoint("CENTER");
-	overlay.Label:SetText(system.displayName);
+	overlay.Label = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge");
+	overlay.Label:SetPoint("TOPLEFT", overlay, "TOPLEFT", 2, -2);
+	overlay.Label:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", -2, 2);
+	overlay.Label:Hide();
 
 	overlay:SetScript("OnEnter", function(self)
+		self.hovered = true;
+		self.MouseOverHighlight:Show();
+		UpdateOverlayLabel(self);
+		-- retail: the frame's name at the cursor while it is not selected
 		if self.state ~= "selected" then
-			SetOverlayState(self, "hover");
+			GameTooltip:SetOwner(self, "ANCHOR_CURSOR");
+			GameTooltip:SetText(system.displayName);
+			GameTooltip:Show();
 		end
 	end);
 	overlay:SetScript("OnLeave", function(self)
-		if self.state ~= "selected" then
-			SetOverlayState(self, "normal");
-		end
+		self.hovered = nil;
+		self.MouseOverHighlight:Hide();
+		UpdateOverlayLabel(self);
+		GameTooltip:Hide();
 	end);
 
 	overlay:SetScript("OnClick", function()
+		GameTooltip:Hide();
 		EditModeCore:SelectSystem(system.name);
 	end);
 
@@ -789,6 +801,15 @@ local function CreateButton(parent, text, width, onClick)
 	return button;
 end
 
+-- the texts of a dialog above its border: DialogBorderTranslucentTemplate is a child frame drawn over the
+-- dialog's own regions, it dimmed the title and the labels
+local function CreateContent(dialog)
+	local content = CreateFrame("Frame", nil, dialog);
+	content:SetAllPoints();
+	content:SetFrameLevel(dialog:GetFrameLevel() + 5);
+	return content;
+end
+
 ---------------------------------------------------------------------------
 -- окно режима
 ---------------------------------------------------------------------------
@@ -803,12 +824,14 @@ function EditModeManagerMixin:OnLoad()
 		EditModeCore:Exit();
 	end);
 
-	self.Title = self:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-	self.Title:SetPoint("TOP", self, "TOP", 0, -14);
+	self.Content = CreateContent(self);
+	-- retail: the title white and large, "Layout:" gold
+	self.Title = self.Content:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
+	self.Title:SetPoint("TOP", self, "TOP", 0, -15);
 	self.Title:SetText(L.TITLE);
 
 	-- макет
-	self.LayoutLabel = self:CreateFontString(nil, "ARTWORK", "GameFontNormal");
+	self.LayoutLabel = self.Content:CreateFontString(nil, "ARTWORK", "GameFontNormal");
 	self.LayoutLabel:SetPoint("TOPLEFT", self, "TOPLEFT", 20, -48);
 	self.LayoutLabel:SetText(L.LAYOUT .. ":");
 
@@ -840,13 +863,9 @@ function EditModeManagerMixin:OnLoad()
 	self.GridSlider:SetPoint("RIGHT", self, "RIGHT", -20, 0);
 
 	-- фреймы: снятая галочка - фрейм не редактируется (накладки нет)
-	self.FramesLabel = self:CreateFontString(nil, "ARTWORK", "GameFontNormal");
+	self.FramesLabel = self.Content:CreateFontString(nil, "ARTWORK", "GameFontNormal");
 	self.FramesLabel:SetPoint("TOPLEFT", self.GridSlider, "BOTTOMLEFT", -6, -10);
 	self.FramesLabel:SetText(L.FRAMES);
-
-	self.Hint = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall");
-	self.Hint:SetPoint("LEFT", self.FramesLabel, "RIGHT", 10, 0);
-	self.Hint:SetText(L.CLICK_TO_EDIT);
 
 	self.frameChecks = {};
 
@@ -1003,22 +1022,26 @@ function EditModeSystemSettingsDialogMixin:OnLoad()
 	self:SetScript("OnDragStart", self.StartMoving);
 	self:SetScript("OnDragStop", self.StopMovingOrSizing);
 
-	self.Title = self:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
-	self.Title:SetPoint("TOP", self, "TOP", 0, -14);
+	self.Content = CreateContent(self);
+	self.Title = self.Content:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge");
+	self.Title:SetPoint("TOP", self, "TOP", 0, -15);
 
 	self.controls = {};
 
-	self.ResetPositionButton = CreateButton(self, L.RESET_POSITION, 150, function()
-		EditModeCore:ResetSystem(self.system.name);
-		self:Refresh();
-	end);
-	self.ResetPositionButton:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 16, 16);
-
-	self.RevertButton = CreateButton(self, L.REVERT_CHANGES, 150, function()
+	-- retail: the two buttons one under the other, the full width of the dialog
+	self.RevertButton = CreateButton(self, L.REVERT_CHANGES, 1, function()
 		EditModeCore:RevertSystem(self.system.name);
 		self:Refresh();
 	end);
-	self.RevertButton:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -16, 16);
+	self.RevertButton:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 20, 16);
+	self.RevertButton:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -20, 16);
+
+	self.ResetPositionButton = CreateButton(self, L.RESET_POSITION, 1, function()
+		EditModeCore:ResetSystem(self.system.name);
+		self:Refresh();
+	end);
+	self.ResetPositionButton:SetPoint("BOTTOMLEFT", self.RevertButton, "TOPLEFT", 0, 4);
+	self.ResetPositionButton:SetPoint("BOTTOMRIGHT", self.RevertButton, "TOPRIGHT", 0, 4);
 end
 
 function EditModeSystemSettingsDialogMixin:BuildControls(system)
@@ -1071,7 +1094,7 @@ function EditModeSystemSettingsDialogMixin:AttachToSystem(system)
 		control:Show();
 	end
 
-	self:SetHeight(44 + #system.settings * 38 + 56);
+	self:SetHeight(44 + #system.settings * 38 + 82);
 	self:Refresh();
 	self:Show();
 end
@@ -1129,14 +1152,25 @@ loader:SetScript("OnEvent", function(self, event)
 		{ "MinimapCluster", MinimapCluster, HUD_EDIT_MODE_MINIMAP_LABEL },
 		{ "ObjectiveTrackerFrame", ObjectiveTrackerFrame, HUD_EDIT_MODE_OBJECTIVE_TRACKER_LABEL },
 		{ "CastingBarFrame", CastingBarFrame, HUD_EDIT_MODE_CAST_BAR_LABEL },
-		{ "MicroMenuFrame", MicroMenuFrame, HUD_EDIT_MODE_MICRO_MENU_LABEL },
+		-- retail: the queue eye is part of the micro menu - its size is a setting of the menu, not a system
+		{ "MicroMenuFrame", MicroMenuFrame, HUD_EDIT_MODE_MICRO_MENU_LABEL, {
+			{
+				key = "eyeSize", type = "slider", label = L.EYE_SIZE, min = 0.5, max = 1.5, step = 0.05, default = 1,
+				format = function(value) return string.format("%d%%", math.floor(value * 100 + 0.5)); end,
+				apply = function(frame, value)
+					if QueueStatusButton then
+						QueueStatusButton:SetScale(value);
+					end
+				end,
+			},
+		} },
 		{ "BackpackFrame", BackpackFrame, HUD_EDIT_MODE_BAGS_LABEL },
 		{ "ChatFrame1", ChatFrame1, HUD_EDIT_MODE_CHAT_FRAME_LABEL },
 		{ "LossOfControlFrame", LossOfControlFrame, HUD_EDIT_MODE_LOSS_OF_CONTROL_LABEL },
 	};
 
 	for _, entry in ipairs(defaults) do
-		EditModeCore:RegisterSystem(entry[1], entry[2], entry[3]);
+		EditModeCore:RegisterSystem(entry[1], entry[2], entry[3], entry[4]);
 	end
 
 	EditModeCore:ApplyLayout();
