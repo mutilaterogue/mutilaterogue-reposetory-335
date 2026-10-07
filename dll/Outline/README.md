@@ -196,7 +196,7 @@ Glue cvars: `ssr`, `ssrStrength`, `vignette`, `filmGrain`.
 | `groundFogDensity` | `0.5` | `0` .. `1` |
 | `groundFogHeight` | `4` | yards, `0` .. `30` |
 
-Without antialiasing the depth effects work too: at the end of a frame our INTZ texture is set in place of the
+Without antialiasing (`depthNoMsaa 1`, experimental: it darkened the world on an antialiasing change) the depth effects work too: at the end of a frame our INTZ texture is set in place of the
 client's depth buffer (vtable `SetDepthStencilSurface` 39 hooked: the client setting its own gets ours), so the
 scene draws its depth straight into it; it is unbound while the passes read it. When no effect needs depth, the
 client's is put back. Glue cvars: `fxaa`, `tonemap`, `tonemapExposure`, `groundFog`, `groundFogDensity`,

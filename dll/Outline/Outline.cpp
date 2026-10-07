@@ -117,12 +117,13 @@ namespace
         { "groundFog",        "Fog low on the ground (valleys, water): 0 off, 1 on", "0", nullptr },
         { "groundFogDensity", "Ground fog density (0 .. 1)", "0.5", nullptr },
         { "groundFogHeight",  "Ground fog: yards above your feet it reaches (0 .. 30)", "4", nullptr },
+        { "depthNoMsaa",      "Depth effects without antialiasing (our depth buffer in place of the client's; experimental): 0 off, 1 on", "0", nullptr },
     };
     enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
         CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN,
         CV_BLOOM, CV_BLOOM_STRENGTH, CV_BLOOM_THRESHOLD, CV_GODRAYS, CV_GODRAYS_STRENGTH, CV_GODRAYS_FLIP,
         CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_SSR, CV_SSR_STRENGTH, CV_VIGNETTE, CV_GRAIN,
-        CV_FXAA, CV_TONEMAP, CV_TONEMAP_EXPOSURE, CV_GROUND_FOG, CV_GROUND_FOG_DENSITY, CV_GROUND_FOG_HEIGHT, CV_COUNT };
+        CV_FXAA, CV_TONEMAP, CV_TONEMAP_EXPOSURE, CV_GROUND_FOG, CV_GROUND_FOG_DENSITY, CV_GROUND_FOG_HEIGHT, CV_DEPTH_NO_MSAA, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -2338,7 +2339,7 @@ namespace
     void UseOwnDepth(IDirect3DDevice9* device)
     {
         bool wanted = (CVarInt(CV_SSAO) || CVarInt(CV_GODRAYS) || CVarInt(CV_DOF) || CVarInt(CV_SSR) || CVarInt(CV_GROUND_FOG))
-            && s_ssaoSupported;
+            && s_ssaoSupported && CVarInt(CV_DEPTH_NO_MSAA);
         IDirect3DSurface9* bound = nullptr;
         device->GetDepthStencilSurface(&bound);
         if (!wanted)
