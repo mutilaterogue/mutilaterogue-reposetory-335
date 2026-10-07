@@ -107,11 +107,15 @@ namespace
         { "dof",              "Depth of field (far blur): 0 off, 1 on", "0", nullptr },
         { "dofStrength",      "Depth of field strength (0 .. 1)", "1", nullptr },
         { "dofDistance",      "Depth of field: yards beyond the focus where the blur is full (5 .. 300)", "60", nullptr },
+        { "ssr",              "Water reflections: 0 off, 1 on", "0", nullptr },
+        { "ssrStrength",      "Water reflections strength (0 .. 1)", "1", nullptr },
+        { "vignette",         "Vignette: darker corners (0 .. 1)", "0", nullptr },
+        { "filmGrain",        "Film grain (0 .. 1)", "0", nullptr },
     };
     enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
         CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN,
         CV_BLOOM, CV_BLOOM_STRENGTH, CV_BLOOM_THRESHOLD, CV_GODRAYS, CV_GODRAYS_STRENGTH, CV_GODRAYS_FLIP,
-        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_COUNT };
+        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_SSR, CV_SSR_STRENGTH, CV_VIGNETTE, CV_GRAIN, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -227,7 +231,21 @@ namespace
     IDirect3DPixelShader9* s_dofShader = nullptr;
     bool s_postChecked = false;
     bool s_depthReady = false;                          // this frame's depth copy is there
-    float s_sunScreen[4] = {};                          // OutlineDebug: the sun's u, v, in front (1/0), visibility
+    float s_sunScreen[4] = {};
+    // water reflections: the water's draws (the client's liquid pixel shaders, CGxShader* at these addresses:
+    // psLiquidWater, psLiquidWaterNoSpec, psLiquidProcWater) drawn once more into a mask, writing depth (the
+    // client's water doesn't: the reflection starts on the surface, not the bottom)
+    const uintptr_t WATER_SHADER_SLOTS[] = { 0xD44C0C, 0xD44BF8, 0xD44C20 };
+    bool s_waterBound = false;
+    IDirect3DTexture9* s_waterMask = nullptr;           // default pool
+    IDirect3DSurface9* s_waterMaskSurface = nullptr;
+    IDirect3DSurface9* s_waterMaskMultisampled = nullptr;
+    UINT s_waterMaskWidth = 0, s_waterMaskHeight = 0;
+    bool s_waterDirty = false;
+    uint32_t s_waterDraws = 0, s_frameWaterDraws = 0;
+    IDirect3DPixelShader9* s_ssrShader = nullptr;
+    bool s_ssrChecked = false;
+    uint32_t s_frameCount = 0;                          // OutlineDebug: the sun's u, v, in front (1/0), visibility
     // 0 off, 1 drawn, 2 no INTZ, 3 no RESZ (the driver), 4 no antialiasing (needs it: RESZ copies a multisampled
     // depth buffer), 5 no shader (the compiler), 6 the depth texture failed
     uint32_t s_ssaoStatus = 0;
@@ -501,7 +519,7 @@ namespace
         VT_SET_PIXEL_SHADER     = 107,
         VT_SET_PS_CONSTANT_F    = 109,
     };
-    constexpr uint32_t SHADOW_PS_REGISTERS = 2;     // c0, c1: the ones we use
+    constexpr uint32_t SHADOW_PS_REGISTERS = 8;     // c0 .. c7: the ones we use
     constexpr uint32_t SHADOW_SAMPLER_STATES = 14;
     constexpr uint32_t SHADOW_STAGES = 3;           // s0 .. s2: the ones we use
 
@@ -618,9 +636,27 @@ namespace
         return s_setStreamSource(device, stream, buffer, offset, stride);
     }
 
+    // one of the client's water shaders: its CGxShader holds the D3D shader somewhere in its first bytes
+    bool IsWaterShader(IDirect3DPixelShader9* shader)
+    {
+        if (!shader)
+            return false;
+        for (uintptr_t slot : WATER_SHADER_SLOTS)
+        {
+            void** gxShader = *reinterpret_cast<void***>(slot);
+            if (!gxShader)
+                continue;
+            for (int i = 0; i < 24; ++i)
+                if (gxShader[i] == shader)
+                    return true;
+        }
+        return false;
+    }
+
     HRESULT __stdcall SetPixelShaderDetour(IDirect3DDevice9* device, IDirect3DPixelShader9* shader)
     {
         s_shadow.PixelShader = shader;
+        s_waterBound = IsWaterShader(shader);
         return s_setPixelShader(device, shader);
     }
 
@@ -722,8 +758,23 @@ namespace
         s_smallWidth = s_smallHeight = 0;
     }
 
+    void ReleaseWaterMask()
+    {
+        if (s_waterMaskMultisampled)
+            s_waterMaskMultisampled->Release();
+        if (s_waterMaskSurface)
+            s_waterMaskSurface->Release();
+        if (s_waterMask)
+            s_waterMask->Release();
+        s_waterMaskMultisampled = nullptr;
+        s_waterMaskSurface = nullptr;
+        s_waterMask = nullptr;
+        s_waterMaskWidth = s_waterMaskHeight = 0;
+    }
+
     void ReleasePostTargets()
     {
+        ReleaseWaterMask();
         if (s_depthCopy)
             s_depthCopy->Release();
         if (s_aoSurface)
@@ -1019,11 +1070,39 @@ namespace
         s_maskDirty = false;
     }
 
+    // the water's draw once more: white into the water mask, its depth into the scene's depth buffer
+    void DrawWater(IDirect3DDevice9* device, D3DPRIMITIVETYPE type, INT baseVertex, UINT minIndex, UINT numVertices,
+        UINT startIndex, UINT primitiveCount)
+    {
+        IDirect3DSurface9* renderTarget = nullptr;
+        device->GetRenderTarget(0, &renderTarget);
+        device->SetRenderTarget(0, s_waterMaskMultisampled ? s_waterMaskMultisampled : s_waterMaskSurface);
+        RestoreViewport(device);
+        const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        s_setPixelShader(device, s_flatShader);
+        s_setPsConstant(device, 0, white, 1);
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_ZENABLE, D3DZB_TRUE);
+        SetState(device, D3DRS_ZWRITEENABLE, TRUE);
+        SetState(device, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+        s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+        device->SetRenderTarget(0, renderTarget);
+        if (renderTarget)
+            renderTarget->Release();
+        RestoreViewport(device);
+        RestorePixelShader(device);
+        RestoreStates(device);
+        ++s_frameWaterDraws;
+        s_waterDirty = true;
+    }
+
     // ---------------------------------------------------------------- 1. the silhouettes
     HRESULT __stdcall DrawIndexedPrimitiveDetour(IDirect3DDevice9* device, D3DPRIMITIVETYPE type, INT baseVertex,
         UINT minIndex, UINT numVertices, UINT startIndex, UINT primitiveCount)
     {
         HRESULT result = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+        if (s_waterBound && s_waterMaskSurface)
+            DrawWater(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         if (!s_currentTarget || (s_mode & 1))
             return result;
         // a billboard (an attachment's, or the unit's own glow / alpha keyed card: a few triangles, its shape only
@@ -1266,11 +1345,13 @@ namespace
         "    return float4(0, 0, 0, saturate(sum / max(weights, 0.0001) * params.y));\n"
         "}\n";
 
-    // color grading: s0 the scene; c0 texel.xy; c1 contrast, saturation, sharpening, brightness
+    // color grading: s0 the scene; c0 texel.xy; c1 contrast, saturation, sharpening, brightness; c2 vignette, grain,
+    // a value changing every frame (the grain's seed)
     const char HLSL_GRADE_PS[] =
         "sampler2D scene : register(s0);\n"
         "float4 screen : register(c0);\n"
         "float4 params : register(c1);\n"
+        "float4 look : register(c2);\n"
         "float3 At(float2 uv) { return tex2Dlod(scene, float4(uv, 0, 0)).rgb; }\n"
         "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
         "{\n"
@@ -1282,6 +1363,9 @@ namespace
         "    float luma = dot(c, float3(0.299, 0.587, 0.114));\n"
         "    c = lerp(luma.xxx, c, params.y);\n"
         "    c = (c - 0.5) * params.x + 0.5;\n"
+        "    float2 fromCenter = uv - 0.5;\n"
+        "    c *= 1.0 - look.x * saturate(dot(fromCenter, fromCenter) * 2.2);\n"
+        "    c += (frac(sin(dot(uv * 1000.0 + look.z, float2(12.9898, 78.233))) * 43758.5453) - 0.5) * look.y * 0.15;\n"
         "    return float4(saturate(c), 1);\n"
         "}\n";
 
@@ -1479,7 +1563,7 @@ namespace
     void PrepareDepth(IDirect3DDevice9* device)
     {
         s_depthReady = false;
-        if (!CVarInt(CV_SSAO) && !CVarInt(CV_GODRAYS) && !CVarInt(CV_DOF))
+        if (!CVarInt(CV_SSAO) && !CVarInt(CV_GODRAYS) && !CVarInt(CV_DOF) && !CVarInt(CV_SSR))
             return;
         if (!s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device) || !CheckSsaoSupport(device))
             return;
@@ -1820,12 +1904,198 @@ namespace
         RestoreGx(device);
     }
 
+    // ---------------------------------------------------------------- water reflections (SSR)
+    // For a water pixel: its point (the camera, the view ray, the linear depth - the water's own, written by
+    // DrawWater), the view ray mirrored by the flat surface, marched until it goes behind the scene's depth: the
+    // color there; the sky if it only met sky. Fresnel: strong at grazing angles. s0 the scene, s1 the depth,
+    // s2 the water mask; c0 texel.xy, near, far; c1 strength, the longest ray; c2..c4 the camera's forward, left,
+    // up; c5 its position; c6 tan(fov / 2) * aspect, tan(fov / 2)
+    const char HLSL_SSR_PS[] =
+        "sampler2D scene : register(s0);\n"
+        "sampler2D depthTex : register(s1);\n"
+        "sampler2D water : register(s2);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float4 forward : register(c2);\n"
+        "float4 left : register(c3);\n"
+        "float4 up : register(c4);\n"
+        "float4 eye : register(c5);\n"
+        "float4 fov : register(c6);\n"
+        "float Linear(float d) { return screen.z * screen.w / (screen.w - d * (screen.w - screen.z)); }\n"
+        "float2 Project(float3 p, out float z)\n"
+        "{\n"
+        "    float3 rel = p - eye.xyz;\n"
+        "    z = dot(rel, forward.xyz);\n"
+        "    float x = -dot(rel, left.xyz) / (z * fov.x);\n"
+        "    float y = dot(rel, up.xyz) / (z * fov.y);\n"
+        "    return float2(0.5 + 0.5 * x, 0.5 - 0.5 * y);\n"
+        "}\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    clip(tex2Dlod(water, float4(uv, 0, 0)).r - 0.5);\n"
+        "    float z = Linear(tex2Dlod(depthTex, float4(uv, 0, 0)).r);\n"
+        "    float2 ndc = float2(uv.x * 2 - 1, 1 - uv.y * 2);\n"
+        "    float3 ray = forward.xyz - left.xyz * ndc.x * fov.x + up.xyz * ndc.y * fov.y;\n"
+        "    float3 surface = eye.xyz + ray * z;\n"
+        "    float3 view = normalize(ray);\n"
+        "    float3 mirrored = float3(view.x, view.y, -view.z);\n"
+        "    float3 color = 0;\n"
+        "    float found = 0;\n"
+        "    float t = 0.5;\n"
+        "    [loop] for (int i = 0; i < 48; ++i)\n"
+        "    {\n"
+        "        float rayZ;\n"
+        "        float2 at = Project(surface + mirrored * t, rayZ);\n"
+        "        if (rayZ <= screen.z || at.x < 0 || at.x > 1 || at.y < 0 || at.y > 1)\n"
+        "            break;\n"
+        "        float d = tex2Dlod(depthTex, float4(at, 0, 0)).r;\n"
+        "        if (d >= 0.99999)\n"
+        "        {\n"
+        "            color = tex2Dlod(scene, float4(at, 0, 0)).rgb;\n"
+        "            found = 1;\n"
+        "        }\n"
+        "        else\n"
+        "        {\n"
+        "            float sceneZ = Linear(d);\n"
+        "            if (sceneZ < rayZ && rayZ - sceneZ < t * 0.2 + 0.5)\n"
+        "            {\n"
+        "                color = tex2Dlod(scene, float4(at, 0, 0)).rgb;\n"
+        "                found = 1;\n"
+        "                break;\n"
+        "            }\n"
+        "        }\n"
+        "        t *= 1.15;\n"
+        "        if (t > params.y)\n"
+        "            break;\n"
+        "    }\n"
+        "    float fresnel = 0.05 + 0.95 * pow(1.0 - abs(view.z), 5.0);\n"
+        "    return float4(color, saturate(found * fresnel * params.x));\n"
+        "}\n";
+
+    // the water mask: the size and the antialiasing of the outline's (they fit the scene's depth buffer)
+    bool EnsureWaterMask(IDirect3DDevice9* device)
+    {
+        if (!CVarInt(CV_SSR) || !s_mask || !CanDepthTest())
+        {
+            ReleaseWaterMask();
+            return false;
+        }
+        if (s_waterMask && s_waterMaskWidth == s_maskWidth && s_waterMaskHeight == s_maskHeight
+            && (s_waterMaskMultisampled != nullptr) == (s_maskSamples != D3DMULTISAMPLE_NONE))
+            return true;
+        ReleaseWaterMask();
+        if (s_maskSamples != D3DMULTISAMPLE_NONE && FAILED(device->CreateRenderTarget(s_maskWidth, s_maskHeight,
+            D3DFMT_A8R8G8B8, s_maskSamples, s_maskQuality, FALSE, &s_waterMaskMultisampled, nullptr)))
+        {
+            s_waterMaskMultisampled = nullptr;
+            return false;
+        }
+        if (FAILED(device->CreateTexture(s_maskWidth, s_maskHeight, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
+            D3DPOOL_DEFAULT, &s_waterMask, nullptr)) || !s_waterMask)
+        {
+            s_waterMask = nullptr;
+            ReleaseWaterMask();
+            return false;
+        }
+        s_waterMask->GetSurfaceLevel(0, &s_waterMaskSurface);
+        s_waterMaskWidth = s_maskWidth;
+        s_waterMaskHeight = s_maskHeight;
+        s_waterDirty = true;
+        return s_waterMaskSurface != nullptr;
+    }
+
+    void ClearWaterMask(IDirect3DDevice9* device)
+    {
+        if (!s_waterDirty || !s_waterMaskSurface)
+            return;
+        IDirect3DSurface9* renderTarget = nullptr;
+        IDirect3DSurface9* depthStencil = nullptr;
+        device->GetRenderTarget(0, &renderTarget);
+        device->GetDepthStencilSurface(&depthStencil);
+        device->SetDepthStencilSurface(nullptr);
+        device->SetRenderTarget(0, s_waterMaskSurface);
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, 0, 1.0f, 0);
+        if (s_waterMaskMultisampled)
+        {
+            device->SetRenderTarget(0, s_waterMaskMultisampled);
+            device->Clear(0, nullptr, D3DCLEAR_TARGET, 0, 1.0f, 0);
+        }
+        device->SetRenderTarget(0, renderTarget);
+        device->SetDepthStencilSurface(depthStencil);
+        if (renderTarget)
+            renderTarget->Release();
+        if (depthStencil)
+            depthStencil->Release();
+        RestoreViewport(device);
+        s_waterDirty = false;
+    }
+
+    // once a frame, after SSAO: the reflections drawn over the water
+    void Reflections(IDirect3DDevice9* device)
+    {
+        s_waterDraws = s_frameWaterDraws;
+        s_frameWaterDraws = 0;
+        if (!CVarInt(CV_SSR) || !s_depthReady || !s_waterMaskSurface || !s_waterDraws)
+            return;
+        if (!s_ssrChecked)
+        {
+            s_ssrChecked = true;
+            std::vector<DWORD> code = Compile(HLSL_SSR_PS, "ps_3_0");
+            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), &s_ssrShader)))
+                s_ssrShader = nullptr;
+        }
+        uint8_t* world = *reinterpret_cast<uint8_t**>(0xB7436C);
+        uint8_t* camera = world ? *reinterpret_cast<uint8_t**>(world + 0x7E20) : nullptr;
+        if (!s_ssrShader || !camera || !CopyScene(device))
+            return;
+        if (s_waterMaskMultisampled)
+            device->StretchRect(s_waterMaskMultisampled, nullptr, s_waterMaskSurface, nullptr, D3DTEXF_NONE);
+
+        const float* position = reinterpret_cast<const float*>(camera + 0x8);
+        const float* facing = reinterpret_cast<const float*>(camera + 0x14);
+        float fov = *reinterpret_cast<const float*>(camera + 0x40);
+        float aspect = *reinterpret_cast<const float*>(camera + 0x44);
+        float halfHeight = tanf((fov > 0.1f ? fov : 1.0f) * 0.5f);
+        float nearClip = CVarNumber("nearclip", 0.2f);
+        float farClip = *reinterpret_cast<float*>(ADDR_FARCLIP);
+        const float constants[7][4] = {
+            { 1.0f / s_sceneCopyWidth, 1.0f / s_sceneCopyHeight, nearClip > 0.01f ? nearClip : 0.2f, farClip > 10.0f ? farClip : 1000.0f },
+            { Clamp(CVarFloat(CV_SSR_STRENGTH), 0.0f, 1.0f), 400.0f, 0.0f, 0.0f },
+            { facing[0], facing[1], facing[2], 0.0f },
+            { facing[3], facing[4], facing[5], 0.0f },
+            { facing[6], facing[7], facing[8], 0.0f },
+            { position[0], position[1], position[2], 0.0f },
+            { halfHeight * (aspect > 0.1f ? aspect : 1.0f), halfHeight, 0.0f, 0.0f },
+        };
+
+        FillQuad(s_sceneCopyWidth, s_sceneCopyHeight);
+        s_setVertexShader(device, s_quadShader);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        s_setPixelShader(device, s_ssrShader);
+        s_setPsConstant(device, 0, &constants[0][0], 7);
+        BindTexture(device, 0, s_sceneCopy, true);
+        BindTexture(device, 1, s_depthCopy, false);
+        BindTexture(device, 2, s_waterMask, false);
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
+        SetState(device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        SetState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+        SetState(device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        for (DWORD stage = 0; stage < SHADOW_STAGES; ++stage)
+            s_setTexture(device, stage, nullptr);
+        RestoreGx(device);
+    }
+
     // once a frame, after SSAO, before the outline: contrast, saturation, brightness, sharpening
     void ColorGrade(IDirect3DDevice9* device)
     {
         float contrast = CVarFloat(CV_CONTRAST), saturation = CVarFloat(CV_SATURATION);
         float brightness = CVarFloat(CV_BRIGHTNESS), sharpen = CVarFloat(CV_SHARPEN);
-        if (contrast == 1.0f && saturation == 1.0f && brightness == 1.0f && sharpen == 0.0f)
+        float vignette = CVarFloat(CV_VIGNETTE), grain = CVarFloat(CV_GRAIN);
+        if (contrast == 1.0f && saturation == 1.0f && brightness == 1.0f && sharpen == 0.0f && vignette <= 0.0f && grain <= 0.0f)
             return;
         if (!s_gradeChecked)
         {
@@ -1852,6 +2122,9 @@ namespace
         s_setPixelShader(device, s_gradeShader);
         s_setPsConstant(device, 0, screen, 1);
         s_setPsConstant(device, 1, params, 1);
+        const float look[4] = { vignette < 0.0f ? 0.0f : (vignette > 1.0f ? 1.0f : vignette),
+            grain < 0.0f ? 0.0f : (grain > 1.0f ? 1.0f : grain), static_cast<float>(s_frameCount % 997), 0.0f };
+        s_setPsConstant(device, 2, look, 1);
         s_setVertexDeclaration(device, s_quadDeclaration);
         s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
         s_setTexture(device, 0, s_sceneCopy);
@@ -1939,13 +2212,17 @@ namespace
         IDirect3DDevice9* device = GetD3DDevice();
         if (device && (s_stats.Installed & 4))
         {
+            ++s_frameCount;
             PrepareDepth(device);
             Ssao(device);
+            Reflections(device);
             PostEffects(device);
             ColorGrade(device);
             Composite(device);
             if (EnsureMask(device) && EnsureQuadBuffer(device))
                 ClearMask(device);
+            if (EnsureWaterMask(device))
+                ClearWaterMask(device);
         }
         s_stats.TargetBatches = s_frameBatches;
         s_stats.Silhouettes = s_frameSilhouettes;
@@ -2175,7 +2452,8 @@ int32_t Outline::OutlineDebug(lua_State* L)
     char sun[96];
     snprintf(sun, sizeof(sun), "sun u %.2f v %.2f front %.0f vis %.2f", s_sunScreen[0], s_sunScreen[1], s_sunScreen[2], s_sunScreen[3]);
     FrameScript::PushString(L, sun);
-    return 17;
+    FrameScript::PushNumber(L, s_waterDraws);
+    return 18;
 }
 
 // /run OutlineMode(n): 1 no silhouettes, 2 no full-screen pass, 4 low quality, 8 stage 1 (silhouettes on the screen)

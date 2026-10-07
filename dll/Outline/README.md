@@ -168,3 +168,20 @@ aspect) - and added. Depth of field: the blurred scene mixed in by the distance 
 distance. `OutlineDebug()` #17: the sun on the screen (`u v front vis`).
 Glue cvars to keep them: `bloom`, `bloomStrength`, `bloomThreshold`, `godRays`, `godRaysStrength`, `godRaysFlip`,
 `dof`, `dofStrength`, `dofDistance`.
+
+## Water reflections, vignette, film grain
+| CVar | Default | |
+|---|---|---|
+| `ssr` | `0` | `1` water reflections (needs MSAA) |
+| `ssrStrength` | `1` | `0` .. `1` |
+| `vignette` | `0` | darker corners, `0` .. `1` |
+| `filmGrain` | `0` | `0` .. `1` |
+
+Water: the client's liquid pixel shaders (`CGxShader*` at `0xD44C0C` psLiquidWater, `0xD44BF8` NoSpec,
+`0xD44C20` ProcWater) are seen in `SetPixelShader`; each water draw is issued once more into a water mask,
+writing its depth into the scene's depth buffer (the client's water doesn't, the reflection would start at the
+bottom). Then for each water pixel the view ray is mirrored by the surface and marched through the depth copy
+(screen-space reflection), Fresnel weighted. Only what is on the screen can be reflected. `OutlineDebug()` #18:
+water draws in the last frame (`0`: the water wasn't found). Vignette and grain are part of the color grading
+pass. Video options -> Нововведения: presets Выкл / Мягко / Ретейл / Максимум.
+Glue cvars: `ssr`, `ssrStrength`, `vignette`, `filmGrain`.

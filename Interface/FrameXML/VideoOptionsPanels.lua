@@ -640,6 +640,8 @@ BLOOM_MODE = "Свечение (Bloom)";
 BLOOM_MODE_TOOLTIP = "Мягкий ореол вокруг ярких мест: огней, окон, эффектов.";
 GODRAYS_MODE = "Лучи солнца";
 GODRAYS_MODE_TOOLTIP = "Лучи света от солнца сквозь деревья и края гор. Требует сглаживания (MSAA).";
+SSR_MODE = "Отражения в воде";
+SSR_MODE_TOOLTIP = "Вода отражает горы, деревья и здания (то, что видно на экране). Требует сглаживания (MSAA).";
 DOF_MODE = "Глубина резкости";
 DOF_MODE_TOOLTIP = "Даль размывается, персонаж и всё рядом остаётся резким. Требует сглаживания (MSAA).";
 
@@ -650,6 +652,7 @@ local FEATURE_DROPDOWNS = {
 	VideoOptionsFeaturesPanelBloomDropDown = { cvar = "bloom", modes = "SSAO_MODES" },
 	VideoOptionsFeaturesPanelGodRaysDropDown = { cvar = "godRays", modes = "SSAO_MODES" },
 	VideoOptionsFeaturesPanelDofDropDown = { cvar = "dof", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelSsrDropDown = { cvar = "ssr", modes = "SSAO_MODES" },
 };
 
 local function FeatureDropDown_Initialize (self)
@@ -679,6 +682,9 @@ end
 SSAO_STRENGTH = "Сила затенения";
 SSAO_RADIUS = "Радиус затенения";
 COLOR_CONTRAST = "Контраст";
+SSR_STRENGTH = "Сила отражений";
+VIGNETTE = "Виньетка";
+FILM_GRAIN = "Зерно";
 BLOOM_STRENGTH = "Сила свечения";
 BLOOM_THRESHOLD = "Порог свечения";
 GODRAYS_STRENGTH = "Сила лучей";
@@ -695,6 +701,9 @@ local FEATURE_SLIDERS = {
 	VideoOptionsFeaturesPanelGodRaysStrength = { cvar = "godRaysStrength", text = "GODRAYS_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelDofStrength = { cvar = "dofStrength", text = "DOF_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
 	VideoOptionsFeaturesPanelDofDistance = { cvar = "dofDistance", text = "DOF_DISTANCE", minValue = 5, maxValue = 300, valueStep = 5, low = "5", high = "300" },
+	VideoOptionsFeaturesPanelSsrStrength = { cvar = "ssrStrength", text = "SSR_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
+	VideoOptionsFeaturesPanelVignette = { cvar = "vignette", text = "VIGNETTE", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
+	VideoOptionsFeaturesPanelFilmGrain = { cvar = "filmGrain", text = "FILM_GRAIN", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
 	VideoOptionsFeaturesPanelColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
 	VideoOptionsFeaturesPanelColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
@@ -721,5 +730,45 @@ end
 function VideoOptionsFeaturesPanelSlider_OnValueChanged (self, value)
 	if ( not self.loading ) then
 		SetCVar(FEATURE_SLIDERS[self:GetName()].cvar, value);
+	end
+end
+
+-- presets: every feature at once
+FEATURES_PRESET_OFF = "Выкл";
+FEATURES_PRESET_SOFT = "Мягко";
+FEATURES_PRESET_RETAIL = "Ретейл";
+FEATURES_PRESET_MAX = "Максимум";
+local FEATURE_PRESETS = {
+	VideoOptionsFeaturesPanelPresetOff = {
+		ssao = 0, bloom = 0, godRays = 0, dof = 0, ssr = 0,
+		colorContrast = 1, colorSaturation = 1, colorBrightness = 1, colorSharpen = 0, vignette = 0, filmGrain = 0,
+	},
+	VideoOptionsFeaturesPanelPresetSoft = {
+		ssao = 1, ssaoStrength = 0.8, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.4, bloomThreshold = 0.8,
+		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6,
+		colorContrast = 1.05, colorSaturation = 1.05, colorBrightness = 1, colorSharpen = 0.1, vignette = 0.2, filmGrain = 0,
+	},
+	VideoOptionsFeaturesPanelPresetRetail = {
+		ssao = 1, ssaoStrength = 1, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.6, bloomThreshold = 0.7,
+		godRays = 1, godRaysStrength = 1, dof = 1, dofStrength = 0.6, dofDistance = 80, ssr = 1, ssrStrength = 0.8,
+		colorContrast = 1.1, colorSaturation = 1.1, colorBrightness = 1, colorSharpen = 0.2, vignette = 0.3, filmGrain = 0,
+	},
+	VideoOptionsFeaturesPanelPresetMax = {
+		ssao = 1, ssaoStrength = 1.5, ssaoRadius = 2, bloom = 1, bloomStrength = 0.9, bloomThreshold = 0.6,
+		godRays = 1, godRaysStrength = 1.5, dof = 1, dofStrength = 1, dofDistance = 60, ssr = 1, ssrStrength = 1,
+		colorContrast = 1.15, colorSaturation = 1.2, colorBrightness = 1, colorSharpen = 0.4, vignette = 0.4, filmGrain = 0.2,
+	},
+};
+
+function VideoOptionsFeaturesPanelPreset_OnClick (self)
+	for cvar, value in pairs(FEATURE_PRESETS[self:GetName()]) do
+		SetCVar(cvar, value);
+	end
+	-- the controls show the new values
+	for name in pairs(FEATURE_DROPDOWNS) do
+		VideoOptionsFeaturesPanelDropDown_OnShow(_G[name]);
+	end
+	for name in pairs(FEATURE_SLIDERS) do
+		VideoOptionsFeaturesPanelSlider_OnShow(_G[name]);
 	end
 end
