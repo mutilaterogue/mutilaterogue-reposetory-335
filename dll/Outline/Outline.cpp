@@ -136,6 +136,14 @@ namespace
         uint32_t Error = 0;                 // 1 no device, 2 flat ps, 3 mask texture, 4 quad buffer, 5 outline ps, 6 low ps, 7 quad vs, 8 declaration
         uint32_t Composites = 0;            // full-screen passes done
     } s_stats;
+    // OutlineDebug: the last depth-tested silhouette - the render target, the depth buffer, our mask, the draw's result
+    struct DepthInfo
+    {
+        UINT TargetWidth, TargetHeight, TargetSamples;
+        UINT DepthWidth, DepthHeight, DepthSamples;
+        UINT MaskSamples;
+        HRESULT Result;
+    } s_depthInfo = {};
     uint32_t s_frameBatches = 0;
     uint32_t s_frameSilhouettes = 0;
 
@@ -895,7 +903,33 @@ namespace
             SetState(device, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
         }
 
-        s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+        if (depthTest)
+        {
+            D3DSURFACE_DESC desc = {};
+            if (renderTarget && SUCCEEDED(renderTarget->GetDesc(&desc)))
+            {
+                s_depthInfo.TargetWidth = desc.Width;
+                s_depthInfo.TargetHeight = desc.Height;
+                s_depthInfo.TargetSamples = desc.MultiSampleType;
+            }
+            IDirect3DSurface9* depth = nullptr;
+            if (SUCCEEDED(device->GetDepthStencilSurface(&depth)) && depth)
+            {
+                if (SUCCEEDED(depth->GetDesc(&desc)))
+                {
+                    s_depthInfo.DepthWidth = desc.Width;
+                    s_depthInfo.DepthHeight = desc.Height;
+                    s_depthInfo.DepthSamples = desc.MultiSampleType;
+                }
+                depth->Release();
+            }
+            else
+                s_depthInfo.DepthWidth = s_depthInfo.DepthHeight = 0;
+            s_depthInfo.MaskSamples = s_maskSamples;
+        }
+        HRESULT drawResult = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+        if (depthTest)
+            s_depthInfo.Result = drawResult;
         ++s_frameSilhouettes;
         s_maskDirty = true;
 
@@ -1265,7 +1299,14 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushNumber(L, s_maskHeight);
     FrameScript::PushNumber(L, s_compiled ? 1 : 0);
     FrameScript::PushString(L, s_compileError[0] ? s_compileError : "-");
-    return 14;
+    // the depth test: "target WxH/samples depth WxH/samples mask samples result"
+    char depth[128];
+    snprintf(depth, sizeof(depth), "rt %ux%u/%u ds %ux%u/%u mask %u hr %08X",
+        s_depthInfo.TargetWidth, s_depthInfo.TargetHeight, s_depthInfo.TargetSamples,
+        s_depthInfo.DepthWidth, s_depthInfo.DepthHeight, s_depthInfo.DepthSamples,
+        s_depthInfo.MaskSamples, static_cast<uint32_t>(s_depthInfo.Result));
+    FrameScript::PushString(L, depth);
+    return 15;
 }
 
 // /run OutlineMode(n): 1 no silhouettes, 2 no full-screen pass, 4 low quality, 8 stage 1 (silhouettes on the screen)

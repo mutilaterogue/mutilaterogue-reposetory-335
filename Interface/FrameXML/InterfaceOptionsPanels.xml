@@ -904,27 +904,46 @@
 				</Scripts>
 			</CheckButton>
 			<!-- Unit outline (WotLKExtensions Outline): the CVars are registered in InterfaceOptionsPanels.lua -->
-			<CheckButton name="$parentOutlineQuality" inherits="InterfaceOptionsCheckButtonTemplate">
+			<Frame name="$parentOutlineQuality" inherits="UIDropDownMenuTemplate" enableMouse="true">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentCinematicSubtitles" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-8"/>
+							<AbsDimension x="-13" y="-24"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
 				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(self.tooltip, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
 					<OnLoad>
-						self.type = CONTROLTYPE_CHECKBOX;
-						self.cvar = "OutlineQuality";
+						self.type = CONTROLTYPE_DROPDOWN;
+						self:RegisterEvent("PLAYER_ENTERING_WORLD");
 						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
 					</OnLoad>
+					<OnEvent function="InterfaceOptionsDisplayPanelOutlineDropDown_OnEvent"/>
 				</Scripts>
-			</CheckButton>
+			</Frame>
 			<CheckButton name="$parentOutlineTarget" inherits="InterfaceOptionsSmallCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentOutlineQuality" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="16" y="-8"/>
+							<AbsDimension x="29" y="-4"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1016,7 +1035,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="BACKGROUND">
-						<FontString name="$parentLabel" inherits="GameFontNormalSmall" text="OUTLINE_ALL">
+						<FontString name="$parentLabel" inherits="GameFontNormalSmall">
 							<Anchors>
 								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
 									<Offset>
@@ -1030,7 +1049,7 @@
 				<Scripts>
 					<OnEnter>
 						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
-						GameTooltip:SetText(OUTLINE_ALL_TOOLTIP, nil, nil, nil, nil, 1);
+						GameTooltip:SetText(self.tooltip, nil, nil, nil, nil, 1);
 					</OnEnter>
 					<OnLeave function="GameTooltip_Hide"/>
 					<OnLoad>
@@ -1039,7 +1058,7 @@
 						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
 						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
 					</OnLoad>
-					<OnEvent function="InterfaceOptionsDisplayPanelOutlineAll_OnEvent"/>
+					<OnEvent function="InterfaceOptionsDisplayPanelOutlineDropDown_OnEvent"/>
 				</Scripts>
 			</Frame>
 		</Frames>

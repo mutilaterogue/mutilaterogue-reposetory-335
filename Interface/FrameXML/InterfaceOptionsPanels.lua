@@ -552,7 +552,6 @@ DisplayPanelOptions = {
 	threatPlaySounds = { text = "PLAY_AGGRO_SOUNDS" },
 	colorblindMode = { text = "USE_COLORBLIND_MODE" },
 	showItemLevel = { text = "SHOW_ITEM_LEVEL" },
-	OutlineQuality = { text = "OUTLINE_ENABLE", tooltip = "Мягкая обводка вокруг моделей: цвет по отношению к вам (враг красный, нейтрал жёлтый, друг зелёный, игрок-союзник синий)." },
 	OutlineTarget = { text = "OUTLINE_TARGET", tooltip = "Обводить вашу цель." },
 	OutlineMouseover = { text = "OUTLINE_MOUSEOVER", tooltip = "Обводить персонажа или существо под курсором." },
 	OutlineQuestBoss = { text = "OUTLINE_QUEST", tooltip = "Обводить боссов поблизости." },
@@ -564,6 +563,15 @@ OUTLINE_ALL = "Всегда обводить";
 OUTLINE_ALL_TOOLTIP = "Кого обводить всегда, а не только цель и юнит под курсором (в пределах дальности индикаторов здоровья).";
 OUTLINE_OCCLUDED = "Сквозь стены";
 OUTLINE_ALL_MODES = { [0] = "Никого", "Всех", "Врагов", "Союзников", "Игроков", "Существ" };
+OUTLINE_QUALITY_MODES = { [0] = "Выключена", "Высокое качество", "Низкое качество" };
+
+-- the outline's dropdowns: their cvar, label, entries, tooltip
+OUTLINE_DROPDOWNS = {
+	InterfaceOptionsDisplayPanelOutlineQuality = { cvar = "OutlineQuality", label = "OUTLINE_ENABLE", modes = "OUTLINE_QUALITY_MODES",
+		tooltip = "Мягкая обводка вокруг моделей: цвет по отношению к вам (враг красный, нейтрал жёлтый, друг зелёный, игрок-союзник синий)." },
+	InterfaceOptionsDisplayPanelOutlineAll = { cvar = "OutlineAll", label = "OUTLINE_ALL", modes = "OUTLINE_ALL_MODES",
+		tooltip = "OUTLINE_ALL_TOOLTIP" },
+};
 
 -- The unit outline's CVars (WotLKExtensions Outline): registered here, before the panel reads them at
 -- PLAYER_ENTERING_WORLD; the DLL finds them by name (and registers them itself when this file isn't there).
@@ -598,19 +606,50 @@ function InterfaceOptionsDisplayPanel_OnEvent (self, event, ...)
 	end
 end
 
--- OutlineAll: 0 nobody, 1 every unit, 2 hostile, 3 friendly, 4 players, 5 creatures
-function InterfaceOptionsDisplayPanelOutlineAll_OnEvent(self, event, ...)
+-- The outline's dropdowns (OUTLINE_DROPDOWNS): OutlineQuality (0 off, 1 high, 2 low quality; the outline's other
+-- controls follow it) and OutlineAll (0 nobody, 1 every unit, 2 hostile, 3 friendly, 4 players, 5 creatures).
+local function OutlineDropDown_UpdateDependents(self)
+	if ( not self.dependentControls ) then
+		return;
+	end
+	local enabled = ( self.value ~= "0" );
+	for _, control in ipairs(self.dependentControls) do
+		if ( enabled ) then
+			control:Enable();
+		else
+			control:Disable();
+		end
+	end
+end
+
+local function OutlineDropDown_Initialize(self)
+	local setup = OUTLINE_DROPDOWNS[self:GetName()];
+	local modes = _G[setup.modes];
+	local selectedValue = UIDropDownMenu_GetSelectedValue(self);
+	local info = UIDropDownMenu_CreateInfo();
+	for mode = 0, #modes do
+		info.text = modes[mode];
+		info.value = tostring(mode);
+		info.func = function (button) self:SetValue(button.value); end;
+		info.checked = ( info.value == selectedValue ) and 1 or nil;
+		UIDropDownMenu_AddButton(info);
+	end
+end
+
+function InterfaceOptionsDisplayPanelOutlineDropDown_OnEvent(self, event, ...)
 	if ( event == "PLAYER_ENTERING_WORLD" ) then
-		self.cvar = "OutlineAll";
-		_G[self:GetName().."Label"]:SetText(OUTLINE_ALL);
+		local setup = OUTLINE_DROPDOWNS[self:GetName()];
+		self.cvar = setup.cvar;
+		_G[self:GetName().."Label"]:SetText(_G[setup.label] or setup.label);
+		self.tooltip = _G[setup.tooltip] or setup.tooltip;
 
 		local value = GetCVar(self.cvar) or "0";
 		self.defaultValue = GetCVarDefault(self.cvar) or "0";
 		self.oldValue = value;
 		self.value = value;
 
-		UIDropDownMenu_SetWidth(self, 120);
-		UIDropDownMenu_Initialize(self, InterfaceOptionsDisplayPanelOutlineAll_Initialize);
+		UIDropDownMenu_SetWidth(self, 140);
+		UIDropDownMenu_Initialize(self, OutlineDropDown_Initialize);
 		UIDropDownMenu_SetSelectedValue(self, value);
 
 		self.SetValue =
@@ -618,6 +657,7 @@ function InterfaceOptionsDisplayPanelOutlineAll_OnEvent(self, event, ...)
 				self.value = value;
 				SetCVar(self.cvar, value);
 				UIDropDownMenu_SetSelectedValue(self, value);
+				OutlineDropDown_UpdateDependents(self);
 			end
 		self.GetValue =
 			function (self)
@@ -625,27 +665,13 @@ function InterfaceOptionsDisplayPanelOutlineAll_OnEvent(self, event, ...)
 			end
 		self.RefreshValue =
 			function (self)
-				UIDropDownMenu_Initialize(self, InterfaceOptionsDisplayPanelOutlineAll_Initialize);
+				UIDropDownMenu_Initialize(self, OutlineDropDown_Initialize);
 				UIDropDownMenu_SetSelectedValue(self, self.value);
+				OutlineDropDown_UpdateDependents(self);
 			end
+		OutlineDropDown_UpdateDependents(self);
 
 		self:UnregisterEvent(event);
-	end
-end
-
-function InterfaceOptionsDisplayPanelOutlineAll_OnClick(self)
-	InterfaceOptionsDisplayPanelOutlineAll:SetValue(self.value);
-end
-
-function InterfaceOptionsDisplayPanelOutlineAll_Initialize()
-	local selectedValue = UIDropDownMenu_GetSelectedValue(InterfaceOptionsDisplayPanelOutlineAll);
-	local info = UIDropDownMenu_CreateInfo();
-	for mode = 0, #OUTLINE_ALL_MODES do
-		info.text = OUTLINE_ALL_MODES[mode];
-		info.func = InterfaceOptionsDisplayPanelOutlineAll_OnClick;
-		info.value = tostring(mode);
-		info.checked = ( info.value == selectedValue ) and 1 or nil;
-		UIDropDownMenu_AddButton(info);
 	end
 end
 
