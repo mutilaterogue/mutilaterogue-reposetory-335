@@ -142,6 +142,7 @@ namespace
         UINT TargetWidth, TargetHeight, TargetSamples;
         UINT DepthWidth, DepthHeight, DepthSamples;
         UINT MaskSamples;
+        UINT TargetQuality, DepthQuality, MaskQuality;
         HRESULT Result;
     } s_depthInfo = {};
     uint32_t s_frameBatches = 0;
@@ -167,6 +168,7 @@ namespace
     // buffer fits only that), copied into the mask texture before the full-screen pass
     IDirect3DSurface9* s_maskMultisampled = nullptr;
     D3DMULTISAMPLE_TYPE s_maskSamples = D3DMULTISAMPLE_NONE;
+    DWORD s_maskQuality = 0;
     UINT s_maskWidth = 0, s_maskHeight = 0;
     bool s_maskDirty = false;                           // something was drawn into it since the last clear
 
@@ -781,12 +783,29 @@ namespace
         backBuffer->GetDesc(&desc);
         backBuffer->Release();
 
-        if (s_mask && s_maskWidth == desc.Width && s_maskHeight == desc.Height && s_maskSamples == desc.MultiSampleType)
+        // the multisampled surface must fit the scene's depth buffer exactly: its sample type AND quality
+        // (a mismatch "succeeds" and draws nothing)
+        D3DMULTISAMPLE_TYPE samples = desc.MultiSampleType;
+        DWORD quality = desc.MultiSampleQuality;
+        IDirect3DSurface9* depth = nullptr;
+        if (SUCCEEDED(device->GetDepthStencilSurface(&depth)) && depth)
+        {
+            D3DSURFACE_DESC depthDesc = {};
+            if (SUCCEEDED(depth->GetDesc(&depthDesc)) && depthDesc.Width >= desc.Width && depthDesc.Height >= desc.Height)
+            {
+                samples = depthDesc.MultiSampleType;
+                quality = depthDesc.MultiSampleQuality;
+            }
+            depth->Release();
+        }
+
+        if (s_mask && s_maskWidth == desc.Width && s_maskHeight == desc.Height && s_maskSamples == samples && s_maskQuality == quality)
             return true;
         ReleaseMask();
-        s_maskSamples = desc.MultiSampleType;
-        if (desc.MultiSampleType != D3DMULTISAMPLE_NONE && FAILED(device->CreateRenderTarget(desc.Width, desc.Height,
-            D3DFMT_A8R8G8B8, desc.MultiSampleType, desc.MultiSampleQuality, FALSE, &s_maskMultisampled, nullptr)))
+        s_maskSamples = samples;
+        s_maskQuality = quality;
+        if (samples != D3DMULTISAMPLE_NONE && FAILED(device->CreateRenderTarget(desc.Width, desc.Height,
+            D3DFMT_A8R8G8B8, samples, quality, FALSE, &s_maskMultisampled, nullptr)))
             s_maskMultisampled = nullptr;   // then no depth test (the depth buffer doesn't fit)
         if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
             D3DPOOL_DEFAULT, &s_mask, nullptr)) || !s_mask)
@@ -911,6 +930,7 @@ namespace
                 s_depthInfo.TargetWidth = desc.Width;
                 s_depthInfo.TargetHeight = desc.Height;
                 s_depthInfo.TargetSamples = desc.MultiSampleType;
+                s_depthInfo.TargetQuality = desc.MultiSampleQuality;
             }
             IDirect3DSurface9* depth = nullptr;
             if (SUCCEEDED(device->GetDepthStencilSurface(&depth)) && depth)
@@ -920,12 +940,14 @@ namespace
                     s_depthInfo.DepthWidth = desc.Width;
                     s_depthInfo.DepthHeight = desc.Height;
                     s_depthInfo.DepthSamples = desc.MultiSampleType;
+                    s_depthInfo.DepthQuality = desc.MultiSampleQuality;
                 }
                 depth->Release();
             }
             else
                 s_depthInfo.DepthWidth = s_depthInfo.DepthHeight = 0;
             s_depthInfo.MaskSamples = s_maskSamples;
+            s_depthInfo.MaskQuality = s_maskQuality;
         }
         HRESULT drawResult = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         if (depthTest)
@@ -1301,10 +1323,10 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushString(L, s_compileError[0] ? s_compileError : "-");
     // the depth test: "target WxH/samples depth WxH/samples mask samples result"
     char depth[128];
-    snprintf(depth, sizeof(depth), "rt %ux%u/%u ds %ux%u/%u mask %u hr %08X",
-        s_depthInfo.TargetWidth, s_depthInfo.TargetHeight, s_depthInfo.TargetSamples,
-        s_depthInfo.DepthWidth, s_depthInfo.DepthHeight, s_depthInfo.DepthSamples,
-        s_depthInfo.MaskSamples, static_cast<uint32_t>(s_depthInfo.Result));
+    snprintf(depth, sizeof(depth), "rt %ux%u/%u.%u ds %ux%u/%u.%u mask %u.%u hr %08X",
+        s_depthInfo.TargetWidth, s_depthInfo.TargetHeight, s_depthInfo.TargetSamples, s_depthInfo.TargetQuality,
+        s_depthInfo.DepthWidth, s_depthInfo.DepthHeight, s_depthInfo.DepthSamples, s_depthInfo.DepthQuality,
+        s_depthInfo.MaskSamples, s_depthInfo.MaskQuality, static_cast<uint32_t>(s_depthInfo.Result));
     FrameScript::PushString(L, depth);
     return 15;
 }
