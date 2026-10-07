@@ -25,6 +25,13 @@ Stage 1 only checks the hard part: the target's and the mouseover's **silhouette
        Outline::ApplyPatches();
    #endif
    ```
+4. `CustomLua.cpp`, `RegisterFunctions()` (next to the `MASKTEXTURE_EXTENSION` block), and `#include <Outline/Outline.hpp>` there:
+   ```cpp
+   #if OUTLINE_EXTENSION
+       AddToFunctionMap("OutlineDebug", &Outline::OutlineDebug);
+   #endif
+   ```
+
 Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface is used.
 
 ## How it works
@@ -36,6 +43,21 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 
 The D3D device: `[[0xC5DF88] + 0x397C]` (only when the Gx API `[+0x1B4]` is Direct3D).
 All D3D states are restored after the redraw (state block).
+
+## Debug: `/run print(OutlineDebug())`
+Target a unit and hover another one, then run it. Nine numbers:
+
+| # | Value | Expected |
+|---|---|---|
+| 1 | hooks installed (bits: 1 batch, 2 world render, 4 mute A, 8 mute B) | `15` |
+| 2 | world render hook calls | grows every run |
+| 3 | batch hook calls | grows a lot |
+| 4 | models picked (target + mouseover) | `1` or `2` |
+| 5 | batches of those models seen | grows |
+| 6 | batches kept in the last frame | > 0 |
+| 7 | batches drawn again in the last frame | = #6 |
+| 8 | Gx API | `1` or `2` (Direct3D) |
+| 9 | error: 1 no D3D device, 2 shader, 3 state block | `0` |
 
 ## What to check
 * Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too.

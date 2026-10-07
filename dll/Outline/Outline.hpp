@@ -14,10 +14,15 @@
 
 #include <cstdint>
 
+struct lua_State;
+
 class Outline
 {
 public:
     static void ApplyPatches();
+
+    // Lua: OutlineDebug() - the counters of every step (README)
+    static int32_t OutlineDebug(lua_State* L);
 
 private:
     Outline() = delete;

@@ -1,6 +1,7 @@
 #include <Outline/Outline.hpp>
 
 #include <Client/ClientServices.hpp>
+#include <Client/FrameScript.hpp>
 #include <Data/Enums.hpp>
 #include <GameObjects/CGObject.hpp>
 #include <Misc/InlineHook.hpp>
@@ -53,6 +54,20 @@ namespace
         std::array<uint8_t, BATCH_SIZE> Data;
         float Color[4];
     };
+
+    // OutlineDebug(): where the chain breaks
+    struct Stats
+    {
+        uint32_t Installed = 0;             // bit mask: 1 batch, 2 world render, 4 mute A, 8 mute B
+        uint32_t WorldRenders = 0;          // the world render hook ran
+        uint32_t BatchDraws = 0;            // the batch hook ran (all models)
+        uint32_t Targets = 0;               // models picked for the last frame
+        uint32_t TargetMatches = 0;         // batches of those models (before the material filter)
+        uint32_t Recorded = 0;              // batches kept in the last frame
+        uint32_t Replayed = 0;              // batches drawn again in the last frame
+        uint32_t GxApi = 0;
+        uint32_t Error = 0;                 // 1 no device, 2 shader, 3 state block
+    } s_stats;
 
     std::vector<Target> s_targets;          // the models outlined in this frame
     std::vector<Batch> s_batches;           // their batches drawn in this frame
@@ -162,11 +177,12 @@ namespace
     {
         if (s_targets.empty() || s_batches.size() >= MAX_BATCHES)
             return;
-        uint8_t* material = *reinterpret_cast<uint8_t**>(batch + BATCH_MATERIAL);
-        if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
-            return;
         Target const* target = FindTarget(*reinterpret_cast<void**>(batch + BATCH_MODEL));
         if (!target)
+            return;
+        ++s_stats.TargetMatches;
+        uint8_t* material = *reinterpret_cast<uint8_t**>(batch + BATCH_MATERIAL);
+        if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
             return;
         Batch copy;
         memcpy(copy.Data.data(), batch, BATCH_SIZE);
@@ -184,18 +200,30 @@ namespace
     // the recorded batches again, one color, over everything (stage 1)
     void ReplayBatches()
     {
+        s_stats.Replayed = 0;
+        if (uint8_t* gx = *reinterpret_cast<uint8_t**>(ADDR_GX_DEVICE))
+            s_stats.GxApi = *reinterpret_cast<uint32_t*>(gx + GX_API_OFFSET);
         IDirect3DDevice9* device = GetD3DDevice();
-        if (!device || s_batches.empty())
+        if (!device)
+        {
+            s_stats.Error = 1;
+            return;
+        }
+        if (s_batches.empty())
             return;
         if (!s_flatShader && FAILED(device->CreatePixelShader(FLAT_SHADER, &s_flatShader)))
         {
             s_flatShader = nullptr;
+            s_stats.Error = 2;
             return;
         }
 
         IDirect3DStateBlock9* state = nullptr;
         if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &state)))
+        {
+            s_stats.Error = 3;
             return;
+        }
 
         s_replaying = true;
         for (Batch& batch : s_batches)
@@ -213,6 +241,7 @@ namespace
             alignas(16) uint8_t copy[BATCH_SIZE];
             memcpy(copy, batch.Data.data(), BATCH_SIZE);
             CallDrawBatch(copy);
+            ++s_stats.Replayed;
         }
         s_replaying = false;
 
@@ -223,6 +252,7 @@ namespace
     // ---------------------------------------------------------------- detours
     void __fastcall DrawBatchDetour(void* batch, void* /*edx*/)
     {
+        ++s_stats.BatchDraws;
         CallDrawBatch(batch);
         if (!s_replaying)
             RecordBatch(static_cast<uint8_t*>(batch));
@@ -230,9 +260,12 @@ namespace
 
     void __cdecl OnWorldRender()
     {
+        ++s_stats.WorldRenders;
+        s_stats.Recorded = static_cast<uint32_t>(s_batches.size());
         ReplayBatches();
         s_batches.clear();
         CollectTargets();
+        s_stats.Targets = static_cast<uint32_t>(s_targets.size());
     }
 
     // the world render hook: everything (registers, FPU/SSE) kept for the original
@@ -328,8 +361,28 @@ namespace
 void Outline::ApplyPatches()
 {
     s_batches.reserve(256);
-    s_hookDrawBatch.Install(ADDR_M2_DRAW_BATCH, reinterpret_cast<void*>(&DrawBatchDetour));
-    s_hookWorldRender.Install(ADDR_WORLD_RENDER, reinterpret_cast<void*>(&WorldRenderDetour));
-    s_hookMuteA.Install(ADDR_GX_MUTE_A, reinterpret_cast<void*>(&MuteADetour));
-    s_hookMuteB.Install(ADDR_GX_MUTE_B, reinterpret_cast<void*>(&MuteBDetour));
+    if (s_hookDrawBatch.Install(ADDR_M2_DRAW_BATCH, reinterpret_cast<void*>(&DrawBatchDetour)))
+        s_stats.Installed |= 1;
+    if (s_hookWorldRender.Install(ADDR_WORLD_RENDER, reinterpret_cast<void*>(&WorldRenderDetour)))
+        s_stats.Installed |= 2;
+    if (s_hookMuteA.Install(ADDR_GX_MUTE_A, reinterpret_cast<void*>(&MuteADetour)))
+        s_stats.Installed |= 4;
+    if (s_hookMuteB.Install(ADDR_GX_MUTE_B, reinterpret_cast<void*>(&MuteBDetour)))
+        s_stats.Installed |= 8;
+}
+
+// /run print(OutlineDebug())
+// installed, world renders, batch draws, targets, target batches, recorded, replayed, gx api, error
+int32_t Outline::OutlineDebug(lua_State* L)
+{
+    FrameScript::PushNumber(L, s_stats.Installed);
+    FrameScript::PushNumber(L, s_stats.WorldRenders);
+    FrameScript::PushNumber(L, s_stats.BatchDraws);
+    FrameScript::PushNumber(L, s_stats.Targets);
+    FrameScript::PushNumber(L, s_stats.TargetMatches);
+    FrameScript::PushNumber(L, s_stats.Recorded);
+    FrameScript::PushNumber(L, s_stats.Replayed);
+    FrameScript::PushNumber(L, s_stats.GxApi);
+    FrameScript::PushNumber(L, s_stats.Error);
+    return 9;
 }
