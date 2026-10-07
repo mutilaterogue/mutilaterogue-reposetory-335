@@ -8,7 +8,7 @@ are our own.
 | File | Where |
 |---|---|
 | `Outline.hpp/.cpp`, `OutlineShaders.hpp` | `WotLKExtensions/src/Outline/` |
-| `tools/sm3asm.py` | not built: the small shader model 3 assembler that made `OutlineShaders.hpp` |
+| `tools/sm3asm.py` | not built: the small shader model 3 assembler that made `OutlineShaders.hpp` (the fallback when Windows' `d3dcompiler_47.dll` isn't there: the HLSL in `Outline.cpp` is compiled at run time) |
 
 ## Hooking it up
 1. `CMakeLists.txt`:
@@ -61,6 +61,8 @@ draws nothing).
 | 9 | `OutlineMode` | |
 | 10 | full-screen passes done | grows |
 | 11, 12 | mask size | the screen size |
+| 13 | 1: the shaders came from Windows' HLSL compiler (`d3dcompiler_47.dll`), 0: the bytecode of `OutlineShaders.hpp` | `1` |
+| 14 | the compiler's error message, if any | `-` |
 
 `/run OutlineMode(n)`: `1` no silhouettes, `2` no full-screen pass, `4` low quality (8 samples),
 `8` stage 1 (the silhouettes straight on the screen). Add them up.

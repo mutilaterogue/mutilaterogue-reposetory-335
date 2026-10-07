@@ -9,6 +9,7 @@
 
 #include <Windows.h>
 #include <d3d9.h>
+#include <d3dcommon.h>
 
 #include <cstdio>
 #include <cstring>
@@ -417,17 +418,133 @@ namespace
         return s_reset(device, parameters);
     }
 
-    // 0, or the error code of what failed (OutlineDebug #8)
-    uint32_t CreateShaders(IDirect3DDevice9* device)
+    // ---------------------------------------------------------------- shaders
+    // HLSL compiled at run time by Windows' own compiler (d3dcompiler_47.dll, in the system since Windows 8);
+    // without it the hand-assembled bytecode of OutlineShaders.hpp. A compiler error is kept for OutlineDebug.
+    const char HLSL_FLAT_PS[] =
+        "float4 color : register(c0);\n"
+        "float4 main() : COLOR { return color; }\n";
+
+    const char HLSL_QUAD_VS[] =
+        "struct V { float4 position : POSITION; float2 uv : TEXCOORD0; };\n"
+        "V main(V v) { return v; }\n";
+
+    // c0.xy one texel, c1.x alpha gain, c1.y strength. The mask's halo (samples around the pixel) minus the mask
+    // at the pixel: the rim, in the silhouette's color.
+    const char HLSL_OUTLINE_PS[] =
+        "sampler2D mask : register(s0);\n"
+        "float4 texel : register(c0);\n"
+        "float4 look : register(c1);\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float4 sum = 0;\n"
+        "    [unroll] for (int ring = 1; ring <= RINGS; ++ring)\n"
+        "        [unroll] for (int i = 0; i < 8; ++i)\n"
+        "        {\n"
+        "            float angle = 6.2831853 * (i + 0.5 * (ring - 1)) / 8;\n"
+        "            float2 offset = float2(cos(angle), sin(angle)) * RADIUS * ring;\n"
+        "            sum += tex2D(mask, uv + offset * texel.xy);\n"
+        "        }\n"
+        "    float4 center = tex2D(mask, uv);\n"
+        "    float3 rgb = sum.rgb / max(sum.a, 0.0001);\n"
+        "    float alpha = saturate(sum.a * look.x) * (1 - center.a) * look.y;\n"
+        "    return float4(rgb, alpha);\n"
+        "}\n";
+
+    struct ShaderMacro
+    {
+        const char* Name;
+        const char* Definition;
+    };
+    typedef HRESULT (WINAPI* D3DCompileFn)(const void*, SIZE_T, const char*, const ShaderMacro*, void*, const char*,
+        const char*, UINT, UINT, ID3DBlob**, ID3DBlob**);
+
+    char s_compileError[256] = "";
+    bool s_compiled = false;            // OutlineDebug: the shaders came from the compiler (not the bytecode)
+
+    D3DCompileFn GetCompiler()
+    {
+        static D3DCompileFn compile = nullptr;
+        static bool tried = false;
+        if (!tried)
+        {
+            tried = true;
+            const char* names[] = { "d3dcompiler_47.dll", "d3dcompiler_46.dll", "d3dcompiler_43.dll" };
+            for (const char* name : names)
+                if (HMODULE module = LoadLibraryA(name))
+                    if ((compile = reinterpret_cast<D3DCompileFn>(GetProcAddress(module, "D3DCompile"))))
+                        break;
+        }
+        return compile;
+    }
+
+    // the bytecode of an HLSL source, or empty (s_compileError says why)
+    std::vector<DWORD> Compile(const char* source, const char* target, const ShaderMacro* macros = nullptr)
+    {
+        std::vector<DWORD> code;
+        D3DCompileFn compile = GetCompiler();
+        if (!compile)
+            return code;
+        ID3DBlob* blob = nullptr;
+        ID3DBlob* errors = nullptr;
+        HRESULT result = compile(source, strlen(source), "Outline", macros, nullptr, "main", target, 0, 0, &blob, &errors);
+        if (errors)
+        {
+            snprintf(s_compileError, sizeof(s_compileError), "%s", static_cast<const char*>(errors->GetBufferPointer()));
+            errors->Release();
+        }
+        if (SUCCEEDED(result) && blob)
+        {
+            code.resize(blob->GetBufferSize() / 4);
+            memcpy(code.data(), blob->GetBufferPointer(), code.size() * 4);
+        }
+        if (blob)
+            blob->Release();
+        return code;
+    }
+
+    bool CreatePixel(IDirect3DDevice9* device, const char* source, const ShaderMacro* macros, const DWORD* fallback, IDirect3DPixelShader9*& shader)
+    {
+        if (shader)
+            return true;
+        std::vector<DWORD> code = Compile(source, "ps_3_0", macros);
+        if (!code.empty() && SUCCEEDED(device->CreatePixelShader(code.data(), &shader)))
+        {
+            s_compiled = true;
+            return true;
+        }
+        shader = nullptr;
+        return SUCCEEDED(device->CreatePixelShader(fallback, &shader));
+    }
+
+    bool CreateVertex(IDirect3DDevice9* device, const char* source, const DWORD* fallback, IDirect3DVertexShader9*& shader)
+    {
+        if (shader)
+            return true;
+        std::vector<DWORD> code = Compile(source, "vs_3_0");
+        if (!code.empty() && SUCCEEDED(device->CreateVertexShader(code.data(), &shader)))
+            return true;
+        shader = nullptr;
+        return SUCCEEDED(device->CreateVertexShader(fallback, &shader));
+    }
+
+    // the silhouette's shader: without it nothing works (OutlineDebug #8 = 2)
+    bool CreateFlatShader(IDirect3DDevice9* device)
+    {
+        return CreatePixel(device, HLSL_FLAT_PS, nullptr, OutlineShaders::SHADER_FLAT_PS, s_flatShader);
+    }
+
+    // the full-screen pass's: 0, or the error code of what failed (OutlineDebug #8); the silhouettes work anyway
+    uint32_t CreateOutlineShaders(IDirect3DDevice9* device)
     {
         using namespace OutlineShaders;
-        if (!s_flatShader && FAILED(device->CreatePixelShader(SHADER_FLAT_PS, &s_flatShader)))
-            return 2;
-        if (!s_outlineShader && FAILED(device->CreatePixelShader(SHADER_OUTLINE_PS, &s_outlineShader)))
+        static const ShaderMacro HIGH[] = { { "RINGS", "2" }, { "RADIUS", "1.5" }, { nullptr, nullptr } };
+        static const ShaderMacro LOW[] = { { "RINGS", "1" }, { "RADIUS", "2.0" }, { nullptr, nullptr } };
+        if (!CreatePixel(device, HLSL_OUTLINE_PS, HIGH, SHADER_OUTLINE_PS, s_outlineShader))
             return 5;
-        if (!s_outlineLowShader && FAILED(device->CreatePixelShader(SHADER_OUTLINE_LOW_PS, &s_outlineLowShader)))
+        if (!CreatePixel(device, HLSL_OUTLINE_PS, LOW, SHADER_OUTLINE_LOW_PS, s_outlineLowShader))
             return 6;
-        if (!s_quadShader && FAILED(device->CreateVertexShader(SHADER_QUAD_VS, &s_quadShader)))
+        if (!CreateVertex(device, HLSL_QUAD_VS, SHADER_QUAD_VS, s_quadShader))
             return 7;
         if (!s_quadDeclaration)
         {
@@ -569,7 +686,8 @@ namespace
     // ---------------------------------------------------------------- 2. the outline over the screen
     void Composite(IDirect3DDevice9* device)
     {
-        if (!s_maskSurface || !s_frameSilhouettes || (s_mode & (2 | 8)))
+        if (!s_maskSurface || !s_frameSilhouettes || (s_mode & (2 | 8)) || !s_outlineShader || !s_outlineLowShader
+            || !s_quadShader || !s_quadDeclaration)
             return;
         FillQuad(s_maskWidth, s_maskHeight);
 
@@ -638,12 +756,13 @@ namespace
             s_stats.Error = 1;
             return;
         }
-        if (uint32_t error = CreateShaders(device))
+        if (!CreateFlatShader(device))
         {
-            s_stats.Error = error;
+            s_stats.Error = 2;
             return;
         }
-        s_stats.Error = 0;
+        // the full-screen pass may be missing: the silhouettes (OutlineMode 8) work anyway
+        s_stats.Error = CreateOutlineShaders(device);
         void** vtable = *reinterpret_cast<void***>(device);
         HookVtable(vtable, VT_RESET, s_reset, reinterpret_cast<void*>(&ResetDetour));
         HookVtable(vtable, VT_SET_VIEWPORT, s_setViewport, reinterpret_cast<void*>(&SetViewportDetour));
@@ -904,7 +1023,9 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushNumber(L, s_stats.Composites);
     FrameScript::PushNumber(L, s_maskWidth);
     FrameScript::PushNumber(L, s_maskHeight);
-    return 12;
+    FrameScript::PushNumber(L, s_compiled ? 1 : 0);
+    FrameScript::PushString(L, s_compileError[0] ? s_compileError : "-");
+    return 14;
 }
 
 // /run OutlineMode(n): 1 no silhouettes, 2 no full-screen pass, 4 low quality, 8 stage 1 (silhouettes on the screen)
