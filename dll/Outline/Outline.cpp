@@ -19,12 +19,7 @@ namespace
     // ---------------------------------------------------------------- client addresses (12340)
     constexpr uintptr_t ADDR_M2_DRAW_BATCH  = 0x8203B0;    // void __thiscall (batch*)
     constexpr uintptr_t ADDR_WORLD_RENDER   = 0x4F9240;    // near the end of the world frame
-    constexpr uintptr_t ADDR_GX_MUTE_A      = 0x6A3620;    // CGxDeviceD3d, 2 stack args (ret 8)
-    constexpr uintptr_t ADDR_GX_MUTE_B      = 0x6A77C0;    // CGxDeviceD3d, 2 stack args (ret 8)
 
-    // the same addresses as variables for the inline asm (it can't call a constant)
-    uintptr_t ADDR_GX_MUTE_A_PTR    = ADDR_GX_MUTE_A;
-    uintptr_t ADDR_GX_MUTE_B_PTR    = ADDR_GX_MUTE_B;
 
     constexpr uintptr_t ADDR_GX_DEVICE      = 0xC5DF88;    // CGxDevice*
     constexpr uint32_t  GX_API_OFFSET       = 0x1B4;       // 1, 2 - Direct3D
@@ -39,6 +34,8 @@ namespace
     constexpr uint32_t BATCH_MATERIAL      = 0x50;         // -> [0] blend mode, [8] flags
     constexpr uint32_t BATCH_MODEL         = 0x60;         // CM2Model*
     constexpr uint32_t MODEL_PARENT        = 0x48;         // CM2Model* the model is attached to
+    // the "previous batch" fields the draw compares with the current ones (0x58, 0x60, 0x68)
+    constexpr uint32_t BATCH_PREVIOUS[]    = { 0x5C, 0x64, 0x6C };
     constexpr uint32_t MAX_BLEND_MODE      = 2;            // opaque / alpha key (no blended, additive...)
 
     constexpr size_t MAX_BATCHES = 4096;
@@ -58,7 +55,7 @@ namespace
     // OutlineDebug(): where the chain breaks
     struct Stats
     {
-        uint32_t Installed = 0;             // bit mask: 1 batch, 2 world render, 4 mute A, 8 mute B
+        uint32_t Installed = 0;             // bit mask: 1 batch, 2 world render, 4 draw call (on the first replay)
         uint32_t WorldRenders = 0;          // the world render hook ran
         uint32_t BatchDraws = 0;            // the batch hook ran (all models)
         uint32_t Targets = 0;               // models picked for the last frame
@@ -66,7 +63,7 @@ namespace
         uint32_t Recorded = 0;              // batches kept in the last frame
         uint32_t Replayed = 0;              // batches drawn again in the last frame
         uint32_t GxApi = 0;
-        uint32_t Error = 0;                 // 1 no device, 2 shader
+        uint32_t Error = 0;                 // 1 no device, 2 shader, 3 draw call hook
     } s_stats;
 
     std::vector<Target> s_targets;          // the models outlined in this frame
@@ -112,8 +109,6 @@ namespace
     };
 
     RawHook s_hookDrawBatch;
-    RawHook s_hookMuteA;
-    RawHook s_hookMuteB;
 
     // ---------------------------------------------------------------- helpers
     IDirect3DDevice9* GetD3DDevice()
@@ -196,6 +191,65 @@ namespace
         s_hookDrawBatch.Repatch();
     }
 
+    // ---------------------------------------------------------------- the draw call of the replay
+    // Gx sends its states (its pixel shader among them) to the device right before the draw: ours are set
+    // here, after it, and Gx's put back after the draw, so Gx's cache always matches the device.
+    constexpr uint32_t DIP_VTABLE_INDEX = 82;      // IDirect3DDevice9::DrawIndexedPrimitive
+    typedef HRESULT (__stdcall* DrawIndexedPrimitiveFn)(IDirect3DDevice9*, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
+    DrawIndexedPrimitiveFn s_dipOriginal = nullptr;
+    float s_replayColor[4] = {};
+
+    const D3DRENDERSTATETYPE REPLAY_STATES[] = {
+        D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_CULLMODE, D3DRS_FOGENABLE,
+    };
+    const DWORD REPLAY_VALUES[] = { FALSE, FALSE, FALSE, FALSE, D3DCULL_NONE, FALSE };
+    constexpr size_t REPLAY_STATE_COUNT = sizeof(REPLAY_STATES) / sizeof(REPLAY_STATES[0]);
+
+    HRESULT __stdcall DrawIndexedPrimitiveDetour(IDirect3DDevice9* device, D3DPRIMITIVETYPE type, INT baseVertex,
+        UINT minIndex, UINT numVertices, UINT startIndex, UINT primitiveCount)
+    {
+        if (!s_replaying || !s_flatShader)
+            return s_dipOriginal(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+
+        IDirect3DPixelShader9* gxShader = nullptr;
+        float gxConstant[4] = {};
+        DWORD gxStates[REPLAY_STATE_COUNT] = {};
+        device->GetPixelShader(&gxShader);
+        device->GetPixelShaderConstantF(0, gxConstant, 1);
+        for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
+            device->GetRenderState(REPLAY_STATES[i], &gxStates[i]);
+
+        device->SetPixelShader(s_flatShader);
+        device->SetPixelShaderConstantF(0, s_replayColor, 1);
+        for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
+            device->SetRenderState(REPLAY_STATES[i], REPLAY_VALUES[i]);
+
+        HRESULT result = s_dipOriginal(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+
+        device->SetPixelShader(gxShader);
+        if (gxShader)
+            gxShader->Release();
+        device->SetPixelShaderConstantF(0, gxConstant, 1);
+        for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
+            device->SetRenderState(REPLAY_STATES[i], gxStates[i]);
+        return result;
+    }
+
+    // the device's vtable entry (the device lives as long as the client: done once)
+    void HookDrawIndexedPrimitive(IDirect3DDevice9* device)
+    {
+        if (s_dipOriginal)
+            return;
+        void** vtable = *reinterpret_cast<void***>(device);
+        DWORD old = 0;
+        if (!VirtualProtect(&vtable[DIP_VTABLE_INDEX], sizeof(void*), PAGE_EXECUTE_READWRITE, &old))
+            return;
+        s_dipOriginal = reinterpret_cast<DrawIndexedPrimitiveFn>(vtable[DIP_VTABLE_INDEX]);
+        vtable[DIP_VTABLE_INDEX] = reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour);
+        VirtualProtect(&vtable[DIP_VTABLE_INDEX], sizeof(void*), old, &old);
+        s_stats.Installed |= 4;
+    }
+
     // the recorded batches again, one color, over everything (stage 1)
     void ReplayBatches()
     {
@@ -217,44 +271,28 @@ namespace
             return;
         }
 
-        // only what we set ourselves goes back afterwards: what the batch sets goes through Gx, and Gx
-        // remembers it - putting the device back under it (a state block) breaks every later draw
-        static const D3DRENDERSTATETYPE STATES[] = {
-            D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_CULLMODE, D3DRS_FOGENABLE,
-        };
-        static const DWORD VALUES[] = { FALSE, FALSE, FALSE, FALSE, D3DCULL_NONE, FALSE };
-        constexpr size_t STATE_COUNT = sizeof(STATES) / sizeof(STATES[0]);
+        HookDrawIndexedPrimitive(device);
+        if (!s_dipOriginal)
+        {
+            s_stats.Error = 3;
+            return;
+        }
 
-        IDirect3DPixelShader9* oldShader = nullptr;
-        float oldConstant[4] = {};
-        DWORD oldStates[STATE_COUNT] = {};
-        device->GetPixelShader(&oldShader);
-        device->GetPixelShaderConstantF(0, oldConstant, 1);
-        for (size_t i = 0; i < STATE_COUNT; ++i)
-            device->GetRenderState(STATES[i], &oldStates[i]);
-
+        // the batch draws itself through Gx as usual; our pixel shader goes in at the draw call
+        // (DrawIndexedPrimitiveDetour), Gx's own states are put back right after it
         s_replaying = true;
         for (Batch& batch : s_batches)
         {
-            device->SetPixelShader(s_flatShader);
-            device->SetPixelShaderConstantF(0, batch.Color, 1);
-            for (size_t i = 0; i < STATE_COUNT; ++i)
-                device->SetRenderState(STATES[i], VALUES[i]);
-
-            // the draw may write into its record: a copy
-            alignas(16) uint8_t copy[BATCH_SIZE];
+            memcpy(s_replayColor, batch.Color, sizeof(s_replayColor));
+            alignas(16) uint8_t copy[BATCH_SIZE];        // the draw writes into its record: a copy
             memcpy(copy, batch.Data.data(), BATCH_SIZE);
+            // "the same as the previous batch" -> the draw would skip the bones / material upload: never
+            for (uint32_t offset : BATCH_PREVIOUS)
+                *reinterpret_cast<uint32_t*>(copy + offset) = 0;
             CallDrawBatch(copy);
             ++s_stats.Replayed;
         }
         s_replaying = false;
-
-        device->SetPixelShader(oldShader);
-        if (oldShader)
-            oldShader->Release();
-        device->SetPixelShaderConstantF(0, oldConstant, 1);
-        for (size_t i = 0; i < STATE_COUNT; ++i)
-            device->SetRenderState(STATES[i], oldStates[i]);
     }
 
     // ---------------------------------------------------------------- detours
@@ -456,61 +494,6 @@ namespace
         }
     }
 
-    // muted while replaying: returns at once (ret 8), else the original with every register intact
-    uint32_t s_muteAReturn = 0;
-    uint32_t s_muteBReturn = 0;
-    void __cdecl UnpatchMuteA() { s_hookMuteA.Unpatch(); }
-    void __cdecl RepatchMuteA() { s_hookMuteA.Repatch(); }
-    void __cdecl UnpatchMuteB() { s_hookMuteB.Unpatch(); }
-    void __cdecl RepatchMuteB() { s_hookMuteB.Repatch(); }
-
-    __declspec(naked) void MuteADetour()
-    {
-        __asm
-        {
-            cmp byte ptr [s_replaying], 0
-            je call_original
-            ret 8
-        call_original:
-            pushad
-            pushfd
-            call UnpatchMuteA
-            popfd
-            popad
-            pop dword ptr [s_muteAReturn]
-            call dword ptr [ADDR_GX_MUTE_A_PTR]
-            pushad
-            pushfd
-            call RepatchMuteA
-            popfd
-            popad
-            jmp dword ptr [s_muteAReturn]
-        }
-    }
-
-    __declspec(naked) void MuteBDetour()
-    {
-        __asm
-        {
-            cmp byte ptr [s_replaying], 0
-            je call_original
-            ret 8
-        call_original:
-            pushad
-            pushfd
-            call UnpatchMuteB
-            popfd
-            popad
-            pop dword ptr [s_muteBReturn]
-            call dword ptr [ADDR_GX_MUTE_B_PTR]
-            pushad
-            pushfd
-            call RepatchMuteB
-            popfd
-            popad
-            jmp dword ptr [s_muteBReturn]
-        }
-    }
 }
 
 void Outline::ApplyPatches()
@@ -523,10 +506,6 @@ void Outline::ApplyPatches()
         s_worldRenderTrampoline = s_hookWorldRender.Trampoline;
         s_stats.Installed |= 2;
     }
-    if (s_hookMuteA.Install(ADDR_GX_MUTE_A, reinterpret_cast<void*>(&MuteADetour)))
-        s_stats.Installed |= 4;
-    if (s_hookMuteB.Install(ADDR_GX_MUTE_B, reinterpret_cast<void*>(&MuteBDetour)))
-        s_stats.Installed |= 8;
 }
 
 // /run print(OutlineDebug())

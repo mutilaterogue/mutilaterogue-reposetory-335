@@ -7,8 +7,8 @@
 //    the batches of the outlined models (and their attachments: model+0x48 parent chain) are copied.
 //  * 0x4F9240 - a place inside the world render function (mid-function hook). There the copied batches are drawn again
 //    with our flat pixel shader: the unit's silhouette in its current pose.
-//  * 0x6A3620, 0x6A77C0 - CGxDeviceD3d functions muted during that replay, so the batch can't put
-//    its own shader / states back over ours.
+//  * IDirect3DDevice9::DrawIndexedPrimitive (vtable) - during that replay our pixel shader goes in right at
+//    the draw call (after Gx sent its states), Gx's states are put back right after it.
 // Stage 1 draws the silhouette straight on the screen in one color (target, mouseover).
 // Stage 2: render target + blur (halo) + union -> a real outline. Stage 3: CVars, colors, Lua.
 
