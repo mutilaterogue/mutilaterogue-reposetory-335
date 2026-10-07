@@ -64,7 +64,15 @@ namespace
         uint32_t Replayed = 0;              // batches drawn again in the last frame
         uint32_t GxApi = 0;
         uint32_t Error = 0;                 // 1 no device, 2 shader, 3 draw call hook
+        uint32_t DrawCalls = 0;             // draw calls inside the last replay (our shader went in)
+        uint32_t OnBackBuffer = 0;          // 1: the render target at the replay was the back buffer
     } s_stats;
+
+    // OutlineMode(bits), for finding the fault:
+    //  1 - keep the batch's "previous" fields (no forced bones / material upload)
+    //  2 - no replay at all (record only)
+    //  4 - replay into the back buffer (whatever render target is set at that point)
+    uint32_t s_mode = 0;
 
     std::vector<Target> s_targets;          // the models outlined in this frame
     std::vector<Batch> s_batches;           // their batches drawn in this frame
@@ -224,6 +232,7 @@ namespace
         for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
             device->SetRenderState(REPLAY_STATES[i], REPLAY_VALUES[i]);
 
+        ++s_stats.DrawCalls;
         HRESULT result = s_dipOriginal(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
 
         device->SetPixelShader(gxShader);
@@ -278,6 +287,20 @@ namespace
             return;
         }
 
+        s_stats.DrawCalls = 0;
+        if (s_mode & 2)
+            return;
+
+        // where the replay draws: the back buffer, or some other render target at this point of the frame
+        IDirect3DSurface9* renderTarget = nullptr;
+        IDirect3DSurface9* backBuffer = nullptr;
+        device->GetRenderTarget(0, &renderTarget);
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
+        s_stats.OnBackBuffer = renderTarget && renderTarget == backBuffer ? 1 : 0;
+        bool switched = (s_mode & 4) && backBuffer && renderTarget != backBuffer;
+        if (switched)
+            device->SetRenderTarget(0, backBuffer);
+
         // the batch draws itself through Gx as usual; our pixel shader goes in at the draw call
         // (DrawIndexedPrimitiveDetour), Gx's own states are put back right after it
         s_replaying = true;
@@ -287,12 +310,20 @@ namespace
             alignas(16) uint8_t copy[BATCH_SIZE];        // the draw writes into its record: a copy
             memcpy(copy, batch.Data.data(), BATCH_SIZE);
             // "the same as the previous batch" -> the draw would skip the bones / material upload: never
-            for (uint32_t offset : BATCH_PREVIOUS)
-                *reinterpret_cast<uint32_t*>(copy + offset) = 0;
+            if (!(s_mode & 1))
+                for (uint32_t offset : BATCH_PREVIOUS)
+                    *reinterpret_cast<uint32_t*>(copy + offset) = 0;
             CallDrawBatch(copy);
             ++s_stats.Replayed;
         }
         s_replaying = false;
+
+        if (switched)
+            device->SetRenderTarget(0, renderTarget);
+        if (renderTarget)
+            renderTarget->Release();
+        if (backBuffer)
+            backBuffer->Release();
     }
 
     // ---------------------------------------------------------------- detours
@@ -527,5 +558,15 @@ int32_t Outline::OutlineDebug(lua_State* L)
         sprintf_s(bytes + i * 3, sizeof(bytes) - i * 3, "%02X ", s_hookWorldRender.Bytes[i]);
     FrameScript::PushString(L, bytes);
     FrameScript::PushNumber(L, static_cast<double>(s_hookWorldRender.Length));
-    return 11;
+    FrameScript::PushNumber(L, s_stats.DrawCalls);
+    FrameScript::PushNumber(L, s_stats.OnBackBuffer);
+    FrameScript::PushNumber(L, s_mode);
+    return 14;
+}
+
+// /run OutlineMode(n) - see s_mode
+int32_t Outline::OutlineMode(lua_State* L)
+{
+    s_mode = static_cast<uint32_t>(FrameScript::GetNumber(L, 1));
+    return 0;
 }

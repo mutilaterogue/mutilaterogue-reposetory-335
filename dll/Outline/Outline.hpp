@@ -23,6 +23,8 @@ public:
 
     // Lua: OutlineDebug() - the counters of every step (README)
     static int32_t OutlineDebug(lua_State* L);
+    // Lua: OutlineMode(bits) - test switches (Outline.cpp, s_mode)
+    static int32_t OutlineMode(lua_State* L);
 
 private:
     Outline() = delete;

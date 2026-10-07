@@ -29,6 +29,7 @@ Stage 1 only checks the hard part: the target's and the mouseover's **silhouette
    ```cpp
    #if OUTLINE_EXTENSION
        AddToFunctionMap("OutlineDebug", &Outline::OutlineDebug);
+       AddToFunctionMap("OutlineMode", &Outline::OutlineMode);
    #endif
    ```
 
@@ -60,6 +61,12 @@ Target a unit and hover another one, then run it. Eleven values:
 | 9 | error: 1 no D3D device, 2 shader, 3 draw call hook | `0` |
 | 10 | the first 12 bytes at `0x4F9240` | (for me) |
 | 11 | bytes moved to the trampoline | `5`..`15` (`0`: an instruction the decoder doesn't know - hook not set) |
+| 12 | draw calls with our shader in the last redraw | > 0 |
+| 13 | 1: the redraw went to the back buffer (0: another render target) | |
+| 14 | the current `OutlineMode` | |
+
+`/run OutlineMode(n)` test switches: `1` keep the batch's "previous" fields, `2` no redraw (record only),
+`4` redraw into the back buffer; add them up (`5` = 1 + 4).
 
 ## What to check
 * Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too.
