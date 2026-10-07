@@ -415,7 +415,11 @@ namespace
         {
             for (Target const& target : s_targets)
                 if (target.Model == model)
+                {
+                    // a mount's effects: the same small billboard rule as an attachment's
+                    s_currentAttachment = s_currentAttachment || target.OpaqueOnly;
                     return target.OpaqueOnly && !opaque ? nullptr : &target;
+                }
             // an attachment (weapon, spell effect): opaque batches only - an alpha keyed spell quad drawn flat
             // is a square
             if (!opaque)
