@@ -89,9 +89,8 @@ namespace
         { "OutlineThickness", "Outline thickness (0.5 .. 3)", "1", nullptr },
         { "OutlineStrength",  "Outline opacity (0 .. 1)", "1", nullptr },
         { "OutlineAll",       "Outline every unit around: 0 off, 1 all, 2 hostile, 3 friendly, 4 players, 5 creatures", "0", nullptr },
-        { "OutlineOccluded",  "Outline the parts hidden behind walls too", "0", nullptr },
     };
-    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL, CV_OCCLUDED, CV_COUNT };
+    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -408,7 +407,9 @@ namespace
         uint8_t* material = *reinterpret_cast<uint8_t**>(batch + BATCH_MATERIAL);
         if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
             return nullptr;
-        bool opaque = *reinterpret_cast<uint32_t*>(material) == 0;
+        // a mount's / an attachment's batch: opaque, lit and fogged, writing depth - glows and flames are unlit,
+        // unfogged or don't write depth (M2 render flags 0x1 / 0x2 / 0x10), their shape only in the texture
+        bool opaque = *reinterpret_cast<uint32_t*>(material) == 0 && !(material[8] & (0x2 | 0x10));
         s_currentAttachment = false;
         void* model = *reinterpret_cast<void**>(batch + BATCH_MODEL);
         for (int depth = 0; model && depth < 8; ++depth)
@@ -928,9 +929,9 @@ namespace
             return result;
 
         // the same draw once more: our shader, the color; into the mask (or the screen: stage 1 test).
-        // Depth tested against the scene (the parts behind walls left out) unless OutlineOccluded; with no depth
+        // Depth tested against the scene (the parts behind walls left out); with no depth
         // test the depth buffer is unbound (it may not fit the mask)
-        bool depthTest = !CVarInt(CV_OCCLUDED) && CanDepthTest();
+        bool depthTest = CanDepthTest();
         IDirect3DSurface9* renderTarget = nullptr;
         IDirect3DSurface9* depthStencil = nullptr;
         if (!toScreen)

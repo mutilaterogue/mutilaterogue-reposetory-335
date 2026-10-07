@@ -46,7 +46,6 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | `OutlineQuestBoss` | `1` | the bosses around (world boss rank, within the nameplate distance). Quest units: not yet - the client has no simple "is a quest objective" |
 | `OutlinePlayer` | `0` | your own character |
 | `OutlineAll` | `0` | always outlined, within the nameplate distance: `1` every unit, `2` hostile, `3` friendly, `4` players, `5` creatures (up to 64 models a frame; a dropdown in the panel) |
-| `OutlineOccluded` | `0` | `0`: only the visible parts (depth tested against the scene; with antialiasing a multisampled mask, resolved before the pass), `1`: through walls too |
 | `OutlineThickness` | `1` | `0.5` .. `3` |
 | `OutlineStrength` | `1` | opacity `0` .. `1` |
 
@@ -61,7 +60,6 @@ Add them to `CVar::FillCustomGlueCVarVector()` (`src/Client/CVar.cpp`), so they 
     AddToGlueCVarVector("OutlineThickness", "Outline thickness (0.5 .. 3)", 1, "1", nullptr, 5, false, 0, false);
     AddToGlueCVarVector("OutlineStrength", "Outline opacity (0 .. 1)", 1, "1", nullptr, 5, false, 0, false);
     AddToGlueCVarVector("OutlineAll", "Outline every unit around: 0 off, 1 all, 2 hostile, 3 friendly, 4 players, 5 creatures", 1, "0", nullptr, 5, false, 0, false);
-    AddToGlueCVarVector("OutlineOccluded", "Outline the parts hidden behind walls too", 1, "0", nullptr, 5, false, 0, false);
 ```
 Without them the DLL registers them in the world (the first frame), and the values are not kept across restarts.
 Your XML's texts, if `GlobalStrings` lacks them:

@@ -975,29 +975,12 @@
 					<OnEvent function="InterfaceOptionsDisplayPanelOutlineUnits_OnEvent"/>
 				</Scripts>
 			</Frame>
-			<CheckButton name="$parentOutlineOccluded" inherits="InterfaceOptionsSmallCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentOutlineUnits" relativePoint="BOTTOMLEFT">
-						<Offset>
-							<AbsDimension x="16" y="-4"/>
-						</Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnLoad>
-						self.type = CONTROLTYPE_CHECKBOX;
-						self.cvar = "OutlineOccluded";
-						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
-						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
-					</OnLoad>
-				</Scripts>
-			</CheckButton>
 			<!-- who is always outlined (OutlineAll) -->
 			<Frame name="$parentOutlineAll" inherits="UIDropDownMenuTemplate" enableMouse="true">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentOutlineOccluded" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentOutlineUnits" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="-13" y="-24"/>
+							<AbsDimension x="0" y="-24"/>
 						</Offset>
 					</Anchor>
 				</Anchors>

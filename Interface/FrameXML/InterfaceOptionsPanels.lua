@@ -552,12 +552,10 @@ DisplayPanelOptions = {
 	threatPlaySounds = { text = "PLAY_AGGRO_SOUNDS" },
 	colorblindMode = { text = "USE_COLORBLIND_MODE" },
 	showItemLevel = { text = "SHOW_ITEM_LEVEL" },
-	OutlineOccluded = { text = "OUTLINE_OCCLUDED", tooltip = "Показывать обводку и сквозь стены (иначе только видимую часть модели)." },
 }
 
 OUTLINE_ALL = "Всегда обводить";
 OUTLINE_ALL_TOOLTIP = "Кого обводить всегда, а не только цель и юнит под курсором (в пределах дальности индикаторов здоровья).";
-OUTLINE_OCCLUDED = "Сквозь стены";
 OUTLINE_ALL_MODES = { [0] = "Никого", "Всех", "Врагов", "Союзников", "Игроков", "Существ" };
 OUTLINE_QUALITY_MODES = { [0] = "Выключена", "Высокое качество", "Низкое качество" };
 OUTLINE_UNITS = "Кого обводить";
@@ -581,7 +579,7 @@ OUTLINE_DROPDOWNS = {
 -- PLAYER_ENTERING_WORLD; the DLL finds them by name (and registers them itself when this file isn't there).
 for name, default in pairs({
 	OutlineQuality = "1", OutlineTarget = "1", OutlineMouseover = "1", OutlineQuestBoss = "1", OutlinePlayer = "0",
-	OutlineThickness = "1", OutlineStrength = "1", OutlineAll = "0", OutlineOccluded = "0",
+	OutlineThickness = "1", OutlineStrength = "1", OutlineAll = "0",
 }) do
 	if ( GetCVar(name) == nil ) then
 		RegisterCVar(name, default);
