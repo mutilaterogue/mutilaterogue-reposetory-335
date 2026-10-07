@@ -111,11 +111,18 @@ namespace
         { "ssrStrength",      "Water reflections strength (0 .. 1)", "1", nullptr },
         { "vignette",         "Vignette: darker corners (0 .. 1)", "0", nullptr },
         { "filmGrain",        "Film grain (0 .. 1)", "0", nullptr },
+        { "fxaa",             "FXAA (edges smoothed after the scene): 0 off, 1 on", "0", nullptr },
+        { "tonemap",          "Filmic tone mapping (soft highlights): 0 off, 1 on", "0", nullptr },
+        { "tonemapExposure",  "Tone mapping exposure (0.5 .. 3)", "1.4", nullptr },
+        { "groundFog",        "Fog low on the ground (valleys, water): 0 off, 1 on", "0", nullptr },
+        { "groundFogDensity", "Ground fog density (0 .. 1)", "0.5", nullptr },
+        { "groundFogHeight",  "Ground fog: yards above your feet it reaches (0 .. 30)", "4", nullptr },
     };
     enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
         CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN,
         CV_BLOOM, CV_BLOOM_STRENGTH, CV_BLOOM_THRESHOLD, CV_GODRAYS, CV_GODRAYS_STRENGTH, CV_GODRAYS_FLIP,
-        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_SSR, CV_SSR_STRENGTH, CV_VIGNETTE, CV_GRAIN, CV_COUNT };
+        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_SSR, CV_SSR_STRENGTH, CV_VIGNETTE, CV_GRAIN,
+        CV_FXAA, CV_TONEMAP, CV_TONEMAP_EXPOSURE, CV_GROUND_FOG, CV_GROUND_FOG_DENSITY, CV_GROUND_FOG_HEIGHT, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -210,6 +217,14 @@ namespace
     // SSAO: the scene's depth copied (RESZ, the drivers' multisampled depth resolve) into an INTZ texture, sampled
     IDirect3DTexture9* s_depthCopy = nullptr;           // default pool: released before a device reset
     UINT s_depthCopyWidth = 0, s_depthCopyHeight = 0;
+    // without antialiasing: our INTZ texture IS the scene's depth buffer (put in place of the client's); either
+    // way the passes read s_depthView
+    IDirect3DTexture9* s_ownDepth = nullptr;            // default pool
+    IDirect3DSurface9* s_ownDepthSurface = nullptr;
+    IDirect3DSurface9* s_clientDepth = nullptr;         // the client's own (not held)
+    IDirect3DTexture9* s_depthView = nullptr;           // not held: s_depthCopy or s_ownDepth
+    UINT s_viewWidth = 0, s_viewHeight = 0;
+    bool s_reszSupported = false;
     IDirect3DPixelShader9* s_ssaoShader = nullptr;
     IDirect3DPixelShader9* s_ssaoBlurShader = nullptr;
     IDirect3DTexture9* s_aoTexture = nullptr;           // the raw occlusion, blurred onto the screen (default pool)
@@ -507,6 +522,7 @@ namespace
     enum VtableIndex : uint32_t
     {
         VT_RESET                = 16,
+        VT_SET_DEPTH_STENCIL    = 39,
         VT_SET_VIEWPORT         = 47,
         VT_SET_RENDER_STATE     = 57,
         VT_SET_TEXTURE          = 65,
@@ -537,6 +553,8 @@ namespace
     typedef HRESULT (__stdcall* SetShaderConstantFFn)(IDirect3DDevice9*, UINT, const float*, UINT);
 
     ResetFn s_reset = nullptr;
+    typedef HRESULT (__stdcall* SetDepthStencilFn)(IDirect3DDevice9*, IDirect3DSurface9*);
+    SetDepthStencilFn s_setDepthStencil = nullptr;
     SetViewportFn s_setViewport = nullptr;
     SetRenderStateFn s_setRenderState = nullptr;
     SetTextureFn s_setTexture = nullptr;
@@ -567,6 +585,17 @@ namespace
         IDirect3DPixelShader9* PixelShader = nullptr;
         float PsConstants[SHADOW_PS_REGISTERS * 4] = {};
     } s_shadow;
+
+    // the client's depth buffer: ours instead while it is in use (no antialiasing, an effect needing depth)
+    HRESULT __stdcall SetDepthStencilDetour(IDirect3DDevice9* device, IDirect3DSurface9* surface)
+    {
+        if (surface && surface != s_ownDepthSurface)
+        {
+            if (s_ownDepthSurface && surface == s_clientDepth)
+                return s_setDepthStencil(device, s_ownDepthSurface);
+        }
+        return s_setDepthStencil(device, surface);
+    }
 
     HRESULT __stdcall SetViewportDetour(IDirect3DDevice9* device, const D3DVIEWPORT9* viewport)
     {
@@ -772,9 +801,22 @@ namespace
         s_waterMaskWidth = s_waterMaskHeight = 0;
     }
 
+    void ReleaseOwnDepth()
+    {
+        if (s_ownDepthSurface)
+            s_ownDepthSurface->Release();
+        if (s_ownDepth)
+            s_ownDepth->Release();
+        s_ownDepthSurface = nullptr;
+        s_ownDepth = nullptr;
+    }
+
     void ReleasePostTargets()
     {
         ReleaseWaterMask();
+        ReleaseOwnDepth();
+        s_depthView = nullptr;
+        s_viewWidth = s_viewHeight = 0;
         if (s_depthCopy)
             s_depthCopy->Release();
         if (s_aoSurface)
@@ -797,6 +839,9 @@ namespace
 
     HRESULT __stdcall ResetDetour(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* parameters)
     {
+        if (s_ownDepthSurface && s_clientDepth && s_setDepthStencil)
+            s_setDepthStencil(device, s_clientDepth);
+        s_clientDepth = nullptr;
         ReleaseMask();      // a default pool resource: a reset fails while it exists
         ReleasePostTargets();
         return s_reset(device, parameters);
@@ -1346,7 +1391,7 @@ namespace
         "}\n";
 
     // color grading: s0 the scene; c0 texel.xy; c1 contrast, saturation, sharpening, brightness; c2 vignette, grain,
-    // a value changing every frame (the grain's seed)
+    // a value changing every frame (the grain's seed), the tone mapping's exposure (0: none; ACES' curve)
     const char HLSL_GRADE_PS[] =
         "sampler2D scene : register(s0);\n"
         "float4 screen : register(c0);\n"
@@ -1356,6 +1401,11 @@ namespace
         "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
         "{\n"
         "    float3 c = At(uv);\n"
+        "    if (look.w > 0)\n"
+        "    {\n"
+        "        float3 x = c * look.w;\n"
+        "        c = saturate((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14));\n"
+        "    }\n"
         "    float3 around = At(uv + float2(screen.x, 0)) + At(uv - float2(screen.x, 0))\n"
         "        + At(uv + float2(0, screen.y)) + At(uv - float2(0, screen.y));\n"
         "    c += (c - around * 0.25) * params.z;\n"
@@ -1393,8 +1443,9 @@ namespace
         bool resz = SUCCEEDED(d3d->CheckDeviceFormat(creation.AdapterOrdinal, creation.DeviceType, mode.Format,
             D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, FORMAT_RESZ));
         d3d->Release();
-        s_ssaoStatus = !intz ? 2 : (!resz ? 3 : 0);
-        if (intz && resz)
+        s_reszSupported = resz;
+        s_ssaoStatus = !intz ? 2 : 0;
+        if (intz)
         {
             std::vector<DWORD> code = Compile(HLSL_SSAO_PS, "ps_3_0");
             std::vector<DWORD> blur = Compile(HLSL_SSAO_BLUR_PS, "ps_3_0");
@@ -1406,9 +1457,11 @@ namespace
                 s_ssaoStatus = 5;
             }
         }
-        s_ssaoSupported = intz && resz && s_ssaoShader && s_ssaoBlurShader;
+        s_ssaoSupported = intz && s_ssaoShader && s_ssaoBlurShader;
         return s_ssaoSupported;
     }
+
+    void SetView(IDirect3DTexture9* texture, UINT width, UINT height);
 
     // the scene's depth buffer, multisampled, into our INTZ texture (the drivers' RESZ: a point drawn with the
     // texture bound, then a magic point size)
@@ -1419,10 +1472,21 @@ namespace
             return false;
         D3DSURFACE_DESC desc = {};
         depth->GetDesc(&desc);
+        bool own = depth == s_ownDepthSurface;
         depth->Release();
+        if (own)
+        {
+            SetView(s_ownDepth, desc.Width, desc.Height);
+            return true;
+        }
         if (desc.MultiSampleType == D3DMULTISAMPLE_NONE)
         {
-            s_ssaoStatus = 4;
+            s_ssaoStatus = 4;       // ours goes in place of it at the end of this frame (UseOwnDepth)
+            return false;
+        }
+        if (!s_reszSupported)
+        {
+            s_ssaoStatus = 3;
             return false;
         }
         if (!s_depthCopy || s_depthCopyWidth != desc.Width || s_depthCopyHeight != desc.Height)
@@ -1462,7 +1526,25 @@ namespace
         SetState(device, D3DRS_POINTSIZE, RESZ_CODE);
         SetState(device, D3DRS_POINTSIZE, 0x3F800000);
         s_setTexture(device, 0, nullptr);
+        SetView(s_depthCopy, s_depthCopyWidth, s_depthCopyHeight);
         return true;
+    }
+
+    // a new size of the depth the passes read: the occlusion texture made again
+    void SetView(IDirect3DTexture9* texture, UINT width, UINT height)
+    {
+        if (width != s_viewWidth || height != s_viewHeight)
+        {
+            if (s_aoSurface)
+                s_aoSurface->Release();
+            if (s_aoTexture)
+                s_aoTexture->Release();
+            s_aoSurface = nullptr;
+            s_aoTexture = nullptr;
+        }
+        s_depthView = texture;
+        s_viewWidth = width;
+        s_viewHeight = height;
     }
 
     float CVarNumber(const char* name, float fallback)
@@ -1490,13 +1572,13 @@ namespace
         float strength = CVarFloat(CV_SSAO_STRENGTH);
         radius = radius < 0.3f ? 0.3f : (radius > 5.0f ? 5.0f : radius);
         strength = strength < 0.0f ? 0.0f : (strength > 2.0f ? 2.0f : strength);
-        const float screen[4] = { 1.0f / s_depthCopyWidth, 1.0f / s_depthCopyHeight, nearClip > 0.01f ? nearClip : 0.2f,
+        const float screen[4] = { 1.0f / s_viewWidth, 1.0f / s_viewHeight, nearClip > 0.01f ? nearClip : 0.2f,
             farClip > 10.0f ? farClip : 1000.0f };
-        const float params[4] = { radius, strength, SSAO_PROJECTION * s_depthCopyHeight, 0.0f };
+        const float params[4] = { radius, strength, SSAO_PROJECTION * s_viewHeight, 0.0f };
 
         if (!s_aoTexture)
         {
-            if (FAILED(device->CreateTexture(s_depthCopyWidth, s_depthCopyHeight, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
+            if (FAILED(device->CreateTexture(s_viewWidth, s_viewHeight, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
                 D3DPOOL_DEFAULT, &s_aoTexture, nullptr)) || !s_aoTexture)
             {
                 s_aoTexture = nullptr;
@@ -1507,7 +1589,7 @@ namespace
             s_aoTexture->GetSurfaceLevel(0, &s_aoSurface);
         }
 
-        FillQuad(s_depthCopyWidth, s_depthCopyHeight);
+        FillQuad(s_viewWidth, s_viewHeight);
         s_setVertexShader(device, s_quadShader);
         s_setVertexDeclaration(device, s_quadDeclaration);
         s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
@@ -1533,7 +1615,7 @@ namespace
         device->SetDepthStencilSurface(nullptr);
         device->Clear(0, nullptr, D3DCLEAR_TARGET, 0x00000000, 1.0f, 0);
         s_setPixelShader(device, s_ssaoShader);
-        s_setTexture(device, 0, s_depthCopy);
+        s_setTexture(device, 0, s_depthView);
         device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
         device->SetRenderTarget(0, renderTarget);
         device->SetDepthStencilSurface(depthStencil);
@@ -1546,7 +1628,7 @@ namespace
         // 2. blurred onto the screen
         s_setPixelShader(device, s_ssaoBlurShader);
         s_setTexture(device, 0, s_aoTexture);
-        s_setTexture(device, 1, s_depthCopy);
+        s_setTexture(device, 1, s_depthView);
         SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
         SetState(device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
         SetState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
@@ -1563,7 +1645,7 @@ namespace
     void PrepareDepth(IDirect3DDevice9* device)
     {
         s_depthReady = false;
-        if (!CVarInt(CV_SSAO) && !CVarInt(CV_GODRAYS) && !CVarInt(CV_DOF) && !CVarInt(CV_SSR))
+        if (!CVarInt(CV_SSAO) && !CVarInt(CV_GODRAYS) && !CVarInt(CV_DOF) && !CVarInt(CV_SSR) && !CVarInt(CV_GROUND_FOG))
             return;
         if (!s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device) || !CheckSsaoSupport(device))
             return;
@@ -1869,7 +1951,7 @@ namespace
             const float params[4] = { focus, Clamp(CVarFloat(CV_DOF_DISTANCE), 5.0f, 300.0f), Clamp(CVarFloat(CV_DOF_STRENGTH), 0.0f, 1.0f), 0.0f };
             BindTexture(device, 0, s_sceneCopy, false);
             BindTexture(device, 1, s_small[0], true);
-            BindTexture(device, 2, s_depthCopy, false);
+            BindTexture(device, 2, s_depthView, false);
             Pass(device, nullptr, s_sceneCopyWidth, s_sceneCopyHeight, s_dofShader, depthScreen, params);
         }
         if (bloom)
@@ -1887,7 +1969,7 @@ namespace
         {
             const float mode[4] = { 2.0f, 0.0f, 1.0f, 0.0f };
             BindTexture(device, 0, s_sceneCopy, true);
-            BindTexture(device, 1, s_depthCopy, false);
+            BindTexture(device, 1, s_depthView, false);
             Pass(device, s_smallSurface[1], s_smallWidth, s_smallHeight, s_downShader, sceneTexel, mode);
             const float radial[4] = { u, v, 0.9f, 0.0f };
             const float none[4] = {};
@@ -2075,7 +2157,7 @@ namespace
         s_setPixelShader(device, s_ssrShader);
         s_setPsConstant(device, 0, &constants[0][0], 7);
         BindTexture(device, 0, s_sceneCopy, true);
-        BindTexture(device, 1, s_depthCopy, false);
+        BindTexture(device, 1, s_depthView, false);
         BindTexture(device, 2, s_waterMask, false);
         SetSilhouetteStates(device);
         SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
@@ -2089,13 +2171,222 @@ namespace
         RestoreGx(device);
     }
 
+    // ---------------------------------------------------------------- ground fog, FXAA
+    // fog low on the ground: the pixel's world point (as SSR), thicker with the distance and below the top (the
+    // player's feet + the height). c0 texel.xy, near, far; c1 density, the top's z, the height; c2..c6 the camera
+    // (as SSR); c7 the zone's fog color
+    const char HLSL_GROUND_FOG_PS[] =
+        "sampler2D depthTex : register(s0);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float4 forward : register(c2);\n"
+        "float4 left : register(c3);\n"
+        "float4 up : register(c4);\n"
+        "float4 eye : register(c5);\n"
+        "float4 fov : register(c6);\n"
+        "float4 fogColor : register(c7);\n"
+        "float Linear(float d) { return screen.z * screen.w / (screen.w - d * (screen.w - screen.z)); }\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float d = tex2Dlod(depthTex, float4(uv, 0, 0)).r;\n"
+        "    clip(0.99999 - d);\n"
+        "    float z = Linear(d);\n"
+        "    float2 ndc = float2(uv.x * 2 - 1, 1 - uv.y * 2);\n"
+        "    float3 ray = forward.xyz - left.xyz * ndc.x * fov.x + up.xyz * ndc.y * fov.y;\n"
+        "    float3 world = eye.xyz + ray * z;\n"
+        "    float below = saturate((params.y - world.z) / max(params.z, 0.5));\n"
+        "    float amount = (1.0 - exp(-length(ray * z) * params.x * 0.02)) * below;\n"
+        "    return float4(fogColor.rgb, saturate(amount));\n"
+        "}\n";
+
+    // FXAA (the console variant): the edge's direction from the luma around, a blur along it
+    const char HLSL_FXAA_PS[] =
+        "sampler2D scene : register(s0);\n"
+        "float4 screen : register(c0);\n"
+        "float3 At(float2 uv) { return tex2Dlod(scene, float4(uv, 0, 0)).rgb; }\n"
+        "float Luma(float3 c) { return dot(c, float3(0.299, 0.587, 0.114)); }\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float2 t = screen.xy;\n"
+        "    float nw = Luma(At(uv + float2(-1, -1) * t)), ne = Luma(At(uv + float2(1, -1) * t));\n"
+        "    float sw = Luma(At(uv + float2(-1, 1) * t)), se = Luma(At(uv + float2(1, 1) * t));\n"
+        "    float3 middle = At(uv);\n"
+        "    float m = Luma(middle);\n"
+        "    float lumaMin = min(m, min(min(nw, ne), min(sw, se)));\n"
+        "    float lumaMax = max(m, max(max(nw, ne), max(sw, se)));\n"
+        "    if (lumaMax - lumaMin < max(0.0312, lumaMax * 0.125))\n"
+        "        return float4(middle, 1);\n"
+        "    float2 dir = float2(-((nw + ne) - (sw + se)), (nw + sw) - (ne + se));\n"
+        "    float reduce = max((nw + ne + sw + se) * 0.03125, 0.0078125);\n"
+        "    dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + reduce), -8.0, 8.0) * t;\n"
+        "    float3 a = 0.5 * (At(uv + dir * (1.0 / 3.0 - 0.5)) + At(uv + dir * (2.0 / 3.0 - 0.5)));\n"
+        "    float3 b = a * 0.5 + 0.25 * (At(uv - dir * 0.5) + At(uv + dir * 0.5));\n"
+        "    float lb = Luma(b);\n"
+        "    return float4((lb < lumaMin || lb > lumaMax) ? a : b, 1);\n"
+        "}\n";
+
+    IDirect3DPixelShader9* s_groundFogShader = nullptr;
+    IDirect3DPixelShader9* s_fxaaShader = nullptr;
+    bool s_groundFogChecked = false, s_fxaaChecked = false;
+
+    IDirect3DPixelShader9* CompileOnce(IDirect3DDevice9* device, const char* source, IDirect3DPixelShader9*& shader, bool& checked)
+    {
+        if (!checked)
+        {
+            checked = true;
+            std::vector<DWORD> code = Compile(source, "ps_3_0");
+            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), &shader)))
+                shader = nullptr;
+        }
+        return shader;
+    }
+
+    // the camera's constants c2 .. c6 (as SSR), false without a camera
+    bool CameraConstants(float constants[5][4])
+    {
+        uint8_t* world = *reinterpret_cast<uint8_t**>(0xB7436C);
+        uint8_t* camera = world ? *reinterpret_cast<uint8_t**>(world + 0x7E20) : nullptr;
+        if (!camera)
+            return false;
+        const float* position = reinterpret_cast<const float*>(camera + 0x8);
+        const float* facing = reinterpret_cast<const float*>(camera + 0x14);
+        float fov = *reinterpret_cast<const float*>(camera + 0x40);
+        float aspect = *reinterpret_cast<const float*>(camera + 0x44);
+        float halfHeight = tanf((fov > 0.1f ? fov : 1.0f) * 0.5f);
+        for (int row = 0; row < 3; ++row)
+        {
+            constants[row][0] = facing[row * 3];
+            constants[row][1] = facing[row * 3 + 1];
+            constants[row][2] = facing[row * 3 + 2];
+            constants[row][3] = 0.0f;
+        }
+        constants[3][0] = position[0];
+        constants[3][1] = position[1];
+        constants[3][2] = position[2];
+        constants[3][3] = 0.0f;
+        constants[4][0] = halfHeight * (aspect > 0.1f ? aspect : 1.0f);
+        constants[4][1] = halfHeight;
+        constants[4][2] = constants[4][3] = 0.0f;
+        return true;
+    }
+
+    // once a frame, after SSAO
+    void GroundFog(IDirect3DDevice9* device)
+    {
+        if (!CVarInt(CV_GROUND_FOG) || !s_depthReady || !CompileOnce(device, HLSL_GROUND_FOG_PS, s_groundFogShader, s_groundFogChecked))
+            return;
+        CGObject* player = FindUnit(reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)());
+        float camera[5][4];
+        if (!player || !CameraConstants(camera))
+            return;
+        float height = Clamp(CVarFloat(CV_GROUND_FOG_HEIGHT), 0.0f, 30.0f);
+        float nearClip = CVarNumber("nearclip", 0.2f);
+        float farClip = *reinterpret_cast<float*>(ADDR_FARCLIP);
+        // the zone's fog color: the light's result, bytes b, g, r at +0x8C
+        const uint8_t* fog = reinterpret_cast<const uint8_t*>(0xD38B00 + 0x8C);
+        float constants[8][4] = {
+            { 1.0f / s_viewWidth, 1.0f / s_viewHeight, nearClip > 0.01f ? nearClip : 0.2f, farClip > 10.0f ? farClip : 1000.0f },
+            { Clamp(CVarFloat(CV_GROUND_FOG_DENSITY), 0.0f, 1.0f), GetPosition(player).Z + height, height > 0.5f ? height : 0.5f, 0.0f },
+        };
+        memcpy(constants[2], camera, sizeof(camera));
+        constants[7][0] = fog[2] / 255.0f;
+        constants[7][1] = fog[1] / 255.0f;
+        constants[7][2] = fog[0] / 255.0f;
+        constants[7][3] = 1.0f;
+
+        FillQuad(s_viewWidth, s_viewHeight);
+        s_setVertexShader(device, s_quadShader);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        s_setPixelShader(device, s_groundFogShader);
+        s_setPsConstant(device, 0, &constants[0][0], 8);
+        BindTexture(device, 0, s_depthView, false);
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
+        SetState(device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        SetState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+        SetState(device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        s_setTexture(device, 0, nullptr);
+        RestoreGx(device);
+    }
+
+    // once a frame, the last of the effects (before the outline)
+    void Fxaa(IDirect3DDevice9* device)
+    {
+        if (!CVarInt(CV_FXAA) || !s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device)
+            || !CompileOnce(device, HLSL_FXAA_PS, s_fxaaShader, s_fxaaChecked) || !CopyScene(device))
+            return;
+        const float screen[4] = { 1.0f / s_sceneCopyWidth, 1.0f / s_sceneCopyHeight, 0.0f, 0.0f };
+        FillQuad(s_sceneCopyWidth, s_sceneCopyHeight);
+        s_setVertexShader(device, s_quadShader);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        s_setPixelShader(device, s_fxaaShader);
+        s_setPsConstant(device, 0, screen, 1);
+        BindTexture(device, 0, s_sceneCopy, true);
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        s_setTexture(device, 0, nullptr);
+        RestoreGx(device);
+    }
+
+    // at the end of a frame: without antialiasing, our INTZ texture in place of the client's depth buffer (from
+    // the next frame on) while an effect needs depth; the client's back when none does
+    void UseOwnDepth(IDirect3DDevice9* device)
+    {
+        bool wanted = (CVarInt(CV_SSAO) || CVarInt(CV_GODRAYS) || CVarInt(CV_DOF) || CVarInt(CV_SSR) || CVarInt(CV_GROUND_FOG))
+            && s_ssaoSupported;
+        IDirect3DSurface9* bound = nullptr;
+        device->GetDepthStencilSurface(&bound);
+        if (!wanted)
+        {
+            if (bound && bound == s_ownDepthSurface && s_clientDepth)
+                s_setDepthStencil(device, s_clientDepth);
+            if (bound != s_ownDepthSurface)
+                ReleaseOwnDepth();
+            s_clientDepth = nullptr;
+        }
+        else if (bound && bound != s_ownDepthSurface)
+        {
+            D3DSURFACE_DESC desc = {};
+            bound->GetDesc(&desc);
+            if (desc.MultiSampleType == D3DMULTISAMPLE_NONE)
+            {
+                D3DSURFACE_DESC ownDesc = {};
+                if (s_ownDepthSurface)
+                    s_ownDepthSurface->GetDesc(&ownDesc);
+                if (!s_ownDepthSurface || ownDesc.Width != desc.Width || ownDesc.Height != desc.Height)
+                {
+                    ReleaseOwnDepth();
+                    if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_DEPTHSTENCIL, FORMAT_INTZ,
+                        D3DPOOL_DEFAULT, &s_ownDepth, nullptr)) || !s_ownDepth)
+                        s_ownDepth = nullptr;
+                    else
+                        s_ownDepth->GetSurfaceLevel(0, &s_ownDepthSurface);
+                }
+                if (s_ownDepthSurface)
+                {
+                    s_clientDepth = bound;
+                    s_setDepthStencil(device, s_ownDepthSurface);
+                }
+            }
+        }
+        if (bound)
+            bound->Release();
+    }
+
     // once a frame, after SSAO, before the outline: contrast, saturation, brightness, sharpening
     void ColorGrade(IDirect3DDevice9* device)
     {
         float contrast = CVarFloat(CV_CONTRAST), saturation = CVarFloat(CV_SATURATION);
         float brightness = CVarFloat(CV_BRIGHTNESS), sharpen = CVarFloat(CV_SHARPEN);
         float vignette = CVarFloat(CV_VIGNETTE), grain = CVarFloat(CV_GRAIN);
-        if (contrast == 1.0f && saturation == 1.0f && brightness == 1.0f && sharpen == 0.0f && vignette <= 0.0f && grain <= 0.0f)
+        float exposure = CVarInt(CV_TONEMAP) ? Clamp(CVarFloat(CV_TONEMAP_EXPOSURE), 0.5f, 3.0f) : 0.0f;
+        if (contrast == 1.0f && saturation == 1.0f && brightness == 1.0f && sharpen == 0.0f && vignette <= 0.0f && grain <= 0.0f
+            && exposure == 0.0f)
             return;
         if (!s_gradeChecked)
         {
@@ -2123,7 +2414,7 @@ namespace
         s_setPsConstant(device, 0, screen, 1);
         s_setPsConstant(device, 1, params, 1);
         const float look[4] = { vignette < 0.0f ? 0.0f : (vignette > 1.0f ? 1.0f : vignette),
-            grain < 0.0f ? 0.0f : (grain > 1.0f ? 1.0f : grain), static_cast<float>(s_frameCount % 997), 0.0f };
+            grain < 0.0f ? 0.0f : (grain > 1.0f ? 1.0f : grain), static_cast<float>(s_frameCount % 997), exposure };
         s_setPsConstant(device, 2, look, 1);
         s_setVertexDeclaration(device, s_quadDeclaration);
         s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
@@ -2173,6 +2464,7 @@ namespace
         void** vtable = *reinterpret_cast<void***>(device);
         HookVtable(vtable, VT_RESET, s_reset, reinterpret_cast<void*>(&ResetDetour));
         HookVtable(vtable, VT_SET_VIEWPORT, s_setViewport, reinterpret_cast<void*>(&SetViewportDetour));
+        HookVtable(vtable, VT_SET_DEPTH_STENCIL, s_setDepthStencil, reinterpret_cast<void*>(&SetDepthStencilDetour));
         HookVtable(vtable, VT_SET_RENDER_STATE, s_setRenderState, reinterpret_cast<void*>(&SetRenderStateDetour));
         HookVtable(vtable, VT_SET_TEXTURE, s_setTexture, reinterpret_cast<void*>(&SetTextureDetour));
         HookVtable(vtable, VT_SET_SAMPLER_STATE, s_setSamplerState, reinterpret_cast<void*>(&SetSamplerStateDetour));
@@ -2184,7 +2476,7 @@ namespace
         HookVtable(vtable, VT_SET_PS_CONSTANT_F, s_setPsConstant, reinterpret_cast<void*>(&SetPsConstantDetour));
         HookVtable(vtable, VT_DRAW_INDEXED, s_drawIndexed, reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour));
         if (s_reset && s_setViewport && s_setRenderState && s_setTexture && s_setSamplerState && s_setVertexDeclaration
-            && s_setFVF && s_setVertexShader && s_setStreamSource && s_setPixelShader && s_setPsConstant && s_drawIndexed)
+            && s_setFVF && s_setDepthStencil && s_setVertexShader && s_setStreamSource && s_setPixelShader && s_setPsConstant && s_drawIndexed)
             s_stats.Installed |= 4;
     }
 
@@ -2214,15 +2506,28 @@ namespace
         {
             ++s_frameCount;
             PrepareDepth(device);
+            // our depth texture can't be read while it is the depth buffer: unbound for the passes
+            IDirect3DSurface9* bound = nullptr;
+            device->GetDepthStencilSurface(&bound);
+            bool ownBound = bound && bound == s_ownDepthSurface;
+            if (bound)
+                bound->Release();
+            if (ownBound)
+                s_setDepthStencil(device, nullptr);
             Ssao(device);
             Reflections(device);
+            GroundFog(device);
             PostEffects(device);
             ColorGrade(device);
+            Fxaa(device);
             Composite(device);
+            if (ownBound)
+                s_setDepthStencil(device, s_ownDepthSurface);
             if (EnsureMask(device) && EnsureQuadBuffer(device))
                 ClearMask(device);
             if (EnsureWaterMask(device))
                 ClearWaterMask(device);
+            UseOwnDepth(device);
         }
         s_stats.TargetBatches = s_frameBatches;
         s_stats.Silhouettes = s_frameSilhouettes;

@@ -963,7 +963,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentFogDropDown" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-26"/>
+							<AbsDimension x="0" y="-22"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1049,14 +1049,104 @@
 					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
 				</Scripts>
 			</Frame>
+			<Frame name="$parentFxaaDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentGodRaysDropDown" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-22"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="FXAA_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(FXAA_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentTonemapDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentFxaaDropDown" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="-4" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="TONEMAP_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(TONEMAP_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentGroundFogDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTonemapDropDown" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="-4" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="GROUND_FOG_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(GROUND_FOG_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
 			<Slider name="$parentSsaoStrength" inherits="OptionsSliderTemplate">
 				<Size>
 					<AbsDimension x="130" y="17"/>
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentGodRaysDropDown" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentFxaaDropDown" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="20" y="-34"/>
+							<AbsDimension x="20" y="-30"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1107,7 +1197,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentSsaoStrength" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-36"/>
+							<AbsDimension x="0" y="-30"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1158,7 +1248,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentBloomThreshold" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-36"/>
+							<AbsDimension x="0" y="-30"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1209,7 +1299,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentDofDistance" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-36"/>
+							<AbsDimension x="0" y="-30"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1260,7 +1350,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentColorBrightness" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-36"/>
+							<AbsDimension x="0" y="-30"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1287,14 +1377,65 @@
 					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
 				</Scripts>
 			</Slider>
+			<Slider name="$parentTonemapExposure" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentFilmGrain" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentGroundFogDensity" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentVignette" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-30"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentGroundFogHeight" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentGroundFogDensity" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
 			<Button name="$parentPresetOff" inherits="UIPanelButtonTemplate" text="FEATURES_PRESET_OFF">
 				<Size>
 					<AbsDimension x="100" y="22"/>
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentVignette" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentGroundFogDensity" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="-4" y="-30"/>
+							<AbsDimension x="-4" y="-24"/>
 						</Offset>
 					</Anchor>
 				</Anchors>

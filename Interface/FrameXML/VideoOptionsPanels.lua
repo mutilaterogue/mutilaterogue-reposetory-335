@@ -621,7 +621,7 @@ end
 -- [[ New features panel (WotLKExtensions) ]] --
 
 FEATURES_LABEL = "Нововведения";
-FEATURES_SUBTEXT = "Дополнительные графические настройки, которых нет в обычном клиенте.";
+FEATURES_SUBTEXT = "";
 FOG_MODE = "Туман";
 FOG_MODE_TOOLTIP = "Дальность тумана: как в клиенте, в три раза дальше или без тумана.";
 FOG_MODES = { [0] = "Обычный", "Дальше", "Выключен" };
@@ -640,6 +640,12 @@ BLOOM_MODE = "Свечение (Bloom)";
 BLOOM_MODE_TOOLTIP = "Мягкий ореол вокруг ярких мест: огней, окон, эффектов.";
 GODRAYS_MODE = "Лучи солнца";
 GODRAYS_MODE_TOOLTIP = "Лучи света от солнца сквозь деревья и края гор. Требует сглаживания (MSAA).";
+FXAA_MODE = "Сглаживание FXAA";
+FXAA_MODE_TOOLTIP = "Сглаживает края после отрисовки: почти бесплатно, работает и без MSAA.";
+TONEMAP_MODE = "Тонмаппинг";
+TONEMAP_MODE_TOOLTIP = "Кинематографичная кривая: мягкие светлые места вместо резкого белого.";
+GROUND_FOG_MODE = "Туман у земли";
+GROUND_FOG_MODE_TOOLTIP = "Дымка в низинах и над водой - ниже вашего персонажа.";
 SSR_MODE = "Отражения в воде";
 SSR_MODE_TOOLTIP = "Вода отражает горы, деревья и здания (то, что видно на экране). Требует сглаживания (MSAA).";
 DOF_MODE = "Глубина резкости";
@@ -662,6 +668,9 @@ local FEATURE_DROPDOWNS = {
 	VideoOptionsFeaturesPanelGodRaysDropDown = { cvar = "godRays", modes = "SSAO_MODES" },
 	VideoOptionsFeaturesPanelDofDropDown = { cvar = "dof", modes = "SSAO_MODES" },
 	VideoOptionsFeaturesPanelSsrDropDown = { cvar = "ssr", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelFxaaDropDown = { cvar = "fxaa", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelTonemapDropDown = { cvar = "tonemap", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelGroundFogDropDown = { cvar = "groundFog", modes = "SSAO_MODES" },
 };
 
 local function FeatureDropDown_Initialize (self)
@@ -691,6 +700,9 @@ end
 SSAO_STRENGTH = "Сила затенения";
 SSAO_RADIUS = "Радиус затенения";
 COLOR_CONTRAST = "Контраст";
+TONEMAP_EXPOSURE = "Экспозиция";
+GROUND_FOG_DENSITY = "Плотность дымки";
+GROUND_FOG_HEIGHT = "Высота дымки";
 SSR_STRENGTH = "Сила отражений";
 VIGNETTE = "Виньетка";
 FILM_GRAIN = "Зерно";
@@ -713,6 +725,9 @@ local FEATURE_SLIDERS = {
 	VideoOptionsFeaturesPanelSsrStrength = { cvar = "ssrStrength", text = "SSR_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
 	VideoOptionsFeaturesPanelVignette = { cvar = "vignette", text = "VIGNETTE", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
 	VideoOptionsFeaturesPanelFilmGrain = { cvar = "filmGrain", text = "FILM_GRAIN", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
+	VideoOptionsFeaturesPanelTonemapExposure = { cvar = "tonemapExposure", text = "TONEMAP_EXPOSURE", minValue = 0.5, maxValue = 3, valueStep = 0.1, low = "0.5", high = "3" },
+	VideoOptionsFeaturesPanelGroundFogDensity = { cvar = "groundFogDensity", text = "GROUND_FOG_DENSITY", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
+	VideoOptionsFeaturesPanelGroundFogHeight = { cvar = "groundFogHeight", text = "GROUND_FOG_HEIGHT", minValue = 0, maxValue = 30, valueStep = 1, low = "0", high = "30" },
 	VideoOptionsFeaturesPanelColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
 	VideoOptionsFeaturesPanelColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
@@ -749,22 +764,24 @@ FEATURES_PRESET_RETAIL = "Ретейл";
 FEATURES_PRESET_MAX = "Максимум";
 local FEATURE_PRESETS = {
 	VideoOptionsFeaturesPanelPresetOff = {
-		ssao = 0, bloom = 0, godRays = 0, dof = 0, ssr = 0,
+		ssao = 0, bloom = 0, godRays = 0, dof = 0, ssr = 0, fxaa = 0, tonemap = 0, groundFog = 0,
 		colorContrast = 1, colorSaturation = 1, colorBrightness = 1, colorSharpen = 0, vignette = 0, filmGrain = 0,
 	},
 	VideoOptionsFeaturesPanelPresetSoft = {
 		ssao = 1, ssaoStrength = 0.8, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.4, bloomThreshold = 0.8,
-		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6,
+		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6, fxaa = 1, tonemap = 0, groundFog = 0,
 		colorContrast = 1.05, colorSaturation = 1.05, colorBrightness = 1, colorSharpen = 0.1, vignette = 0.2, filmGrain = 0,
 	},
 	VideoOptionsFeaturesPanelPresetRetail = {
 		ssao = 1, ssaoStrength = 1, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.6, bloomThreshold = 0.7,
 		godRays = 1, godRaysStrength = 1, dof = 1, dofStrength = 0.6, dofDistance = 80, ssr = 1, ssrStrength = 0.8,
+		fxaa = 1, tonemap = 1, tonemapExposure = 1.4, groundFog = 1, groundFogDensity = 0.4, groundFogHeight = 4,
 		colorContrast = 1.1, colorSaturation = 1.1, colorBrightness = 1, colorSharpen = 0.2, vignette = 0.3, filmGrain = 0,
 	},
 	VideoOptionsFeaturesPanelPresetMax = {
 		ssao = 1, ssaoStrength = 1.5, ssaoRadius = 2, bloom = 1, bloomStrength = 0.9, bloomThreshold = 0.6,
 		godRays = 1, godRaysStrength = 1.5, dof = 1, dofStrength = 1, dofDistance = 60, ssr = 1, ssrStrength = 1,
+		fxaa = 1, tonemap = 1, tonemapExposure = 1.6, groundFog = 1, groundFogDensity = 0.6, groundFogHeight = 6,
 		colorContrast = 1.15, colorSaturation = 1.2, colorBrightness = 1, colorSharpen = 0.4, vignette = 0.4, filmGrain = 0.2,
 	},
 };
