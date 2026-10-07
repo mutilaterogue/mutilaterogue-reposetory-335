@@ -58,6 +58,7 @@ namespace
     constexpr uint32_t BATCH_MODEL         = 0x60;         // CM2Model*
     constexpr uint32_t MODEL_PARENT        = 0x48;         // CM2Model* the model is attached to
     constexpr uint32_t MAX_BLEND_MODE      = 2;            // opaque / alpha key (no blended, additive...)
+    constexpr uint32_t MIN_ATTACHMENT_TRIANGLES = 24;      // fewer on an attachment: a spell effect's billboard
 
     // the look
     constexpr float ALPHA_GAIN_HIGH = 1.0f / 3.0f;         // 16 samples
@@ -164,6 +165,7 @@ namespace
 
     std::vector<Target> s_targets;
     Target const* s_currentTarget = nullptr;    // set while the client draws a batch of an outlined model
+    bool s_currentAttachment = false;           // that batch is of a model attached to it (weapon, spell effect)
 
     // our device objects
     IDirect3DPixelShader9* s_flatShader = nullptr;
@@ -405,6 +407,7 @@ namespace
         if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
             return nullptr;
         bool opaque = *reinterpret_cast<uint32_t*>(material) == 0;
+        s_currentAttachment = false;
         void* model = *reinterpret_cast<void**>(batch + BATCH_MODEL);
         for (int depth = 0; model && depth < 8; ++depth)
         {
@@ -415,6 +418,7 @@ namespace
             // is a square
             if (!opaque)
                 return nullptr;
+            s_currentAttachment = true;
             model = *reinterpret_cast<void**>(static_cast<uint8_t*>(model) + MODEL_PARENT);
         }
         return nullptr;
@@ -908,6 +912,10 @@ namespace
     {
         HRESULT result = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         if (!s_currentTarget || (s_mode & 1))
+            return result;
+        // a spell effect's billboard on an attachment (a few triangles, its shape only in the texture): not a
+        // silhouette. Weapons and armor pieces have far more
+        if (s_currentAttachment && primitiveCount < MIN_ATTACHMENT_TRIANGLES)
             return result;
         bool toScreen = (s_mode & 8) != 0;
         if (!toScreen && !s_maskSurface)
