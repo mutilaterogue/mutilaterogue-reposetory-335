@@ -557,13 +557,16 @@ DisplayPanelOptions = {
 	OutlineMouseover = { text = "OUTLINE_MOUSEOVER", tooltip = "Обводить персонажа или существо под курсором." },
 	OutlineQuestBoss = { text = "OUTLINE_QUEST", tooltip = "Обводить боссов поблизости." },
 	OutlinePlayer = { text = "OUTLINE_PLAYER", tooltip = "Обводить вашего персонажа." },
+	OutlineAll = { text = "OUTLINE_ALL", tooltip = "Всегда обводить всех персонажей и существ вокруг, а не только цель и юнит под курсором." },
 }
+
+OUTLINE_ALL = OUTLINE_ALL or "Всегда обводить всех";
 
 -- The unit outline's CVars (WotLKExtensions Outline): registered here, before the panel reads them at
 -- PLAYER_ENTERING_WORLD; the DLL finds them by name (and registers them itself when this file isn't there).
 for name, default in pairs({
 	OutlineQuality = "1", OutlineTarget = "1", OutlineMouseover = "1", OutlineQuestBoss = "1", OutlinePlayer = "0",
-	OutlineThickness = "1", OutlineStrength = "1",
+	OutlineThickness = "1", OutlineStrength = "1", OutlineAll = "0",
 }) do
 	if ( GetCVar(name) == nil ) then
 		RegisterCVar(name, default);

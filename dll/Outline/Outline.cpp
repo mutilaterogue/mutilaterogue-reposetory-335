@@ -48,6 +48,7 @@ namespace
     constexpr uint32_t  CVAR_STRING_OFFSET  = 0x28;        // CVar: the value as a string
     constexpr uint32_t  RANK_WORLD_BOSS     = 3;
     constexpr size_t    MAX_BOSSES          = 8;
+    constexpr size_t    MAX_OUTLINED        = 64;      // models in a frame (OutlineAll)
 
     // the batch record (this of 0x8203B0)
     constexpr uint32_t BATCH_MATERIAL      = 0x50;         // -> [0] blend mode, [8] flags
@@ -83,8 +84,9 @@ namespace
         { "OutlineQuestBoss", "Outline bosses around you", "1", nullptr },
         { "OutlineThickness", "Outline thickness (0.5 .. 3)", "1", nullptr },
         { "OutlineStrength",  "Outline opacity (0 .. 1)", "1", nullptr },
+        { "OutlineAll",       "Outline every unit around: 0 off, 1 all, 2 hostile only", "0", nullptr },
     };
-    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_COUNT };
+    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL, CV_COUNT };
     bool s_cvarsRegistered = false;
 
     void RegisterCVars()
@@ -290,6 +292,25 @@ namespace
         return 1;
     }
 
+    // every unit around (OutlineAll: 1 all, 2 hostile only); not the player himself (OutlinePlayer)
+    int __cdecl EnumAll(WoWGUID guid, void* param)
+    {
+        if (s_targets.size() >= MAX_OUTLINED)
+            return 0;
+        CGObject* object = FindUnit(guid);
+        if (!object || !(object->m_objectData->m_type & TYPEMASK_UNIT))
+            return 1;
+        if (guid == reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)())
+            return 1;
+        float color[3];
+        ReactionColor(object, color);
+        bool hostile = color[0] == COLOR_HOSTILE[0] && color[1] == COLOR_HOSTILE[1] && color[2] == COLOR_HOSTILE[2];
+        if (reinterpret_cast<intptr_t>(param) == 2 && !hostile)
+            return 1;
+        AddTarget(object, color);
+        return 1;
+    }
+
     // the models of the next frame, by the CVars
     void CollectTargets()
     {
@@ -306,6 +327,9 @@ namespace
                 reinterpret_cast<int (__cdecl*)(int (__cdecl*)(WoWGUID, void*), void*)>(ADDR_ENUM_VISIBLE)(&EnumBoss, nullptr);
             if (CVarInt(CV_PLAYER))
                 AddTarget(FindUnit(reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)()));
+            if (int all = CVarInt(CV_ALL))
+                reinterpret_cast<int (__cdecl*)(int (__cdecl*)(WoWGUID, void*), void*)>(ADDR_ENUM_VISIBLE)(
+                    &EnumAll, reinterpret_cast<void*>(static_cast<intptr_t>(all)));
         }
         s_stats.Targets = static_cast<uint32_t>(s_targets.size());
     }
