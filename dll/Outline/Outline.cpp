@@ -927,7 +927,7 @@ namespace
             {
                 device->GetDepthStencilSurface(&depthStencil);
                 device->SetDepthStencilSurface(nullptr);
-            }}
+            }
             // SetRenderTarget resets the viewport to the whole target with depth 0..1: the client's back (its
             // MinZ / MaxZ), else the silhouette's depth doesn't match the scene's
             RestoreViewport(device);
