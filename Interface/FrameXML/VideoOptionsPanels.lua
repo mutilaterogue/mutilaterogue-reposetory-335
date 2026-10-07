@@ -665,3 +665,34 @@ function VideoOptionsFeaturesPanelDropDown_OnShow (self)
 	UIDropDownMenu_Initialize(self, FeatureDropDown_Initialize);
 	UIDropDownMenu_SetSelectedValue(self, GetCVar(FEATURE_DROPDOWNS[self:GetName()].cvar) or "0");
 end
+
+-- the sliders: applied at once too
+SSAO_STRENGTH = "Сила затенения";
+SSAO_RADIUS = "Радиус затенения";
+local FEATURE_SLIDERS = {
+	VideoOptionsFeaturesPanelSsaoStrength = { cvar = "ssaoStrength", text = "SSAO_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
+	VideoOptionsFeaturesPanelSsaoRadius = { cvar = "ssaoRadius", text = "SSAO_RADIUS", minValue = 0.3, maxValue = 5, valueStep = 0.1, low = "0.3", high = "5" },
+};
+
+function VideoOptionsFeaturesPanelSlider_OnLoad (self)
+	local setup = FEATURE_SLIDERS[self:GetName()];
+	local name = self:GetName();
+	_G[name.."Text"]:SetText(_G[setup.text]);
+	_G[name.."Low"]:SetText(setup.low);
+	_G[name.."High"]:SetText(setup.high);
+	self:SetMinMaxValues(setup.minValue, setup.maxValue);
+	self:SetValueStep(setup.valueStep);
+end
+
+function VideoOptionsFeaturesPanelSlider_OnShow (self)
+	local setup = FEATURE_SLIDERS[self:GetName()];
+	self.loading = true;
+	self:SetValue(tonumber(GetCVar(setup.cvar)) or setup.minValue);
+	self.loading = nil;
+end
+
+function VideoOptionsFeaturesPanelSlider_OnValueChanged (self, value)
+	if ( not self.loading ) then
+		SetCVar(FEATURE_SLIDERS[self:GetName()].cvar, value);
+	end
+end

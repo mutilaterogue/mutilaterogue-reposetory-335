@@ -929,6 +929,34 @@
 					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
 				</Scripts>
 			</Frame>
+			<Slider name="$parentSsaoStrength" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentSsaoDropDown" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-24"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentSsaoRadius" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentSsaoStrength" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-32"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
 		</Frames>
 		<Scripts>
 			<OnLoad function="VideoOptionsFeaturesPanel_OnLoad"/>
