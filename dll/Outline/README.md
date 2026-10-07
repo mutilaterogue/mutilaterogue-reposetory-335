@@ -1,15 +1,14 @@
-# Outline (WotLKExtensions patch) — stage 1
+# Outline (WotLKExtensions patch) — stage 2
 
-Retail-like unit outline (Outline Mode) for 3.3.5a (12340). The method is taken from a client DLL that
-already does it (its hooks and passes analysed), the code and the shaders are our own.
-
-Stage 1 only checks the hard part: the target's and the mouseover's **silhouette in one color over everything**
-(target red, mouseover yellow). No blur, no CVars yet.
+Retail-like unit outline (Outline Mode) for 3.3.5a (12340): a soft rim around the target (red) and the
+mouseover (yellow), over walls too. The method was taken from a client DLL that does it; the code and the shaders
+are our own.
 
 ## Files
 | File | Where |
 |---|---|
-| `Outline.hpp/.cpp` | `WotLKExtensions/src/Outline/` |
+| `Outline.hpp/.cpp`, `OutlineShaders.hpp` | `WotLKExtensions/src/Outline/` |
+| `tools/sm3asm.py` | not built: the small shader model 3 assembler that made `OutlineShaders.hpp` |
 
 ## Hooking it up
 1. `CMakeLists.txt`:
@@ -39,12 +38,14 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | Hook | What it does |
 |---|---|
 | `0x8203B0` M2 batch draw (`__thiscall`) | a flag around the client's own draw of a batch of an outlined model (and its attachments, `model+0x48`; opaque / alpha key materials only) |
-| device vtable `DrawIndexedPrimitive` | with the flag: the same draw call once more right after the client's, with our pixel shader (`mov oC0, c0`; `ps_3_0` with a `vs_3_0` vertex shader, else `ps_2_0` - D3D9 doesn't mix 3.0 with older), no depth test |
-| device vtable `SetRenderState`, `SetPixelShader`, `SetPixelShaderConstantF` | a copy of what Gx sends; after our draw call exactly that is put back (the client's device can't be read back with `Get*`) |
-| `0x4F9240` inside the world render function, after the 3D scene (mid-function hook, trampoline) | once a frame: the models of the next frame (target red, mouseover yellow) |
+| device vtable `DrawIndexedPrimitive` | with the flag: the same draw call once more right after the client's, into our **mask** (a screen-sized texture), flat shader: the silhouette in its color |
+| `0x4F9240` inside the world render function, after the 3D scene (mid-function hook, trampoline) | one full-screen pass: 16 mask samples on two rings (1.5 / 3 px; 8 on one ring in low quality) = the halo, minus the mask itself = the rim, alpha blended; the mask cleared; the models of the next frame picked |
+| device vtable `SetRenderState`, `SetViewport`, `SetTexture`, `SetSamplerState`, `SetVertexDeclaration`, `SetFVF`, `SetVertexShader`, `SetStreamSource`, `SetPixelShader`, `SetPixelShaderConstantF` | a copy of what Gx sends; after our draws exactly that is put back (the client's device can't be read back with `Get*`) |
+| device vtable `Reset` | the mask (a default pool texture) released first |
 
-No M2 / Gx function is ever called a second time: an earlier version re-ran `0x8203B0` and that broke the world
-(sky, textures) through their caches.
+No M2 / Gx function is ever called a second time: re-running `0x8203B0` broke the world (sky, textures) through
+their caches. The client's vertex shaders are `vs_3_0`, so the pixel shaders are `ps_3_0` (a `ps_2_0` with them
+draws nothing).
 
 ## Debug: `/run print(OutlineDebug())`
 | # | Value | Expected |
@@ -54,16 +55,17 @@ No M2 / Gx function is ever called a second time: an earlier version re-ran `0x8
 | 3 | batch draws | grows a lot |
 | 4 | models picked | `1`..`2` |
 | 5 | their batches in the last frame | > 0 |
-| 6 | silhouette draw calls in the last frame | = #5 or more |
+| 6 | silhouette draw calls in the last frame | = #5 |
 | 7 | Gx API | `1` / `2` |
-| 8 | error: 1 no D3D device, 2 shader | `0` |
+| 8 | error: 1 no D3D device, 2 shaders, 3 mask texture, 4 quad buffer | `0` |
 | 9 | `OutlineMode` | |
-| 10 | silhouette draw calls that went to the screen (back buffer) | = #6 |
-| 11 | vertex shader model of the last silhouette (`3` -> our `ps_3_0` is used) | |
-| 12 | 1: our `ps_3_0` exists | `1` |
+| 10 | full-screen passes done | grows |
+| 11, 12 | mask size | the screen size |
 
-`/run OutlineMode(n)`: `1` no extra draw (does the world stay fine without it?), `2` keep the depth test, `4` the silhouette writes depth and draws over everything (nothing drawn later can cover it).
+`/run OutlineMode(n)`: `1` no silhouettes, `2` no full-screen pass, `4` low quality (8 samples),
+`8` stage 1 (the silhouettes straight on the screen). Add them up.
 
 ## What to check
-* Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too; the rest of the world as usual.
-* Crash: send the crash log.
+* Target an NPC / hover a unit: a red / yellow rim around the model (weapons too); the model itself as usual.
+* `OutlineMode(4)`: a thinner, cheaper rim.
+* Alt+Tab / a resolution change: no crash, the rim still there.

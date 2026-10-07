@@ -1,4 +1,5 @@
 #include <Outline/Outline.hpp>
+#include <Outline/OutlineShaders.hpp>
 
 #include <Client/ClientServices.hpp>
 #include <Client/FrameScript.hpp>
@@ -13,10 +14,14 @@
 #include <cstring>
 #include <vector>
 
-// Stage 1. No M2 / Gx function is ever called a second time (that changes their caches - the world broke):
-// when the client itself draws a batch of an outlined model, the same DrawIndexedPrimitive is issued once more
-// right after it, with our pixel shader - every state (bones, buffers, camera) is the client's own at that moment.
-// Then exactly the states Gx sent are put back (from a copy: the client's device can't be read back).
+// Stage 2: the outline.
+//  1. When the client draws a batch of an outlined model, the same DrawIndexedPrimitive is issued once more right
+//     after it into our mask texture (screen sized), with a flat pixel shader: the silhouette in its color.
+//     Every state (bones, buffers, camera) is the client's own at that moment; no M2 / Gx function is called twice.
+//  2. After the 3D scene (0x4F9240) one full-screen pass over the screen: the mask sampled around every pixel (the
+//     halo) minus the mask at that pixel -> a soft rim around the silhouettes, alpha blended. Then the mask is cleared.
+// Gx keeps a cache of the device states and the device can't be read back: everything Gx sends that we touch is
+// copied as it goes (device vtable hooks) and put back from that copy after our draws.
 
 namespace
 {
@@ -38,6 +43,11 @@ namespace
     constexpr uint32_t MODEL_PARENT        = 0x48;         // CM2Model* the model is attached to
     constexpr uint32_t MAX_BLEND_MODE      = 2;            // opaque / alpha key (no blended, additive...)
 
+    // the look
+    constexpr float ALPHA_GAIN_HIGH = 1.0f / 3.0f;         // 16 samples
+    constexpr float ALPHA_GAIN_LOW  = 1.0f / 2.0f;         // 8 samples
+    constexpr float STRENGTH        = 1.0f;
+
     struct Target
     {
         void* Model = nullptr;
@@ -52,29 +62,38 @@ namespace
         uint32_t BatchDraws = 0;
         uint32_t Targets = 0;               // models picked for this frame
         uint32_t TargetBatches = 0;         // their batches in the last frame
-        uint32_t Silhouettes = 0;           // extra draw calls in the last frame
-        uint32_t OnScreen = 0;              // of them, drawn into the back buffer
+        uint32_t Silhouettes = 0;           // silhouette draw calls in the last frame
         uint32_t GxApi = 0;
-        uint32_t Error = 0;                 // 1 no device, 2 shader
+        uint32_t Error = 0;                 // 1 no device, 2 shaders, 3 mask texture, 4 quad buffer
+        uint32_t Composites = 0;            // full-screen passes done
     } s_stats;
     uint32_t s_frameBatches = 0;
     uint32_t s_frameSilhouettes = 0;
-    uint32_t s_frameOnScreen = 0;
-    uint32_t s_lastVsMajor = 0;         // OutlineDebug: the vertex shader model of the last silhouette
 
-    // OutlineMode(bits): 1 - no extra draw (find the batches only), 2 - keep the depth test,
-    //  4 - the silhouette writes depth and draws over everything (nothing drawn later covers it)
+    // OutlineMode(bits): 1 - no silhouettes, 2 - no full-screen pass, 4 - low quality (8 samples),
+    //  8 - stage 1: the silhouettes straight on the screen, no depth test
     uint32_t s_mode = 0;
 
     std::vector<Target> s_targets;
     Target const* s_currentTarget = nullptr;    // set while the client draws a batch of an outlined model
 
-    // mov oC0, c0 - the color in c0. Two versions: a vs_3_0 vertex shader needs a ps_3_0 pixel shader
-    // (a ps_2_0 with it draws nothing), a vs_1/vs_2 one a ps_2_0.
-    IDirect3DPixelShader9* s_flatShader = nullptr;      // ps_2_0
-    IDirect3DPixelShader9* s_flatShader3 = nullptr;     // ps_3_0
-    const DWORD FLAT_SHADER[] = { 0xFFFF0200, 0x02000001, 0x800F0800, 0xA0E40000, 0x0000FFFF };
-    const DWORD FLAT_SHADER3[] = { 0xFFFF0300, 0x02000001, 0x800F0800, 0xA0E40000, 0x0000FFFF };
+    // our device objects
+    IDirect3DPixelShader9* s_flatShader = nullptr;
+    IDirect3DPixelShader9* s_outlineShader = nullptr;
+    IDirect3DPixelShader9* s_outlineLowShader = nullptr;
+    IDirect3DVertexShader9* s_quadShader = nullptr;
+    IDirect3DVertexDeclaration9* s_quadDeclaration = nullptr;
+    IDirect3DVertexBuffer9* s_quadBuffer = nullptr;     // managed: survives a device reset
+    IDirect3DTexture9* s_mask = nullptr;                // default pool: released before a device reset
+    IDirect3DSurface9* s_maskSurface = nullptr;
+    UINT s_maskWidth = 0, s_maskHeight = 0;
+    bool s_maskDirty = false;                           // something was drawn into it since the last clear
+
+    struct QuadVertex
+    {
+        float X, Y, Z, W;
+        float U, V;
+    };
 
     // ---------------------------------------------------------------- code hooks
     // jmp over the first 5 bytes; the original is called with them put back
@@ -112,7 +131,7 @@ namespace
 
     RawHook s_hookDrawBatch;
 
-    // ---------------------------------------------------------------- helpers
+    // ---------------------------------------------------------------- targets
     IDirect3DDevice9* GetD3DDevice()
     {
         uint8_t* gx = *reinterpret_cast<uint8_t**>(ADDR_GX_DEVICE);
@@ -148,7 +167,7 @@ namespace
         s_targets.push_back(target);
     }
 
-    // the models of the next frame (stage 1: the target red, the mouseover yellow)
+    // the models of the next frame (stage 2: the target red, the mouseover yellow)
     void CollectTargets()
     {
         s_targets.clear();
@@ -174,73 +193,79 @@ namespace
         return nullptr;
     }
 
-    // ---------------------------------------------------------------- the device
-    // What Gx sends is copied as it goes (the device can't be read back): after our draw call exactly that
-    // is put back, so Gx's cache and the device never disagree.
+    // ---------------------------------------------------------------- the device: what Gx sends, copied
     enum VtableIndex : uint32_t
     {
-        VT_SET_RENDER_STATE  = 57,
-        VT_DRAW_INDEXED      = 82,
-        VT_SET_VERTEX_SHADER = 92,
-        VT_SET_PIXEL_SHADER  = 107,
-        VT_SET_PS_CONSTANT_F = 109,
+        VT_RESET                = 16,
+        VT_SET_VIEWPORT         = 47,
+        VT_SET_RENDER_STATE     = 57,
+        VT_SET_TEXTURE          = 65,
+        VT_SET_SAMPLER_STATE    = 69,
+        VT_DRAW_INDEXED         = 82,
+        VT_SET_VERTEX_DECL      = 87,
+        VT_SET_FVF              = 89,
+        VT_SET_VERTEX_SHADER    = 92,
+        VT_SET_STREAM_SOURCE    = 100,
+        VT_SET_PIXEL_SHADER     = 107,
+        VT_SET_PS_CONSTANT_F    = 109,
     };
+    constexpr uint32_t SHADOW_PS_REGISTERS = 2;     // c0, c1: the ones we use
+    constexpr uint32_t SHADOW_SAMPLER_STATES = 14;
 
+    typedef HRESULT (__stdcall* ResetFn)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
+    typedef HRESULT (__stdcall* SetViewportFn)(IDirect3DDevice9*, const D3DVIEWPORT9*);
     typedef HRESULT (__stdcall* SetRenderStateFn)(IDirect3DDevice9*, D3DRENDERSTATETYPE, DWORD);
+    typedef HRESULT (__stdcall* SetTextureFn)(IDirect3DDevice9*, DWORD, IDirect3DBaseTexture9*);
+    typedef HRESULT (__stdcall* SetSamplerStateFn)(IDirect3DDevice9*, DWORD, D3DSAMPLERSTATETYPE, DWORD);
     typedef HRESULT (__stdcall* DrawIndexedPrimitiveFn)(IDirect3DDevice9*, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
-    typedef HRESULT (__stdcall* SetShaderConstantFFn)(IDirect3DDevice9*, UINT, const float*, UINT);
-    typedef HRESULT (__stdcall* SetPixelShaderFn)(IDirect3DDevice9*, IDirect3DPixelShader9*);
+    typedef HRESULT (__stdcall* SetVertexDeclarationFn)(IDirect3DDevice9*, IDirect3DVertexDeclaration9*);
+    typedef HRESULT (__stdcall* SetFVFFn)(IDirect3DDevice9*, DWORD);
     typedef HRESULT (__stdcall* SetVertexShaderFn)(IDirect3DDevice9*, IDirect3DVertexShader9*);
+    typedef HRESULT (__stdcall* SetStreamSourceFn)(IDirect3DDevice9*, UINT, IDirect3DVertexBuffer9*, UINT, UINT);
+    typedef HRESULT (__stdcall* SetPixelShaderFn)(IDirect3DDevice9*, IDirect3DPixelShader9*);
+    typedef HRESULT (__stdcall* SetShaderConstantFFn)(IDirect3DDevice9*, UINT, const float*, UINT);
 
+    ResetFn s_reset = nullptr;
+    SetViewportFn s_setViewport = nullptr;
     SetRenderStateFn s_setRenderState = nullptr;
+    SetTextureFn s_setTexture = nullptr;
+    SetSamplerStateFn s_setSamplerState = nullptr;
     DrawIndexedPrimitiveFn s_drawIndexed = nullptr;
+    SetVertexDeclarationFn s_setVertexDeclaration = nullptr;
+    SetFVFFn s_setFVF = nullptr;
+    SetVertexShaderFn s_setVertexShader = nullptr;
+    SetStreamSourceFn s_setStreamSource = nullptr;
     SetPixelShaderFn s_setPixelShader = nullptr;
     SetShaderConstantFFn s_setPsConstant = nullptr;
-    SetVertexShaderFn s_setVertexShader = nullptr;
-    IDirect3DVertexShader9* s_vertexShader = nullptr;   // the current one (what Gx set)
-
-    // the shader model of a vertex shader (its first token), cached
-    struct VertexShaderVersion
-    {
-        IDirect3DVertexShader9* Shader;
-        uint32_t Major;
-    };
-    std::vector<VertexShaderVersion> s_vsVersions;
-
-    uint32_t VertexShaderMajor(IDirect3DVertexShader9* shader)
-    {
-        if (!shader)
-            return 0;
-        for (VertexShaderVersion const& entry : s_vsVersions)
-            if (entry.Shader == shader)
-                return entry.Major;
-        uint32_t major = 0;
-        UINT size = 0;
-        if (SUCCEEDED(shader->GetFunction(nullptr, &size)) && size >= 4)
-        {
-            std::vector<DWORD> code(size / 4);
-            if (SUCCEEDED(shader->GetFunction(code.data(), &size)))
-                major = (code[0] >> 8) & 0xFF;
-        }
-        if (s_vsVersions.size() > 4096)
-            s_vsVersions.clear();
-        s_vsVersions.push_back({ shader, major });
-        return major;
-    }
-
-    HRESULT __stdcall SetVertexShaderDetour(IDirect3DDevice9* device, IDirect3DVertexShader9* shader)
-    {
-        s_vertexShader = shader;
-        return s_setVertexShader(device, shader);
-    }
 
     struct Shadow
     {
         DWORD RenderStates[256] = {};
         bool Known[256] = {};
+        D3DVIEWPORT9 Viewport = {};
+        bool ViewportKnown = false;
+        IDirect3DBaseTexture9* Texture0 = nullptr;
+        DWORD Sampler0[SHADOW_SAMPLER_STATES] = {};
+        bool SamplerKnown[SHADOW_SAMPLER_STATES] = {};
+        IDirect3DVertexDeclaration9* Declaration = nullptr;
+        DWORD FVF = 0;
+        bool DeclarationLast = true;        // the last of SetVertexDeclaration / SetFVF
+        IDirect3DVertexShader9* VertexShader = nullptr;
+        IDirect3DVertexBuffer9* Stream0 = nullptr;
+        UINT Stream0Offset = 0, Stream0Stride = 0;
         IDirect3DPixelShader9* PixelShader = nullptr;
-        float PsConstant0[4] = {};
+        float PsConstants[SHADOW_PS_REGISTERS * 4] = {};
     } s_shadow;
+
+    HRESULT __stdcall SetViewportDetour(IDirect3DDevice9* device, const D3DVIEWPORT9* viewport)
+    {
+        if (viewport)
+        {
+            s_shadow.Viewport = *viewport;
+            s_shadow.ViewportKnown = true;
+        }
+        return s_setViewport(device, viewport);
+    }
 
     HRESULT __stdcall SetRenderStateDetour(IDirect3DDevice9* device, D3DRENDERSTATETYPE state, DWORD value)
     {
@@ -252,6 +277,54 @@ namespace
         return s_setRenderState(device, state, value);
     }
 
+    HRESULT __stdcall SetTextureDetour(IDirect3DDevice9* device, DWORD stage, IDirect3DBaseTexture9* texture)
+    {
+        if (stage == 0)
+            s_shadow.Texture0 = texture;
+        return s_setTexture(device, stage, texture);
+    }
+
+    HRESULT __stdcall SetSamplerStateDetour(IDirect3DDevice9* device, DWORD sampler, D3DSAMPLERSTATETYPE type, DWORD value)
+    {
+        if (sampler == 0 && type < SHADOW_SAMPLER_STATES)
+        {
+            s_shadow.Sampler0[type] = value;
+            s_shadow.SamplerKnown[type] = true;
+        }
+        return s_setSamplerState(device, sampler, type, value);
+    }
+
+    HRESULT __stdcall SetVertexDeclarationDetour(IDirect3DDevice9* device, IDirect3DVertexDeclaration9* declaration)
+    {
+        s_shadow.Declaration = declaration;
+        s_shadow.DeclarationLast = true;
+        return s_setVertexDeclaration(device, declaration);
+    }
+
+    HRESULT __stdcall SetFVFDetour(IDirect3DDevice9* device, DWORD fvf)
+    {
+        s_shadow.FVF = fvf;
+        s_shadow.DeclarationLast = false;
+        return s_setFVF(device, fvf);
+    }
+
+    HRESULT __stdcall SetVertexShaderDetour(IDirect3DDevice9* device, IDirect3DVertexShader9* shader)
+    {
+        s_shadow.VertexShader = shader;
+        return s_setVertexShader(device, shader);
+    }
+
+    HRESULT __stdcall SetStreamSourceDetour(IDirect3DDevice9* device, UINT stream, IDirect3DVertexBuffer9* buffer, UINT offset, UINT stride)
+    {
+        if (stream == 0)
+        {
+            s_shadow.Stream0 = buffer;
+            s_shadow.Stream0Offset = offset;
+            s_shadow.Stream0Stride = stride;
+        }
+        return s_setStreamSource(device, stream, buffer, offset, stride);
+    }
+
     HRESULT __stdcall SetPixelShaderDetour(IDirect3DDevice9* device, IDirect3DPixelShader9* shader)
     {
         s_shadow.PixelShader = shader;
@@ -260,64 +333,286 @@ namespace
 
     HRESULT __stdcall SetPsConstantDetour(IDirect3DDevice9* device, UINT start, const float* data, UINT count)
     {
-        if (start == 0 && count > 0 && data)
-            memcpy(s_shadow.PsConstant0, data, sizeof(s_shadow.PsConstant0));
+        if (data && start < SHADOW_PS_REGISTERS)
+        {
+            UINT copy = (start + count > SHADOW_PS_REGISTERS) ? SHADOW_PS_REGISTERS - start : count;
+            memcpy(&s_shadow.PsConstants[start * 4], data, copy * 4 * sizeof(float));
+        }
         return s_setPsConstant(device, start, data, count);
     }
 
-    // our states for the silhouette; the device defaults for the ones Gx never set since the hooks went in
-    const D3DRENDERSTATETYPE SILHOUETTE_STATES[] = {
-        D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ZFUNC, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_FOGENABLE,
-        D3DRS_COLORWRITEENABLE, D3DRS_STENCILENABLE, D3DRS_SCISSORTESTENABLE, D3DRS_CLIPPLANEENABLE, D3DRS_CULLMODE,
-        D3DRS_SRGBWRITEENABLE,
+    // ---------------------------------------------------------------- states we set, and Gx's back
+    struct StateValue
+    {
+        D3DRENDERSTATETYPE State;
+        DWORD Default;      // the device default, for a state Gx never set since the hooks went in
     };
-    // mode 4: the silhouette writes depth and wins over everything drawn later at the same place
-    const DWORD SILHOUETTE_VALUES[] = { FALSE, FALSE, D3DCMP_LESSEQUAL, FALSE, FALSE, FALSE, 0xF, FALSE, FALSE, 0, D3DCULL_NONE, FALSE };
-    const DWORD SILHOUETTE_VALUES_TOP[] = { D3DZB_TRUE, TRUE, D3DCMP_ALWAYS, FALSE, FALSE, FALSE, 0xF, FALSE, FALSE, 0, D3DCULL_NONE, FALSE };
-    const DWORD STATE_DEFAULTS[] = { D3DZB_TRUE, TRUE, D3DCMP_LESSEQUAL, FALSE, FALSE, FALSE, 0xF, FALSE, FALSE, 0, D3DCULL_CCW, FALSE };
-    constexpr size_t SILHOUETTE_STATE_COUNT = sizeof(SILHOUETTE_STATES) / sizeof(SILHOUETTE_STATES[0]);
 
+    const StateValue TOUCHED_STATES[] = {
+        { D3DRS_ZENABLE, D3DZB_TRUE }, { D3DRS_ZWRITEENABLE, TRUE }, { D3DRS_ZFUNC, D3DCMP_LESSEQUAL },
+        { D3DRS_ALPHABLENDENABLE, FALSE }, { D3DRS_SRCBLEND, D3DBLEND_ONE }, { D3DRS_DESTBLEND, D3DBLEND_ZERO },
+        { D3DRS_BLENDOP, D3DBLENDOP_ADD }, { D3DRS_SEPARATEALPHABLENDENABLE, FALSE },
+        { D3DRS_ALPHATESTENABLE, FALSE }, { D3DRS_FOGENABLE, FALSE }, { D3DRS_COLORWRITEENABLE, 0xF },
+        { D3DRS_STENCILENABLE, FALSE }, { D3DRS_SCISSORTESTENABLE, FALSE }, { D3DRS_CLIPPLANEENABLE, 0 },
+        { D3DRS_CULLMODE, D3DCULL_CCW }, { D3DRS_SRGBWRITEENABLE, FALSE },
+    };
+
+    void SetState(IDirect3DDevice9* device, D3DRENDERSTATETYPE state, DWORD value)
+    {
+        s_setRenderState(device, state, value);
+    }
+
+    // no depth, no blend, nothing cut away: the silhouette into the mask / the stage 1 test
+    void SetSilhouetteStates(IDirect3DDevice9* device)
+    {
+        SetState(device, D3DRS_ZENABLE, FALSE);
+        SetState(device, D3DRS_ZWRITEENABLE, FALSE);
+        SetState(device, D3DRS_ALPHABLENDENABLE, FALSE);
+        SetState(device, D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
+        SetState(device, D3DRS_ALPHATESTENABLE, FALSE);
+        SetState(device, D3DRS_FOGENABLE, FALSE);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0xF);
+        SetState(device, D3DRS_STENCILENABLE, FALSE);
+        SetState(device, D3DRS_SCISSORTESTENABLE, FALSE);
+        SetState(device, D3DRS_CLIPPLANEENABLE, 0);
+        SetState(device, D3DRS_CULLMODE, D3DCULL_NONE);
+        SetState(device, D3DRS_SRGBWRITEENABLE, FALSE);
+    }
+
+    void RestoreStates(IDirect3DDevice9* device)
+    {
+        for (StateValue const& entry : TOUCHED_STATES)
+            s_setRenderState(device, entry.State, s_shadow.Known[entry.State] ? s_shadow.RenderStates[entry.State] : entry.Default);
+    }
+
+    void RestorePixelShader(IDirect3DDevice9* device)
+    {
+        s_setPixelShader(device, s_shadow.PixelShader);
+        s_setPsConstant(device, 0, s_shadow.PsConstants, SHADOW_PS_REGISTERS);
+    }
+
+    // after SetRenderTarget the viewport is the whole target: Gx's back
+    void RestoreViewport(IDirect3DDevice9* device)
+    {
+        if (s_shadow.ViewportKnown)
+            s_setViewport(device, &s_shadow.Viewport);
+    }
+
+    // ---------------------------------------------------------------- our device objects
+    void ReleaseMask()
+    {
+        if (s_maskSurface)
+            s_maskSurface->Release();
+        if (s_mask)
+            s_mask->Release();
+        s_maskSurface = nullptr;
+        s_mask = nullptr;
+        s_maskWidth = s_maskHeight = 0;
+        s_maskDirty = false;
+    }
+
+    HRESULT __stdcall ResetDetour(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* parameters)
+    {
+        ReleaseMask();      // a default pool resource: a reset fails while it exists
+        return s_reset(device, parameters);
+    }
+
+    bool CreateShaders(IDirect3DDevice9* device)
+    {
+        using namespace OutlineShaders;
+        if (!s_flatShader && FAILED(device->CreatePixelShader(SHADER_FLAT_PS, &s_flatShader)))
+            return false;
+        if (!s_outlineShader && FAILED(device->CreatePixelShader(SHADER_OUTLINE_PS, &s_outlineShader)))
+            return false;
+        if (!s_outlineLowShader && FAILED(device->CreatePixelShader(SHADER_OUTLINE_LOW_PS, &s_outlineLowShader)))
+            return false;
+        if (!s_quadShader && FAILED(device->CreateVertexShader(SHADER_QUAD_VS, &s_quadShader)))
+            return false;
+        if (!s_quadDeclaration)
+        {
+            const D3DVERTEXELEMENT9 elements[] = {
+                { 0, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+                { 0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+                D3DDECL_END(),
+            };
+            if (FAILED(device->CreateVertexDeclaration(elements, &s_quadDeclaration)))
+                return false;
+        }
+        return true;
+    }
+
+    // the mask: as big as the back buffer (made again when that changes, after a reset)
+    bool EnsureMask(IDirect3DDevice9* device)
+    {
+        IDirect3DSurface9* backBuffer = nullptr;
+        if (FAILED(device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer)) || !backBuffer)
+            return false;
+        D3DSURFACE_DESC desc = {};
+        backBuffer->GetDesc(&desc);
+        backBuffer->Release();
+
+        if (s_mask && s_maskWidth == desc.Width && s_maskHeight == desc.Height)
+            return true;
+        ReleaseMask();
+        if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
+            D3DPOOL_DEFAULT, &s_mask, nullptr)) || !s_mask)
+        {
+            s_mask = nullptr;
+            s_stats.Error = 3;
+            return false;
+        }
+        s_mask->GetSurfaceLevel(0, &s_maskSurface);
+        s_maskWidth = desc.Width;
+        s_maskHeight = desc.Height;
+        s_maskDirty = true;     // cleared before the first use
+        return s_maskSurface != nullptr;
+    }
+
+    bool EnsureQuadBuffer(IDirect3DDevice9* device)
+    {
+        if (s_quadBuffer)
+            return true;
+        if (FAILED(device->CreateVertexBuffer(4 * sizeof(QuadVertex), D3DUSAGE_WRITEONLY, 0, D3DPOOL_MANAGED, &s_quadBuffer, nullptr)))
+        {
+            s_quadBuffer = nullptr;
+            s_stats.Error = 4;
+            return false;
+        }
+        return true;
+    }
+
+    // the whole screen, a texel to a pixel (D3D9: positions half a pixel up-left)
+    void FillQuad(UINT width, UINT height)
+    {
+        QuadVertex* vertices = nullptr;
+        if (FAILED(s_quadBuffer->Lock(0, 0, reinterpret_cast<void**>(&vertices), 0)))
+            return;
+        float dx = 1.0f / width, dy = 1.0f / height;
+        const QuadVertex quad[4] = {
+            { -1.0f - dx,  1.0f + dy, 0.0f, 1.0f, 0.0f, 0.0f },
+            {  1.0f - dx,  1.0f + dy, 0.0f, 1.0f, 1.0f, 0.0f },
+            { -1.0f - dx, -1.0f + dy, 0.0f, 1.0f, 0.0f, 1.0f },
+            {  1.0f - dx, -1.0f + dy, 0.0f, 1.0f, 1.0f, 1.0f },
+        };
+        memcpy(vertices, quad, sizeof(quad));
+        s_quadBuffer->Unlock();
+    }
+
+    // the mask empty again (the render target switched to it and back)
+    void ClearMask(IDirect3DDevice9* device)
+    {
+        if (!s_maskSurface || !s_maskDirty)
+            return;
+        IDirect3DSurface9* renderTarget = nullptr;
+        IDirect3DSurface9* depthStencil = nullptr;
+        device->GetRenderTarget(0, &renderTarget);
+        device->GetDepthStencilSurface(&depthStencil);
+        device->SetRenderTarget(0, s_maskSurface);
+        device->SetDepthStencilSurface(nullptr);
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, 0x00000000, 1.0f, 0);
+        device->SetRenderTarget(0, renderTarget);
+        device->SetDepthStencilSurface(depthStencil);
+        if (renderTarget)
+            renderTarget->Release();
+        if (depthStencil)
+            depthStencil->Release();
+        RestoreViewport(device);
+        s_maskDirty = false;
+    }
+
+    // ---------------------------------------------------------------- 1. the silhouettes
     HRESULT __stdcall DrawIndexedPrimitiveDetour(IDirect3DDevice9* device, D3DPRIMITIVETYPE type, INT baseVertex,
         UINT minIndex, UINT numVertices, UINT startIndex, UINT primitiveCount)
     {
         HRESULT result = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
-        if (!s_currentTarget || !s_flatShader || (s_mode & 1))
+        if (!s_currentTarget || (s_mode & 1))
+            return result;
+        bool toScreen = (s_mode & 8) != 0;
+        if (!toScreen && !s_maskSurface)
             return result;
 
-        // the same draw once more: our shader and color, no depth test (stage 1: over everything)
-        uint32_t vsMajor = VertexShaderMajor(s_vertexShader);
-        s_lastVsMajor = vsMajor;
-        s_setPixelShader(device, vsMajor >= 3 && s_flatShader3 ? s_flatShader3 : s_flatShader);
-        s_setPsConstant(device, 0, s_currentTarget->Color, 1);
-        const DWORD* values = (s_mode & 4) ? SILHOUETTE_VALUES_TOP : SILHOUETTE_VALUES;
-        for (size_t i = 0; i < SILHOUETTE_STATE_COUNT; ++i)
-            if (!((s_mode & 2) && SILHOUETTE_STATES[i] == D3DRS_ZENABLE))
-                s_setRenderState(device, SILHOUETTE_STATES[i], values[i]);
-
-        // where it goes: the screen or some other render target (reflections, ...)
+        // the same draw once more: our shader, the color; into the mask (or the screen: stage 1 test)
+        // (the depth buffer off too: with antialiasing it doesn't fit our plain texture and the draw would fail)
         IDirect3DSurface9* renderTarget = nullptr;
-        IDirect3DSurface9* backBuffer = nullptr;
-        device->GetRenderTarget(0, &renderTarget);
-        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
-        if (renderTarget && renderTarget == backBuffer)
-            ++s_frameOnScreen;
-        if (renderTarget)
-            renderTarget->Release();
-        if (backBuffer)
-            backBuffer->Release();
+        IDirect3DSurface9* depthStencil = nullptr;
+        if (!toScreen)
+        {
+            device->GetRenderTarget(0, &renderTarget);
+            device->GetDepthStencilSurface(&depthStencil);
+            device->SetRenderTarget(0, s_maskSurface);
+            device->SetDepthStencilSurface(nullptr);
+        }
+        s_setPixelShader(device, s_flatShader);
+        s_setPsConstant(device, 0, s_currentTarget->Color, 1);
+        SetSilhouetteStates(device);
 
         s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         ++s_frameSilhouettes;
+        s_maskDirty = true;
 
-        // Gx's own back
-        s_setPixelShader(device, s_shadow.PixelShader);
-        s_setPsConstant(device, 0, s_shadow.PsConstant0, 1);
-        for (size_t i = 0; i < SILHOUETTE_STATE_COUNT; ++i)
+        if (!toScreen)
         {
-            D3DRENDERSTATETYPE state = SILHOUETTE_STATES[i];
-            s_setRenderState(device, state, s_shadow.Known[state] ? s_shadow.RenderStates[state] : STATE_DEFAULTS[i]);
+            device->SetRenderTarget(0, renderTarget);
+            device->SetDepthStencilSurface(depthStencil);
+            if (renderTarget)
+                renderTarget->Release();
+            if (depthStencil)
+                depthStencil->Release();
+            RestoreViewport(device);
         }
+        RestorePixelShader(device);
+        RestoreStates(device);
         return result;
+    }
+
+    // ---------------------------------------------------------------- 2. the outline over the screen
+    void Composite(IDirect3DDevice9* device)
+    {
+        if (!s_maskSurface || !s_frameSilhouettes || (s_mode & (2 | 8)))
+            return;
+        FillQuad(s_maskWidth, s_maskHeight);
+
+        const float texel[4] = { 1.0f / s_maskWidth, 1.0f / s_maskHeight, 0.0f, 0.0f };
+        const float look[4] = { (s_mode & 4) ? ALPHA_GAIN_LOW : ALPHA_GAIN_HIGH, STRENGTH, 0.0f, 0.0f };
+
+        s_setVertexShader(device, s_quadShader);
+        s_setPixelShader(device, (s_mode & 4) ? s_outlineLowShader : s_outlineShader);
+        s_setPsConstant(device, 0, texel, 1);
+        s_setPsConstant(device, 1, look, 1);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        s_setTexture(device, 0, s_mask);
+        s_setSamplerState(device, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, 0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+        s_setSamplerState(device, 0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+        s_setSamplerState(device, 0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+        s_setSamplerState(device, 0, D3DSAMP_SRGBTEXTURE, FALSE);
+
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
+        SetState(device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        SetState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+        SetState(device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);     // the screen's alpha stays
+
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        ++s_stats.Composites;
+
+        // Gx's back
+        s_setVertexShader(device, s_shadow.VertexShader);
+        RestorePixelShader(device);
+        if (s_shadow.DeclarationLast)
+            s_setVertexDeclaration(device, s_shadow.Declaration);
+        else
+            s_setFVF(device, s_shadow.FVF);
+        s_setStreamSource(device, 0, s_shadow.Stream0, s_shadow.Stream0Offset, s_shadow.Stream0Stride);
+        s_setTexture(device, 0, s_shadow.Texture0);
+        const D3DSAMPLERSTATETYPE samplers[] = { D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV, D3DSAMP_MAGFILTER, D3DSAMP_MINFILTER, D3DSAMP_MIPFILTER, D3DSAMP_SRGBTEXTURE };
+        const DWORD samplerDefaults[] = { D3DTADDRESS_WRAP, D3DTADDRESS_WRAP, D3DTEXF_POINT, D3DTEXF_POINT, D3DTEXF_NONE, FALSE };
+        for (size_t i = 0; i < sizeof(samplers) / sizeof(samplers[0]); ++i)
+            s_setSamplerState(device, 0, samplers[i], s_shadow.SamplerKnown[samplers[i]] ? s_shadow.Sampler0[samplers[i]] : samplerDefaults[i]);
+        RestoreStates(device);
     }
 
     template <typename Fn>
@@ -342,22 +637,27 @@ namespace
             s_stats.Error = 1;
             return;
         }
-        if (!s_flatShader && FAILED(device->CreatePixelShader(FLAT_SHADER, &s_flatShader)))
+        if (!CreateShaders(device))
         {
-            s_flatShader = nullptr;
             s_stats.Error = 2;
             return;
         }
-        if (!s_flatShader3 && FAILED(device->CreatePixelShader(FLAT_SHADER3, &s_flatShader3)))
-            s_flatShader3 = nullptr;    // no shader model 3: the vertex shaders aren't vs_3_0 either
         s_stats.Error = 0;
         void** vtable = *reinterpret_cast<void***>(device);
+        HookVtable(vtable, VT_RESET, s_reset, reinterpret_cast<void*>(&ResetDetour));
+        HookVtable(vtable, VT_SET_VIEWPORT, s_setViewport, reinterpret_cast<void*>(&SetViewportDetour));
         HookVtable(vtable, VT_SET_RENDER_STATE, s_setRenderState, reinterpret_cast<void*>(&SetRenderStateDetour));
+        HookVtable(vtable, VT_SET_TEXTURE, s_setTexture, reinterpret_cast<void*>(&SetTextureDetour));
+        HookVtable(vtable, VT_SET_SAMPLER_STATE, s_setSamplerState, reinterpret_cast<void*>(&SetSamplerStateDetour));
+        HookVtable(vtable, VT_SET_VERTEX_DECL, s_setVertexDeclaration, reinterpret_cast<void*>(&SetVertexDeclarationDetour));
+        HookVtable(vtable, VT_SET_FVF, s_setFVF, reinterpret_cast<void*>(&SetFVFDetour));
+        HookVtable(vtable, VT_SET_VERTEX_SHADER, s_setVertexShader, reinterpret_cast<void*>(&SetVertexShaderDetour));
+        HookVtable(vtable, VT_SET_STREAM_SOURCE, s_setStreamSource, reinterpret_cast<void*>(&SetStreamSourceDetour));
         HookVtable(vtable, VT_SET_PIXEL_SHADER, s_setPixelShader, reinterpret_cast<void*>(&SetPixelShaderDetour));
         HookVtable(vtable, VT_SET_PS_CONSTANT_F, s_setPsConstant, reinterpret_cast<void*>(&SetPsConstantDetour));
-        HookVtable(vtable, VT_SET_VERTEX_SHADER, s_setVertexShader, reinterpret_cast<void*>(&SetVertexShaderDetour));
         HookVtable(vtable, VT_DRAW_INDEXED, s_drawIndexed, reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour));
-        if (s_setRenderState && s_setPixelShader && s_setPsConstant && s_setVertexShader && s_drawIndexed)
+        if (s_reset && s_setViewport && s_setRenderState && s_setTexture && s_setSamplerState && s_setVertexDeclaration
+            && s_setFVF && s_setVertexShader && s_setStreamSource && s_setPixelShader && s_setPsConstant && s_drawIndexed)
             s_stats.Installed |= 4;
     }
 
@@ -376,15 +676,21 @@ namespace
         s_currentTarget = nullptr;
     }
 
-    // once a frame, after the 3D scene
+    // once a frame, after the 3D scene: the outline, then the next frame gets ready
     void __cdecl OnWorldRender()
     {
         HookDevice();
         ++s_stats.WorldRenders;
+        IDirect3DDevice9* device = GetD3DDevice();
+        if (device && (s_stats.Installed & 4))
+        {
+            Composite(device);
+            if (EnsureMask(device) && EnsureQuadBuffer(device))
+                ClearMask(device);
+        }
         s_stats.TargetBatches = s_frameBatches;
         s_stats.Silhouettes = s_frameSilhouettes;
-        s_stats.OnScreen = s_frameOnScreen;
-        s_frameBatches = s_frameSilhouettes = s_frameOnScreen = 0;
+        s_frameBatches = s_frameSilhouettes = 0;
         CollectTargets();
     }
 
@@ -582,7 +888,7 @@ void Outline::ApplyPatches()
 }
 
 // /run print(OutlineDebug())
-// installed, world renders, batch draws, targets, target batches, silhouettes, gx api, error, mode
+// installed, world renders, batch draws, targets, target batches, silhouettes, gx api, error, mode, composites, mask w, h
 int32_t Outline::OutlineDebug(lua_State* L)
 {
     FrameScript::PushNumber(L, s_stats.Installed);
@@ -594,13 +900,13 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushNumber(L, s_stats.GxApi);
     FrameScript::PushNumber(L, s_stats.Error);
     FrameScript::PushNumber(L, s_mode);
-    FrameScript::PushNumber(L, s_stats.OnScreen);
-    FrameScript::PushNumber(L, s_lastVsMajor);
-    FrameScript::PushNumber(L, s_flatShader3 ? 1 : 0);
+    FrameScript::PushNumber(L, s_stats.Composites);
+    FrameScript::PushNumber(L, s_maskWidth);
+    FrameScript::PushNumber(L, s_maskHeight);
     return 12;
 }
 
-// /run OutlineMode(n): 1 - no extra draw, 2 - keep the depth test, 4 - write depth, over everything
+// /run OutlineMode(n): 1 no silhouettes, 2 no full-screen pass, 4 low quality, 8 stage 1 (silhouettes on the screen)
 int32_t Outline::OutlineMode(lua_State* L)
 {
     s_mode = static_cast<uint32_t>(FrameScript::GetNumber(L, 1));
