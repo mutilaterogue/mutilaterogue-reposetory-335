@@ -901,9 +901,9 @@
 			</Frame>
 			<Frame name="$parentSsaoDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentFogDropDown" relativePoint="BOTTOMLEFT">
+					<Anchor point="LEFT" relativeTo="$parentFogDropDown" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="0" y="-24"/>
+							<AbsDimension x="40" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -930,10 +930,13 @@
 				</Scripts>
 			</Frame>
 			<Slider name="$parentSsaoStrength" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentSsaoDropDown" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentFogDropDown" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="20" y="-24"/>
+							<AbsDimension x="20" y="-34"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -944,10 +947,13 @@
 				</Scripts>
 			</Slider>
 			<Slider name="$parentSsaoRadius" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentSsaoStrength" relativePoint="BOTTOMLEFT">
+					<Anchor point="LEFT" relativeTo="$parentSsaoStrength" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="0" y="-32"/>
+							<AbsDimension x="22" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -958,10 +964,13 @@
 				</Scripts>
 			</Slider>
 			<Slider name="$parentColorContrast" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentSsaoRadius" relativePoint="BOTTOMLEFT">
+					<Anchor point="LEFT" relativeTo="$parentSsaoRadius" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="0" y="-32"/>
+							<AbsDimension x="22" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -972,10 +981,13 @@
 				</Scripts>
 			</Slider>
 			<Slider name="$parentColorSaturation" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentColorContrast" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentSsaoStrength" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-32"/>
+							<AbsDimension x="0" y="-40"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -986,10 +998,13 @@
 				</Scripts>
 			</Slider>
 			<Slider name="$parentColorBrightness" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentColorSaturation" relativePoint="BOTTOMLEFT">
+					<Anchor point="LEFT" relativeTo="$parentColorSaturation" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="0" y="-32"/>
+							<AbsDimension x="22" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1000,10 +1015,13 @@
 				</Scripts>
 			</Slider>
 			<Slider name="$parentColorSharpen" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentColorBrightness" relativePoint="BOTTOMLEFT">
+					<Anchor point="LEFT" relativeTo="$parentColorBrightness" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="0" y="-32"/>
+							<AbsDimension x="22" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
