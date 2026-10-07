@@ -165,6 +165,10 @@ namespace
     std::map<ObjectGuid, Return> s_returns;
     std::vector<ObjectGuid> s_pendingReturn;   // left the group: teleported on the next world update
 
+    // a new raid: its members' names sent again once they are in the raid (the client asked for them while
+    // teleporting and shows "Unknown" in the raid roster): group guid -> times left
+    std::map<ObjectGuid, std::vector<time_t>> s_nameRefresh;
+
     // bosses already rewarded: instance id -> creature spawn guids
     std::map<uint32, std::set<ObjectGuid>> s_rewardedBosses;
 
@@ -537,7 +541,39 @@ namespace
             SendStatus(player);
             TeleportToRaid(player, *raid);
         }
+        time_t now = GameTime::GetGameTime();
+        s_nameRefresh[group->GetGUID()] = { now + 3, now + 10 };
         SendStatusToRaidQueue(raid->Id);
+    }
+
+    // every member gets every member's name (SMSG_NAME_QUERY_RESPONSE) and the group list again
+    void RefreshNames()
+    {
+        time_t now = GameTime::GetGameTime();
+        for (auto itr = s_nameRefresh.begin(); itr != s_nameRefresh.end();)
+        {
+            std::vector<time_t>& times = itr->second;
+            if (times.empty() || times.front() > now)
+            {
+                ++itr;
+                continue;
+            }
+            times.erase(times.begin());
+            if (Group* group = sGroupMgr->GetGroupByGUID(itr->first))
+            {
+                for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+                    if (Player* member = ref->GetSource())
+                        for (Group::MemberSlot const& slot : group->GetMemberSlots())
+                            member->GetSession()->SendNameQueryOpcode(slot.guid);
+                group->SendUpdate();
+            }
+            else
+                times.clear();
+            if (times.empty())
+                itr = s_nameRefresh.erase(itr);
+            else
+                ++itr;
+        }
     }
 
     // the earliest queued units (a player alone or a queued group) for every role of a raid; false - not enough of them
@@ -1068,6 +1104,8 @@ public:
     {
         if (!s_pendingReturn.empty())
             UpdateReturns();
+        if (!s_nameRefresh.empty())
+            RefreshNames();
         timer += diff;
         if (timer < UPDATE_INTERVAL)
             return;
