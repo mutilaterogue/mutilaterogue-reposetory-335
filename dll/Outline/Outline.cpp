@@ -143,6 +143,7 @@ namespace
         UINT DepthWidth, DepthHeight, DepthSamples;
         UINT MaskSamples;
         UINT TargetQuality, DepthQuality, MaskQuality;
+        UINT ZFunc;                     // the client's (1 never .. 8 always)
         HRESULT Result;
     } s_depthInfo = {};
     uint32_t s_frameBatches = 0;
@@ -918,8 +919,16 @@ namespace
         SetSilhouetteStates(device);
         if (depthTest)
         {
+            // the client's own depth function for this model, made "or equal": the silhouette lies exactly on the
+            // model's depth (a strict LESS / GREATER would reject all of it)
+            DWORD zfunc = s_shadow.Known[D3DRS_ZFUNC] ? s_shadow.RenderStates[D3DRS_ZFUNC] : D3DCMP_LESSEQUAL;
+            if (zfunc == D3DCMP_LESS || zfunc == D3DCMP_EQUAL || zfunc == D3DCMP_NEVER)
+                zfunc = D3DCMP_LESSEQUAL;
+            else if (zfunc == D3DCMP_GREATER)
+                zfunc = D3DCMP_GREATEREQUAL;
+            s_depthInfo.ZFunc = s_shadow.Known[D3DRS_ZFUNC] ? s_shadow.RenderStates[D3DRS_ZFUNC] : 0;
             SetState(device, D3DRS_ZENABLE, D3DZB_TRUE);
-            SetState(device, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+            SetState(device, D3DRS_ZFUNC, zfunc);
         }
 
         if (depthTest)
@@ -1323,10 +1332,10 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushString(L, s_compileError[0] ? s_compileError : "-");
     // the depth test: "target WxH/samples depth WxH/samples mask samples result"
     char depth[128];
-    snprintf(depth, sizeof(depth), "rt %ux%u/%u.%u ds %ux%u/%u.%u mask %u.%u hr %08X",
+    snprintf(depth, sizeof(depth), "rt %ux%u/%u.%u ds %ux%u/%u.%u mask %u.%u zf %u hr %08X",
         s_depthInfo.TargetWidth, s_depthInfo.TargetHeight, s_depthInfo.TargetSamples, s_depthInfo.TargetQuality,
         s_depthInfo.DepthWidth, s_depthInfo.DepthHeight, s_depthInfo.DepthSamples, s_depthInfo.DepthQuality,
-        s_depthInfo.MaskSamples, s_depthInfo.MaskQuality, static_cast<uint32_t>(s_depthInfo.Result));
+        s_depthInfo.MaskSamples, s_depthInfo.MaskQuality, s_depthInfo.ZFunc, static_cast<uint32_t>(s_depthInfo.Result));
     FrameScript::PushString(L, depth);
     return 15;
 }

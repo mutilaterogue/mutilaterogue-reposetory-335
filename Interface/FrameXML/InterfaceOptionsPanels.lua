@@ -552,10 +552,6 @@ DisplayPanelOptions = {
 	threatPlaySounds = { text = "PLAY_AGGRO_SOUNDS" },
 	colorblindMode = { text = "USE_COLORBLIND_MODE" },
 	showItemLevel = { text = "SHOW_ITEM_LEVEL" },
-	OutlineTarget = { text = "OUTLINE_TARGET", tooltip = "Обводить вашу цель." },
-	OutlineMouseover = { text = "OUTLINE_MOUSEOVER", tooltip = "Обводить персонажа или существо под курсором." },
-	OutlineQuestBoss = { text = "OUTLINE_QUEST", tooltip = "Обводить боссов поблизости." },
-	OutlinePlayer = { text = "OUTLINE_PLAYER", tooltip = "Обводить вашего персонажа." },
 	OutlineOccluded = { text = "OUTLINE_OCCLUDED", tooltip = "Показывать обводку и сквозь стены (иначе только видимую часть модели)." },
 }
 
@@ -564,6 +560,14 @@ OUTLINE_ALL_TOOLTIP = "Кого обводить всегда, а не толь�
 OUTLINE_OCCLUDED = "Сквозь стены";
 OUTLINE_ALL_MODES = { [0] = "Никого", "Всех", "Врагов", "Союзников", "Игроков", "Существ" };
 OUTLINE_QUALITY_MODES = { [0] = "Выключена", "Высокое качество", "Низкое качество" };
+OUTLINE_UNITS = "Кого обводить";
+OUTLINE_UNITS_TOOLTIP = "Отметьте, кого обводить: цель, юнит под курсором, боссов поблизости, своего персонажа.";
+OUTLINE_UNITS_LIST = {
+	{ cvar = "OutlineTarget", text = "OUTLINE_TARGET" },
+	{ cvar = "OutlineMouseover", text = "OUTLINE_MOUSEOVER" },
+	{ cvar = "OutlineQuestBoss", text = "OUTLINE_QUEST" },
+	{ cvar = "OutlinePlayer", text = "OUTLINE_PLAYER" },
+};
 
 -- the outline's dropdowns: their cvar, label, entries, tooltip
 OUTLINE_DROPDOWNS = {
@@ -633,6 +637,41 @@ local function OutlineDropDown_Initialize(self)
 		info.func = function (button) self:SetValue(button.value); end;
 		info.checked = ( info.value == selectedValue ) and 1 or nil;
 		UIDropDownMenu_AddButton(info);
+	end
+end
+
+-- "Кого обводить": checkable entries, each its own cvar (applied at once); the button lists the checked ones
+local function OutlineUnits_UpdateText(self)
+	local names = {};
+	for _, entry in ipairs(OUTLINE_UNITS_LIST) do
+		if ( GetCVar(entry.cvar) == "1" ) then
+			tinsert(names, _G[entry.text] or entry.text);
+		end
+	end
+	UIDropDownMenu_SetText(self, #names > 0 and table.concat(names, ", ") or NONE);
+end
+
+local function OutlineUnits_Initialize(self)
+	local info = UIDropDownMenu_CreateInfo();
+	for _, entry in ipairs(OUTLINE_UNITS_LIST) do
+		info.text = _G[entry.text] or entry.text;
+		info.checked = ( GetCVar(entry.cvar) == "1" ) and 1 or nil;
+		info.keepShownOnClick = 1;
+		info.func = function ()
+			SetCVar(entry.cvar, ( GetCVar(entry.cvar) == "1" ) and "0" or "1");
+			OutlineUnits_UpdateText(self);
+		end;
+		UIDropDownMenu_AddButton(info);
+	end
+end
+
+function InterfaceOptionsDisplayPanelOutlineUnits_OnEvent(self, event, ...)
+	if ( event == "PLAYER_ENTERING_WORLD" ) then
+		_G[self:GetName().."Label"]:SetText(OUTLINE_UNITS);
+		UIDropDownMenu_SetWidth(self, 140);
+		UIDropDownMenu_Initialize(self, OutlineUnits_Initialize);
+		OutlineUnits_UpdateText(self);
+		self:UnregisterEvent(event);
 	end
 end
 

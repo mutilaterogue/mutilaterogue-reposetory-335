@@ -939,79 +939,47 @@
 					<OnEvent function="InterfaceOptionsDisplayPanelOutlineDropDown_OnEvent"/>
 				</Scripts>
 			</Frame>
-			<CheckButton name="$parentOutlineTarget" inherits="InterfaceOptionsSmallCheckButtonTemplate">
+			<!-- whom to outline: the target, the mouseover, bosses, yourself (checkable entries) -->
+			<Frame name="$parentOutlineUnits" inherits="UIDropDownMenuTemplate" enableMouse="true">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentOutlineQuality" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="29" y="-4"/>
+							<AbsDimension x="0" y="-24"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
 				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(OUTLINE_UNITS_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
 					<OnLoad>
-						self.type = CONTROLTYPE_CHECKBOX;
-						self.cvar = "OutlineTarget";
-						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
+						self.type = CONTROLTYPE_DROPDOWN;
+						self:RegisterEvent("PLAYER_ENTERING_WORLD");
 						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
 					</OnLoad>
+					<OnEvent function="InterfaceOptionsDisplayPanelOutlineUnits_OnEvent"/>
 				</Scripts>
-			</CheckButton>
-			<CheckButton name="$parentOutlineMouseover" inherits="InterfaceOptionsSmallCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentOutlineTarget" relativePoint="BOTTOMLEFT">
-						<Offset>
-							<AbsDimension x="0" y="-8"/>
-						</Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnLoad>
-						self.type = CONTROLTYPE_CHECKBOX;
-						self.cvar = "OutlineMouseover";
-						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
-						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
-					</OnLoad>
-				</Scripts>
-			</CheckButton>
-			<CheckButton name="$parentOutlineQuestBoss" inherits="InterfaceOptionsSmallCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentOutlineMouseover" relativePoint="BOTTOMLEFT">
-						<Offset>
-							<AbsDimension x="0" y="-8"/>
-						</Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnLoad>
-						self.type = CONTROLTYPE_CHECKBOX;
-						self.cvar = "OutlineQuestBoss";
-						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
-						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
-					</OnLoad>
-				</Scripts>
-			</CheckButton>
-			<CheckButton name="$parentOutlinePlayer" inherits="InterfaceOptionsSmallCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentOutlineQuestBoss" relativePoint="BOTTOMLEFT">
-						<Offset>
-							<AbsDimension x="0" y="-8"/>
-						</Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnLoad>
-						self.type = CONTROLTYPE_CHECKBOX;
-						self.cvar = "OutlinePlayer";
-						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
-						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
-					</OnLoad>
-				</Scripts>
-			</CheckButton>
+			</Frame>
 			<CheckButton name="$parentOutlineOccluded" inherits="InterfaceOptionsSmallCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentOutlinePlayer" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentOutlineUnits" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-8"/>
+							<AbsDimension x="16" y="-4"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
