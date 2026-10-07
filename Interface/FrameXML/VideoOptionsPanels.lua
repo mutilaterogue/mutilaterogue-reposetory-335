@@ -629,6 +629,7 @@ FOG_MODES = { [0] = "Обычный", "Дальше", "Выключен" };
 function VideoOptionsFeaturesPanel_OnLoad (self)
 	self.name = FEATURES_LABEL;
 	self.options = {};
+	self.controls = {};	-- none registered (the dropdowns apply at once): Okay / Cancel / Refresh walk this table
 	VideoOptionsPanel_OnLoad(self);
 end
 
