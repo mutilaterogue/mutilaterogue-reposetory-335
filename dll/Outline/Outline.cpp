@@ -198,6 +198,7 @@ namespace
 
     std::vector<Target> s_targets;
     Target const* s_currentTarget = nullptr;    // set while the client draws a batch of an outlined model
+    IDirect3DDevice9* s_hookedDevice = nullptr;         // the device our objects belong to
     bool s_currentOpaque = true;                // that batch is opaque (not alpha keyed, no glow flags)
     bool s_currentAttachment = false;           // that batch is of a model attached to it (weapon, spell effect)
 
@@ -1157,6 +1158,8 @@ namespace
         UINT minIndex, UINT numVertices, UINT startIndex, UINT primitiveCount)
     {
         HRESULT result = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
+        if (device != s_hookedDevice)
+            return result;      // a new device: our objects are made again at the end of the frame
         if (s_waterBound && s_waterMaskSurface)
             DrawWater(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         if (!s_currentTarget || (s_mode & 1))
@@ -2466,14 +2469,48 @@ namespace
         DWORD old = 0;
         if (!VirtualProtect(&vtable[index], sizeof(void*), PAGE_EXECUTE_READWRITE, &old))
             return;
-        original = reinterpret_cast<Fn>(vtable[index]);
-        vtable[index] = detour;
+        // already ours (a new device of the same class shares the vtable): the original kept
+        if (vtable[index] != detour)
+        {
+            original = reinterpret_cast<Fn>(vtable[index]);
+            vtable[index] = detour;
+        }
         VirtualProtect(&vtable[index], sizeof(void*), old, &old);
     }
 
-    // the device's vtable (the device lives as long as the client: done once, as soon as it exists)
+    // a new device (the client makes one on an antialiasing change): everything of ours belonged to the old one
+
+    template <typename T>
+    void Drop(T*& object)
+    {
+        if (object)
+            object->Release();
+        object = nullptr;
+    }
+
+    void DropDeviceObjects()
+    {
+        ReleaseMask();
+        ReleasePostTargets();
+        Drop(s_flatShader); Drop(s_flatAlphaShader); Drop(s_outlineShader); Drop(s_outlineLowShader);
+        Drop(s_quadShader); Drop(s_quadDeclaration); Drop(s_quadBuffer);
+        Drop(s_ssaoShader); Drop(s_ssaoBlurShader); Drop(s_gradeShader);
+        Drop(s_downShader); Drop(s_blurShader); Drop(s_radialShader); Drop(s_addShader); Drop(s_dofShader);
+        Drop(s_ssrShader); Drop(s_groundFogShader); Drop(s_fxaaShader);
+        s_ssaoChecked = s_ssaoSupported = s_reszSupported = false;
+        s_gradeChecked = s_postChecked = s_ssrChecked = s_groundFogChecked = s_fxaaChecked = false;
+        s_clientDepth = nullptr;
+        s_depthReady = false;
+        s_shadow = Shadow();
+        s_stats.Installed &= ~4u;
+    }
+
+    // the device's vtable (hooked once per device class; the shaders made again for each new device)
     void HookDevice()
     {
+        IDirect3DDevice9* current = GetD3DDevice();
+        if (current && s_hookedDevice && current != s_hookedDevice)
+            DropDeviceObjects();
         if (s_stats.Installed & 4)
             return;
         IDirect3DDevice9* device = GetD3DDevice();
@@ -2503,6 +2540,7 @@ namespace
         HookVtable(vtable, VT_SET_PIXEL_SHADER, s_setPixelShader, reinterpret_cast<void*>(&SetPixelShaderDetour));
         HookVtable(vtable, VT_SET_PS_CONSTANT_F, s_setPsConstant, reinterpret_cast<void*>(&SetPsConstantDetour));
         HookVtable(vtable, VT_DRAW_INDEXED, s_drawIndexed, reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour));
+        s_hookedDevice = device;
         if (s_reset && s_setViewport && s_setRenderState && s_setTexture && s_setSamplerState && s_setVertexDeclaration
             && s_setFVF && s_setDepthStencil && s_setVertexShader && s_setStreamSource && s_setPixelShader && s_setPsConstant && s_drawIndexed)
             s_stats.Installed |= 4;
