@@ -8,9 +8,9 @@
  *
  * Types (the client's SPELL_POWER_*): 7 Soul Shards, 8 Eclipse, 9 Holy Power.
  *
- * Holy Power (0 .. 3)
+ * Holy Power (0 .. 5, as retail)
  *   +1: Crusader Strike, Holy Shock, Hammer of the Righteous (when they hit)
- *   spent, all of it: Shield of the Righteous, Divine Storm - +50% damage / healing per point
+ *   spent, up to 3: Shield of the Righteous, Divine Storm - +50% damage / healing per point
  * Eclipse (-100 lunar .. +100 solar; a balance druid: Moonkin Form known)
  *   Wrath: -13 while heading to the moon, Starfire: +20 while heading to the sun (either way at the start)
  *   at -100: Lunar Eclipse (48518), then toward the sun; at +100: Solar Eclipse (48517), then toward the moon
@@ -45,7 +45,8 @@ namespace
         SPELL_LUNAR_ECLIPSE         = 48518,
     };
 
-    constexpr int32 HOLY_POWER_MAX      = 3;
+    constexpr int32 HOLY_POWER_MAX      = 5;        // retail's five sockets
+    constexpr int32 HOLY_POWER_SPEND    = 3;        // a spender takes up to this (retail's)
     constexpr int32 SOUL_SHARDS_MAX     = 3;
     constexpr int32 ECLIPSE_MAX         = 100;
     constexpr int32 ECLIPSE_WRATH       = 13;
@@ -197,7 +198,7 @@ class spell_class_power_holy_spender : public SpellScript
         Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr;
         if (!player)
             return;
-        _spent = State(player).holyPower;
+        _spent = std::min(State(player).holyPower, HOLY_POWER_SPEND);
         AddHolyPower(player, -_spent);
     }
 

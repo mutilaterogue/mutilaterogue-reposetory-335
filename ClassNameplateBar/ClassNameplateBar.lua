@@ -82,15 +82,25 @@ end
 local function GetClassResourceFrame()
 	local _, class = UnitClass("player");
 
-	if class == "ROGUE" or class == "DRUID" then
+	if class == "DRUID" and EclipseBarFrame and GetShapeshiftFormID and GetShapeshiftFormID() == MOONKIN_FORM then
+		return EclipseBarFrame;		-- moonkin: the eclipse (ClassPower\ClassPower.lua feeds it)
+	elseif class == "ROGUE" or class == "DRUID" then
 		return ComboFrame;
 	elseif class == "DEATHKNIGHT" then
 		return RuneFrame;
+	elseif class == "PALADIN" and ClassNameplateBarPaladin_GetFrame then
+		return ClassNameplateBarPaladin_GetFrame();		-- ClassPower\ClassPower.lua
 	end
 end
 
+local DetachClassResource;	-- below
+
 local function AttachClassResource(self)
 	local frame = GetClassResourceFrame();
+	-- a druid changing form: the other resource first goes back where it was
+	if self.classResource and self.classResource ~= frame then
+		DetachClassResource(self);
+	end
 	if not frame then
 		return;
 	end
@@ -108,11 +118,17 @@ local function AttachClassResource(self)
 	frame:ClearAllPoints();
 	frame:SetPoint("TOP", self.PowerBar, "BOTTOM", 0, ClassNameplateBarSetupOptions.classResourceSpacing);
 	frame:SetScale(ClassNameplateBarSetupOptions.classResourceScale);
+	if frame.hideWhenDetached then
+		frame:Show();
+		if ClassNameplateBarPaladin_Update then
+			ClassNameplateBarPaladin_Update();
+		end
+	end
 
 	self.classResource = frame;
 end
 
-local function DetachClassResource(self)
+function DetachClassResource(self)		-- the local declared above
 	local frame = self.classResource;
 	if not frame or not frame.nameplateOriginalPoint then
 		return;
@@ -122,6 +138,9 @@ local function DetachClassResource(self)
 	frame:ClearAllPoints();
 	frame:SetPoint(unpack(frame.nameplateOriginalPoint));
 	frame:SetScale(frame.nameplateOriginalScale or 1);
+	if frame.hideWhenDetached then
+		frame:Hide();
+	end
 
 	self.classResource = nil;
 end

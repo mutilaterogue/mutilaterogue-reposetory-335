@@ -8,6 +8,7 @@
 SPELL_POWER_SOUL_SHARDS = 7;
 SPELL_POWER_ECLIPSE = 8;
 SPELL_POWER_HOLY_POWER = 9;
+HOLY_POWER_SPELL_READY = 3;		-- what the spenders take (retail's); up to 5 banked
 
 HOLY_POWER = HOLY_POWER or "Сила Света";
 SOUL_SHARDS_POWER = SOUL_SHARDS_POWER or "Осколки души";
@@ -71,12 +72,168 @@ local function RefreshBars(powerType, directionChanged)
 		if ( directionChanged and EclipseBarFrame:IsShown() ) then
 			EclipseBar_OnShow(EclipseBarFrame);
 		end
-	elseif ( powerType == SPELL_POWER_HOLY_POWER and PaladinPowerBar and PaladinPowerBar_Update ) then
-		PaladinPowerBar_Update(PaladinPowerBar);
+	elseif ( powerType == SPELL_POWER_HOLY_POWER ) then
+		if ( PaladinPowerBar and PaladinPowerBar_Update ) then
+			PaladinPowerBar_Update(PaladinPowerBar);
+		end
+		ClassNameplateBarPaladin_Update();
 	end
 end
 
-Comm_Register("CLASS_POWER", function(powerType, value, maximum, direction)
+-- ------------------------------------------------------------
+--  Holy Power under the personal resource bar (ClassNameplateBar), retail's look: the ClassOverlay atlases
+-- ------------------------------------------------------------
+local function HasAtlas(name)
+	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) ~= nil;
+end
+
+-- the art the client has: retail 12.x (UF-HolyPower: a 150 x 43 holder, five sockets), Legion's ClassOverlay, else
+-- Cataclysm's PaladinPowerTextures file (the player frame's own)
+local PALADIN_ART = {
+	{
+		-- retail 12.1.5 PaladinPowerBarFrameTemplate: the runes' LEFT anchors + half their size (their centers)
+		check = "UF-HolyPower-RuneHolder", width = 150, height = 43, left = true,
+		bg = { atlas = "UF-HolyPower-RuneHolder" },
+		active = "UF-HolyPower-RuneHolder-Active",
+		ready = "UF-HolyPower-RuneHolder-ThinGlow",
+		runes = {
+			{ atlas = "UF-HolyPower-Rune1-Active", glow = "UF-HolyPower-Rune1-Glow", x = 27, y = -1 },
+			{ atlas = "UF-HolyPower-Rune2-Active", glow = "UF-HolyPower-Rune2-Glow", x = 51.6, y = 0 },
+			{ atlas = "UF-HolyPower-Rune3-Active", glow = "UF-HolyPower-Rune3-Glow", x = 76.5, y = 0.5 },
+			{ atlas = "UF-HolyPower-Rune4-Active", glow = "UF-HolyPower-Rune4-Glow", x = 99.5, y = 0 },
+			{ atlas = "UF-HolyPower-Rune5-Active", glow = "UF-HolyPower-Rune5-Glow", x = 121.2, y = -1 },
+		},
+	},
+	{
+		check = "ClassOverlay-HolyPowerBG", width = 136, height = 39,
+		bg = { atlas = "ClassOverlay-HolyPowerBG" },
+		runes = {
+			{ atlas = "ClassOverlay-HolyPower1on", x = 37, y = -22 },
+			{ atlas = "ClassOverlay-HolyPower2on", x = 70, y = -21 },
+			{ atlas = "ClassOverlay-HolyPower3on", x = 101, y = -21 },
+		},
+	},
+	{
+		width = 136, height = 39,
+		bg = { file = "Interface\\PlayerFrame\\PaladinPowerTextures", coords = { 0.00390625, 0.53515625, 0.00781250, 0.31250000 } },
+		runes = {
+			{ file = "Interface\\PlayerFrame\\PaladinPowerTextures", coords = { 0.00390625, 0.14453125, 0.78906250, 0.96093750 }, width = 36, height = 22, x = 39, y = -22 },
+			{ file = "Interface\\PlayerFrame\\PaladinPowerTextures", coords = { 0.15234375, 0.27343750, 0.78906250, 0.92187500 }, width = 31, height = 17, x = 72, y = -20 },
+			{ file = "Interface\\PlayerFrame\\PaladinPowerTextures", coords = { 0.28125000, 0.38671875, 0.64843750, 0.81250000 }, width = 27, height = 21, x = 103, y = -22 },
+		},
+	},
+};
+
+local function SetArt(texture, art, keepSize)
+	if ( art.atlas ) then
+		texture:SetAtlas(art.atlas, keepSize);
+	else
+		texture:SetTexture(art.file);
+		texture:SetTexCoord(unpack(art.coords));
+		if ( art.width ) then
+			texture:SetSize(art.width, art.height);
+		end
+	end
+end
+
+local function CreatePaladinNameplateFrame()
+	local art = PALADIN_ART[#PALADIN_ART];
+	for _, candidate in ipairs(PALADIN_ART) do
+		if ( candidate.check and HasAtlas(candidate.check) ) then
+			art = candidate;
+			break;
+		end
+	end
+
+	local frame = CreateFrame("Frame", "ClassNameplateBarPaladinFrame", UIParent);
+	frame:SetSize(art.width, art.height);
+	frame:SetPoint("CENTER");
+	frame.hideWhenDetached = true;	-- only under the personal bar (ClassNameplateBar)
+	frame:Hide();
+
+	frame.bg = frame:CreateTexture(nil, "BACKGROUND");
+	SetArt(frame.bg, art.bg, false);
+	frame.bg:SetAllPoints(frame);
+
+	-- the holder lit (some power) and its thin glow (enough for a spell), as retail's
+	if ( art.active ) then
+		frame.active = frame:CreateTexture(nil, "BORDER");
+		frame.active:SetAtlas(art.active);
+		frame.active:SetAllPoints(frame);
+		frame.active:SetAlpha(0);
+		frame.ready = frame:CreateTexture(nil, "BORDER");
+		frame.ready:SetAtlas(art.ready);
+		frame.ready:SetAllPoints(frame);
+		frame.ready:SetBlendMode("ADD");
+		frame.ready:SetAlpha(0);
+	end
+
+	local anchor = art.left and "LEFT" or "TOPLEFT";
+	frame.runes = {};
+	for i, place in ipairs(art.runes) do
+		local rune = frame:CreateTexture(nil, "ARTWORK");
+		SetArt(rune, place, true);
+		rune:SetPoint("CENTER", frame, anchor, place.x, place.y);
+		rune:SetAlpha(0);
+		if ( place.glow ) then
+			rune.glow = frame:CreateTexture(nil, "OVERLAY");
+			rune.glow:SetAtlas(place.glow, true);
+			rune.glow:SetPoint("CENTER", rune, "CENTER");
+			rune.glow:SetBlendMode("ADD");
+			rune.glow:SetAlpha(0);
+		end
+		frame.runes[i] = rune;
+	end
+	return frame;
+end
+
+local paladinNameplateFrame;
+
+function ClassNameplateBarPaladin_GetFrame()
+	local _, class = UnitClass("player");
+	if ( class ~= "PALADIN" ) then
+		return nil;
+	end
+	if ( not paladinNameplateFrame ) then
+		paladinNameplateFrame = CreatePaladinNameplateFrame();
+	end
+	return paladinNameplateFrame;		-- shown by ClassNameplateBar when it attaches it
+end
+
+-- a rune lit or out: a short fade
+local function SetRune(rune, lit)
+	local target = lit and 1 or 0;
+	if ( rune.target == target ) then
+		return;
+	end
+	rune.target = target;
+	if ( lit ) then
+		UIFrameFadeIn(rune, 0.2, rune:GetAlpha(), 1);
+	else
+		UIFrameFadeOut(rune, 0.3, rune:GetAlpha(), 0);
+	end
+end
+
+function ClassNameplateBarPaladin_Update()
+	if ( not paladinNameplateFrame ) then
+		return;
+	end
+	local frame = paladinNameplateFrame;
+	local power = UnitPower("player", SPELL_POWER_HOLY_POWER);
+	local ready = power >= HOLY_POWER_SPELL_READY;
+	for i, rune in ipairs(frame.runes) do
+		SetRune(rune, i <= power);
+		if ( rune.glow ) then
+			rune.glow:SetAlpha((ready and i <= power) and 0.6 or 0);
+		end
+	end
+	if ( frame.active ) then
+		frame.active:SetAlpha(power > 0 and 1 or 0);
+		frame.ready:SetAlpha(ready and 1 or 0);
+	end
+end
+
+local function OnClassPower(powerType, value, maximum, direction)
 	powerType = tonumber(powerType);
 	if ( not powerType or not CLASS_POWER_TOKENS[powerType] ) then
 		return;
@@ -89,8 +246,22 @@ Comm_Register("CLASS_POWER", function(powerType, value, maximum, direction)
 		directionChanged = true;
 	end
 	RefreshBars(powerType, directionChanged);
-end);
+end
 
-Comm_OnLogin(function()
-	Comm_Send("CLASS_POWER_GET");
+-- Server.lua (Comm_Register / Comm_Send) may load after this file: registered at login, whatever the .toc order
+local registered = false;
+local loader = CreateFrame("Frame");
+loader:RegisterEvent("PLAYER_LOGIN");
+loader:RegisterEvent("PLAYER_ENTERING_WORLD");
+loader:SetScript("OnEvent", function(self, event)
+	if ( not Comm_Register or not Comm_Send ) then
+		return;
+	end
+	if ( not registered ) then
+		Comm_Register("CLASS_POWER", OnClassPower);
+		registered = true;
+	end
+	if ( event == "PLAYER_ENTERING_WORLD" ) then
+		Comm_Send("CLASS_POWER_GET");
+	end
 end);

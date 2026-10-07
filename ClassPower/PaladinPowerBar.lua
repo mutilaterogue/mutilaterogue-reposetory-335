@@ -2,34 +2,26 @@
 HOLY_POWER_FULL = 3;
 PALADINPOWERBAR_SHOW_LEVEL = 10;
 
+-- straight alpha: a 3.3.5a alpha animation puts the region back as it was when it ends (the rune went out again)
 function PaladinPowerBar_ToggleHolyRune(rune, visible)
-	if ( visible ) then
-		rune.deactivate:Stop();
-		rune.activate:Play();
-	else
-		rune.activate:Stop();
-		rune.deactivate:Play();
-	end
+	rune.activate:Stop();
+	rune.deactivate:Stop();
+	rune:SetAlpha(visible and 1 or 0);
 end
 
 function PaladinPowerBar_Update(self)
 	local numHolyPower = UnitPower(self:GetParent().unit or "player", SPELL_POWER_HOLY_POWER);
 	for i = 1, HOLY_POWER_FULL do
 		local rune = _G[self:GetName().."Rune"..i];
-		local isShown = rune:GetAlpha() > 0 or rune.activate:IsPlaying();
+		local isShown = rune:GetAlpha() > 0;
 		local shouldShow = i <= numHolyPower;
 		if ( isShown ~= shouldShow ) then
 			PaladinPowerBar_ToggleHolyRune(rune, shouldShow);
 		end
 	end
 
-	-- the bar flashes when it is full
-	if ( numHolyPower >= HOLY_POWER_FULL ) then
-		self.glow.pulse.stopPulse = false;
-		self.glow.pulse:Play();
-	else
-		self.glow.pulse.stopPulse = true;
-	end
+	-- the glow when it is full
+	self.glow:SetAlpha(numHolyPower >= HOLY_POWER_FULL and 1 or 0);
 end
 
 function PaladinPowerBar_OnLoad(self)
