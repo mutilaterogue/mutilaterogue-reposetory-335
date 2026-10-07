@@ -557,16 +557,19 @@ DisplayPanelOptions = {
 	OutlineMouseover = { text = "OUTLINE_MOUSEOVER", tooltip = "Обводить персонажа или существо под курсором." },
 	OutlineQuestBoss = { text = "OUTLINE_QUEST", tooltip = "Обводить боссов поблизости." },
 	OutlinePlayer = { text = "OUTLINE_PLAYER", tooltip = "Обводить вашего персонажа." },
-	OutlineAll = { text = "OUTLINE_ALL", tooltip = "Всегда обводить всех персонажей и существ вокруг, а не только цель и юнит под курсором." },
+	OutlineOccluded = { text = "OUTLINE_OCCLUDED", tooltip = "Показывать обводку и сквозь стены (иначе только видимую часть модели)." },
 }
 
-OUTLINE_ALL = OUTLINE_ALL or "Всегда обводить всех";
+OUTLINE_ALL = "Всегда обводить";
+OUTLINE_ALL_TOOLTIP = "Кого обводить всегда, а не только цель и юнит под курсором (в пределах дальности индикаторов здоровья).";
+OUTLINE_OCCLUDED = "Сквозь стены";
+OUTLINE_ALL_MODES = { [0] = "Никого", "Всех", "Врагов", "Союзников", "Игроков", "Существ" };
 
 -- The unit outline's CVars (WotLKExtensions Outline): registered here, before the panel reads them at
 -- PLAYER_ENTERING_WORLD; the DLL finds them by name (and registers them itself when this file isn't there).
 for name, default in pairs({
 	OutlineQuality = "1", OutlineTarget = "1", OutlineMouseover = "1", OutlineQuestBoss = "1", OutlinePlayer = "0",
-	OutlineThickness = "1", OutlineStrength = "1", OutlineAll = "0",
+	OutlineThickness = "1", OutlineStrength = "1", OutlineAll = "0", OutlineOccluded = "0",
 }) do
 	if ( GetCVar(name) == nil ) then
 		RegisterCVar(name, default);
@@ -592,6 +595,57 @@ function InterfaceOptionsDisplayPanel_OnEvent (self, event, ...)
 
 		control = InterfaceOptionsDisplayPanelRotateMinimap;
 		control.setFunc(GetCVar(control.cvar));
+	end
+end
+
+-- OutlineAll: 0 nobody, 1 every unit, 2 hostile, 3 friendly, 4 players, 5 creatures
+function InterfaceOptionsDisplayPanelOutlineAll_OnEvent(self, event, ...)
+	if ( event == "PLAYER_ENTERING_WORLD" ) then
+		self.cvar = "OutlineAll";
+		_G[self:GetName().."Label"]:SetText(OUTLINE_ALL);
+
+		local value = GetCVar(self.cvar) or "0";
+		self.defaultValue = GetCVarDefault(self.cvar) or "0";
+		self.oldValue = value;
+		self.value = value;
+
+		UIDropDownMenu_SetWidth(self, 120);
+		UIDropDownMenu_Initialize(self, InterfaceOptionsDisplayPanelOutlineAll_Initialize);
+		UIDropDownMenu_SetSelectedValue(self, value);
+
+		self.SetValue =
+			function (self, value)
+				self.value = value;
+				SetCVar(self.cvar, value);
+				UIDropDownMenu_SetSelectedValue(self, value);
+			end
+		self.GetValue =
+			function (self)
+				return UIDropDownMenu_GetSelectedValue(self);
+			end
+		self.RefreshValue =
+			function (self)
+				UIDropDownMenu_Initialize(self, InterfaceOptionsDisplayPanelOutlineAll_Initialize);
+				UIDropDownMenu_SetSelectedValue(self, self.value);
+			end
+
+		self:UnregisterEvent(event);
+	end
+end
+
+function InterfaceOptionsDisplayPanelOutlineAll_OnClick(self)
+	InterfaceOptionsDisplayPanelOutlineAll:SetValue(self.value);
+end
+
+function InterfaceOptionsDisplayPanelOutlineAll_Initialize()
+	local selectedValue = UIDropDownMenu_GetSelectedValue(InterfaceOptionsDisplayPanelOutlineAll);
+	local info = UIDropDownMenu_CreateInfo();
+	for mode = 0, #OUTLINE_ALL_MODES do
+		info.text = OUTLINE_ALL_MODES[mode];
+		info.func = InterfaceOptionsDisplayPanelOutlineAll_OnClick;
+		info.value = tostring(mode);
+		info.checked = ( info.value == selectedValue ) and 1 or nil;
+		UIDropDownMenu_AddButton(info);
 	end
 end
 

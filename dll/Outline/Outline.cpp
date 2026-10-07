@@ -49,6 +49,8 @@ namespace
     constexpr uint32_t  RANK_WORLD_BOSS     = 3;
     constexpr size_t    MAX_BOSSES          = 8;
     constexpr size_t    MAX_OUTLINED        = 64;      // models in a frame (OutlineAll)
+    constexpr uintptr_t ADDR_NAMEPLATE_DIST_SQ = 0xADAA7C; // the nameplate distance, squared (NamePlates.cpp sets it)
+    constexpr uint32_t  VT_OBJECT_GET_POSITION = 11;    // CGObject_C::GetPosition(C3Vector&)
 
     // the batch record (this of 0x8203B0)
     constexpr uint32_t BATCH_MATERIAL      = 0x50;         // -> [0] blend mode, [8] flags
@@ -84,9 +86,11 @@ namespace
         { "OutlineQuestBoss", "Outline bosses around you", "1", nullptr },
         { "OutlineThickness", "Outline thickness (0.5 .. 3)", "1", nullptr },
         { "OutlineStrength",  "Outline opacity (0 .. 1)", "1", nullptr },
-        { "OutlineAll",       "Outline every unit around: 0 off, 1 all, 2 hostile only", "0", nullptr },
+        { "OutlineAll",       "Outline every unit around: 0 off, 1 all, 2 hostile, 3 friendly, 4 players, 5 creatures", "0", nullptr },
+        { "OutlineOccluded",  "Outline the parts hidden behind walls too", "0", nullptr },
     };
-    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL, CV_COUNT };
+    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL, CV_OCCLUDED, CV_COUNT };
+    enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
     void RegisterCVars()
@@ -151,6 +155,10 @@ namespace
     IDirect3DVertexBuffer9* s_quadBuffer = nullptr;     // managed: survives a device reset
     IDirect3DTexture9* s_mask = nullptr;                // default pool: released before a device reset
     IDirect3DSurface9* s_maskSurface = nullptr;
+    // with antialiasing: the silhouettes go into a multisampled surface like the back buffer (the scene's depth
+    // buffer fits only that), copied into the mask texture before the full-screen pass
+    IDirect3DSurface9* s_maskMultisampled = nullptr;
+    D3DMULTISAMPLE_TYPE s_maskSamples = D3DMULTISAMPLE_NONE;
     UINT s_maskWidth = 0, s_maskHeight = 0;
     bool s_maskDirty = false;                           // something was drawn into it since the last clear
 
@@ -280,6 +288,30 @@ namespace
         }
     }
 
+    struct Position
+    {
+        float X, Y, Z;
+    };
+
+    Position GetPosition(CGObject* object)
+    {
+        Position position = {};
+        void** vtable = *reinterpret_cast<void***>(object);
+        reinterpret_cast<Position& (__thiscall*)(CGObject*, Position&)>(vtable[VT_OBJECT_GET_POSITION])(object, position);
+        return position;
+    }
+
+    // within the nameplates' distance of the player (the always-on outlines: every unit, the bosses)
+    Position s_playerPosition = {};
+    float s_maxDistanceSq = 41.0f * 41.0f;
+
+    bool InRange(CGObject* object)
+    {
+        Position position = GetPosition(object);
+        float dx = position.X - s_playerPosition.X, dy = position.Y - s_playerPosition.Y, dz = position.Z - s_playerPosition.Z;
+        return dx * dx + dy * dy + dz * dz <= s_maxDistanceSq;
+    }
+
     // the bosses around (OutlineQuestBoss)
     int __cdecl EnumBoss(WoWGUID guid, void* /*param*/)
     {
@@ -287,26 +319,34 @@ namespace
             return 0;
         CGObject* object = FindUnit(guid);
         if (object && (object->m_objectData->m_type & TYPEMASK_UNIT) && !(object->m_objectData->m_type & TYPEMASK_PLAYER)
-            && reinterpret_cast<uint32_t (__thiscall*)(CGObject*)>(ADDR_CREATURE_RANK)(object) == RANK_WORLD_BOSS)
+            && reinterpret_cast<uint32_t (__thiscall*)(CGObject*)>(ADDR_CREATURE_RANK)(object) == RANK_WORLD_BOSS && InRange(object))
             AddTarget(object);
         return 1;
     }
 
-    // every unit around (OutlineAll: 1 all, 2 hostile only); not the player himself (OutlinePlayer)
+    // every unit around (OutlineAll, the mode in param), not the player himself (OutlinePlayer)
     int __cdecl EnumAll(WoWGUID guid, void* param)
     {
         if (s_targets.size() >= MAX_OUTLINED)
             return 0;
         CGObject* object = FindUnit(guid);
-        if (!object || !(object->m_objectData->m_type & TYPEMASK_UNIT))
+        if (!object || !(object->m_objectData->m_type & TYPEMASK_UNIT) || !object->m_model)
             return 1;
-        if (guid == reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)())
+        if (guid == reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)() || !InRange(object))
             return 1;
         float color[3];
         ReactionColor(object, color);
-        bool hostile = color[0] == COLOR_HOSTILE[0] && color[1] == COLOR_HOSTILE[1] && color[2] == COLOR_HOSTILE[2];
-        if (reinterpret_cast<intptr_t>(param) == 2 && !hostile)
-            return 1;
+        bool hostile = memcmp(color, COLOR_HOSTILE, sizeof(color)) == 0;
+        bool friendly = memcmp(color, COLOR_FRIENDLY, sizeof(color)) == 0 || memcmp(color, COLOR_FRIENDLY_PLAYER, sizeof(color)) == 0;
+        bool isPlayer = (object->m_objectData->m_type & TYPEMASK_PLAYER) != 0;
+        switch (static_cast<OutlineAllMode>(reinterpret_cast<intptr_t>(param)))
+        {
+            case ALL_HOSTILE:   if (!hostile) return 1; break;
+            case ALL_FRIENDLY:  if (!friendly) return 1; break;
+            case ALL_PLAYERS:   if (!isPlayer) return 1; break;
+            case ALL_CREATURES: if (isPlayer) return 1; break;
+            default: break;
+        }
         AddTarget(object, color);
         return 1;
     }
@@ -317,6 +357,10 @@ namespace
         s_targets.clear();
         if (CVarInt(CV_QUALITY) > 0)
         {
+            if (CGObject* player = FindUnit(reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)()))
+                s_playerPosition = GetPosition(player);
+            float distanceSq = *reinterpret_cast<float*>(ADDR_NAMEPLATE_DIST_SQ);
+            s_maxDistanceSq = distanceSq > 1.0f ? distanceSq : 41.0f * 41.0f;
             for (CustomOutline const& custom : s_custom)
                 AddTarget(FindUnit(custom.Guid), custom.Color);
             if (CVarInt(CV_TARGET))
@@ -559,10 +603,13 @@ namespace
     // ---------------------------------------------------------------- our device objects
     void ReleaseMask()
     {
+        if (s_maskMultisampled)
+            s_maskMultisampled->Release();
         if (s_maskSurface)
             s_maskSurface->Release();
         if (s_mask)
             s_mask->Release();
+        s_maskMultisampled = nullptr;
         s_maskSurface = nullptr;
         s_mask = nullptr;
         s_maskWidth = s_maskHeight = 0;
@@ -726,9 +773,13 @@ namespace
         backBuffer->GetDesc(&desc);
         backBuffer->Release();
 
-        if (s_mask && s_maskWidth == desc.Width && s_maskHeight == desc.Height)
+        if (s_mask && s_maskWidth == desc.Width && s_maskHeight == desc.Height && s_maskSamples == desc.MultiSampleType)
             return true;
         ReleaseMask();
+        s_maskSamples = desc.MultiSampleType;
+        if (desc.MultiSampleType != D3DMULTISAMPLE_NONE && FAILED(device->CreateRenderTarget(desc.Width, desc.Height,
+            D3DFMT_A8R8G8B8, desc.MultiSampleType, desc.MultiSampleQuality, FALSE, &s_maskMultisampled, nullptr)))
+            s_maskMultisampled = nullptr;   // then no depth test (the depth buffer doesn't fit)
         if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
             D3DPOOL_DEFAULT, &s_mask, nullptr)) || !s_mask)
         {
@@ -773,6 +824,19 @@ namespace
         s_quadBuffer->Unlock();
     }
 
+    // where the silhouettes are drawn
+    IDirect3DSurface9* MaskTarget()
+    {
+        return s_maskMultisampled ? s_maskMultisampled : s_maskSurface;
+    }
+
+    // the depth test against the scene (no outline of what is behind a wall) works when our target fits the depth
+    // buffer: the same antialiasing as the back buffer
+    bool CanDepthTest()
+    {
+        return s_maskSamples == D3DMULTISAMPLE_NONE || s_maskMultisampled;
+    }
+
     // the mask empty again (the render target switched to it and back)
     void ClearMask(IDirect3DDevice9* device)
     {
@@ -782,7 +846,7 @@ namespace
         IDirect3DSurface9* depthStencil = nullptr;
         device->GetRenderTarget(0, &renderTarget);
         device->GetDepthStencilSurface(&depthStencil);
-        device->SetRenderTarget(0, s_maskSurface);
+        device->SetRenderTarget(0, MaskTarget());
         device->SetDepthStencilSurface(nullptr);
         device->Clear(0, nullptr, D3DCLEAR_TARGET, 0x00000000, 1.0f, 0);
         device->SetRenderTarget(0, renderTarget);
@@ -806,20 +870,30 @@ namespace
         if (!toScreen && !s_maskSurface)
             return result;
 
-        // the same draw once more: our shader, the color; into the mask (or the screen: stage 1 test)
-        // (the depth buffer off too: with antialiasing it doesn't fit our plain texture and the draw would fail)
+        // the same draw once more: our shader, the color; into the mask (or the screen: stage 1 test).
+        // Depth tested against the scene (the parts behind walls left out) unless OutlineOccluded; with no depth
+        // test the depth buffer is unbound (it may not fit the mask)
+        bool depthTest = !CVarInt(CV_OCCLUDED) && CanDepthTest();
         IDirect3DSurface9* renderTarget = nullptr;
         IDirect3DSurface9* depthStencil = nullptr;
         if (!toScreen)
         {
             device->GetRenderTarget(0, &renderTarget);
-            device->GetDepthStencilSurface(&depthStencil);
-            device->SetRenderTarget(0, s_maskSurface);
-            device->SetDepthStencilSurface(nullptr);
+            device->SetRenderTarget(0, MaskTarget());
+            if (!depthTest)
+            {
+                device->GetDepthStencilSurface(&depthStencil);
+                device->SetDepthStencilSurface(nullptr);
+            }
         }
         s_setPixelShader(device, s_flatShader);
         s_setPsConstant(device, 0, s_currentTarget->Color, 1);
         SetSilhouetteStates(device);
+        if (depthTest)
+        {
+            SetState(device, D3DRS_ZENABLE, D3DZB_TRUE);
+            SetState(device, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+        }
 
         s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         ++s_frameSilhouettes;
@@ -828,7 +902,8 @@ namespace
         if (!toScreen)
         {
             device->SetRenderTarget(0, renderTarget);
-            device->SetDepthStencilSurface(depthStencil);
+            if (depthStencil)
+                device->SetDepthStencilSurface(depthStencil);
             if (renderTarget)
                 renderTarget->Release();
             if (depthStencil)
@@ -846,6 +921,8 @@ namespace
         if (!s_maskSurface || !s_frameSilhouettes || (s_mode & (2 | 8)) || !s_outlineShader || !s_outlineLowShader
             || !s_quadShader || !s_quadDeclaration)
             return;
+        if (s_maskMultisampled)
+            device->StretchRect(s_maskMultisampled, nullptr, s_maskSurface, nullptr, D3DTEXF_NONE);
         FillQuad(s_maskWidth, s_maskHeight);
 
         const float texel[4] = { 1.0f / s_maskWidth, 1.0f / s_maskHeight, 0.0f, 0.0f };

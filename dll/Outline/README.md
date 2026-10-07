@@ -43,9 +43,10 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | `OutlineQuality` | `1` | `0` off, `1` on, `2` on, low quality (8 samples) |
 | `OutlineTarget` | `1` | the target |
 | `OutlineMouseover` | `1` | the unit under the mouse |
-| `OutlineQuestBoss` | `1` | the bosses around (world boss rank). Quest units: not yet - the client has no simple "is a quest objective" |
+| `OutlineQuestBoss` | `1` | the bosses around (world boss rank, within the nameplate distance). Quest units: not yet - the client has no simple "is a quest objective" |
 | `OutlinePlayer` | `0` | your own character |
-| `OutlineAll` | `0` | every unit around, always: `1` all, `2` hostile only (up to 64 models a frame) |
+| `OutlineAll` | `0` | always outlined, within the nameplate distance: `1` every unit, `2` hostile, `3` friendly, `4` players, `5` creatures (up to 64 models a frame; a dropdown in the panel) |
+| `OutlineOccluded` | `0` | `0`: only the visible parts (depth tested against the scene; with antialiasing a multisampled mask, resolved before the pass), `1`: through walls too |
 | `OutlineThickness` | `1` | `0.5` .. `3` |
 | `OutlineStrength` | `1` | opacity `0` .. `1` |
 
