@@ -39,8 +39,9 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | Wow.exe | What we do |
 |---|---|
 | `0x8203B0` M2 batch draw (`__thiscall`, record 0xBC bytes) | after the normal draw: copy the batches of the outlined models (and their attachments, `model+0x48`) |
-| `0x4F9240` a place **inside** the world render function, after the 3D scene (mid-function hook: the overwritten instructions run from a trampoline) | there, with the view-projection of the world draw (`c2..c5`, saved when recorded) put back through `CGxDevice::ShaderConstantsSet` `0x6833E0`: draw the copies again (their "previous batch" fields `+0x5C/+0x64/+0x6C` cleared, so bones and material are uploaded) with our pixel shader (`mov oC0, c0`), then pick the models of the next frame |
-| `IDirect3DDevice9::DrawIndexedPrimitive` (vtable `+0x148`) | during that redraw: our pixel shader and states set right at the draw call (Gx has sent its own just before), Gx's put back right after |
+| `0x4F9240` a place **inside** the world render function, after the 3D scene (mid-function hook: the overwritten instructions run from a trampoline) | there: draw the copies again (their "previous batch" fields `+0x5C/+0x64/+0x6C` cleared, so bones and material are uploaded) with our pixel shader (`mov oC0, c0`), then pick the models of the next frame |
+| device vtable: `SetRenderState`, `SetPixelShader`, `SetPixelShaderConstantF`, `SetVertexShaderConstantF` | a copy of what Gx sends (the client's device can't be read back with `Get*`) |
+| device vtable: `DrawIndexedPrimitive` | during the redraw: our pixel shader, color, the record's `c2..c5` and states set right at the draw call, Gx's put back from the copy right after |
 
 The D3D device: `[[0xC5DF88] + 0x397C]` (only when the Gx API `[+0x1B4]` is Direct3D).
 Gx keeps a cache of the device states: nothing is changed behind it except for that one draw call, and put back right after.
@@ -66,7 +67,7 @@ Target a unit and hover another one, then run it. Eleven values:
 | 14 | the current `OutlineMode` | |
 
 `/run OutlineMode(n)` test switches: `1` keep the batch's "previous" fields, `2` no redraw (record only),
-`4` redraw into the back buffer; add them up (`5` = 1 + 4).
+`4` redraw into the back buffer, `8` no view-projection of the record; add them up (`5` = 1 + 4).
 
 ## What to check
 * Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too.

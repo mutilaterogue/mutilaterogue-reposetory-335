@@ -28,10 +28,8 @@ namespace
     constexpr uintptr_t ADDR_TARGET_GUID    = 0xBD07B0;
     constexpr uintptr_t ADDR_MOUSEOVER_GUID = 0xBD07A0;
     constexpr uintptr_t ADDR_OBJECT_PTR     = 0x4D4DB0;    // ClntObjMgrObjectPtr(guid, typeMask, file, line)
-    // CGxDevice::ShaderConstantsSet(target 0 vertex, first register, data, register count)
-    constexpr uintptr_t ADDR_GX_SHADER_CONSTANTS = 0x6833E0;
-    // the M2 vertex shaders' view * projection: c2..c5; at 0x4F9240 the 3D scene is over and Gx holds
-    // another matrix there - the one of the world's draws is put back for the replay
+    // the M2 vertex shaders' view * projection: c2..c5; at 0x4F9240 the 3D scene is over and another
+    // matrix is there - the one the batch was drawn with is put back for the replay's draw call
     constexpr uint32_t VIEWPROJ_REGISTER   = 2;
     constexpr uint32_t VIEWPROJ_COUNT      = 4;
 
@@ -79,7 +77,19 @@ namespace
     //  1 - keep the batch's "previous" fields (no forced bones / material upload)
     //  2 - no replay at all (record only)
     //  4 - replay into the back buffer (whatever render target is set at that point)
+    //  8 - leave c2..c5 as they are at the replay (no view-projection of the record)
     uint32_t s_mode = 0;
+
+    // what Gx sent to the device (the device hooks below; the device can't be read back)
+    constexpr uint32_t SHADOW_VS_REGISTERS = 32;
+    struct Shadow
+    {
+        DWORD RenderStates[256] = {};
+        bool Known[256] = {};
+        IDirect3DPixelShader9* PixelShader = nullptr;
+        float PsConstant0[4] = {};
+        float VsConstants[SHADOW_VS_REGISTERS * 4] = {};
+    } s_shadow;
 
     std::vector<Target> s_targets;          // the models outlined in this frame
     std::vector<Batch> s_batches;           // their batches drawn in this frame
@@ -184,7 +194,7 @@ namespace
 
     void RecordBatch(uint8_t* batch)
     {
-        if (s_targets.empty() || s_batches.size() >= MAX_BATCHES)
+        if (s_targets.empty() || s_batches.size() >= MAX_BATCHES || !(s_stats.Installed & 4))
             return;
         Target const* target = FindTarget(*reinterpret_cast<void**>(batch + BATCH_MODEL));
         if (!target)
@@ -193,13 +203,10 @@ namespace
         uint8_t* material = *reinterpret_cast<uint8_t**>(batch + BATCH_MATERIAL);
         if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
             return;
-        IDirect3DDevice9* device = GetD3DDevice();
-        if (!device)
-            return;
         Batch copy;
         memcpy(copy.Data.data(), batch, BATCH_SIZE);
         memcpy(copy.Color, target->Color, sizeof(copy.Color));
-        device->GetVertexShaderConstantF(VIEWPROJ_REGISTER, copy.ViewProj, VIEWPROJ_COUNT);
+        memcpy(copy.ViewProj, &s_shadow.VsConstants[VIEWPROJ_REGISTER * 4], sizeof(copy.ViewProj));
         s_batches.push_back(copy);
     }
 
@@ -210,18 +217,75 @@ namespace
         s_hookDrawBatch.Repatch();
     }
 
-    // ---------------------------------------------------------------- the draw call of the replay
-    // Gx sends its states (its pixel shader among them) to the device right before the draw: ours are set
-    // here, after it, and Gx's put back after the draw, so Gx's cache always matches the device.
-    constexpr uint32_t DIP_VTABLE_INDEX = 82;      // IDirect3DDevice9::DrawIndexedPrimitive
+    // ---------------------------------------------------------------- the device
+    // The client's device can't be read back (Get* gives nothing on it), so the states Gx sends are copied
+    // here as they go (SetRenderState, SetPixelShader, Set*ShaderConstantF hooked in the device's vtable).
+    // The replay's draw call sets ours and then puts exactly Gx's back from that copy: Gx's cache and the
+    // device never disagree.
+    enum VtableIndex : uint32_t
+    {
+        VT_SET_RENDER_STATE      = 57,
+        VT_DRAW_INDEXED          = 82,
+        VT_SET_VS_CONSTANT_F     = 94,
+        VT_SET_PIXEL_SHADER      = 107,
+        VT_SET_PS_CONSTANT_F     = 109,
+    };
+
+    typedef HRESULT (__stdcall* SetRenderStateFn)(IDirect3DDevice9*, D3DRENDERSTATETYPE, DWORD);
     typedef HRESULT (__stdcall* DrawIndexedPrimitiveFn)(IDirect3DDevice9*, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
+    typedef HRESULT (__stdcall* SetShaderConstantFFn)(IDirect3DDevice9*, UINT, const float*, UINT);
+    typedef HRESULT (__stdcall* SetPixelShaderFn)(IDirect3DDevice9*, IDirect3DPixelShader9*);
+
+    SetRenderStateFn s_setRenderState = nullptr;
     DrawIndexedPrimitiveFn s_dipOriginal = nullptr;
+    SetShaderConstantFFn s_setVsConstant = nullptr;
+    SetPixelShaderFn s_setPixelShader = nullptr;
+    SetShaderConstantFFn s_setPsConstant = nullptr;
+
+
+    HRESULT __stdcall SetRenderStateDetour(IDirect3DDevice9* device, D3DRENDERSTATETYPE state, DWORD value)
+    {
+        if (state < 256)
+        {
+            s_shadow.RenderStates[state] = value;
+            s_shadow.Known[state] = true;
+        }
+        return s_setRenderState(device, state, value);
+    }
+
+    HRESULT __stdcall SetPixelShaderDetour(IDirect3DDevice9* device, IDirect3DPixelShader9* shader)
+    {
+        s_shadow.PixelShader = shader;
+        return s_setPixelShader(device, shader);
+    }
+
+    HRESULT __stdcall SetPsConstantDetour(IDirect3DDevice9* device, UINT start, const float* data, UINT count)
+    {
+        if (start == 0 && count > 0 && data)
+            memcpy(s_shadow.PsConstant0, data, sizeof(s_shadow.PsConstant0));
+        return s_setPsConstant(device, start, data, count);
+    }
+
+    HRESULT __stdcall SetVsConstantDetour(IDirect3DDevice9* device, UINT start, const float* data, UINT count)
+    {
+        if (data && start < SHADOW_VS_REGISTERS)
+        {
+            UINT copy = (start + count > SHADOW_VS_REGISTERS) ? SHADOW_VS_REGISTERS - start : count;
+            memcpy(&s_shadow.VsConstants[start * 4], data, copy * 4 * sizeof(float));
+        }
+        return s_setVsConstant(device, start, data, count);
+    }
+
+    // the replay's draw call
     float s_replayColor[4] = {};
+    const float* s_replayViewProj = nullptr;
 
     const D3DRENDERSTATETYPE REPLAY_STATES[] = {
         D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_CULLMODE, D3DRS_FOGENABLE,
     };
     const DWORD REPLAY_VALUES[] = { FALSE, FALSE, FALSE, FALSE, D3DCULL_NONE, FALSE };
+    // the device defaults for states Gx never set since the hooks went in
+    const DWORD STATE_DEFAULTS[] = { D3DZB_TRUE, TRUE, FALSE, FALSE, D3DCULL_CCW, FALSE };
     constexpr size_t REPLAY_STATE_COUNT = sizeof(REPLAY_STATES) / sizeof(REPLAY_STATES[0]);
 
     HRESULT __stdcall DrawIndexedPrimitiveDetour(IDirect3DDevice9* device, D3DPRIMITIVETYPE type, INT baseVertex,
@@ -230,44 +294,56 @@ namespace
         if (!s_replaying || !s_flatShader)
             return s_dipOriginal(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
 
-        IDirect3DPixelShader9* gxShader = nullptr;
-        float gxConstant[4] = {};
-        DWORD gxStates[REPLAY_STATE_COUNT] = {};
-        device->GetPixelShader(&gxShader);
-        device->GetPixelShaderConstantF(0, gxConstant, 1);
+        // ours, around Gx's copy (the original setters: the copy keeps Gx's values)
+        s_setPixelShader(device, s_flatShader);
+        s_setPsConstant(device, 0, s_replayColor, 1);
+        if (s_replayViewProj)
+            s_setVsConstant(device, VIEWPROJ_REGISTER, s_replayViewProj, VIEWPROJ_COUNT);
         for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
-            device->GetRenderState(REPLAY_STATES[i], &gxStates[i]);
-
-        device->SetPixelShader(s_flatShader);
-        device->SetPixelShaderConstantF(0, s_replayColor, 1);
-        for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
-            device->SetRenderState(REPLAY_STATES[i], REPLAY_VALUES[i]);
+            s_setRenderState(device, REPLAY_STATES[i], REPLAY_VALUES[i]);
 
         ++s_stats.DrawCalls;
         HRESULT result = s_dipOriginal(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
 
-        device->SetPixelShader(gxShader);
-        if (gxShader)
-            gxShader->Release();
-        device->SetPixelShaderConstantF(0, gxConstant, 1);
+        s_setPixelShader(device, s_shadow.PixelShader);
+        s_setPsConstant(device, 0, s_shadow.PsConstant0, 1);
+        if (s_replayViewProj)
+            s_setVsConstant(device, VIEWPROJ_REGISTER, &s_shadow.VsConstants[VIEWPROJ_REGISTER * 4], VIEWPROJ_COUNT);
         for (size_t i = 0; i < REPLAY_STATE_COUNT; ++i)
-            device->SetRenderState(REPLAY_STATES[i], gxStates[i]);
+        {
+            D3DRENDERSTATETYPE state = REPLAY_STATES[i];
+            s_setRenderState(device, state, s_shadow.Known[state] ? s_shadow.RenderStates[state] : STATE_DEFAULTS[i]);
+        }
         return result;
     }
 
-    // the device's vtable entry (the device lives as long as the client: done once)
-    void HookDrawIndexedPrimitive(IDirect3DDevice9* device)
+    template <typename Fn>
+    void HookVtable(void** vtable, uint32_t index, Fn& original, void* detour)
+    {
+        DWORD old = 0;
+        if (!VirtualProtect(&vtable[index], sizeof(void*), PAGE_EXECUTE_READWRITE, &old))
+            return;
+        original = reinterpret_cast<Fn>(vtable[index]);
+        vtable[index] = detour;
+        VirtualProtect(&vtable[index], sizeof(void*), old, &old);
+    }
+
+    // the device's vtable (the device lives as long as the client: done once, as soon as it exists)
+    void HookDevice()
     {
         if (s_dipOriginal)
             return;
-        void** vtable = *reinterpret_cast<void***>(device);
-        DWORD old = 0;
-        if (!VirtualProtect(&vtable[DIP_VTABLE_INDEX], sizeof(void*), PAGE_EXECUTE_READWRITE, &old))
+        IDirect3DDevice9* device = GetD3DDevice();
+        if (!device)
             return;
-        s_dipOriginal = reinterpret_cast<DrawIndexedPrimitiveFn>(vtable[DIP_VTABLE_INDEX]);
-        vtable[DIP_VTABLE_INDEX] = reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour);
-        VirtualProtect(&vtable[DIP_VTABLE_INDEX], sizeof(void*), old, &old);
-        s_stats.Installed |= 4;
+        void** vtable = *reinterpret_cast<void***>(device);
+        HookVtable(vtable, VT_SET_RENDER_STATE, s_setRenderState, reinterpret_cast<void*>(&SetRenderStateDetour));
+        HookVtable(vtable, VT_SET_VS_CONSTANT_F, s_setVsConstant, reinterpret_cast<void*>(&SetVsConstantDetour));
+        HookVtable(vtable, VT_SET_PIXEL_SHADER, s_setPixelShader, reinterpret_cast<void*>(&SetPixelShaderDetour));
+        HookVtable(vtable, VT_SET_PS_CONSTANT_F, s_setPsConstant, reinterpret_cast<void*>(&SetPsConstantDetour));
+        HookVtable(vtable, VT_DRAW_INDEXED, s_dipOriginal, reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour));
+        if (s_setRenderState && s_setVsConstant && s_setPixelShader && s_setPsConstant && s_dipOriginal)
+            s_stats.Installed |= 4;
     }
 
     // the recorded batches again, one color, over everything (stage 1)
@@ -291,8 +367,7 @@ namespace
             return;
         }
 
-        HookDrawIndexedPrimitive(device);
-        if (!s_dipOriginal)
+        if (!(s_stats.Installed & 4))
         {
             s_stats.Error = 3;
             return;
@@ -318,11 +393,7 @@ namespace
         for (Batch& batch : s_batches)
         {
             memcpy(s_replayColor, batch.Color, sizeof(s_replayColor));
-            // the world's camera back (through Gx so its cache knows it, and on the device at once)
-            if (uint8_t* gx = *reinterpret_cast<uint8_t**>(ADDR_GX_DEVICE))
-                reinterpret_cast<void (__thiscall*)(void*, int32_t, int32_t, const float*, int32_t)>(ADDR_GX_SHADER_CONSTANTS)(
-                    gx, 0, VIEWPROJ_REGISTER, batch.ViewProj, VIEWPROJ_COUNT);
-            device->SetVertexShaderConstantF(VIEWPROJ_REGISTER, batch.ViewProj, VIEWPROJ_COUNT);
+            s_replayViewProj = (s_mode & 8) ? nullptr : batch.ViewProj;
             alignas(16) uint8_t copy[BATCH_SIZE];        // the draw writes into its record: a copy
             memcpy(copy, batch.Data.data(), BATCH_SIZE);
             // "the same as the previous batch" -> the draw would skip the bones / material upload: never
@@ -353,6 +424,7 @@ namespace
 
     void __cdecl OnWorldRender()
     {
+        HookDevice();
         ++s_stats.WorldRenders;
         s_stats.Recorded = static_cast<uint32_t>(s_batches.size());
         ReplayBatches();
