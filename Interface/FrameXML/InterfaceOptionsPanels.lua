@@ -552,7 +552,13 @@ DisplayPanelOptions = {
 	threatPlaySounds = { text = "PLAY_AGGRO_SOUNDS" },
 	colorblindMode = { text = "USE_COLORBLIND_MODE" },
 	showItemLevel = { text = "SHOW_ITEM_LEVEL" },
+	OutlineThickness = { text = "OUTLINE_THICKNESS", minValue = 0.5, maxValue = 3, valueStep = 0.25 },
 }
+
+OUTLINE_THICKNESS = "Толщина обводки";
+OPTION_TOOLTIP_OUTLINE_THICKNESS = "Толщина обводки моделей.";
+OUTLINE_THICKNESS_LOW = "Тонкая";
+OUTLINE_THICKNESS_HIGH = "Толстая";
 
 OUTLINE_ALL = "Всегда обводить";
 OUTLINE_ALL_TOOLTIP = "Кого обводить всегда, а не только цель и юнит под курсором (в пределах дальности индикаторов здоровья).";

@@ -1012,6 +1012,36 @@
 					<OnEvent function="InterfaceOptionsDisplayPanelOutlineDropDown_OnEvent"/>
 				</Scripts>
 			</Frame>
+			<!-- outline thickness (OutlineThickness) -->
+			<Slider name="$parentOutlineThickness" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentOutlineAll" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-20"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						self.type = CONTROLTYPE_SLIDER;
+						self.cvar = "OutlineThickness";
+						self.SetDisplayValue = self.SetValue;
+						self.SetValue = function (self, value)
+							self:SetDisplayValue(value);
+							self.value = value;
+							SetCVar(self.cvar, value);
+						end
+						_G[self:GetName().."Low"]:SetText(OUTLINE_THICKNESS_LOW);
+						_G[self:GetName().."High"]:SetText(OUTLINE_THICKNESS_HIGH);
+						BlizzardOptionsPanel_RegisterControl(self, self:GetParent());
+						BlizzardOptionsPanel_SetupDependentControl(InterfaceOptionsDisplayPanelOutlineQuality, self);
+					</OnLoad>
+					<OnValueChanged>
+						self.value = value;
+						SetCVar(self.cvar, value);
+					</OnValueChanged>
+				</Scripts>
+			</Slider>
 		</Frames>
 		<Scripts>
 			<OnLoad function="InterfaceOptionsDisplayPanel_OnLoad"/>
