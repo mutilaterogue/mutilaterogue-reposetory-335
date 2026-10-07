@@ -1122,7 +1122,12 @@ namespace
     {
         IDirect3DSurface9* renderTarget = nullptr;
         device->GetRenderTarget(0, &renderTarget);
-        device->SetRenderTarget(0, s_waterMaskMultisampled ? s_waterMaskMultisampled : s_waterMaskSurface);
+        if (FAILED(device->SetRenderTarget(0, s_waterMaskMultisampled ? s_waterMaskMultisampled : s_waterMaskSurface)))
+        {
+            if (renderTarget)
+                renderTarget->Release();
+            return;
+        }
         RestoreViewport(device);
         const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         s_setPixelShader(device, s_flatShader);
@@ -1612,7 +1617,17 @@ namespace
         IDirect3DSurface9* depthStencil = nullptr;
         device->GetRenderTarget(0, &renderTarget);
         device->GetDepthStencilSurface(&depthStencil);
-        device->SetRenderTarget(0, s_aoSurface);
+        // the target not taken: nothing drawn (on the screen it would be the raw occlusion)
+        if (!s_aoSurface || FAILED(device->SetRenderTarget(0, s_aoSurface)))
+        {
+            if (renderTarget)
+                renderTarget->Release();
+            if (depthStencil)
+                depthStencil->Release();
+            s_ssaoStatus = 7;
+            RestoreGx(device);
+            return;
+        }
         device->SetDepthStencilSurface(nullptr);
         device->Clear(0, nullptr, D3DCLEAR_TARGET, 0x00000000, 1.0f, 0);
         s_setPixelShader(device, s_ssaoShader);
@@ -1827,7 +1842,14 @@ namespace
         {
             device->GetRenderTarget(0, &renderTarget);
             device->GetDepthStencilSurface(&depthStencil);
-            device->SetRenderTarget(0, target);
+            if (FAILED(device->SetRenderTarget(0, target)))
+            {
+                if (renderTarget)
+                    renderTarget->Release();
+                if (depthStencil)
+                    depthStencil->Release();
+                return;
+            }
             device->SetDepthStencilSurface(nullptr);
         }
         FillQuad(width, height);
@@ -2503,7 +2525,8 @@ namespace
         HookDevice();
         ++s_stats.WorldRenders;
         IDirect3DDevice9* device = GetD3DDevice();
-        if (device && (s_stats.Installed & 4))
+        // a lost / resetting device: nothing of ours made or drawn (default pool resources made then break the reset)
+        if (device && (s_stats.Installed & 4) && device->TestCooperativeLevel() == D3D_OK)
         {
             ++s_frameCount;
             PrepareDepth(device);
