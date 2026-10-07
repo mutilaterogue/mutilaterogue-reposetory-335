@@ -165,6 +165,7 @@ namespace
 
     std::vector<Target> s_targets;
     Target const* s_currentTarget = nullptr;    // set while the client draws a batch of an outlined model
+    bool s_currentOpaque = true;                // that batch is opaque (not alpha keyed, no glow flags)
     bool s_currentAttachment = false;           // that batch is of a model attached to it (weapon, spell effect)
 
     // our device objects
@@ -411,6 +412,7 @@ namespace
         // a mount's / an attachment's batch: opaque, lit and fogged, writing depth - glows and flames are unlit,
         // unfogged or don't write depth (M2 render flags 0x1 / 0x2 / 0x10), their shape only in the texture
         bool opaque = *reinterpret_cast<uint32_t*>(material) == 0 && !(material[8] & (0x2 | 0x10));
+        s_currentOpaque = opaque;
         s_currentAttachment = false;
         void* model = *reinterpret_cast<void**>(batch + BATCH_MODEL);
         for (int depth = 0; model && depth < 8; ++depth)
@@ -962,8 +964,9 @@ namespace
             // MinZ / MaxZ), else the silhouette's depth doesn't match the scene's
             RestoreViewport(device);
         }
-        // 64: no alpha cut (a test switch)
-        bool alphaCut = s_currentAttachment && s_flatAlphaShader && !(s_mode & 64);
+        // cut by the texture's alpha: attachments, mounts, and the unit's own alpha keyed / glowing batches (fur,
+        // feathers, effects - flat they are blocks). 64: no alpha cut (a test switch)
+        bool alphaCut = (s_currentAttachment || !s_currentOpaque) && s_flatAlphaShader && !(s_mode & 64);
         s_setPixelShader(device, alphaCut ? s_flatAlphaShader : s_flatShader);
         s_setPsConstant(device, 0, s_currentTarget->Color, 1);
         SetSilhouetteStates(device);
