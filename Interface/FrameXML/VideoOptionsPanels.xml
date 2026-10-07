@@ -1428,12 +1428,46 @@
 					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
 				</Scripts>
 			</Slider>
+			<Slider name="$parentSsrRipple" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentGroundFogHeight" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentSsrSun" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentGroundFogDensity" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-30"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
 			<Button name="$parentPresetOff" inherits="UIPanelButtonTemplate" text="FEATURES_PRESET_OFF">
 				<Size>
 					<AbsDimension x="100" y="22"/>
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentGroundFogDensity" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentSsrSun" relativePoint="BOTTOMLEFT">
 						<Offset>
 							<AbsDimension x="-4" y="-24"/>
 						</Offset>

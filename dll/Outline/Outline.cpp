@@ -109,6 +109,8 @@ namespace
         { "dofDistance",      "Depth of field: yards beyond the focus where the blur is full (5 .. 300)", "60", nullptr },
         { "ssr",              "Water reflections: 0 off, 1 on", "0", nullptr },
         { "ssrStrength",      "Water reflections strength (0 .. 1)", "1", nullptr },
+        { "ssrRipple",        "Water reflections: ripples (0 .. 1)", "0.5", nullptr },
+        { "ssrSun",           "Water reflections: the sun's glint (0 .. 2)", "1", nullptr },
         { "vignette",         "Vignette: darker corners (0 .. 1)", "0", nullptr },
         { "filmGrain",        "Film grain (0 .. 1)", "0", nullptr },
         { "fxaa",             "FXAA (edges smoothed after the scene): 0 off, 1 on", "0", nullptr },
@@ -122,7 +124,7 @@ namespace
     enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
         CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN,
         CV_BLOOM, CV_BLOOM_STRENGTH, CV_BLOOM_THRESHOLD, CV_GODRAYS, CV_GODRAYS_STRENGTH, CV_GODRAYS_FLIP,
-        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_SSR, CV_SSR_STRENGTH, CV_VIGNETTE, CV_GRAIN,
+        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_SSR, CV_SSR_STRENGTH, CV_SSR_RIPPLE, CV_SSR_SUN, CV_VIGNETTE, CV_GRAIN,
         CV_FXAA, CV_TONEMAP, CV_TONEMAP_EXPOSURE, CV_GROUND_FOG, CV_GROUND_FOG_DENSITY, CV_GROUND_FOG_HEIGHT, CV_DEPTH_NO_MSAA, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
@@ -2022,7 +2024,8 @@ namespace
     // DrawWater), the view ray mirrored by the flat surface, marched until it goes behind the scene's depth: the
     // color there; the sky if it only met sky. Fresnel: strong at grazing angles. s0 the scene, s1 the depth,
     // s2 the water mask; c0 texel.xy, near, far; c1 strength, the longest ray; c2..c4 the camera's forward, left,
-    // up; c5 its position; c6 tan(fov / 2) * aspect, tan(fov / 2)
+    // up; c5 its position; c6 tan(fov / 2) * aspect, tan(fov / 2); c7 the sun's direction (toward it), the time.
+    // c1.z the ripples, c1.w the glint
     const char HLSL_SSR_PS[] =
         "sampler2D scene : register(s0);\n"
         "sampler2D depthTex : register(s1);\n"
@@ -2034,7 +2037,18 @@ namespace
         "float4 up : register(c4);\n"
         "float4 eye : register(c5);\n"
         "float4 fov : register(c6);\n"
+        "float4 sun : register(c7);\n"
         "float Linear(float d) { return screen.z * screen.w / (screen.w - d * (screen.w - screen.z)); }\n"
+        "// the surface's slope: a few waves running over the world's x, y\n"
+        "float2 Slope(float2 p, float t)\n"
+        "{\n"
+        "    float2 s = 0;\n"
+        "    s += float2(0.8, 0.6) * cos(dot(p, float2(0.8, 0.6)) * 1.3 + t * 1.7) * 0.5;\n"
+        "    s += float2(-0.5, 0.86) * cos(dot(p, float2(-0.5, 0.86)) * 2.1 + t * 2.3) * 0.3;\n"
+        "    s += float2(0.2, -0.98) * cos(dot(p, float2(0.2, -0.98)) * 3.7 + t * 3.1) * 0.2;\n"
+        "    s += float2(-0.9, -0.4) * cos(dot(p, float2(-0.9, -0.4)) * 6.3 + t * 4.3) * 0.1;\n"
+        "    return s;\n"
+        "}\n"
         "float2 Project(float3 p, out float z)\n"
         "{\n"
         "    float3 rel = p - eye.xyz;\n"
@@ -2051,7 +2065,9 @@ namespace
         "    float3 ray = forward.xyz - left.xyz * ndc.x * fov.x + up.xyz * ndc.y * fov.y;\n"
         "    float3 surface = eye.xyz + ray * z;\n"
         "    float3 view = normalize(ray);\n"
-        "    float3 mirrored = float3(view.x, view.y, -view.z);\n"
+        "    float3 normal = normalize(float3(-Slope(surface.xy, sun.w) * params.z, 1.0));\n"
+        "    float3 mirrored = reflect(view, normal);\n"
+        "    mirrored.z = abs(mirrored.z);\n"
         "    float3 color = 0;\n"
         "    float found = 0;\n"
         "    float t = 0.5;\n"
@@ -2082,7 +2098,11 @@ namespace
         "            break;\n"
         "    }\n"
         "    float fresnel = 0.05 + 0.95 * pow(1.0 - abs(view.z), 5.0);\n"
-        "    return float4(color, saturate(found * fresnel * params.x));\n"
+        "    float glint = pow(saturate(dot(mirrored, sun.xyz)), 300.0) * params.w * 4.0;\n"
+        "    float alpha = saturate(found * fresnel * params.x);\n"
+        "    // the glint added on top: premultiplied into the blended color\n"
+        "    float3 result = color + glint / max(alpha + glint, 0.001);\n"
+        "    return float4(result, saturate(alpha + glint));\n"
         "}\n";
 
     // the water mask: the size and the antialiasing of the outline's (they fit the scene's depth buffer)
@@ -2171,14 +2191,23 @@ namespace
         float halfHeight = tanf((fov > 0.1f ? fov : 1.0f) * 0.5f);
         float nearClip = CVarNumber("nearclip", 0.2f);
         float farClip = *reinterpret_cast<float*>(ADDR_FARCLIP);
-        const float constants[7][4] = {
+        // the sun: toward it, as the sun rays take it (the light's travel reversed, godRaysFlip)
+        const float* light = reinterpret_cast<const float*>(0xD38B00 + 0x18);
+        float sign = CVarInt(CV_GODRAYS_FLIP) ? 1.0f : -1.0f;
+        float sunLength = sqrtf(light[0] * light[0] + light[1] * light[1] + light[2] * light[2]);
+        if (sunLength < 0.001f)
+            sunLength = 1.0f;
+        const float constants[8][4] = {
             { 1.0f / s_sceneCopyWidth, 1.0f / s_sceneCopyHeight, nearClip > 0.01f ? nearClip : 0.2f, farClip > 10.0f ? farClip : 1000.0f },
-            { Clamp(CVarFloat(CV_SSR_STRENGTH), 0.0f, 1.0f), 400.0f, 0.0f, 0.0f },
+            { Clamp(CVarFloat(CV_SSR_STRENGTH), 0.0f, 1.0f), 400.0f, Clamp(CVarFloat(CV_SSR_RIPPLE), 0.0f, 1.0f) * 0.15f,
+                Clamp(CVarFloat(CV_SSR_SUN), 0.0f, 2.0f) },
             { facing[0], facing[1], facing[2], 0.0f },
             { facing[3], facing[4], facing[5], 0.0f },
             { facing[6], facing[7], facing[8], 0.0f },
             { position[0], position[1], position[2], 0.0f },
             { halfHeight * (aspect > 0.1f ? aspect : 1.0f), halfHeight, 0.0f, 0.0f },
+            { light[0] * sign / sunLength, light[1] * sign / sunLength, light[2] * sign / sunLength,
+                static_cast<float>(GetTickCount() % 600000) / 1000.0f },
         };
 
         FillQuad(s_sceneCopyWidth, s_sceneCopyHeight);
@@ -2186,7 +2215,7 @@ namespace
         s_setVertexDeclaration(device, s_quadDeclaration);
         s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
         s_setPixelShader(device, s_ssrShader);
-        s_setPsConstant(device, 0, &constants[0][0], 7);
+        s_setPsConstant(device, 0, &constants[0][0], 8);
         BindTexture(device, 0, s_sceneCopy, true);
         BindTexture(device, 1, s_depthView, false);
         BindTexture(device, 2, s_waterMask, false);

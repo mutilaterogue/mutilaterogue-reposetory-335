@@ -704,6 +704,8 @@ TONEMAP_EXPOSURE = "Экспозиция";
 GROUND_FOG_DENSITY = "Плотность дымки";
 GROUND_FOG_HEIGHT = "Высота дымки";
 SSR_STRENGTH = "Сила отражений";
+SSR_RIPPLE = "Рябь на воде";
+SSR_SUN = "Блик солнца";
 VIGNETTE = "Виньетка";
 FILM_GRAIN = "Зерно";
 BLOOM_STRENGTH = "Сила свечения";
@@ -728,6 +730,8 @@ local FEATURE_SLIDERS = {
 	VideoOptionsFeaturesPanelTonemapExposure = { cvar = "tonemapExposure", text = "TONEMAP_EXPOSURE", minValue = 0.5, maxValue = 3, valueStep = 0.1, low = "0.5", high = "3" },
 	VideoOptionsFeaturesPanelGroundFogDensity = { cvar = "groundFogDensity", text = "GROUND_FOG_DENSITY", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
 	VideoOptionsFeaturesPanelGroundFogHeight = { cvar = "groundFogHeight", text = "GROUND_FOG_HEIGHT", minValue = 0, maxValue = 30, valueStep = 1, low = "0", high = "30" },
+	VideoOptionsFeaturesPanelSsrRipple = { cvar = "ssrRipple", text = "SSR_RIPPLE", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
+	VideoOptionsFeaturesPanelSsrSun = { cvar = "ssrSun", text = "SSR_SUN", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
 	VideoOptionsFeaturesPanelColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
@@ -769,18 +773,18 @@ local FEATURE_PRESETS = {
 	},
 	VideoOptionsFeaturesPanelPresetSoft = {
 		ssao = 1, ssaoStrength = 0.8, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.4, bloomThreshold = 0.8,
-		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6, fxaa = 1, tonemap = 0, groundFog = 0,
+		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6, ssrRipple = 0.4, ssrSun = 0.8, fxaa = 1, tonemap = 0, groundFog = 0,
 		colorContrast = 1.05, colorSaturation = 1.05, colorBrightness = 1, colorSharpen = 0.1, vignette = 0.2, filmGrain = 0,
 	},
 	VideoOptionsFeaturesPanelPresetRetail = {
 		ssao = 1, ssaoStrength = 1, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.6, bloomThreshold = 0.7,
-		godRays = 1, godRaysStrength = 1, dof = 1, dofStrength = 0.6, dofDistance = 80, ssr = 1, ssrStrength = 0.8,
+		godRays = 1, godRaysStrength = 1, dof = 1, dofStrength = 0.6, dofDistance = 80, ssr = 1, ssrStrength = 0.8, ssrRipple = 0.5, ssrSun = 1,
 		fxaa = 1, tonemap = 1, tonemapExposure = 1.4, groundFog = 1, groundFogDensity = 0.4, groundFogHeight = 4,
 		colorContrast = 1.1, colorSaturation = 1.1, colorBrightness = 1, colorSharpen = 0.2, vignette = 0.3, filmGrain = 0,
 	},
 	VideoOptionsFeaturesPanelPresetMax = {
 		ssao = 1, ssaoStrength = 1.5, ssaoRadius = 2, bloom = 1, bloomStrength = 0.9, bloomThreshold = 0.6,
-		godRays = 1, godRaysStrength = 1.5, dof = 1, dofStrength = 1, dofDistance = 60, ssr = 1, ssrStrength = 1,
+		godRays = 1, godRaysStrength = 1.5, dof = 1, dofStrength = 1, dofDistance = 60, ssr = 1, ssrStrength = 1, ssrRipple = 0.6, ssrSun = 1.5,
 		fxaa = 1, tonemap = 1, tonemapExposure = 1.6, groundFog = 1, groundFogDensity = 0.6, groundFogHeight = 6,
 		colorContrast = 1.15, colorSaturation = 1.2, colorBrightness = 1, colorSharpen = 0.4, vignette = 0.4, filmGrain = 0.2,
 	},

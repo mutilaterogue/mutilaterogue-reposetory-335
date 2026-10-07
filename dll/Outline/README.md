@@ -174,6 +174,8 @@ Glue cvars to keep them: `bloom`, `bloomStrength`, `bloomThreshold`, `godRays`, 
 |---|---|---|
 | `ssr` | `0` | `1` water reflections (needs MSAA) |
 | `ssrStrength` | `1` | `0` .. `1` |
+| `ssrRipple` | `0.5` | ripples: the surface's normal from a few running waves, `0` .. `1` |
+| `ssrSun` | `1` | the sun's glint (the mirrored ray toward the sun), `0` .. `2` |
 | `vignette` | `0` | darker corners, `0` .. `1` |
 | `filmGrain` | `0` | `0` .. `1` |
 
@@ -184,7 +186,7 @@ bottom). Then for each water pixel the view ray is mirrored by the surface and m
 (screen-space reflection), Fresnel weighted. Only what is on the screen can be reflected. `OutlineDebug()` #18:
 water draws in the last frame (`0`: the water wasn't found). Vignette and grain are part of the color grading
 pass. Video options -> Нововведения: presets Выкл / Мягко / Ретейл / Максимум.
-Glue cvars: `ssr`, `ssrStrength`, `vignette`, `filmGrain`.
+Glue cvars: `ssr`, `ssrStrength`, `ssrRipple`, `ssrSun`, `vignette`, `filmGrain`.
 
 ## FXAA, tone mapping, ground fog; depth without MSAA
 | CVar | Default | |
