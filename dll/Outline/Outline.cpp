@@ -130,6 +130,7 @@ namespace
     {
         void* Model = nullptr;
         float Color[4] = {};
+        bool OpaqueOnly = false;    // a mount: its alpha keyed batches (fire, feathers, glow) drawn flat are blocks
     };
 
     // OutlineDebug()
@@ -304,6 +305,7 @@ namespace
             {
                 Target mount = target;
                 mount.Model = parent;
+                mount.OpaqueOnly = true;
                 s_targets.push_back(mount);
             }
             parent = *reinterpret_cast<void**>(static_cast<uint8_t*>(parent) + MODEL_PARENT);
@@ -413,7 +415,7 @@ namespace
         {
             for (Target const& target : s_targets)
                 if (target.Model == model)
-                    return &target;
+                    return target.OpaqueOnly && !opaque ? nullptr : &target;
             // an attachment (weapon, spell effect): opaque batches only - an alpha keyed spell quad drawn flat
             // is a square
             if (!opaque)
