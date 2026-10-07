@@ -636,11 +636,20 @@ end
 SSAO_MODE = "Затенение (SSAO)";
 SSAO_MODE_TOOLTIP = "Мягкие тени в углах, щелях и под предметами. Требует сглаживания (MSAA): без него не работает.";
 SSAO_MODES = { [0] = "Выключено", "Включено" };
+BLOOM_MODE = "Свечение (Bloom)";
+BLOOM_MODE_TOOLTIP = "Мягкий ореол вокруг ярких мест: огней, окон, эффектов.";
+GODRAYS_MODE = "Лучи солнца";
+GODRAYS_MODE_TOOLTIP = "Лучи света от солнца сквозь деревья и края гор. Требует сглаживания (MSAA).";
+DOF_MODE = "Глубина резкости";
+DOF_MODE_TOOLTIP = "Даль размывается, персонаж и всё рядом остаётся резким. Требует сглаживания (MSAA).";
 
 -- the dropdowns: cvar and its modes; applied at once (no Okay / Cancel), saved by the client (glue cvars)
 local FEATURE_DROPDOWNS = {
 	VideoOptionsFeaturesPanelFogDropDown = { cvar = "fogMode", modes = "FOG_MODES" },
 	VideoOptionsFeaturesPanelSsaoDropDown = { cvar = "ssao", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelBloomDropDown = { cvar = "bloom", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelGodRaysDropDown = { cvar = "godRays", modes = "SSAO_MODES" },
+	VideoOptionsFeaturesPanelDofDropDown = { cvar = "dof", modes = "SSAO_MODES" },
 };
 
 local function FeatureDropDown_Initialize (self)
@@ -661,7 +670,7 @@ local function FeatureDropDown_Initialize (self)
 end
 
 function VideoOptionsFeaturesPanelDropDown_OnShow (self)
-	UIDropDownMenu_SetWidth(self, 140);
+	UIDropDownMenu_SetWidth(self, 110);
 	UIDropDownMenu_Initialize(self, FeatureDropDown_Initialize);
 	UIDropDownMenu_SetSelectedValue(self, GetCVar(FEATURE_DROPDOWNS[self:GetName()].cvar) or "0");
 end
@@ -670,12 +679,22 @@ end
 SSAO_STRENGTH = "Сила затенения";
 SSAO_RADIUS = "Радиус затенения";
 COLOR_CONTRAST = "Контраст";
+BLOOM_STRENGTH = "Сила свечения";
+BLOOM_THRESHOLD = "Порог свечения";
+GODRAYS_STRENGTH = "Сила лучей";
+DOF_STRENGTH = "Сила размытия";
+DOF_DISTANCE = "Дальность размытия";
 COLOR_SATURATION = "Насыщенность";
 COLOR_BRIGHTNESS = "Яркость";
 COLOR_SHARPEN = "Резкость";
 local FEATURE_SLIDERS = {
 	VideoOptionsFeaturesPanelSsaoStrength = { cvar = "ssaoStrength", text = "SSAO_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelSsaoRadius = { cvar = "ssaoRadius", text = "SSAO_RADIUS", minValue = 0.3, maxValue = 5, valueStep = 0.1, low = "0.3", high = "5" },
+	VideoOptionsFeaturesPanelBloomStrength = { cvar = "bloomStrength", text = "BLOOM_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
+	VideoOptionsFeaturesPanelBloomThreshold = { cvar = "bloomThreshold", text = "BLOOM_THRESHOLD", minValue = 0.3, maxValue = 1, valueStep = 0.05, low = "0.3", high = "1" },
+	VideoOptionsFeaturesPanelGodRaysStrength = { cvar = "godRaysStrength", text = "GODRAYS_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
+	VideoOptionsFeaturesPanelDofStrength = { cvar = "dofStrength", text = "DOF_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
+	VideoOptionsFeaturesPanelDofDistance = { cvar = "dofDistance", text = "DOF_DISTANCE", minValue = 5, maxValue = 300, valueStep = 5, low = "5", high = "300" },
 	VideoOptionsFeaturesPanelColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
 	VideoOptionsFeaturesPanelColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },

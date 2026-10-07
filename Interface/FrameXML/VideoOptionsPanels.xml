@@ -903,7 +903,7 @@
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentFogDropDown" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="40" y="0"/>
+							<AbsDimension x="-4" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -929,12 +929,102 @@
 					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
 				</Scripts>
 			</Frame>
+			<Frame name="$parentBloomDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentSsaoDropDown" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="-4" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="BLOOM_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(BLOOM_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentGodRaysDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentFogDropDown" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-26"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="GODRAYS_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(GODRAYS_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentDofDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentGodRaysDropDown" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="-4" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="DOF_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(DOF_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
 			<Slider name="$parentSsaoStrength" inherits="OptionsSliderTemplate">
 				<Size>
 					<AbsDimension x="130" y="17"/>
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentFogDropDown" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentGodRaysDropDown" relativePoint="BOTTOMLEFT">
 						<Offset>
 							<AbsDimension x="20" y="-34"/>
 						</Offset>
@@ -963,7 +1053,7 @@
 					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
 				</Scripts>
 			</Slider>
-			<Slider name="$parentColorContrast" inherits="OptionsSliderTemplate">
+			<Slider name="$parentBloomStrength" inherits="OptionsSliderTemplate">
 				<Size>
 					<AbsDimension x="130" y="17"/>
 				</Size>
@@ -980,14 +1070,99 @@
 					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
 				</Scripts>
 			</Slider>
-			<Slider name="$parentColorSaturation" inherits="OptionsSliderTemplate">
+			<Slider name="$parentBloomThreshold" inherits="OptionsSliderTemplate">
 				<Size>
 					<AbsDimension x="130" y="17"/>
 				</Size>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentSsaoStrength" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="-40"/>
+							<AbsDimension x="0" y="-36"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentGodRaysStrength" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentBloomThreshold" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentDofStrength" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentGodRaysStrength" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentDofDistance" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentBloomThreshold" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-36"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentColorContrast" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentDofDistance" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentColorSaturation" inherits="OptionsSliderTemplate">
+				<Size>
+					<AbsDimension x="130" y="17"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentColorContrast" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="22" y="0"/>
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1002,9 +1177,9 @@
 					<AbsDimension x="130" y="17"/>
 				</Size>
 				<Anchors>
-					<Anchor point="LEFT" relativeTo="$parentColorSaturation" relativePoint="RIGHT">
+					<Anchor point="TOPLEFT" relativeTo="$parentDofDistance" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="22" y="0"/>
+							<AbsDimension x="0" y="-36"/>
 						</Offset>
 					</Anchor>
 				</Anchors>

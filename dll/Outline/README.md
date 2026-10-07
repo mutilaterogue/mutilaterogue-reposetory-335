@@ -147,3 +147,24 @@ drivers' RESZ, then one full-screen pass darkens the creases (pairs of depth sam
 plane their mean is the pixel's own depth, so slopes stay clean). Needs antialiasing (MSAA): RESZ copies a
 multisampled depth buffer only. `OutlineDebug()` #16: `0` off, `1` drawn, `2` no INTZ, `3` no RESZ, `4` no
 antialiasing, `5` no shader (the compiler), `6` the depth texture failed.
+
+## Bloom, sun rays, depth of field
+| CVar | Default | |
+|---|---|---|
+| `bloom` | `0` | `1` on |
+| `bloomStrength` | `0.6` | `0` .. `2` |
+| `bloomThreshold` | `0.7` | brightness it starts at, `0.3` .. `1` |
+| `godRays` | `0` | `1` on (needs MSAA: the sky is found by the depth) |
+| `godRaysStrength` | `1` | `0` .. `2` |
+| `godRaysFlip` | `0` | `1` if the rays come from the wrong side of the sky |
+| `dof` | `0` | `1` on (needs MSAA) |
+| `dofStrength` | `1` | `0` .. `1` |
+| `dofDistance` | `60` | yards beyond the focus (the character) where the blur is full |
+
+After SSAO, before the color grading: the scene copied once, quarter size targets. Bloom: the bright part,
+blurred twice, added. Sun rays: the sky (depth 1) smeared toward the sun - its direction is the zone light's
+(`0xD38B00 + 0x18`), the camera `[[0xB7436C] + 0x7E20]` (`+0x8` position, `+0x14` facing, `+0x40` fov, `+0x44`
+aspect) - and added. Depth of field: the blurred scene mixed in by the distance beyond the camera-to-character
+distance. `OutlineDebug()` #17: the sun on the screen (`u v front vis`).
+Glue cvars to keep them: `bloom`, `bloomStrength`, `bloomThreshold`, `godRays`, `godRaysStrength`, `godRaysFlip`,
+`dof`, `dofStrength`, `dofDistance`.

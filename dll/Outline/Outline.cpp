@@ -12,6 +12,7 @@
 #include <d3dcommon.h>
 
 #include <cstdio>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -97,9 +98,20 @@ namespace
         { "colorSaturation",  "Color grading: saturation (0 .. 2)", "1", nullptr },
         { "colorBrightness",  "Color grading: brightness (0.5 .. 1.5)", "1", nullptr },
         { "colorSharpen",     "Color grading: sharpening (0 .. 1)", "0", nullptr },
+        { "bloom",            "Bloom: 0 off, 1 on", "0", nullptr },
+        { "bloomStrength",    "Bloom strength (0 .. 2)", "0.6", nullptr },
+        { "bloomThreshold",   "Bloom: brightness it starts at (0.3 .. 1)", "0.7", nullptr },
+        { "godRays",          "Sun rays: 0 off, 1 on", "0", nullptr },
+        { "godRaysStrength",  "Sun rays strength (0 .. 2)", "1", nullptr },
+        { "godRaysFlip",      "Sun rays: 1 if they come from the wrong side", "0", nullptr },
+        { "dof",              "Depth of field (far blur): 0 off, 1 on", "0", nullptr },
+        { "dofStrength",      "Depth of field strength (0 .. 1)", "1", nullptr },
+        { "dofDistance",      "Depth of field: yards beyond the focus where the blur is full (5 .. 300)", "60", nullptr },
     };
     enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
-        CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN, CV_COUNT };
+        CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN,
+        CV_BLOOM, CV_BLOOM_STRENGTH, CV_BLOOM_THRESHOLD, CV_GODRAYS, CV_GODRAYS_STRENGTH, CV_GODRAYS_FLIP,
+        CV_DOF, CV_DOF_STRENGTH, CV_DOF_DISTANCE, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -204,6 +216,18 @@ namespace
     IDirect3DSurface9* s_sceneCopySurface = nullptr;
     UINT s_sceneCopyWidth = 0, s_sceneCopyHeight = 0;
     bool s_gradeChecked = false;
+    // bloom / sun rays / depth of field: quarter screen render targets
+    IDirect3DTexture9* s_small[3] = {};                 // default pool
+    IDirect3DSurface9* s_smallSurface[3] = {};
+    UINT s_smallWidth = 0, s_smallHeight = 0;
+    IDirect3DPixelShader9* s_downShader = nullptr;
+    IDirect3DPixelShader9* s_blurShader = nullptr;
+    IDirect3DPixelShader9* s_radialShader = nullptr;
+    IDirect3DPixelShader9* s_addShader = nullptr;
+    IDirect3DPixelShader9* s_dofShader = nullptr;
+    bool s_postChecked = false;
+    bool s_depthReady = false;                          // this frame's depth copy is there
+    float s_sunScreen[4] = {};                          // OutlineDebug: the sun's u, v, in front (1/0), visibility
     // 0 off, 1 drawn, 2 no INTZ, 3 no RESZ (the driver), 4 no antialiasing (needs it: RESZ copies a multisampled
     // depth buffer), 5 no shader (the compiler), 6 the depth texture failed
     uint32_t s_ssaoStatus = 0;
@@ -479,7 +503,7 @@ namespace
     };
     constexpr uint32_t SHADOW_PS_REGISTERS = 2;     // c0, c1: the ones we use
     constexpr uint32_t SHADOW_SAMPLER_STATES = 14;
-    constexpr uint32_t SHADOW_STAGES = 2;           // s0, s1: the ones we use
+    constexpr uint32_t SHADOW_STAGES = 3;           // s0 .. s2: the ones we use
 
     typedef HRESULT (__stdcall* ResetFn)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
     typedef HRESULT (__stdcall* SetViewportFn)(IDirect3DDevice9*, const D3DVIEWPORT9*);
@@ -684,6 +708,20 @@ namespace
         s_maskDirty = false;
     }
 
+    void ReleaseSmall()
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            if (s_smallSurface[i])
+                s_smallSurface[i]->Release();
+            if (s_small[i])
+                s_small[i]->Release();
+            s_smallSurface[i] = nullptr;
+            s_small[i] = nullptr;
+        }
+        s_smallWidth = s_smallHeight = 0;
+    }
+
     void ReleasePostTargets()
     {
         if (s_depthCopy)
@@ -703,6 +741,7 @@ namespace
         s_sceneCopy = nullptr;
         s_depthCopyWidth = s_depthCopyHeight = 0;
         s_sceneCopyWidth = s_sceneCopyHeight = 0;
+        ReleaseSmall();
     }
 
     HRESULT __stdcall ResetDetour(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* parameters)
@@ -1354,17 +1393,12 @@ namespace
     {
         if (!CVarInt(CV_SSAO))
         {
-            s_ssaoStatus = 0;
+            if (s_ssaoStatus == 1)
+                s_ssaoStatus = 0;
             return;
         }
-        if (!CheckSsaoSupport(device) || !s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device))
+        if (!s_depthReady)
             return;
-        bool resolved = ResolveDepth(device);
-        if (!resolved)
-        {
-            RestoreGx(device);
-            return;
-        }
 
         float nearClip = CVarNumber("nearclip", 0.2f);
         float farClip = *reinterpret_cast<float*>(ADDR_FARCLIP);
@@ -1441,6 +1475,351 @@ namespace
         RestoreGx(device);
     }
 
+    // once a frame: the scene's depth copied when an effect needs it (SSAO, sun rays, depth of field)
+    void PrepareDepth(IDirect3DDevice9* device)
+    {
+        s_depthReady = false;
+        if (!CVarInt(CV_SSAO) && !CVarInt(CV_GODRAYS) && !CVarInt(CV_DOF))
+            return;
+        if (!s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device) || !CheckSsaoSupport(device))
+            return;
+        s_depthReady = ResolveDepth(device);
+        RestoreGx(device);
+    }
+
+    // the screen (resolved if multisampled) into s_sceneCopy
+    bool CopyScene(IDirect3DDevice9* device)
+    {
+        IDirect3DSurface9* renderTarget = nullptr;
+        if (FAILED(device->GetRenderTarget(0, &renderTarget)) || !renderTarget)
+            return false;
+        D3DSURFACE_DESC desc = {};
+        renderTarget->GetDesc(&desc);
+        if (!s_sceneCopy || s_sceneCopyWidth != desc.Width || s_sceneCopyHeight != desc.Height)
+        {
+            if (s_sceneCopySurface)
+                s_sceneCopySurface->Release();
+            if (s_sceneCopy)
+                s_sceneCopy->Release();
+            s_sceneCopySurface = nullptr;
+            s_sceneCopy = nullptr;
+            if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_X8R8G8B8,
+                D3DPOOL_DEFAULT, &s_sceneCopy, nullptr)) || !s_sceneCopy)
+            {
+                s_sceneCopy = nullptr;
+                renderTarget->Release();
+                return false;
+            }
+            s_sceneCopy->GetSurfaceLevel(0, &s_sceneCopySurface);
+            s_sceneCopyWidth = desc.Width;
+            s_sceneCopyHeight = desc.Height;
+        }
+        HRESULT copied = device->StretchRect(renderTarget, nullptr, s_sceneCopySurface, nullptr, D3DTEXF_NONE);
+        renderTarget->Release();
+        return SUCCEEDED(copied);
+    }
+
+    // ---------------------------------------------------------------- bloom, sun rays, depth of field
+    // s0 the scene (linear, a quarter size target: four bilinear taps = 16 pixels); c1.x mode: 0 as is, 1 the bright
+    // part (c1.y threshold), 2 the sky only (s1 the depth: 1 there); c1.z the sky's gain
+    const char HLSL_DOWN_PS[] =
+        "sampler2D scene : register(s0);\n"
+        "sampler2D depthTex : register(s1);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float2 o = screen.xy;\n"
+        "    float3 c = (tex2Dlod(scene, float4(uv + float2(-o.x, -o.y), 0, 0)).rgb + tex2Dlod(scene, float4(uv + float2(o.x, -o.y), 0, 0)).rgb\n"
+        "        + tex2Dlod(scene, float4(uv + float2(-o.x, o.y), 0, 0)).rgb + tex2Dlod(scene, float4(uv + float2(o.x, o.y), 0, 0)).rgb) * 0.25;\n"
+        "    if (params.x == 1)\n"
+        "    {\n"
+        "        float luma = dot(c, float3(0.299, 0.587, 0.114));\n"
+        "        c *= saturate((luma - params.y) / max(1.0 - params.y, 0.01));\n"
+        "    }\n"
+        "    else if (params.x == 2)\n"
+        "        c *= step(0.99999, tex2Dlod(depthTex, float4(uv, 0, 0)).r) * params.z;\n"
+        "    return float4(c, 1);\n"
+        "}\n";
+
+    // 9 taps along c1.xy (in texels of the target)
+    const char HLSL_BLUR_PS[] =
+        "sampler2D source : register(s0);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    const float w[5] = { 0.2270270, 0.1945946, 0.1216216, 0.0540541, 0.0162162 };\n"
+        "    float2 dir = params.xy * screen.xy;\n"
+        "    float3 c = tex2Dlod(source, float4(uv, 0, 0)).rgb * w[0];\n"
+        "    [unroll] for (int i = 1; i < 5; ++i)\n"
+        "        c += (tex2Dlod(source, float4(uv + dir * i, 0, 0)).rgb + tex2Dlod(source, float4(uv - dir * i, 0, 0)).rgb) * w[i];\n"
+        "    return float4(c, 1);\n"
+        "}\n";
+
+    // the sky's light smeared toward the sun: c1.xy the sun's uv, c1.z the length (0..1 of the way)
+    const char HLSL_RADIAL_PS[] =
+        "sampler2D source : register(s0);\n"
+        "float4 params : register(c1);\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float2 delta = (params.xy - uv) * params.z / 32.0;\n"
+        "    float3 c = 0;\n"
+        "    float decay = 1.0;\n"
+        "    float2 at = uv;\n"
+        "    [unroll] for (int i = 0; i < 32; ++i)\n"
+        "    {\n"
+        "        c += tex2Dlod(source, float4(at, 0, 0)).rgb * decay;\n"
+        "        decay *= 0.96;\n"
+        "        at += delta;\n"
+        "    }\n"
+        "    return float4(c / 16.0, 1);\n"
+        "}\n";
+
+    // added onto the screen: s0 times c1.rgb
+    const char HLSL_ADD_PS[] =
+        "sampler2D source : register(s0);\n"
+        "float4 params : register(c1);\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(tex2Dlod(source, float4(uv, 0, 0)).rgb * params.rgb, 1); }\n";
+
+    // the far blur: s0 the scene, s1 the blurred scene (a quarter size), s2 the depth. c0 texel.xy, near, far;
+    // c1 focus (yards), the distance to full blur, strength
+    const char HLSL_DOF_PS[] =
+        "sampler2D scene : register(s0);\n"
+        "sampler2D blurred : register(s1);\n"
+        "sampler2D depthTex : register(s2);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float Linear(float d) { return screen.z * screen.w / (screen.w - d * (screen.w - screen.z)); }\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float d = tex2Dlod(depthTex, float4(uv, 0, 0)).r;\n"
+        "    float amount = d >= 0.99999 ? 1.0 : saturate((Linear(d) - params.x) / params.y);\n"
+        "    float3 sharp = tex2Dlod(scene, float4(uv, 0, 0)).rgb;\n"
+        "    float3 soft = tex2Dlod(blurred, float4(uv, 0, 0)).rgb;\n"
+        "    return float4(lerp(sharp, soft, amount * params.z), 1);\n"
+        "}\n";
+
+    bool CreatePostShaders(IDirect3DDevice9* device)
+    {
+        if (s_postChecked)
+            return s_downShader && s_blurShader && s_radialShader && s_addShader && s_dofShader;
+        s_postChecked = true;
+        const char* sources[] = { HLSL_DOWN_PS, HLSL_BLUR_PS, HLSL_RADIAL_PS, HLSL_ADD_PS, HLSL_DOF_PS };
+        IDirect3DPixelShader9** shaders[] = { &s_downShader, &s_blurShader, &s_radialShader, &s_addShader, &s_dofShader };
+        for (int i = 0; i < 5; ++i)
+        {
+            std::vector<DWORD> code = Compile(sources[i], "ps_3_0");
+            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), shaders[i])))
+                *shaders[i] = nullptr;
+        }
+        return s_downShader && s_blurShader && s_radialShader && s_addShader && s_dofShader;
+    }
+
+    bool EnsureSmall(UINT width, UINT height, IDirect3DDevice9* device)
+    {
+        width = width / 4 > 1 ? width / 4 : 1;
+        height = height / 4 > 1 ? height / 4 : 1;
+        if (s_small[0] && s_smallWidth == width && s_smallHeight == height)
+            return true;
+        ReleaseSmall();
+        for (int i = 0; i < 3; ++i)
+        {
+            if (FAILED(device->CreateTexture(width, height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT,
+                &s_small[i], nullptr)) || !s_small[i])
+            {
+                s_small[i] = nullptr;
+                ReleaseSmall();
+                return false;
+            }
+            s_small[i]->GetSurfaceLevel(0, &s_smallSurface[i]);
+        }
+        s_smallWidth = width;
+        s_smallHeight = height;
+        return true;
+    }
+
+    void BindTexture(IDirect3DDevice9* device, DWORD stage, IDirect3DBaseTexture9* texture, bool linear)
+    {
+        s_setTexture(device, stage, texture);
+        s_setSamplerState(device, stage, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, stage, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, stage, D3DSAMP_MAGFILTER, linear ? D3DTEXF_LINEAR : D3DTEXF_POINT);
+        s_setSamplerState(device, stage, D3DSAMP_MINFILTER, linear ? D3DTEXF_LINEAR : D3DTEXF_POINT);
+        s_setSamplerState(device, stage, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+        s_setSamplerState(device, stage, D3DSAMP_SRGBTEXTURE, FALSE);
+    }
+
+    // one full-screen pass of the shader into a target (nullptr: the screen, as it is set); c0 is the source's texel
+    void Pass(IDirect3DDevice9* device, IDirect3DSurface9* target, UINT width, UINT height, IDirect3DPixelShader9* shader,
+        const float source[4], const float params[4])
+    {
+        IDirect3DSurface9* renderTarget = nullptr;
+        IDirect3DSurface9* depthStencil = nullptr;
+        if (target)
+        {
+            device->GetRenderTarget(0, &renderTarget);
+            device->GetDepthStencilSurface(&depthStencil);
+            device->SetRenderTarget(0, target);
+            device->SetDepthStencilSurface(nullptr);
+        }
+        FillQuad(width, height);
+        s_setPixelShader(device, shader);
+        s_setPsConstant(device, 0, source, 1);
+        s_setPsConstant(device, 1, params, 1);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        if (target)
+        {
+            device->SetRenderTarget(0, renderTarget);
+            device->SetDepthStencilSurface(depthStencil);
+            if (renderTarget)
+                renderTarget->Release();
+            if (depthStencil)
+                depthStencil->Release();
+            RestoreViewport(device);
+        }
+    }
+
+    // a quarter size target blurred both ways (through s_small[2])
+    void BlurSmall(IDirect3DDevice9* device, int index)
+    {
+        const float texel[4] = { 1.0f / s_smallWidth, 1.0f / s_smallHeight, 0.0f, 0.0f };
+        const float horizontal[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+        const float vertical[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+        BindTexture(device, 0, s_small[index], true);
+        Pass(device, s_smallSurface[2], s_smallWidth, s_smallHeight, s_blurShader, texel, horizontal);
+        BindTexture(device, 0, s_small[2], true);
+        Pass(device, s_smallSurface[index], s_smallWidth, s_smallHeight, s_blurShader, texel, vertical);
+    }
+
+    void AddOnto(IDirect3DDevice9* device, int index, float r, float g, float b)
+    {
+        const float none[4] = {};
+        const float tint[4] = { r, g, b, 0.0f };
+        BindTexture(device, 0, s_small[index], true);
+        SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
+        SetState(device, D3DRS_SRCBLEND, D3DBLEND_ONE);
+        SetState(device, D3DRS_DESTBLEND, D3DBLEND_ONE);
+        SetState(device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+        Pass(device, nullptr, s_sceneCopyWidth, s_sceneCopyHeight, s_addShader, none, tint);
+        SetState(device, D3DRS_ALPHABLENDENABLE, FALSE);
+    }
+
+    float Clamp(float value, float low, float high) { return value < low ? low : (value > high ? high : value); }
+
+    // the sun on the screen: the zone light's direction (0xD38B00 + 0x18, the light's travel) seen by the camera
+    // ([[0xB7436C] + 0x7E20]: +0x8 position, +0x14 3x3 facing - forward, left, up -, +0x40 fov, +0x44 aspect)
+    bool SunOnScreen(float& u, float& v, float& visibility)
+    {
+        uint8_t* world = *reinterpret_cast<uint8_t**>(0xB7436C);
+        uint8_t* camera = world ? *reinterpret_cast<uint8_t**>(world + 0x7E20) : nullptr;
+        if (!camera)
+            return false;
+        const float* light = reinterpret_cast<const float*>(0xD38B00 + 0x18);
+        float sign = CVarInt(CV_GODRAYS_FLIP) ? 1.0f : -1.0f;
+        float sun[3] = { light[0] * sign, light[1] * sign, light[2] * sign };
+        const float* facing = reinterpret_cast<const float*>(camera + 0x14);
+        float forward = sun[0] * facing[0] + sun[1] * facing[1] + sun[2] * facing[2];
+        float left = sun[0] * facing[3] + sun[1] * facing[4] + sun[2] * facing[5];
+        float up = sun[0] * facing[6] + sun[1] * facing[7] + sun[2] * facing[8];
+        float fov = *reinterpret_cast<const float*>(camera + 0x40);
+        float aspect = *reinterpret_cast<const float*>(camera + 0x44);
+        s_sunScreen[2] = forward > 0.0f ? 1.0f : 0.0f;
+        if (forward <= 0.05f || fov <= 0.1f || aspect <= 0.1f)
+            return false;
+        float halfHeight = tanf(fov * 0.5f);
+        float x = -left / forward / (halfHeight * aspect);
+        float y = up / forward / halfHeight;
+        u = 0.5f + 0.5f * x;
+        v = 0.5f - 0.5f * y;
+        // fading out as it leaves the screen
+        float outside = (fabsf(x) > fabsf(y) ? fabsf(x) : fabsf(y)) - 1.0f;
+        visibility = Clamp(1.0f - outside, 0.0f, 1.0f);
+        return visibility > 0.0f;
+    }
+
+    // once a frame, after SSAO: depth of field, bloom, sun rays
+    void PostEffects(IDirect3DDevice9* device)
+    {
+        bool dof = CVarInt(CV_DOF) && s_depthReady;
+        bool bloom = CVarInt(CV_BLOOM) != 0;
+        bool rays = CVarInt(CV_GODRAYS) && s_depthReady;
+        if (!dof && !bloom && !rays)
+            return;
+        if (!s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device) || !CreatePostShaders(device) || !CopyScene(device)
+            || !EnsureSmall(s_sceneCopyWidth, s_sceneCopyHeight, device))
+            return;
+
+        s_setVertexShader(device, s_quadShader);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
+
+        const float sceneTexel[4] = { 1.0f / s_sceneCopyWidth, 1.0f / s_sceneCopyHeight, 0.0f, 0.0f };
+        float nearClip = CVarNumber("nearclip", 0.2f);
+        float farClip = *reinterpret_cast<float*>(ADDR_FARCLIP);
+        const float depthScreen[4] = { 1.0f / s_sceneCopyWidth, 1.0f / s_sceneCopyHeight, nearClip > 0.01f ? nearClip : 0.2f,
+            farClip > 10.0f ? farClip : 1000.0f };
+
+        if (dof)
+        {
+            // the focus: the depth at the middle of the screen (the character, mostly) - read on the CPU would
+            // stall; the camera's distance to the player instead
+            float focus = 10.0f;
+            uint8_t* world = *reinterpret_cast<uint8_t**>(0xB7436C);
+            uint8_t* camera = world ? *reinterpret_cast<uint8_t**>(world + 0x7E20) : nullptr;
+            CGObject* player = FindUnit(reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)());
+            if (camera && player)
+            {
+                Position at = GetPosition(player);
+                const float* position = reinterpret_cast<const float*>(camera + 0x8);
+                float dx = position[0] - at.X, dy = position[1] - at.Y, dz = position[2] - at.Z;
+                focus = sqrtf(dx * dx + dy * dy + dz * dz) + 5.0f;
+            }
+            const float mode[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            BindTexture(device, 0, s_sceneCopy, true);
+            Pass(device, s_smallSurface[0], s_smallWidth, s_smallHeight, s_downShader, sceneTexel, mode);
+            BlurSmall(device, 0);
+            BlurSmall(device, 0);
+            const float params[4] = { focus, Clamp(CVarFloat(CV_DOF_DISTANCE), 5.0f, 300.0f), Clamp(CVarFloat(CV_DOF_STRENGTH), 0.0f, 1.0f), 0.0f };
+            BindTexture(device, 0, s_sceneCopy, false);
+            BindTexture(device, 1, s_small[0], true);
+            BindTexture(device, 2, s_depthCopy, false);
+            Pass(device, nullptr, s_sceneCopyWidth, s_sceneCopyHeight, s_dofShader, depthScreen, params);
+        }
+        if (bloom)
+        {
+            const float mode[4] = { 1.0f, Clamp(CVarFloat(CV_BLOOM_THRESHOLD), 0.3f, 1.0f), 0.0f, 0.0f };
+            BindTexture(device, 0, s_sceneCopy, true);
+            Pass(device, s_smallSurface[1], s_smallWidth, s_smallHeight, s_downShader, sceneTexel, mode);
+            BlurSmall(device, 1);
+            BlurSmall(device, 1);
+            float strength = Clamp(CVarFloat(CV_BLOOM_STRENGTH), 0.0f, 2.0f);
+            AddOnto(device, 1, strength, strength, strength);
+        }
+        float u = 0.0f, v = 0.0f, visibility = 0.0f;
+        if (rays && SunOnScreen(u, v, visibility))
+        {
+            const float mode[4] = { 2.0f, 0.0f, 1.0f, 0.0f };
+            BindTexture(device, 0, s_sceneCopy, true);
+            BindTexture(device, 1, s_depthCopy, false);
+            Pass(device, s_smallSurface[1], s_smallWidth, s_smallHeight, s_downShader, sceneTexel, mode);
+            const float radial[4] = { u, v, 0.9f, 0.0f };
+            const float none[4] = {};
+            BindTexture(device, 0, s_small[1], true);
+            Pass(device, s_smallSurface[0], s_smallWidth, s_smallHeight, s_radialShader, none, radial);
+            float strength = Clamp(CVarFloat(CV_GODRAYS_STRENGTH), 0.0f, 2.0f) * visibility * 0.5f;
+            AddOnto(device, 0, strength, strength * 0.95f, strength * 0.85f);
+        }
+        s_sunScreen[0] = u;
+        s_sunScreen[1] = v;
+        s_sunScreen[3] = visibility;
+        for (DWORD stage = 0; stage < SHADOW_STAGES; ++stage)
+            s_setTexture(device, stage, nullptr);
+        RestoreGx(device);
+    }
+
     // once a frame, after SSAO, before the outline: contrast, saturation, brightness, sharpening
     void ColorGrade(IDirect3DDevice9* device)
     {
@@ -1458,34 +1837,7 @@ namespace
         if (!s_gradeShader || !s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device))
             return;
 
-        IDirect3DSurface9* renderTarget = nullptr;
-        if (FAILED(device->GetRenderTarget(0, &renderTarget)) || !renderTarget)
-            return;
-        D3DSURFACE_DESC desc = {};
-        renderTarget->GetDesc(&desc);
-        if (!s_sceneCopy || s_sceneCopyWidth != desc.Width || s_sceneCopyHeight != desc.Height)
-        {
-            if (s_sceneCopySurface)
-                s_sceneCopySurface->Release();
-            if (s_sceneCopy)
-                s_sceneCopy->Release();
-            s_sceneCopySurface = nullptr;
-            s_sceneCopy = nullptr;
-            if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_X8R8G8B8,
-                D3DPOOL_DEFAULT, &s_sceneCopy, nullptr)) || !s_sceneCopy)
-            {
-                s_sceneCopy = nullptr;
-                renderTarget->Release();
-                return;
-            }
-            s_sceneCopy->GetSurfaceLevel(0, &s_sceneCopySurface);
-            s_sceneCopyWidth = desc.Width;
-            s_sceneCopyHeight = desc.Height;
-        }
-        // a multisampled screen is resolved by the copy
-        HRESULT copied = device->StretchRect(renderTarget, nullptr, s_sceneCopySurface, nullptr, D3DTEXF_NONE);
-        renderTarget->Release();
-        if (FAILED(copied))
+        if (!CopyScene(device))
             return;
 
         contrast = contrast < 0.5f ? 0.5f : (contrast > 1.5f ? 1.5f : contrast);
@@ -1587,7 +1939,9 @@ namespace
         IDirect3DDevice9* device = GetD3DDevice();
         if (device && (s_stats.Installed & 4))
         {
+            PrepareDepth(device);
             Ssao(device);
+            PostEffects(device);
             ColorGrade(device);
             Composite(device);
             if (EnsureMask(device) && EnsureQuadBuffer(device))
@@ -1818,7 +2172,10 @@ int32_t Outline::OutlineDebug(lua_State* L)
         s_depthInfo.MaskSamples, s_depthInfo.MaskQuality, s_depthInfo.ZFunc, s_depthInfo.ZEnable, static_cast<uint32_t>(s_depthInfo.Result));
     FrameScript::PushString(L, depth);
     FrameScript::PushNumber(L, s_ssaoStatus);
-    return 16;
+    char sun[96];
+    snprintf(sun, sizeof(sun), "sun u %.2f v %.2f front %.0f vis %.2f", s_sunScreen[0], s_sunScreen[1], s_sunScreen[2], s_sunScreen[3]);
+    FrameScript::PushString(L, sun);
+    return 17;
 }
 
 // /run OutlineMode(n): 1 no silhouettes, 2 no full-screen pass, 4 low quality, 8 stage 1 (silhouettes on the screen)
