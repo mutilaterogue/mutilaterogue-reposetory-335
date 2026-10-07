@@ -66,7 +66,7 @@ namespace
         uint32_t Recorded = 0;              // batches kept in the last frame
         uint32_t Replayed = 0;              // batches drawn again in the last frame
         uint32_t GxApi = 0;
-        uint32_t Error = 0;                 // 1 no device, 2 shader, 3 state block
+        uint32_t Error = 0;                 // 1 no device, 2 shader
     } s_stats;
 
     std::vector<Target> s_targets;          // the models outlined in this frame
@@ -217,24 +217,29 @@ namespace
             return;
         }
 
-        IDirect3DStateBlock9* state = nullptr;
-        if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &state)))
-        {
-            s_stats.Error = 3;
-            return;
-        }
+        // only what we set ourselves goes back afterwards: what the batch sets goes through Gx, and Gx
+        // remembers it - putting the device back under it (a state block) breaks every later draw
+        static const D3DRENDERSTATETYPE STATES[] = {
+            D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_CULLMODE, D3DRS_FOGENABLE,
+        };
+        static const DWORD VALUES[] = { FALSE, FALSE, FALSE, FALSE, D3DCULL_NONE, FALSE };
+        constexpr size_t STATE_COUNT = sizeof(STATES) / sizeof(STATES[0]);
+
+        IDirect3DPixelShader9* oldShader = nullptr;
+        float oldConstant[4] = {};
+        DWORD oldStates[STATE_COUNT] = {};
+        device->GetPixelShader(&oldShader);
+        device->GetPixelShaderConstantF(0, oldConstant, 1);
+        for (size_t i = 0; i < STATE_COUNT; ++i)
+            device->GetRenderState(STATES[i], &oldStates[i]);
 
         s_replaying = true;
         for (Batch& batch : s_batches)
         {
             device->SetPixelShader(s_flatShader);
             device->SetPixelShaderConstantF(0, batch.Color, 1);
-            device->SetRenderState(D3DRS_ZENABLE, FALSE);
-            device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
-            device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-            device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-            device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-            device->SetRenderState(D3DRS_FOGENABLE, FALSE);
+            for (size_t i = 0; i < STATE_COUNT; ++i)
+                device->SetRenderState(STATES[i], VALUES[i]);
 
             // the draw may write into its record: a copy
             alignas(16) uint8_t copy[BATCH_SIZE];
@@ -244,8 +249,12 @@ namespace
         }
         s_replaying = false;
 
-        state->Apply();
-        state->Release();
+        device->SetPixelShader(oldShader);
+        if (oldShader)
+            oldShader->Release();
+        device->SetPixelShaderConstantF(0, oldConstant, 1);
+        for (size_t i = 0; i < STATE_COUNT; ++i)
+            device->SetRenderState(STATES[i], oldStates[i]);
     }
 
     // ---------------------------------------------------------------- detours

@@ -42,7 +42,7 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | `0x6A3620`, `0x6A77C0` (`CGxDeviceD3d`) | muted (`ret 8`) during that redraw, so the batch can't put its own shader back |
 
 The D3D device: `[[0xC5DF88] + 0x397C]` (only when the Gx API `[+0x1B4]` is Direct3D).
-All D3D states are restored after the redraw (state block).
+Only the states we set ourselves are put back after the redraw (pixel shader, c0, 6 render states): what the batch sets goes through Gx and must stay, or Gx's cache and the device disagree and later models vanish.
 
 ## Debug: `/run print(OutlineDebug())`
 Target a unit and hover another one, then run it. Eleven values:
@@ -57,7 +57,7 @@ Target a unit and hover another one, then run it. Eleven values:
 | 6 | batches kept in the last frame | > 0 |
 | 7 | batches drawn again in the last frame | = #6 |
 | 8 | Gx API | `1` or `2` (Direct3D) |
-| 9 | error: 1 no D3D device, 2 shader, 3 state block | `0` |
+| 9 | error: 1 no D3D device, 2 shader | `0` |
 | 10 | the first 12 bytes at `0x4F9240` | (for me) |
 | 11 | bytes moved to the trampoline | `5`..`15` (`0`: an instruction the decoder doesn't know - hook not set) |
 
