@@ -65,8 +65,11 @@ if ( not GetSpecName ) then
 end
 
 local function RefreshBars(powerType, directionChanged)
-	if ( powerType == SPELL_POWER_SOUL_SHARDS and ShardBarFrame and ShardBar_OnEvent ) then
-		ShardBar_OnEvent(ShardBarFrame, "UNIT_POWER_FREQUENT", ShardBarFrame:GetParent().unit, "SOUL_SHARDS");
+	if ( powerType == SPELL_POWER_SOUL_SHARDS ) then
+		if ( ShardBarFrame and ShardBar_OnEvent ) then
+			ShardBar_OnEvent(ShardBarFrame, "UNIT_POWER_FREQUENT", ShardBarFrame:GetParent().unit, "SOUL_SHARDS");
+		end
+		ClassNameplateBarWarlock_Update();
 	elseif ( powerType == SPELL_POWER_ECLIPSE and EclipseBarFrame and EclipseBar_Update ) then
 		EclipseBar_Update(EclipseBarFrame);
 		if ( directionChanged and EclipseBarFrame:IsShown() ) then
@@ -231,6 +234,97 @@ function ClassNameplateBarPaladin_Update()
 		frame.active:SetAlpha(power > 0 and 1 or 0);
 		frame.ready:SetAlpha(ready and 1 or 0);
 	end
+end
+
+-- ------------------------------------------------------------
+--  Soul Shards under the personal resource bar, retail's look (12.1.5 ShardBar.xml): a 23 x 30 slot a shard,
+--  1 apart; the holder UF-SoulShard-Holder, the shard UF-SoulShard-Icon (+ IconGlow as it fills)
+-- ------------------------------------------------------------
+local SHARD_WIDTH, SHARD_HEIGHT, SHARD_SPACING = 23, 30, 1;
+local warlockNameplateFrame;
+
+local function CreateWarlockNameplateFrame()
+	local count = 3;
+	local frame = CreateFrame("Frame", "ClassNameplateBarWarlockFrame", UIParent);
+	frame:SetSize(count * SHARD_WIDTH + (count - 1) * SHARD_SPACING, SHARD_HEIGHT);
+	frame:SetPoint("CENTER");
+	frame.hideWhenDetached = true;	-- only under the personal bar (ClassNameplateBar)
+	frame:Hide();
+
+	local retail = HasAtlas("UF-SoulShard-Holder");
+	frame.shards = {};
+	for i = 1, count do
+		local slot = CreateFrame("Frame", nil, frame);
+		slot:SetSize(SHARD_WIDTH, SHARD_HEIGHT);
+		slot:SetPoint("LEFT", frame, "LEFT", (i - 1) * (SHARD_WIDTH + SHARD_SPACING), 0);
+
+		slot.holder = slot:CreateTexture(nil, "BACKGROUND");
+		slot.icon = slot:CreateTexture(nil, "ARTWORK");
+		slot.glow = slot:CreateTexture(nil, "OVERLAY");
+		if ( retail ) then
+			slot.holder:SetAtlas("UF-SoulShard-Holder", true);
+			slot.holder:SetPoint("CENTER", 0, -4.5);
+			slot.icon:SetAtlas("UF-SoulShard-Icon", true);
+			slot.icon:SetPoint("CENTER", 0, -3);
+			slot.glow:SetAtlas("UF-SoulShard-IconGlow", true);
+			slot.glow:SetPoint("CENTER", 0, -3);
+		else
+			-- Cataclysm's UI-WarlockShard (the player frame's ShardBar)
+			slot.holder:SetTexture("Interface\\PlayerFrame\\UI-WarlockShard");
+			slot.holder:SetTexCoord(0.01562500, 0.82812500, 0.60937500, 0.83593750);
+			slot.holder:SetSize(SHARD_WIDTH, 13);
+			slot.holder:SetPoint("CENTER");
+			slot.icon:SetTexture("Interface\\PlayerFrame\\UI-WarlockShard");
+			slot.icon:SetTexCoord(0.01562500, 0.28125000, 0.00781250, 0.13281250);
+			slot.icon:SetSize(17, 16);
+			slot.icon:SetPoint("CENTER");
+			slot.glow:SetTexture("Interface\\PlayerFrame\\UI-WarlockShard");
+			slot.glow:SetTexCoord(0.01562500, 0.42187500, 0.14843750, 0.32812500);
+			slot.glow:SetSize(26, 23);
+			slot.glow:SetPoint("CENTER");
+		end
+		slot.glow:SetBlendMode("ADD");
+		slot.icon:SetAlpha(0);
+		slot.glow:SetAlpha(0);
+		frame.shards[i] = slot;
+	end
+	return frame;
+end
+
+function ClassNameplateBarWarlock_GetFrame()
+	local _, class = UnitClass("player");
+	if ( class ~= "WARLOCK" ) then
+		return nil;
+	end
+	if ( not warlockNameplateFrame ) then
+		warlockNameplateFrame = CreateWarlockNameplateFrame();
+	end
+	return warlockNameplateFrame;		-- shown by ClassNameplateBar when it attaches it
+end
+
+function ClassNameplateBarWarlock_Update()
+	if ( not warlockNameplateFrame ) then
+		return;
+	end
+	local power = UnitPower("player", SPELL_POWER_SOUL_SHARDS);
+	for i, slot in ipairs(warlockNameplateFrame.shards) do
+		local lit = i <= power;
+		if ( slot.lit ~= lit ) then
+			slot.lit = lit;
+			SetRune(slot.icon, lit);
+			if ( lit ) then
+				-- a short flash as it fills (retail's IconGlow)
+				slot.glow:SetAlpha(1);
+				UIFrameFadeOut(slot.glow, 0.6, 1, 0);
+			end
+		end
+	end
+end
+
+-- the bar of the player's class under the personal resource bar (ClassNameplateBar), refreshed as it is attached
+function ClassNameplateBarClassPower_Update()
+	ClassNameplateBarPaladin_Update();
+	ClassNameplateBarWarlock_Update();
 end
 
 local function OnClassPower(powerType, value, maximum, direction)

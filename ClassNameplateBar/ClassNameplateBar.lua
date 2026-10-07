@@ -90,6 +90,8 @@ local function GetClassResourceFrame()
 		return RuneFrame;
 	elseif class == "PALADIN" and ClassNameplateBarPaladin_GetFrame then
 		return ClassNameplateBarPaladin_GetFrame();		-- ClassPower\ClassPower.lua
+	elseif class == "WARLOCK" and ClassNameplateBarWarlock_GetFrame then
+		return ClassNameplateBarWarlock_GetFrame();		-- ClassPower\ClassPower.lua
 	end
 end
 
@@ -120,8 +122,8 @@ local function AttachClassResource(self)
 	frame:SetScale(ClassNameplateBarSetupOptions.classResourceScale);
 	if frame.hideWhenDetached then
 		frame:Show();
-		if ClassNameplateBarPaladin_Update then
-			ClassNameplateBarPaladin_Update();
+		if ClassNameplateBarClassPower_Update then
+			ClassNameplateBarClassPower_Update();
 		end
 	end
 
