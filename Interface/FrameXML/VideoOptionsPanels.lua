@@ -1,7 +1,7 @@
 -- if you change something here you probably want to change the glue version too
 
 local OPTIONS_FARCLIP_MIN = 177;
-local OPTIONS_FARCLIP_MAX = 1277;
+local OPTIONS_FARCLIP_MAX = 3000;
 
 local VIDEO_OPTIONS_CUSTOM_QUALITY = 6;
 
@@ -669,9 +669,17 @@ end
 -- the sliders: applied at once too
 SSAO_STRENGTH = "Сила затенения";
 SSAO_RADIUS = "Радиус затенения";
+COLOR_CONTRAST = "Контраст";
+COLOR_SATURATION = "Насыщенность";
+COLOR_BRIGHTNESS = "Яркость";
+COLOR_SHARPEN = "Резкость";
 local FEATURE_SLIDERS = {
 	VideoOptionsFeaturesPanelSsaoStrength = { cvar = "ssaoStrength", text = "SSAO_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
 	VideoOptionsFeaturesPanelSsaoRadius = { cvar = "ssaoRadius", text = "SSAO_RADIUS", minValue = 0.3, maxValue = 5, valueStep = 0.1, low = "0.3", high = "5" },
+	VideoOptionsFeaturesPanelColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
+	VideoOptionsFeaturesPanelColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05, low = "0", high = "2" },
+	VideoOptionsFeaturesPanelColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
+	VideoOptionsFeaturesPanelColorSharpen = { cvar = "colorSharpen", text = "COLOR_SHARPEN", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
 };
 
 function VideoOptionsFeaturesPanelSlider_OnLoad (self)

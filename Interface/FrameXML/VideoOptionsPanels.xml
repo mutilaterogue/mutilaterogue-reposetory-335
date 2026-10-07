@@ -957,6 +957,62 @@
 					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
 				</Scripts>
 			</Slider>
+			<Slider name="$parentColorContrast" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentSsaoRadius" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-32"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentColorSaturation" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentColorContrast" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-32"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentColorBrightness" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentColorSaturation" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-32"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
+			<Slider name="$parentColorSharpen" inherits="OptionsSliderTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentColorBrightness" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-32"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad function="VideoOptionsFeaturesPanelSlider_OnLoad"/>
+					<OnShow function="VideoOptionsFeaturesPanelSlider_OnShow"/>
+					<OnValueChanged function="VideoOptionsFeaturesPanelSlider_OnValueChanged"/>
+				</Scripts>
+			</Slider>
 		</Frames>
 		<Scripts>
 			<OnLoad function="VideoOptionsFeaturesPanel_OnLoad"/>

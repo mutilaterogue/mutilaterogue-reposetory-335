@@ -128,6 +128,20 @@ For `Config.wtf` to keep them, in `CVar::FillCustomGlueCVarVector()`:
     AddToGlueCVarVector("ssaoStrength", "SSAO darkness (0 .. 2)", 1, "1", nullptr, 5, false, 0, false);
     AddToGlueCVarVector("ssaoRadius", "SSAO radius in yards (0.3 .. 5)", 1, "1.5", nullptr, 5, false, 0, false);
 ```
+Two passes: the raw occlusion into a texture, then blurred (5 x 5 taps, not across depth edges) onto the screen.
+
+## Color grading
+| CVar | Default | |
+|---|---|---|
+| `colorContrast` | `1` | `0.5` .. `1.5` |
+| `colorSaturation` | `1` | `0` .. `2` |
+| `colorBrightness` | `1` | `0.5` .. `1.5` |
+| `colorSharpen` | `0` | `0` .. `1` |
+
+All at the defaults: no pass. Otherwise the scene is copied (resolved) and drawn back graded, after SSAO, before
+the outline. Glue cvars to keep them (as above): `colorContrast`, `colorSaturation`, `colorBrightness`, `colorSharpen`.
+
+## SSAO: how
 At `0x4F9240`, before the outline: the scene's depth buffer (multisampled) is copied into an INTZ texture by the
 drivers' RESZ, then one full-screen pass darkens the creases (pairs of depth samples around each pixel; on a
 plane their mean is the pixel's own depth, so slopes stay clean). Needs antialiasing (MSAA): RESZ copies a

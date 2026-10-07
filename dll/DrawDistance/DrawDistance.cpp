@@ -15,6 +15,11 @@ namespace
     float s_groundEffectDistMax = 500.0f;
     float s_environmentDetailMax = 5.0f;
 
+    // farclip: 0x780770 clamps it to 183 .. 1583 (fld [0xA3E710] at 0x780777); beyond the map's loaded tiles
+    // nothing more shows up
+    constexpr uint32_t ADDR_FARCLIP_MAX = 0x780779;
+    float s_farclipMax = 3000.0f;
+
     // ---------------------------------------------------------------- the fog
     constexpr uint32_t ADDR_WORLD_LIGHT_UPDATE = 0x7816F0;    // cdecl (int, void*), prologue 55 8B EC 83 EC 10
     constexpr uint32_t ADDR_M2_SET_FOG         = 0x834990;    // thiscall (color*, start, end, density), 55 8B EC D9 45 0C
@@ -131,6 +136,7 @@ void DrawDistance::ApplyPatches()
 {
     Util::OverwriteUInt32AtAddress(ADDR_GROUND_EFFECT_DIST_MAX, reinterpret_cast<uint32_t>(&s_groundEffectDistMax));
     Util::OverwriteUInt32AtAddress(ADDR_ENVIRONMENT_DETAIL_MAX, reinterpret_cast<uint32_t>(&s_environmentDetailMax));
+    Util::OverwriteUInt32AtAddress(ADDR_FARCLIP_MAX, reinterpret_cast<uint32_t>(&s_farclipMax));
 
     s_worldLightUpdate = reinterpret_cast<WorldLightUpdateFn>(MakeTrampoline(ADDR_WORLD_LIGHT_UPDATE, reinterpret_cast<void*>(&WorldLightUpdateDetour)));
     s_m2SetFog = reinterpret_cast<M2SetFogFn>(MakeTrampoline(ADDR_M2_SET_FOG, reinterpret_cast<void*>(&M2SetFogDetour)));

@@ -6,6 +6,7 @@ Raises the client's limits on the grass and small objects draw distance, and set
 |---|---|---|
 | `groundEffectDist` | 140 | 500 |
 | `environmentDetail` (doodad distance multiplier) | 1.5 | 5 |
+| `farclip` (view distance, Video options -> Видимость) | 1583 (slider 1277) | 3000 |
 
 ## Fog: `fogMode`
 `0` the client's, `1` three times farther, `2` none. `/console fogMode 2`.

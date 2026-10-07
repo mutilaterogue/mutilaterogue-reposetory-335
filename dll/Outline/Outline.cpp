@@ -93,9 +93,13 @@ namespace
         { "ssao",             "Ambient occlusion (SSAO): 0 off, 1 on", "0", nullptr },
         { "ssaoStrength",     "SSAO darkness (0 .. 2)", "1", nullptr },
         { "ssaoRadius",       "SSAO radius in yards (0.3 .. 5)", "1.5", nullptr },
+        { "colorContrast",    "Color grading: contrast (0.5 .. 1.5)", "1", nullptr },
+        { "colorSaturation",  "Color grading: saturation (0 .. 2)", "1", nullptr },
+        { "colorBrightness",  "Color grading: brightness (0.5 .. 1.5)", "1", nullptr },
+        { "colorSharpen",     "Color grading: sharpening (0 .. 1)", "0", nullptr },
     };
     enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
-        CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_COUNT };
+        CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_CONTRAST, CV_SATURATION, CV_BRIGHTNESS, CV_SHARPEN, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -191,6 +195,15 @@ namespace
     IDirect3DTexture9* s_depthCopy = nullptr;           // default pool: released before a device reset
     UINT s_depthCopyWidth = 0, s_depthCopyHeight = 0;
     IDirect3DPixelShader9* s_ssaoShader = nullptr;
+    IDirect3DPixelShader9* s_ssaoBlurShader = nullptr;
+    IDirect3DTexture9* s_aoTexture = nullptr;           // the raw occlusion, blurred onto the screen (default pool)
+    IDirect3DSurface9* s_aoSurface = nullptr;
+    // color grading: the scene copied (resolved), then drawn back graded
+    IDirect3DPixelShader9* s_gradeShader = nullptr;
+    IDirect3DTexture9* s_sceneCopy = nullptr;           // default pool
+    IDirect3DSurface9* s_sceneCopySurface = nullptr;
+    UINT s_sceneCopyWidth = 0, s_sceneCopyHeight = 0;
+    bool s_gradeChecked = false;
     // 0 off, 1 drawn, 2 no INTZ, 3 no RESZ (the driver), 4 no antialiasing (needs it: RESZ copies a multisampled
     // depth buffer), 5 no shader (the compiler), 6 the depth texture failed
     uint32_t s_ssaoStatus = 0;
@@ -466,6 +479,7 @@ namespace
     };
     constexpr uint32_t SHADOW_PS_REGISTERS = 2;     // c0, c1: the ones we use
     constexpr uint32_t SHADOW_SAMPLER_STATES = 14;
+    constexpr uint32_t SHADOW_STAGES = 2;           // s0, s1: the ones we use
 
     typedef HRESULT (__stdcall* ResetFn)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
     typedef HRESULT (__stdcall* SetViewportFn)(IDirect3DDevice9*, const D3DVIEWPORT9*);
@@ -499,9 +513,9 @@ namespace
         bool Known[256] = {};
         D3DVIEWPORT9 Viewport = {};
         bool ViewportKnown = false;
-        IDirect3DBaseTexture9* Texture0 = nullptr;
-        DWORD Sampler0[SHADOW_SAMPLER_STATES] = {};
-        bool SamplerKnown[SHADOW_SAMPLER_STATES] = {};
+        IDirect3DBaseTexture9* Texture[SHADOW_STAGES] = {};
+        DWORD Sampler[SHADOW_STAGES][SHADOW_SAMPLER_STATES] = {};
+        bool SamplerKnown[SHADOW_STAGES][SHADOW_SAMPLER_STATES] = {};
         IDirect3DVertexDeclaration9* Declaration = nullptr;
         DWORD FVF = 0;
         bool DeclarationLast = true;        // the last of SetVertexDeclaration / SetFVF
@@ -534,17 +548,17 @@ namespace
 
     HRESULT __stdcall SetTextureDetour(IDirect3DDevice9* device, DWORD stage, IDirect3DBaseTexture9* texture)
     {
-        if (stage == 0)
-            s_shadow.Texture0 = texture;
+        if (stage < SHADOW_STAGES)
+            s_shadow.Texture[stage] = texture;
         return s_setTexture(device, stage, texture);
     }
 
     HRESULT __stdcall SetSamplerStateDetour(IDirect3DDevice9* device, DWORD sampler, D3DSAMPLERSTATETYPE type, DWORD value)
     {
-        if (sampler == 0 && type < SHADOW_SAMPLER_STATES)
+        if (sampler < SHADOW_STAGES && type < SHADOW_SAMPLER_STATES)
         {
-            s_shadow.Sampler0[type] = value;
-            s_shadow.SamplerKnown[type] = true;
+            s_shadow.Sampler[sampler][type] = value;
+            s_shadow.SamplerKnown[sampler][type] = true;
         }
         return s_setSamplerState(device, sampler, type, value);
     }
@@ -670,13 +684,31 @@ namespace
         s_maskDirty = false;
     }
 
+    void ReleasePostTargets()
+    {
+        if (s_depthCopy)
+            s_depthCopy->Release();
+        if (s_aoSurface)
+            s_aoSurface->Release();
+        if (s_aoTexture)
+            s_aoTexture->Release();
+        if (s_sceneCopySurface)
+            s_sceneCopySurface->Release();
+        if (s_sceneCopy)
+            s_sceneCopy->Release();
+        s_depthCopy = nullptr;
+        s_aoSurface = nullptr;
+        s_aoTexture = nullptr;
+        s_sceneCopySurface = nullptr;
+        s_sceneCopy = nullptr;
+        s_depthCopyWidth = s_depthCopyHeight = 0;
+        s_sceneCopyWidth = s_sceneCopyHeight = 0;
+    }
+
     HRESULT __stdcall ResetDetour(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* parameters)
     {
         ReleaseMask();      // a default pool resource: a reset fails while it exists
-        if (s_depthCopy)
-            s_depthCopy->Release();
-        s_depthCopy = nullptr;
-        s_depthCopyWidth = s_depthCopyHeight = 0;
+        ReleasePostTargets();
         return s_reset(device, parameters);
     }
 
@@ -1125,11 +1157,15 @@ namespace
         else
             s_setFVF(device, s_shadow.FVF);
         s_setStreamSource(device, 0, s_shadow.Stream0, s_shadow.Stream0Offset, s_shadow.Stream0Stride);
-        s_setTexture(device, 0, s_shadow.Texture0);
         const D3DSAMPLERSTATETYPE samplers[] = { D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV, D3DSAMP_MAGFILTER, D3DSAMP_MINFILTER, D3DSAMP_MIPFILTER, D3DSAMP_SRGBTEXTURE };
         const DWORD samplerDefaults[] = { D3DTADDRESS_WRAP, D3DTADDRESS_WRAP, D3DTEXF_POINT, D3DTEXF_POINT, D3DTEXF_NONE, FALSE };
-        for (size_t i = 0; i < sizeof(samplers) / sizeof(samplers[0]); ++i)
-            s_setSamplerState(device, 0, samplers[i], s_shadow.SamplerKnown[samplers[i]] ? s_shadow.Sampler0[samplers[i]] : samplerDefaults[i]);
+        for (DWORD stage = 0; stage < SHADOW_STAGES; ++stage)
+        {
+            s_setTexture(device, stage, s_shadow.Texture[stage]);
+            for (size_t i = 0; i < sizeof(samplers) / sizeof(samplers[0]); ++i)
+                s_setSamplerState(device, stage, samplers[i],
+                    s_shadow.SamplerKnown[stage][samplers[i]] ? s_shadow.Sampler[stage][samplers[i]] : samplerDefaults[i]);
+        }
         RestoreStates(device);
     }
 
@@ -1163,7 +1199,51 @@ namespace
         "            occlusion += saturate(crease / params.x) * saturate((3.0 * params.x - crease) / (2.0 * params.x));\n"
         "        }\n"
         "    }\n"
-        "    return float4(0, 0, 0, saturate(occlusion / 8 * params.y));\n"
+        "    return float4(saturate(occlusion / 8), 0, 0, 1);\n"
+        "}\n";
+
+    // the occlusion blurred (5 x 5 taps, 2 pixels apart) where the depth is about the same - not across an edge -
+    // and darkening the screen. s0 the occlusion, s1 the depth; c0 texel.xy, near, far; c1.y strength
+    const char HLSL_SSAO_BLUR_PS[] =
+        "sampler2D aoTex : register(s0);\n"
+        "sampler2D depthTex : register(s1);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float Linear(float d) { return screen.z * screen.w / (screen.w - d * (screen.w - screen.z)); }\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float d = tex2Dlod(depthTex, float4(uv, 0, 0)).r;\n"
+        "    clip(0.99999 - d);\n"
+        "    float z = Linear(d);\n"
+        "    float sum = 0, weights = 0;\n"
+        "    [unroll] for (int y = -2; y <= 2; ++y)\n"
+        "        [unroll] for (int x = -2; x <= 2; ++x)\n"
+        "        {\n"
+        "            float4 at = float4(uv + float2(x, y) * 2.0 * screen.xy, 0, 0);\n"
+        "            float w = saturate(1.0 - abs(Linear(tex2Dlod(depthTex, at).r) - z) / (0.05 * z + 0.1));\n"
+        "            sum += tex2Dlod(aoTex, at).r * w;\n"
+        "            weights += w;\n"
+        "        }\n"
+        "    return float4(0, 0, 0, saturate(sum / max(weights, 0.0001) * params.y));\n"
+        "}\n";
+
+    // color grading: s0 the scene; c0 texel.xy; c1 contrast, saturation, sharpening, brightness
+    const char HLSL_GRADE_PS[] =
+        "sampler2D scene : register(s0);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float3 At(float2 uv) { return tex2Dlod(scene, float4(uv, 0, 0)).rgb; }\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR\n"
+        "{\n"
+        "    float3 c = At(uv);\n"
+        "    float3 around = At(uv + float2(screen.x, 0)) + At(uv - float2(screen.x, 0))\n"
+        "        + At(uv + float2(0, screen.y)) + At(uv - float2(0, screen.y));\n"
+        "    c += (c - around * 0.25) * params.z;\n"
+        "    c *= params.w;\n"
+        "    float luma = dot(c, float3(0.299, 0.587, 0.114));\n"
+        "    c = lerp(luma.xxx, c, params.y);\n"
+        "    c = (c - 0.5) * params.x + 0.5;\n"
+        "    return float4(saturate(c), 1);\n"
         "}\n";
 
     constexpr D3DFORMAT FORMAT_INTZ = static_cast<D3DFORMAT>(MAKEFOURCC('I', 'N', 'T', 'Z'));
@@ -1194,13 +1274,16 @@ namespace
         if (intz && resz)
         {
             std::vector<DWORD> code = Compile(HLSL_SSAO_PS, "ps_3_0");
-            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), &s_ssaoShader)))
+            std::vector<DWORD> blur = Compile(HLSL_SSAO_BLUR_PS, "ps_3_0");
+            if (code.empty() || blur.empty() || FAILED(device->CreatePixelShader(code.data(), &s_ssaoShader))
+                || FAILED(device->CreatePixelShader(blur.data(), &s_ssaoBlurShader)))
             {
                 s_ssaoShader = nullptr;
+                s_ssaoBlurShader = nullptr;
                 s_ssaoStatus = 5;
             }
         }
-        s_ssaoSupported = intz && resz && s_ssaoShader;
+        s_ssaoSupported = intz && resz && s_ssaoShader && s_ssaoBlurShader;
         return s_ssaoSupported;
     }
 
@@ -1223,7 +1306,13 @@ namespace
         {
             if (s_depthCopy)
                 s_depthCopy->Release();
+            if (s_aoSurface)
+                s_aoSurface->Release();
+            if (s_aoTexture)
+                s_aoTexture->Release();
             s_depthCopy = nullptr;
+            s_aoSurface = nullptr;
+            s_aoTexture = nullptr;     // made again at the new size
             if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_DEPTHSTENCIL, FORMAT_INTZ,
                 D3DPOOL_DEFAULT, &s_depthCopy, nullptr)) || !s_depthCopy)
             {
@@ -1287,30 +1376,143 @@ namespace
             farClip > 10.0f ? farClip : 1000.0f };
         const float params[4] = { radius, strength, SSAO_PROJECTION * s_depthCopyHeight, 0.0f };
 
+        if (!s_aoTexture)
+        {
+            if (FAILED(device->CreateTexture(s_depthCopyWidth, s_depthCopyHeight, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8,
+                D3DPOOL_DEFAULT, &s_aoTexture, nullptr)) || !s_aoTexture)
+            {
+                s_aoTexture = nullptr;
+                s_ssaoStatus = 6;
+                RestoreGx(device);
+                return;
+            }
+            s_aoTexture->GetSurfaceLevel(0, &s_aoSurface);
+        }
+
         FillQuad(s_depthCopyWidth, s_depthCopyHeight);
         s_setVertexShader(device, s_quadShader);
-        s_setPixelShader(device, s_ssaoShader);
-        s_setPsConstant(device, 0, screen, 1);
-        s_setPsConstant(device, 1, params, 1);
         s_setVertexDeclaration(device, s_quadDeclaration);
         s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
-        s_setTexture(device, 0, s_depthCopy);
-        s_setSamplerState(device, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
-        s_setSamplerState(device, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-        s_setSamplerState(device, 0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
-        s_setSamplerState(device, 0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
-        s_setSamplerState(device, 0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
-        s_setSamplerState(device, 0, D3DSAMP_SRGBTEXTURE, FALSE);
-
+        s_setPsConstant(device, 0, screen, 1);
+        s_setPsConstant(device, 1, params, 1);
+        for (DWORD stage = 0; stage < 2; ++stage)
+        {
+            s_setSamplerState(device, stage, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+            s_setSamplerState(device, stage, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+            s_setSamplerState(device, stage, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+            s_setSamplerState(device, stage, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+            s_setSamplerState(device, stage, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+            s_setSamplerState(device, stage, D3DSAMP_SRGBTEXTURE, FALSE);
+        }
         SetSilhouetteStates(device);
+
+        // 1. the raw occlusion into our texture (no depth buffer: it doesn't fit, and isn't needed)
+        IDirect3DSurface9* renderTarget = nullptr;
+        IDirect3DSurface9* depthStencil = nullptr;
+        device->GetRenderTarget(0, &renderTarget);
+        device->GetDepthStencilSurface(&depthStencil);
+        device->SetRenderTarget(0, s_aoSurface);
+        device->SetDepthStencilSurface(nullptr);
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, 0x00000000, 1.0f, 0);
+        s_setPixelShader(device, s_ssaoShader);
+        s_setTexture(device, 0, s_depthCopy);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        device->SetRenderTarget(0, renderTarget);
+        device->SetDepthStencilSurface(depthStencil);
+        if (renderTarget)
+            renderTarget->Release();
+        if (depthStencil)
+            depthStencil->Release();
+        RestoreViewport(device);
+
+        // 2. blurred onto the screen
+        s_setPixelShader(device, s_ssaoBlurShader);
+        s_setTexture(device, 0, s_aoTexture);
+        s_setTexture(device, 1, s_depthCopy);
         SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
         SetState(device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
         SetState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
         SetState(device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
         SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
         device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
-        s_setTexture(device, 0, nullptr);       // not bound while it is no texture of Gx's
+        s_setTexture(device, 0, nullptr);       // not bound while they are no textures of Gx's
+        s_setTexture(device, 1, nullptr);
         s_ssaoStatus = 1;
+        RestoreGx(device);
+    }
+
+    // once a frame, after SSAO, before the outline: contrast, saturation, brightness, sharpening
+    void ColorGrade(IDirect3DDevice9* device)
+    {
+        float contrast = CVarFloat(CV_CONTRAST), saturation = CVarFloat(CV_SATURATION);
+        float brightness = CVarFloat(CV_BRIGHTNESS), sharpen = CVarFloat(CV_SHARPEN);
+        if (contrast == 1.0f && saturation == 1.0f && brightness == 1.0f && sharpen == 0.0f)
+            return;
+        if (!s_gradeChecked)
+        {
+            s_gradeChecked = true;
+            std::vector<DWORD> code = Compile(HLSL_GRADE_PS, "ps_3_0");
+            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), &s_gradeShader)))
+                s_gradeShader = nullptr;
+        }
+        if (!s_gradeShader || !s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device))
+            return;
+
+        IDirect3DSurface9* renderTarget = nullptr;
+        if (FAILED(device->GetRenderTarget(0, &renderTarget)) || !renderTarget)
+            return;
+        D3DSURFACE_DESC desc = {};
+        renderTarget->GetDesc(&desc);
+        if (!s_sceneCopy || s_sceneCopyWidth != desc.Width || s_sceneCopyHeight != desc.Height)
+        {
+            if (s_sceneCopySurface)
+                s_sceneCopySurface->Release();
+            if (s_sceneCopy)
+                s_sceneCopy->Release();
+            s_sceneCopySurface = nullptr;
+            s_sceneCopy = nullptr;
+            if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_X8R8G8B8,
+                D3DPOOL_DEFAULT, &s_sceneCopy, nullptr)) || !s_sceneCopy)
+            {
+                s_sceneCopy = nullptr;
+                renderTarget->Release();
+                return;
+            }
+            s_sceneCopy->GetSurfaceLevel(0, &s_sceneCopySurface);
+            s_sceneCopyWidth = desc.Width;
+            s_sceneCopyHeight = desc.Height;
+        }
+        // a multisampled screen is resolved by the copy
+        HRESULT copied = device->StretchRect(renderTarget, nullptr, s_sceneCopySurface, nullptr, D3DTEXF_NONE);
+        renderTarget->Release();
+        if (FAILED(copied))
+            return;
+
+        contrast = contrast < 0.5f ? 0.5f : (contrast > 1.5f ? 1.5f : contrast);
+        saturation = saturation < 0.0f ? 0.0f : (saturation > 2.0f ? 2.0f : saturation);
+        brightness = brightness < 0.5f ? 0.5f : (brightness > 1.5f ? 1.5f : brightness);
+        sharpen = sharpen < 0.0f ? 0.0f : (sharpen > 1.0f ? 1.0f : sharpen);
+        const float screen[4] = { 1.0f / s_sceneCopyWidth, 1.0f / s_sceneCopyHeight, 0.0f, 0.0f };
+        const float params[4] = { contrast, saturation, sharpen, brightness };
+
+        FillQuad(s_sceneCopyWidth, s_sceneCopyHeight);
+        s_setVertexShader(device, s_quadShader);
+        s_setPixelShader(device, s_gradeShader);
+        s_setPsConstant(device, 0, screen, 1);
+        s_setPsConstant(device, 1, params, 1);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        s_setTexture(device, 0, s_sceneCopy);
+        s_setSamplerState(device, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, 0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+        s_setSamplerState(device, 0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+        s_setSamplerState(device, 0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+        s_setSamplerState(device, 0, D3DSAMP_SRGBTEXTURE, FALSE);
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        s_setTexture(device, 0, nullptr);
         RestoreGx(device);
     }
 
@@ -1386,6 +1588,7 @@ namespace
         if (device && (s_stats.Installed & 4))
         {
             Ssao(device);
+            ColorGrade(device);
             Composite(device);
             if (EnsureMask(device) && EnsureQuadBuffer(device))
                 ClearMask(device);
