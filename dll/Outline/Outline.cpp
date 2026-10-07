@@ -845,7 +845,12 @@ namespace
         s_clientDepth = nullptr;
         ReleaseMask();      // a default pool resource: a reset fails while it exists
         ReleasePostTargets();
-        return s_reset(device, parameters);
+        HRESULT result = s_reset(device, parameters);
+        // the device is back at its defaults: so is our copy of what Gx set (else our restore after a pass puts the
+        // states of before the reset back - Gx doesn't know them: a dark, broken world)
+        if (SUCCEEDED(result))
+            s_shadow = Shadow();
+        return result;
     }
 
     // ---------------------------------------------------------------- shaders
