@@ -2,15 +2,17 @@
 
 // Retail-like unit outline (Outline Mode) for 3.3.5a (12340). Stage 1: the silhouette.
 //
-// How it works (the same points the retail-style Client.dll uses):
-//  * 0x8203B0 - draws one M2 batch (__thiscall, the batch record is 0xBC bytes). After the normal draw,
-//    the batches of the outlined models (and their attachments: model+0x48 parent chain) are copied.
-//  * 0x4F9240 - a place inside the world render function (mid-function hook). There the copied batches are drawn again
-//    with our flat pixel shader: the unit's silhouette in its current pose.
-//  * IDirect3DDevice9::DrawIndexedPrimitive (vtable) - during that replay our pixel shader goes in right at
-//    the draw call (after Gx sent its states), Gx's states are put back right after it.
-// Stage 1 draws the silhouette straight on the screen in one color (target, mouseover).
-// Stage 2: render target + blur (halo) + union -> a real outline. Stage 3: CVars, colors, Lua.
+// How it works:
+//  * 0x8203B0 - the client draws one M2 batch (__thiscall, the batch record). For a batch of an outlined model
+//    (or of its attachments: model+0x48 parent chain) a flag is set around the original call.
+//  * IDirect3DDevice9::DrawIndexedPrimitive (vtable) - with that flag set, the same draw call is issued once more
+//    right after the client's, with our flat pixel shader: the unit's silhouette in its current pose. No M2 / Gx
+//    function is called a second time (that changes their caches). Gx's states are put back from a copy of what
+//    it sent (SetRenderState / SetPixelShader / SetPixelShaderConstantF hooked): the device can't be read back.
+//  * 0x4F9240 - inside the world render function, after the 3D scene (mid-function hook): once a frame, the
+//    models of the next frame are picked (target, mouseover).
+// Stage 1 draws the silhouette straight on the screen in one color (target red, mouseover yellow).
+// Stage 2: the silhouettes into a texture + blur (halo) + union -> a real outline. Stage 3: CVars, colors, Lua.
 
 #include <cstdint>
 

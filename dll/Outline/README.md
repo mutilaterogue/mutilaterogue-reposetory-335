@@ -36,39 +36,31 @@ Stage 1 only checks the hard part: the target's and the mouseover's **silhouette
 Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface is used.
 
 ## How it works
-| Wow.exe | What we do |
+| Hook | What it does |
 |---|---|
-| `0x8203B0` M2 batch draw (`__thiscall`, record 0xBC bytes) | after the normal draw: copy the batches of the outlined models (and their attachments, `model+0x48`) |
-| `0x4F9240` a place **inside** the world render function, after the 3D scene (mid-function hook: the overwritten instructions run from a trampoline) | there: draw the copies again (their "previous batch" fields `+0x5C/+0x64/+0x6C` cleared, so bones and material are uploaded) with our pixel shader (`mov oC0, c0`), then pick the models of the next frame |
-| device vtable: `SetRenderState`, `SetPixelShader`, `SetPixelShaderConstantF`, `SetVertexShaderConstantF` | a copy of what Gx sends (the client's device can't be read back with `Get*`) |
-| device vtable: `DrawIndexedPrimitive` | during the redraw: our pixel shader, color, the record's `c2..c5` and states set right at the draw call, Gx's put back from the copy right after |
+| `0x8203B0` M2 batch draw (`__thiscall`) | a flag around the client's own draw of a batch of an outlined model (and its attachments, `model+0x48`; opaque / alpha key materials only) |
+| device vtable `DrawIndexedPrimitive` | with the flag: the same draw call once more right after the client's, with our pixel shader (`mov oC0, c0`), no depth test |
+| device vtable `SetRenderState`, `SetPixelShader`, `SetPixelShaderConstantF` | a copy of what Gx sends; after our draw call exactly that is put back (the client's device can't be read back with `Get*`) |
+| `0x4F9240` inside the world render function, after the 3D scene (mid-function hook, trampoline) | once a frame: the models of the next frame (target red, mouseover yellow) |
 
-The D3D device: `[[0xC5DF88] + 0x397C]` (only when the Gx API `[+0x1B4]` is Direct3D).
-Gx keeps a cache of the device states: nothing is changed behind it except for that one draw call, and put back right after.
+No M2 / Gx function is ever called a second time: an earlier version re-ran `0x8203B0` and that broke the world
+(sky, textures) through their caches.
 
 ## Debug: `/run print(OutlineDebug())`
-Target a unit and hover another one, then run it. Eleven values:
-
 | # | Value | Expected |
 |---|---|---|
-| 1 | hooks installed (bits: 1 batch, 2 world render, 4 draw call - set on the first redraw) | `7` (`3` until something is targeted) |
-| 2 | world render hook calls | grows every run |
-| 3 | batch hook calls | grows a lot |
-| 4 | models picked (target + mouseover) | `1` or `2` |
-| 5 | batches of those models seen | grows |
-| 6 | batches kept in the last frame | > 0 |
-| 7 | batches drawn again in the last frame | = #6 |
-| 8 | Gx API | `1` or `2` (Direct3D) |
-| 9 | error: 1 no D3D device, 2 shader, 3 draw call hook | `0` |
-| 10 | the first 12 bytes at `0x4F9240` | (for me) |
-| 11 | bytes moved to the trampoline | `5`..`15` (`0`: an instruction the decoder doesn't know - hook not set) |
-| 12 | draw calls with our shader in the last redraw | > 0 |
-| 13 | 1: the redraw went to the back buffer (0: another render target) | |
-| 14 | the current `OutlineMode` | |
+| 1 | hooks (bits: 1 batch, 2 world render, 4 device) | `7` |
+| 2 | world render calls | grows |
+| 3 | batch draws | grows a lot |
+| 4 | models picked | `1`..`2` |
+| 5 | their batches in the last frame | > 0 |
+| 6 | silhouette draw calls in the last frame | = #5 or more |
+| 7 | Gx API | `1` / `2` |
+| 8 | error: 1 no D3D device, 2 shader | `0` |
+| 9 | `OutlineMode` | |
 
-`/run OutlineMode(n)` test switches: `1` keep the batch's "previous" fields, `2` no redraw (record only),
-`4` redraw into the back buffer, `8` no view-projection of the record; add them up (`5` = 1 + 4).
+`/run OutlineMode(n)`: `1` no extra draw (does the world stay fine without it?), `2` keep the depth test.
 
 ## What to check
-* Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too.
-* Crash: send the crash log (address + stack). Nothing at all: tell me, there are a few switches to try.
+* Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too; the rest of the world as usual.
+* Crash: send the crash log.
