@@ -169,6 +169,7 @@ namespace
 
     // our device objects
     IDirect3DPixelShader9* s_flatShader = nullptr;
+    IDirect3DPixelShader9* s_flatAlphaShader = nullptr;   // the same, cut by the client's texture's alpha
     IDirect3DPixelShader9* s_outlineShader = nullptr;
     IDirect3DPixelShader9* s_outlineLowShader = nullptr;
     IDirect3DVertexShader9* s_quadShader = nullptr;
@@ -666,6 +667,13 @@ namespace
         "float4 color : register(c0);\n"
         "float4 main() : COLOR { return color; }\n";
 
+    // a mount's / an attachment's batch: flames, feathers, glows are quads whose shape is only in the texture's alpha.
+    // The client's texture (stage 0) and its sampler are still bound; its vertex shader puts the uv in TEXCOORD0
+    const char HLSL_FLAT_ALPHA_PS[] =
+        "sampler2D diffuse : register(s0);\n"
+        "float4 color : register(c0);\n"
+        "float4 main(float2 uv : TEXCOORD0) : COLOR { clip(tex2D(diffuse, uv).a - 0.5); return color; }\n";
+
     const char HLSL_QUAD_VS[] =
         "struct V { float4 position : POSITION; float2 uv : TEXCOORD0; };\n"
         "V main(V v) { return v; }\n";
@@ -772,6 +780,13 @@ namespace
     // the silhouette's shader: without it nothing works (OutlineDebug #8 = 2)
     bool CreateFlatShader(IDirect3DDevice9* device)
     {
+        // no fallback bytecode for the alpha cut one: without the compiler those batches are drawn flat
+        if (!s_flatAlphaShader)
+        {
+            std::vector<DWORD> code = Compile(HLSL_FLAT_ALPHA_PS, "ps_3_0");
+            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), &s_flatAlphaShader)))
+                s_flatAlphaShader = nullptr;
+        }
         return CreatePixel(device, HLSL_FLAT_PS, nullptr, OutlineShaders::SHADER_FLAT_PS, s_flatShader);
     }
 
@@ -947,7 +962,9 @@ namespace
             // MinZ / MaxZ), else the silhouette's depth doesn't match the scene's
             RestoreViewport(device);
         }
-        s_setPixelShader(device, s_flatShader);
+        // 64: no alpha cut (a test switch)
+        bool alphaCut = s_currentAttachment && s_flatAlphaShader && !(s_mode & 64);
+        s_setPixelShader(device, alphaCut ? s_flatAlphaShader : s_flatShader);
         s_setPsConstant(device, 0, s_currentTarget->Color, 1);
         SetSilhouetteStates(device);
         if (depthTest)

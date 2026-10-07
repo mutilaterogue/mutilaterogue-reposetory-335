@@ -106,7 +106,7 @@ draws nothing).
 | 14 | the compiler's error message, if any | `-` |
 
 `/run OutlineMode(n)`: `1` no silhouettes, `2` no full-screen pass, `4` low quality (8 samples),
-`8` stage 1 (the silhouettes straight on the screen). Add them up.
+`8` stage 1 (the silhouettes straight on the screen), `64` mounts / attachments without the cut by the texture's alpha. Add them up.
 
 ## What to check
 * Target / hover a hostile mob: red; a neutral one: yellow; a friendly NPC: green; a friendly player: blue.
