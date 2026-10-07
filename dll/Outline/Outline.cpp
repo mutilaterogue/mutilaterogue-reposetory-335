@@ -28,6 +28,12 @@ namespace
     constexpr uintptr_t ADDR_TARGET_GUID    = 0xBD07B0;
     constexpr uintptr_t ADDR_MOUSEOVER_GUID = 0xBD07A0;
     constexpr uintptr_t ADDR_OBJECT_PTR     = 0x4D4DB0;    // ClntObjMgrObjectPtr(guid, typeMask, file, line)
+    // CGxDevice::ShaderConstantsSet(target 0 vertex, first register, data, register count)
+    constexpr uintptr_t ADDR_GX_SHADER_CONSTANTS = 0x6833E0;
+    // the M2 vertex shaders' view * projection: c2..c5; at 0x4F9240 the 3D scene is over and Gx holds
+    // another matrix there - the one of the world's draws is put back for the replay
+    constexpr uint32_t VIEWPROJ_REGISTER   = 2;
+    constexpr uint32_t VIEWPROJ_COUNT      = 4;
 
     // the batch record
     constexpr size_t   BATCH_SIZE          = 0xBC;
@@ -50,6 +56,7 @@ namespace
     {
         std::array<uint8_t, BATCH_SIZE> Data;
         float Color[4];
+        float ViewProj[VIEWPROJ_COUNT * 4];     // c2..c5 when it was drawn
     };
 
     // OutlineDebug(): where the chain breaks
@@ -186,9 +193,13 @@ namespace
         uint8_t* material = *reinterpret_cast<uint8_t**>(batch + BATCH_MATERIAL);
         if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
             return;
+        IDirect3DDevice9* device = GetD3DDevice();
+        if (!device)
+            return;
         Batch copy;
         memcpy(copy.Data.data(), batch, BATCH_SIZE);
         memcpy(copy.Color, target->Color, sizeof(copy.Color));
+        device->GetVertexShaderConstantF(VIEWPROJ_REGISTER, copy.ViewProj, VIEWPROJ_COUNT);
         s_batches.push_back(copy);
     }
 
@@ -307,6 +318,11 @@ namespace
         for (Batch& batch : s_batches)
         {
             memcpy(s_replayColor, batch.Color, sizeof(s_replayColor));
+            // the world's camera back (through Gx so its cache knows it, and on the device at once)
+            if (uint8_t* gx = *reinterpret_cast<uint8_t**>(ADDR_GX_DEVICE))
+                reinterpret_cast<void (__thiscall*)(void*, int32_t, int32_t, const float*, int32_t)>(ADDR_GX_SHADER_CONSTANTS)(
+                    gx, 0, VIEWPROJ_REGISTER, batch.ViewProj, VIEWPROJ_COUNT);
+            device->SetVertexShaderConstantF(VIEWPROJ_REGISTER, batch.ViewProj, VIEWPROJ_COUNT);
             alignas(16) uint8_t copy[BATCH_SIZE];        // the draw writes into its record: a copy
             memcpy(copy, batch.Data.data(), BATCH_SIZE);
             // "the same as the previous batch" -> the draw would skip the bones / material upload: never
