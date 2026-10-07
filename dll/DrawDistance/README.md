@@ -10,7 +10,13 @@ Raises the client's limits on the grass and small objects draw distance.
 ## Hooking it up
 1. Copy `DrawDistance.hpp/.cpp` to `WotLKExtensions/src/DrawDistance/`.
 2. `Main.hpp`: `#include <DrawDistance/DrawDistance.hpp>`
-3. `Main.cpp`, `Main::Init()`: `DrawDistance::ApplyPatches();`
+3. `CMakeLists.txt`: `option(DRAWDISTANCE_EXTENSION ...)`, `cmake/PatchConfig.hpp.in`: `#cmakedefine01 DRAWDISTANCE_EXTENSION`
+4. `Main.cpp`, `Main::Init()`:
+   ```cpp
+   #if DRAWDISTANCE_EXTENSION
+       DrawDistance::ApplyPatches();
+   #endif
+   ```
 
 ## Check
 `/console groundEffectDist 300`, `/console environmentDetail 3` - the grass and the doodads reach farther.
