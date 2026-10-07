@@ -54,18 +54,22 @@ def ps_outline(rings=((1.5, 8), (3.0, 8)), rotate=True):
     t += defc(9, 0.0001, 1.0, 0, 0)
     t += dcl_usage(5, ('v', 0), 'xy')
     t += dcl_2d(0)
-    # r3 = 0 (the sum); r1 = 0 (texld reads all of it, only .xy is set below: an unwritten
-    # component makes the shader invalid)
+    # r3 = 0 (the sum); r1, r9 = 0 (texld reads all of them, only .xy is set: an unwritten component makes
+    # the shader invalid); r8 = c0 (one texel) and r9.xy = v0.xy: an instruction reads at most one constant,
+    # and texld takes its coordinate without a swizzle
     t += ins(OP['mov'], dst(('r', 3)), src(('c', 9), 'zzzz'))
     t += ins(OP['mov'], dst(('r', 1)), src(('c', 9), 'zzzz'))
+    t += ins(OP['mov'], dst(('r', 9)), src(('c', 9), 'zzzz'))
+    t += ins(OP['mov'], dst(('r', 8)), src(('c', 0)))
+    t += ins(OP['mov'], dst(('r', 9), 'xy'), src(('v', 0), 'xyxy'))
     for i in range(len(taps)):
         c = ('c', base + i // 2)
         sw = 'xyxy' if i % 2 == 0 else 'zwzw'
-        t += ins(OP['mad'], dst(('r', 1), 'xy'), src(c, sw), src(('c', 0), 'xyxy'), src(('v', 0), 'xyxy'))
+        t += ins(OP['mad'], dst(('r', 1), 'xy'), src(c, sw), src(('r', 8), 'xyxy'), src(('r', 9), 'xyxy'))
         t += ins(OP['texld'], dst(('r', 2)), src(('r', 1)), src(('s', 0)))
         t += ins(OP['add'], dst(('r', 3)), src(('r', 3)), src(('r', 2)))
     # center
-    t += ins(OP['texld'], dst(('r', 4)), src(('v', 0), 'xyxy'), src(('s', 0)))
+    t += ins(OP['texld'], dst(('r', 4)), src(('r', 9)), src(('s', 0)))
     # rgb = sum.rgb / max(sum.a, eps)
     t += ins(OP['max'], dst(('r', 5), 'x'), src(('r', 3), 'wwww'), src(('c', 9), 'xxxx'))
     t += ins(OP['rcp'], dst(('r', 5), 'x'), src(('r', 5), 'xxxx'))
