@@ -259,6 +259,23 @@ namespace
             ReactionColor(object, target.Color);
         target.Color[3] = 1.0f;
         s_targets.push_back(target);
+
+        // on a mount the unit's model is the rider, attached to the mount's model: that one too (and so all
+        // that hangs on the mount, through the parent chain in FindTarget)
+        void* parent = *reinterpret_cast<void**>(static_cast<uint8_t*>(object->m_model) + MODEL_PARENT);
+        for (int depth = 0; parent && depth < 3; ++depth)
+        {
+            bool known = false;
+            for (Target const& existing : s_targets)
+                known = known || existing.Model == parent;
+            if (!known)
+            {
+                Target mount = target;
+                mount.Model = parent;
+                s_targets.push_back(mount);
+            }
+            parent = *reinterpret_cast<void**>(static_cast<uint8_t*>(parent) + MODEL_PARENT);
+        }
     }
 
     // the bosses around (OutlineQuestBoss)
