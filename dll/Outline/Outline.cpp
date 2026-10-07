@@ -64,7 +64,7 @@ namespace
         uint32_t TargetBatches = 0;         // their batches in the last frame
         uint32_t Silhouettes = 0;           // silhouette draw calls in the last frame
         uint32_t GxApi = 0;
-        uint32_t Error = 0;                 // 1 no device, 2 shaders, 3 mask texture, 4 quad buffer
+        uint32_t Error = 0;                 // 1 no device, 2 flat ps, 3 mask texture, 4 quad buffer, 5 outline ps, 6 low ps, 7 quad vs, 8 declaration
         uint32_t Composites = 0;            // full-screen passes done
     } s_stats;
     uint32_t s_frameBatches = 0;
@@ -417,17 +417,18 @@ namespace
         return s_reset(device, parameters);
     }
 
-    bool CreateShaders(IDirect3DDevice9* device)
+    // 0, or the error code of what failed (OutlineDebug #8)
+    uint32_t CreateShaders(IDirect3DDevice9* device)
     {
         using namespace OutlineShaders;
         if (!s_flatShader && FAILED(device->CreatePixelShader(SHADER_FLAT_PS, &s_flatShader)))
-            return false;
+            return 2;
         if (!s_outlineShader && FAILED(device->CreatePixelShader(SHADER_OUTLINE_PS, &s_outlineShader)))
-            return false;
+            return 5;
         if (!s_outlineLowShader && FAILED(device->CreatePixelShader(SHADER_OUTLINE_LOW_PS, &s_outlineLowShader)))
-            return false;
+            return 6;
         if (!s_quadShader && FAILED(device->CreateVertexShader(SHADER_QUAD_VS, &s_quadShader)))
-            return false;
+            return 7;
         if (!s_quadDeclaration)
         {
             const D3DVERTEXELEMENT9 elements[] = {
@@ -436,9 +437,9 @@ namespace
                 D3DDECL_END(),
             };
             if (FAILED(device->CreateVertexDeclaration(elements, &s_quadDeclaration)))
-                return false;
+                return 8;
         }
-        return true;
+        return 0;
     }
 
     // the mask: as big as the back buffer (made again when that changes, after a reset)
@@ -637,9 +638,9 @@ namespace
             s_stats.Error = 1;
             return;
         }
-        if (!CreateShaders(device))
+        if (uint32_t error = CreateShaders(device))
         {
-            s_stats.Error = 2;
+            s_stats.Error = error;
             return;
         }
         s_stats.Error = 0;

@@ -54,8 +54,10 @@ def ps_outline(rings=((1.5, 8), (3.0, 8)), rotate=True):
     t += defc(9, 0.0001, 1.0, 0, 0)
     t += dcl_usage(5, ('v', 0), 'xy')
     t += dcl_2d(0)
-    # r3 = 0 (the sum)
+    # r3 = 0 (the sum); r1 = 0 (texld reads all of it, only .xy is set below: an unwritten
+    # component makes the shader invalid)
     t += ins(OP['mov'], dst(('r', 3)), src(('c', 9), 'zzzz'))
+    t += ins(OP['mov'], dst(('r', 1)), src(('c', 9), 'zzzz'))
     for i in range(len(taps)):
         c = ('c', base + i // 2)
         sw = 'xyxy' if i % 2 == 0 else 'zwzw'

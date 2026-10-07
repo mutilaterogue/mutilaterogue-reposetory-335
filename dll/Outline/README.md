@@ -57,7 +57,7 @@ draws nothing).
 | 5 | their batches in the last frame | > 0 |
 | 6 | silhouette draw calls in the last frame | = #5 |
 | 7 | Gx API | `1` / `2` |
-| 8 | error: 1 no D3D device, 2 shaders, 3 mask texture, 4 quad buffer | `0` |
+| 8 | error: 1 no D3D device, 2 flat shader, 3 mask texture, 4 quad buffer, 5 outline shader, 6 low outline shader, 7 quad vertex shader, 8 vertex declaration | `0` |
 | 9 | `OutlineMode` | |
 | 10 | full-screen passes done | grows |
 | 11, 12 | mask size | the screen size |
