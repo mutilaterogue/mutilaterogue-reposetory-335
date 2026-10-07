@@ -937,9 +937,10 @@ namespace
         HRESULT result = s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         if (!s_currentTarget || (s_mode & 1))
             return result;
-        // a spell effect's billboard on an attachment (a few triangles, its shape only in the texture): not a
+        // a billboard (an attachment's, or the unit's own glow / alpha keyed card: a few triangles, its shape only
+        // in the texture): not a
         // silhouette. Weapons and armor pieces have far more
-        if (s_currentAttachment && primitiveCount < MIN_ATTACHMENT_TRIANGLES)
+        if ((s_currentAttachment || !s_currentOpaque) && primitiveCount < MIN_ATTACHMENT_TRIANGLES)
             return result;
         bool toScreen = (s_mode & 8) != 0;
         if (!toScreen && !s_maskSurface)
