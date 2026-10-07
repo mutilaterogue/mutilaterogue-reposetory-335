@@ -10,6 +10,7 @@
 #include <d3d9.h>
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -22,7 +23,6 @@ namespace
     constexpr uintptr_t ADDR_GX_MUTE_B      = 0x6A77C0;    // CGxDeviceD3d, 2 stack args (ret 8)
 
     // the same addresses as variables for the inline asm (it can't call a constant)
-    uintptr_t ADDR_WORLD_RENDER_PTR = ADDR_WORLD_RENDER;
     uintptr_t ADDR_GX_MUTE_A_PTR    = ADDR_GX_MUTE_A;
     uintptr_t ADDR_GX_MUTE_B_PTR    = ADDR_GX_MUTE_B;
 
@@ -112,7 +112,6 @@ namespace
     };
 
     RawHook s_hookDrawBatch;
-    RawHook s_hookWorldRender;
     RawHook s_hookMuteA;
     RawHook s_hookMuteB;
 
@@ -268,11 +267,167 @@ namespace
         s_stats.Targets = static_cast<uint32_t>(s_targets.size());
     }
 
-    // the world render hook: everything (registers, FPU/SSE) kept for the original
-    uint32_t s_worldRenderReturn = 0;
-    void __cdecl UnpatchWorldRender() { s_hookWorldRender.Unpatch(); }
-    void __cdecl RepatchWorldRender() { s_hookWorldRender.Repatch(); }
+    // ---------------------------------------------------------------- the mid-function hook at 0x4F9240
+    // 0x4F9240 is a place inside the world render function, not a function: our code runs there, then the
+    // instructions we overwrote (copied to a trampoline) and a jmp back right after them.
 
+    // the length of one x86 instruction (the usual compiler output; 0 - not handled)
+    size_t ModRmLength(const uint8_t* p, bool address16)
+    {
+        uint8_t modrm = p[0];
+        uint8_t mod = modrm >> 6, rm = modrm & 7;
+        size_t length = 1;
+        if (address16)
+            return 0;
+        if (mod != 3 && rm == 4)
+        {
+            uint8_t sib = p[1];
+            ++length;
+            if (mod == 0 && (sib & 7) == 5)
+                length += 4;
+        }
+        if (mod == 1)
+            length += 1;
+        else if (mod == 2 || (mod == 0 && rm == 5))
+            length += 4;
+        return length;
+    }
+
+    // relative: the instruction has a rel32 at its end (call / jmp / jcc) - fixed when copied
+    size_t InstructionLength(const uint8_t* code, bool& relative32, bool& relative8)
+    {
+        relative32 = relative8 = false;
+        const uint8_t* p = code;
+        bool operand16 = false;
+        while (*p == 0x66 || *p == 0x67 || *p == 0xF2 || *p == 0xF3 || *p == 0x2E || *p == 0x3E || *p == 0x26 || *p == 0x36 || *p == 0x64 || *p == 0x65)
+        {
+            if (*p == 0x66)
+                operand16 = true;
+            if (*p == 0x67)
+                return 0;
+            ++p;
+        }
+        size_t prefixes = p - code;
+        uint8_t op = *p++;
+        size_t imm = operand16 ? 2 : 4;
+
+        if (op >= 0x50 && op <= 0x61) return prefixes + 1;                     // push / pop reg, pushad, popad
+        if (op >= 0x40 && op <= 0x4F) return prefixes + 1;                     // inc / dec reg
+        if (op >= 0x90 && op <= 0x99) return prefixes + 1;                     // nop, xchg, cwde, cdq
+        if (op == 0x9C || op == 0x9D || op == 0xC3 || op == 0xCC) return prefixes + 1;
+        if (op >= 0xB0 && op <= 0xB7) return prefixes + 2;                     // mov r8, imm8
+        if (op >= 0xB8 && op <= 0xBF) return prefixes + 1 + imm;               // mov reg, imm
+        if (op == 0x6A) return prefixes + 2;                                   // push imm8
+        if (op == 0x68) return prefixes + 1 + imm;                             // push imm
+        if (op == 0xA8) return prefixes + 2;                                   // test al, imm8
+        if (op == 0xA9) return prefixes + 1 + imm;                             // test eax, imm
+        if (op >= 0xA0 && op <= 0xA3) return prefixes + 5;                     // mov eax, [moffs]
+        if (op == 0x04 || op == 0x0C || op == 0x14 || op == 0x1C || op == 0x24 || op == 0x2C || op == 0x34 || op == 0x3C)
+            return prefixes + 2;                                               // op al, imm8
+        if (op == 0x05 || op == 0x0D || op == 0x15 || op == 0x1D || op == 0x25 || op == 0x2D || op == 0x35 || op == 0x3D)
+            return prefixes + 1 + imm;                                         // op eax, imm
+        if (op == 0xC2) return prefixes + 3;                                   // ret imm16
+        if (op == 0xE8 || op == 0xE9) { relative32 = true; return prefixes + 5; }
+        if (op == 0xEB || (op >= 0x70 && op <= 0x7F)) { relative8 = true; return prefixes + 2; }
+
+        // modrm forms: alu r/m, mov, lea, test, xchg, fpu, ...
+        if ((op <= 0x3F && (op & 7) <= 3) || (op >= 0x84 && op <= 0x8F) || (op >= 0xD8 && op <= 0xDF) || op == 0xD0 || op == 0xD1 || op == 0xD2 || op == 0xD3 || op == 0xFE || op == 0xFF)
+        {
+            size_t m = ModRmLength(p, false);
+            return m ? prefixes + 1 + m : 0;
+        }
+        if (op == 0x80 || op == 0x82 || op == 0x83 || op == 0xC0 || op == 0xC1 || op == 0xC6 || op == 0x6B)
+        {
+            size_t m = ModRmLength(p, false);
+            return m ? prefixes + 1 + m + 1 : 0;
+        }
+        if (op == 0x81 || op == 0xC7 || op == 0x69)
+        {
+            size_t m = ModRmLength(p, false);
+            return m ? prefixes + 1 + m + imm : 0;
+        }
+        if (op == 0xF6 || op == 0xF7)
+        {
+            size_t m = ModRmLength(p, false);
+            if (!m)
+                return 0;
+            bool hasImm = ((p[0] >> 3) & 7) <= 1;                            // test r/m, imm
+            return prefixes + 1 + m + (hasImm ? (op == 0xF6 ? 1 : imm) : 0);
+        }
+        if (op == 0x0F)
+        {
+            uint8_t op2 = *p++;
+            if (op2 >= 0x80 && op2 <= 0x8F) { relative32 = true; return prefixes + 6; }   // jcc rel32
+            if ((op2 >= 0x90 && op2 <= 0x9F) || op2 == 0xAF || op2 == 0xB6 || op2 == 0xB7 || op2 == 0xBE || op2 == 0xBF
+                || (op2 >= 0x10 && op2 <= 0x17) || (op2 >= 0x28 && op2 <= 0x2F) || (op2 >= 0x40 && op2 <= 0x4F)
+                || (op2 >= 0x51 && op2 <= 0x7F) || op2 == 0xD6 || op2 == 0xE6 || op2 == 0xEF || op2 == 0x18)
+            {
+                size_t m = ModRmLength(p, false);
+                return m ? prefixes + 2 + m : 0;
+            }
+            if (op2 == 0xC6 || op2 == 0x70 || op2 == 0xC2)
+            {
+                size_t m = ModRmLength(p, false);
+                return m ? prefixes + 2 + m + 1 : 0;
+            }
+            return 0;
+        }
+        return 0;
+    }
+
+    struct MidHook
+    {
+        uintptr_t Site = 0;
+        size_t Length = 0;
+        uint8_t* Trampoline = nullptr;
+        uint8_t Bytes[16] = {};     // OutlineDebug: what was there
+
+        // `detour` runs at `site` (it must end with `jmp [trampoline]`)
+        bool Install(uintptr_t site, void* detour)
+        {
+            Site = site;
+            memcpy(Bytes, reinterpret_cast<void*>(site), sizeof(Bytes));
+            Trampoline = static_cast<uint8_t*>(VirtualAlloc(nullptr, 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!Trampoline)
+                return false;
+
+            // whole instructions covering the 5 bytes of our jmp, copied (rel32 fixed, rel8 not allowed)
+            size_t length = 0;
+            uint8_t* out = Trampoline;
+            while (length < 5)
+            {
+                bool rel32 = false, rel8 = false;
+                const uint8_t* instruction = reinterpret_cast<const uint8_t*>(site + length);
+                size_t size = InstructionLength(instruction, rel32, rel8);
+                if (!size || rel8 || length + size > 15)
+                    return false;
+                memcpy(out, instruction, size);
+                if (rel32)
+                {
+                    int32_t& displacement = *reinterpret_cast<int32_t*>(out + size - 4);
+                    uintptr_t destination = site + length + size + *reinterpret_cast<const int32_t*>(instruction + size - 4);
+                    displacement = static_cast<int32_t>(destination - (reinterpret_cast<uintptr_t>(out) + size));
+                }
+                out += size;
+                length += size;
+            }
+            // back to the rest of the original code
+            out[0] = 0xE9;
+            *reinterpret_cast<int32_t*>(out + 1) = static_cast<int32_t>((site + length) - (reinterpret_cast<uintptr_t>(out) + 5));
+            Length = length;
+
+            uint8_t patch[16];
+            memset(patch, 0x90, sizeof(patch));
+            patch[0] = 0xE9;
+            *reinterpret_cast<int32_t*>(patch + 1) = static_cast<int32_t>(reinterpret_cast<uintptr_t>(detour) - (site + 5));
+            return HookUtil::WriteCode(site, patch, length);
+        }
+    };
+
+    MidHook s_hookWorldRender;
+    uint8_t* s_worldRenderTrampoline = nullptr;
+
+    // everything (registers, flags, FPU/SSE) kept for the code we interrupt
     __declspec(naked) void WorldRenderDetour()
     {
         __asm
@@ -284,20 +439,11 @@ namespace
             and esp, 0xFFFFFFF0
             fxsave [esp]
             call OnWorldRender
-            call UnpatchWorldRender
             fxrstor [esp]
             mov esp, ebp
             popfd
             popad
-            // the original with the caller's arguments; back here, then to the caller
-            pop dword ptr [s_worldRenderReturn]
-            call dword ptr [ADDR_WORLD_RENDER_PTR]
-            pushad
-            pushfd
-            call RepatchWorldRender
-            popfd
-            popad
-            jmp dword ptr [s_worldRenderReturn]
+            jmp dword ptr [s_worldRenderTrampoline]
         }
     }
 
@@ -364,7 +510,10 @@ void Outline::ApplyPatches()
     if (s_hookDrawBatch.Install(ADDR_M2_DRAW_BATCH, reinterpret_cast<void*>(&DrawBatchDetour)))
         s_stats.Installed |= 1;
     if (s_hookWorldRender.Install(ADDR_WORLD_RENDER, reinterpret_cast<void*>(&WorldRenderDetour)))
+    {
+        s_worldRenderTrampoline = s_hookWorldRender.Trampoline;
         s_stats.Installed |= 2;
+    }
     if (s_hookMuteA.Install(ADDR_GX_MUTE_A, reinterpret_cast<void*>(&MuteADetour)))
         s_stats.Installed |= 4;
     if (s_hookMuteB.Install(ADDR_GX_MUTE_B, reinterpret_cast<void*>(&MuteBDetour)))
@@ -384,5 +533,11 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushNumber(L, s_stats.Replayed);
     FrameScript::PushNumber(L, s_stats.GxApi);
     FrameScript::PushNumber(L, s_stats.Error);
-    return 9;
+    // the bytes at 0x4F9240 and how many were moved to the trampoline
+    char bytes[64] = {};
+    for (int i = 0; i < 12; ++i)
+        sprintf_s(bytes + i * 3, sizeof(bytes) - i * 3, "%02X ", s_hookWorldRender.Bytes[i]);
+    FrameScript::PushString(L, bytes);
+    FrameScript::PushNumber(L, static_cast<double>(s_hookWorldRender.Length));
+    return 11;
 }

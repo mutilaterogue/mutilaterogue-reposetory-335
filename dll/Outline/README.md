@@ -38,14 +38,14 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | Wow.exe | What we do |
 |---|---|
 | `0x8203B0` M2 batch draw (`__thiscall`, record 0xBC bytes) | after the normal draw: copy the batches of the outlined models (and their attachments, `model+0x48`) |
-| `0x4F9240` near the end of the world frame | before it: draw the copies again with our pixel shader (`mov oC0, c0`), then pick the models of the next frame |
+| `0x4F9240` a place **inside** the world render function (mid-function hook: the overwritten instructions run from a trampoline) | there: draw the copies again with our pixel shader (`mov oC0, c0`), then pick the models of the next frame |
 | `0x6A3620`, `0x6A77C0` (`CGxDeviceD3d`) | muted (`ret 8`) during that redraw, so the batch can't put its own shader back |
 
 The D3D device: `[[0xC5DF88] + 0x397C]` (only when the Gx API `[+0x1B4]` is Direct3D).
 All D3D states are restored after the redraw (state block).
 
 ## Debug: `/run print(OutlineDebug())`
-Target a unit and hover another one, then run it. Nine numbers:
+Target a unit and hover another one, then run it. Eleven values:
 
 | # | Value | Expected |
 |---|---|---|
@@ -58,6 +58,8 @@ Target a unit and hover another one, then run it. Nine numbers:
 | 7 | batches drawn again in the last frame | = #6 |
 | 8 | Gx API | `1` or `2` (Direct3D) |
 | 9 | error: 1 no D3D device, 2 shader, 3 state block | `0` |
+| 10 | the first 12 bytes at `0x4F9240` | (for me) |
+| 11 | bytes moved to the trampoline | `5`..`15` (`0`: an instruction the decoder doesn't know - hook not set) |
 
 ## What to check
 * Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too.

@@ -5,7 +5,7 @@
 // How it works (the same points the retail-style Client.dll uses):
 //  * 0x8203B0 - draws one M2 batch (__thiscall, the batch record is 0xBC bytes). After the normal draw,
 //    the batches of the outlined models (and their attachments: model+0x48 parent chain) are copied.
-//  * 0x4F9240 - near the end of the world frame. Before it runs, the copied batches are drawn again
+//  * 0x4F9240 - a place inside the world render function (mid-function hook). There the copied batches are drawn again
 //    with our flat pixel shader: the unit's silhouette in its current pose.
 //  * 0x6A3620, 0x6A77C0 - CGxDeviceD3d functions muted during that replay, so the batch can't put
 //    its own shader / states back over ours.
