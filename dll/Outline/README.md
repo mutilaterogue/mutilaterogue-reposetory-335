@@ -1,7 +1,8 @@
-# Outline (WotLKExtensions patch) — stage 2
+# Outline (WotLKExtensions patch) — stage 3
 
-Retail-like unit outline (Outline Mode) for 3.3.5a (12340): a soft rim around the target (red) and the
-mouseover (yellow), over walls too. The method was taken from a client DLL that does it; the code and the shaders
+Retail-like unit outline (Outline Mode) for 3.3.5a (12340): a soft rim around the target, the mouseover,
+the bosses around and your own character, over walls too. The color is the unit's reaction, whatever made it
+outlined: hostile red, neutral yellow, friendly green, friendly players blue. The method was taken from a client DLL that does it; the code and the shaders
 are our own.
 
 ## Files
@@ -29,17 +30,44 @@ are our own.
    #if OUTLINE_EXTENSION
        AddToFunctionMap("OutlineDebug", &Outline::OutlineDebug);
        AddToFunctionMap("OutlineMode", &Outline::OutlineMode);
+       AddToFunctionMap("SetUnitOutline", &Outline::SetUnitOutline);
+       AddToFunctionMap("ClearUnitOutline", &Outline::ClearUnitOutline);
    #endif
    ```
 
 Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface is used.
+
+## CVars (the options panel XML: `InterfaceOptionsDisplayPanelOutline*`)
+| CVar | Default | |
+|---|---|---|
+| `OutlineQuality` | `1` | `0` off, `1` on, `2` on, low quality (8 samples) |
+| `OutlineTarget` | `1` | the target |
+| `OutlineMouseover` | `1` | the unit under the mouse |
+| `OutlineQuestBoss` | `1` | the bosses around (world boss rank). Quest units: not yet - the client has no simple "is a quest objective" |
+| `OutlinePlayer` | `0` | your own character |
+| `OutlineThickness` | `1` | `0.5` .. `3` |
+| `OutlineStrength` | `1` | opacity `0` .. `1` |
+
+They are registered in the world (the first frame), not at the login screen (more custom glue cvars crashed the
+client, see `NamePlates.cpp`); a value saved in `Config.wtf` is kept. Your XML's texts, if `GlobalStrings` lacks them:
+```lua
+OUTLINE_ENABLE = "Обводка моделей";
+OUTLINE_PLAYER = "Свой персонаж";
+OUTLINE_TARGET = "Цель";
+OUTLINE_MOUSEOVER = "Под курсором";
+OUTLINE_QUEST = "Боссы";
+```
+
+## Lua
+* `SetUnitOutline(unit, r, g, b)` — an outline of its own color for any unit (`"target"`, `"party1"`, ...), until
+* `ClearUnitOutline(unit)` / `ClearUnitOutline()` (every one).
 
 ## How it works
 | Hook | What it does |
 |---|---|
 | `0x8203B0` M2 batch draw (`__thiscall`) | a flag around the client's own draw of a batch of an outlined model (and its attachments, `model+0x48`; opaque / alpha key materials only) |
 | device vtable `DrawIndexedPrimitive` | with the flag: the same draw call once more right after the client's, into our **mask** (a screen-sized texture), flat shader: the silhouette in its color |
-| `0x4F9240` inside the world render function, after the 3D scene (mid-function hook, trampoline) | one full-screen pass: 16 mask samples on two rings (1.5 / 3 px; 8 on one ring in low quality) = the halo, minus the mask itself = the rim, alpha blended; the mask cleared; the models of the next frame picked |
+| `0x4F9240` inside the world render function, after the 3D scene (mid-function hook, trampoline) | one full-screen pass: 16 mask samples on two rings (1.5 / 3 px × `OutlineThickness`; 8 on one ring in low quality) = the halo, minus the mask itself = the rim, alpha blended; the mask cleared; the units of the next frame picked by the CVars, colored by reaction (`CGUnit_C::UnitReaction` `0x7251C0`, `CanAttack` `0x729A70`), bosses from `ClntObjMgrEnumVisibleObjects` `0x4D4B30` + `GetCreatureRank` `0x718A00` |
 | device vtable `SetRenderState`, `SetViewport`, `SetTexture`, `SetSamplerState`, `SetVertexDeclaration`, `SetFVF`, `SetVertexShader`, `SetStreamSource`, `SetPixelShader`, `SetPixelShaderConstantF` | a copy of what Gx sends; after our draws exactly that is put back (the client's device can't be read back with `Get*`) |
 | device vtable `Reset` | the mask (a default pool texture) released first |
 
@@ -68,6 +96,8 @@ draws nothing).
 `8` stage 1 (the silhouettes straight on the screen). Add them up.
 
 ## What to check
-* Target an NPC / hover a unit: a red / yellow rim around the model (weapons too); the model itself as usual.
+* Target / hover a hostile mob: red; a neutral one: yellow; a friendly NPC: green; a friendly player: blue.
+* `/console OutlineTarget 0` and the others; `/console OutlineThickness 2`; `/console OutlineQuality 0` (off).
+* `/run SetUnitOutline("target", 0.6, 0.2, 1)`: purple, `/run ClearUnitOutline()`.
 * `OutlineMode(4)`: a thinner, cheaper rim.
 * Alt+Tab / a resolution change: no crash, the rim still there.

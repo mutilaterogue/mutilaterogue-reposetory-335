@@ -37,6 +37,17 @@ namespace
     constexpr uintptr_t ADDR_TARGET_GUID    = 0xBD07B0;
     constexpr uintptr_t ADDR_MOUSEOVER_GUID = 0xBD07A0;
     constexpr uintptr_t ADDR_OBJECT_PTR     = 0x4D4DB0;    // ClntObjMgrObjectPtr(guid, typeMask, file, line)
+    constexpr uintptr_t ADDR_ACTIVE_PLAYER  = 0x4D3790;    // ClntObjMgrGetActivePlayer()
+    constexpr uintptr_t ADDR_ENUM_VISIBLE   = 0x4D4B30;    // ClntObjMgrEnumVisibleObjects(int (*)(guid, param), param)
+    constexpr uintptr_t ADDR_UNIT_REACTION  = 0x7251C0;    // CGUnit_C::UnitReaction(this, other): 0 hated .. 7 exalted
+    constexpr uintptr_t ADDR_CAN_ATTACK     = 0x729A70;    // CGUnit_C::CanAttack(this, other)
+    constexpr uintptr_t ADDR_CREATURE_RANK  = 0x718A00;    // CGUnit_C::GetCreatureRank(this): 3 world boss
+    constexpr uintptr_t ADDR_GUID_BY_TOKEN  = 0x60C1C0;    // GetGuidByUnitID("target")
+    constexpr uintptr_t ADDR_CVAR_REGISTER  = 0x767FC0;    // CVar::Register
+    constexpr uintptr_t ADDR_CVAR_LOOKUP    = 0x767440;    // CVar::Lookup(name)
+    constexpr uint32_t  CVAR_STRING_OFFSET  = 0x28;        // CVar: the value as a string
+    constexpr uint32_t  RANK_WORLD_BOSS     = 3;
+    constexpr size_t    MAX_BOSSES          = 8;
 
     // the batch record (this of 0x8203B0)
     constexpr uint32_t BATCH_MATERIAL      = 0x50;         // -> [0] blend mode, [8] flags
@@ -47,7 +58,58 @@ namespace
     // the look
     constexpr float ALPHA_GAIN_HIGH = 1.0f / 3.0f;         // 16 samples
     constexpr float ALPHA_GAIN_LOW  = 1.0f / 2.0f;         // 8 samples
-    constexpr float STRENGTH        = 1.0f;
+
+    // the colors by reaction (retail: the same for the target, the mouseover, ...)
+    const float COLOR_HOSTILE[3]         = { 1.00f, 0.15f, 0.10f };
+    const float COLOR_NEUTRAL[3]         = { 1.00f, 0.85f, 0.10f };
+    const float COLOR_FRIENDLY[3]        = { 0.20f, 1.00f, 0.20f };
+    const float COLOR_FRIENDLY_PLAYER[3] = { 0.25f, 0.55f, 1.00f };
+
+    // ---------------------------------------------------------------- CVars
+    // Registered in the world (the first frame), not at the login screen: more custom glue cvars crash
+    // the client. A value saved in Config.wtf is kept (the client holds unknown cvars until registered).
+    struct CVarDefinition
+    {
+        const char* Name;
+        const char* Description;
+        const char* Default;
+        void* Handle;
+    };
+    CVarDefinition s_cvars[] = {
+        { "OutlineQuality",   "Unit outline: 0 off, 1 on, 2 on (low quality)", "1", nullptr },
+        { "OutlinePlayer",    "Outline your own character", "0", nullptr },
+        { "OutlineTarget",    "Outline your target", "1", nullptr },
+        { "OutlineMouseover", "Outline the unit under the mouse", "1", nullptr },
+        { "OutlineQuestBoss", "Outline bosses around you", "1", nullptr },
+        { "OutlineThickness", "Outline thickness (0.5 .. 3)", "1", nullptr },
+        { "OutlineStrength",  "Outline opacity (0 .. 1)", "1", nullptr },
+    };
+    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_COUNT };
+    bool s_cvarsRegistered = false;
+
+    void RegisterCVars()
+    {
+        if (s_cvarsRegistered)
+            return;
+        s_cvarsRegistered = true;
+        for (CVarDefinition& cvar : s_cvars)
+        {
+            // (name, description, flags: 1 archived, default, callback, category, ...) - as CVar::AddToGlueCVarVector
+            reinterpret_cast<int32_t (__cdecl*)(const char*, const char*, uint32_t, const char*, void*, uint32_t, bool, int32_t, bool)>(
+                ADDR_CVAR_REGISTER)(cvar.Name, cvar.Description, 1, cvar.Default, nullptr, 5, false, 0, false);
+            cvar.Handle = reinterpret_cast<void* (__cdecl*)(const char*)>(ADDR_CVAR_LOOKUP)(cvar.Name);
+        }
+    }
+
+    const char* CVarString(CVarIndex index)
+    {
+        void* handle = s_cvars[index].Handle;
+        const char* value = handle ? *reinterpret_cast<const char**>(static_cast<uint8_t*>(handle) + CVAR_STRING_OFFSET) : nullptr;
+        return value ? value : s_cvars[index].Default;
+    }
+
+    int CVarInt(CVarIndex index) { return atoi(CVarString(index)); }
+    float CVarFloat(CVarIndex index) { return static_cast<float>(atof(CVarString(index))); }
 
     struct Target
     {
@@ -151,29 +213,83 @@ namespace
         return reinterpret_cast<CGObject* (__cdecl*)(WoWGUID, uint32_t, const char*, int32_t)>(ADDR_OBJECT_PTR)(guid, TYPEMASK_UNIT, nullptr, 0);
     }
 
-    void AddTarget(WoWGUID guid, float r, float g, float b)
+    // Lua SetUnitOutline: units outlined in a color of their own (until ClearUnitOutline)
+    struct CustomOutline
     {
-        CGObject* object = FindUnit(guid);
+        WoWGUID Guid;
+        float Color[3];
+    };
+    std::vector<CustomOutline> s_custom;
+
+    // the color of a unit for the player: its reaction (hostile, neutral, friendly; friendly players blue)
+    void ReactionColor(CGObject* unit, float color[3])
+    {
+        WoWGUID playerGuid = reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)();
+        CGObject* player = FindUnit(playerGuid);
+        const float* chosen = COLOR_NEUTRAL;
+        if (player && player != unit)
+        {
+            int reaction = reinterpret_cast<int (__thiscall*)(CGObject*, CGObject*)>(ADDR_UNIT_REACTION)(player, unit);
+            bool attackable = reinterpret_cast<bool (__thiscall*)(CGObject*, CGObject*)>(ADDR_CAN_ATTACK)(player, unit);
+            bool isPlayer = (unit->m_objectData->m_type & TYPEMASK_PLAYER) != 0;
+            if (reaction <= 3)
+                chosen = COLOR_HOSTILE;
+            else if (reaction == 4 && attackable)
+                chosen = COLOR_NEUTRAL;
+            else
+                chosen = isPlayer ? COLOR_FRIENDLY_PLAYER : COLOR_FRIENDLY;
+        }
+        else if (player == unit)
+            chosen = COLOR_FRIENDLY_PLAYER;
+        memcpy(color, chosen, sizeof(float) * 3);
+    }
+
+    void AddTarget(CGObject* object, const float* color = nullptr)
+    {
         if (!object || !object->m_model)
             return;
         for (Target& target : s_targets)
             if (target.Model == object->m_model)
-                return;     // the target wins over the mouseover
+                return;     // the first reason wins (custom, target, mouseover, boss, player)
         Target target;
         target.Model = object->m_model;
-        target.Color[0] = r;
-        target.Color[1] = g;
-        target.Color[2] = b;
+        if (color)
+            memcpy(target.Color, color, sizeof(float) * 3);
+        else
+            ReactionColor(object, target.Color);
         target.Color[3] = 1.0f;
         s_targets.push_back(target);
     }
 
-    // the models of the next frame (stage 2: the target red, the mouseover yellow)
+    // the bosses around (OutlineQuestBoss)
+    int __cdecl EnumBoss(WoWGUID guid, void* /*param*/)
+    {
+        if (s_targets.size() >= MAX_BOSSES)
+            return 0;
+        CGObject* object = FindUnit(guid);
+        if (object && (object->m_objectData->m_type & TYPEMASK_UNIT) && !(object->m_objectData->m_type & TYPEMASK_PLAYER)
+            && reinterpret_cast<uint32_t (__thiscall*)(CGObject*)>(ADDR_CREATURE_RANK)(object) == RANK_WORLD_BOSS)
+            AddTarget(object);
+        return 1;
+    }
+
+    // the models of the next frame, by the CVars
     void CollectTargets()
     {
         s_targets.clear();
-        AddTarget(*reinterpret_cast<WoWGUID*>(ADDR_TARGET_GUID), 1.0f, 0.2f, 0.2f);
-        AddTarget(*reinterpret_cast<WoWGUID*>(ADDR_MOUSEOVER_GUID), 1.0f, 0.9f, 0.3f);
+        if (CVarInt(CV_QUALITY) > 0)
+        {
+            for (CustomOutline const& custom : s_custom)
+                AddTarget(FindUnit(custom.Guid), custom.Color);
+            if (CVarInt(CV_TARGET))
+                AddTarget(FindUnit(*reinterpret_cast<WoWGUID*>(ADDR_TARGET_GUID)));
+            if (CVarInt(CV_MOUSEOVER))
+                AddTarget(FindUnit(*reinterpret_cast<WoWGUID*>(ADDR_MOUSEOVER_GUID)));
+            if (CVarInt(CV_QUESTBOSS))
+                reinterpret_cast<int (__cdecl*)(int (__cdecl*)(WoWGUID, void*), void*)>(ADDR_ENUM_VISIBLE)(&EnumBoss, nullptr);
+            if (CVarInt(CV_PLAYER))
+                AddTarget(FindUnit(reinterpret_cast<WoWGUID (__cdecl*)()>(ADDR_ACTIVE_PLAYER)()));
+        }
         s_stats.Targets = static_cast<uint32_t>(s_targets.size());
     }
 
@@ -429,7 +545,7 @@ namespace
         "struct V { float4 position : POSITION; float2 uv : TEXCOORD0; };\n"
         "V main(V v) { return v; }\n";
 
-    // c0.xy one texel, c1.x alpha gain, c1.y strength. The mask's halo (samples around the pixel) minus the mask
+    // c0.xy one texel, c1.x alpha gain, c1.y strength, c1.z thickness. The mask's halo (samples around the pixel) minus the mask
     // at the pixel: the rim, in the silhouette's color.
     const char HLSL_OUTLINE_PS[] =
         "sampler2D mask : register(s0);\n"
@@ -442,7 +558,7 @@ namespace
         "        [unroll] for (int i = 0; i < 8; ++i)\n"
         "        {\n"
         "            float angle = 6.2831853 * (i + 0.5 * (ring - 1)) / 8;\n"
-        "            float2 offset = float2(cos(angle), sin(angle)) * RADIUS * ring;\n"
+        "            float2 offset = float2(cos(angle), sin(angle)) * RADIUS * ring * look.z;\n"
         "            sum += tex2D(mask, uv + offset * texel.xy);\n"
         "        }\n"
         "    float4 center = tex2D(mask, uv);\n"
@@ -692,10 +808,15 @@ namespace
         FillQuad(s_maskWidth, s_maskHeight);
 
         const float texel[4] = { 1.0f / s_maskWidth, 1.0f / s_maskHeight, 0.0f, 0.0f };
-        const float look[4] = { (s_mode & 4) ? ALPHA_GAIN_LOW : ALPHA_GAIN_HIGH, STRENGTH, 0.0f, 0.0f };
+        bool low = (s_mode & 4) || CVarInt(CV_QUALITY) == 2;
+        float thickness = CVarFloat(CV_THICKNESS);
+        float strength = CVarFloat(CV_STRENGTH);
+        thickness = thickness < 0.5f ? 0.5f : (thickness > 3.0f ? 3.0f : thickness);
+        strength = strength < 0.0f ? 0.0f : (strength > 1.0f ? 1.0f : strength);
+        const float look[4] = { low ? ALPHA_GAIN_LOW : ALPHA_GAIN_HIGH, strength, thickness, 0.0f };
 
         s_setVertexShader(device, s_quadShader);
-        s_setPixelShader(device, (s_mode & 4) ? s_outlineLowShader : s_outlineShader);
+        s_setPixelShader(device, low ? s_outlineLowShader : s_outlineShader);
         s_setPsConstant(device, 0, texel, 1);
         s_setPsConstant(device, 1, look, 1);
         s_setVertexDeclaration(device, s_quadDeclaration);
@@ -799,6 +920,7 @@ namespace
     // once a frame, after the 3D scene: the outline, then the next frame gets ready
     void __cdecl OnWorldRender()
     {
+        RegisterCVars();
         HookDevice();
         ++s_stats.WorldRenders;
         IDirect3DDevice9* device = GetD3DDevice();
@@ -1032,5 +1154,49 @@ int32_t Outline::OutlineDebug(lua_State* L)
 int32_t Outline::OutlineMode(lua_State* L)
 {
     s_mode = static_cast<uint32_t>(FrameScript::GetNumber(L, 1));
+    return 0;
+}
+
+// /run SetUnitOutline("target", 0, 0.5, 1) - an outline of its own (any color) until ClearUnitOutline
+int32_t Outline::SetUnitOutline(lua_State* L)
+{
+    const char* token = FrameScript::IsString(L, 1);
+    WoWGUID guid = 0;
+    if (!token || !FrameScript::GetGUIDFromToken(token, &guid, false) || !guid)
+        return 0;
+    CustomOutline custom;
+    custom.Guid = guid;
+    custom.Color[0] = static_cast<float>(FrameScript::GetNumber(L, 2));
+    custom.Color[1] = static_cast<float>(FrameScript::GetNumber(L, 3));
+    custom.Color[2] = static_cast<float>(FrameScript::GetNumber(L, 4));
+    for (CustomOutline& existing : s_custom)
+        if (existing.Guid == guid)
+        {
+            existing = custom;
+            return 0;
+        }
+    if (s_custom.size() < 32)
+        s_custom.push_back(custom);
+    return 0;
+}
+
+// /run ClearUnitOutline("target") - or ClearUnitOutline() for every one
+int32_t Outline::ClearUnitOutline(lua_State* L)
+{
+    const char* token = FrameScript::IsString(L, 1);
+    if (!token)
+    {
+        s_custom.clear();
+        return 0;
+    }
+    WoWGUID guid = 0;
+    if (!FrameScript::GetGUIDFromToken(token, &guid, false))
+        return 0;
+    for (size_t i = 0; i < s_custom.size(); ++i)
+        if (s_custom[i].Guid == guid)
+        {
+            s_custom.erase(s_custom.begin() + i);
+            break;
+        }
     return 0;
 }

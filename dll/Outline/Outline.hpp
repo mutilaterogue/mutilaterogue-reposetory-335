@@ -12,7 +12,10 @@
 //    next frame picked (target, mouseover).
 //  * the device states Gx sends are copied as they go (vtable hooks) and put back after our draws: Gx's cache and
 //    the device never disagree (the client's device can't be read back with Get*).
-// The shaders: OutlineShaders.hpp (tools/sm3asm.py). Stage 3: CVars, colors by reaction, Lua.
+// Stage 3: the colors by reaction (hostile red, neutral yellow, friendly green, friendly players blue - the same
+// whatever made the unit outlined), the CVars of the options panel (OutlineQuality, OutlinePlayer, OutlineTarget,
+// OutlineMouseover, OutlineQuestBoss + OutlineThickness, OutlineStrength), Lua SetUnitOutline / ClearUnitOutline.
+// The shaders: HLSL compiled at run time (d3dcompiler_47.dll), OutlineShaders.hpp (tools/sm3asm.py) as fallback.
 
 #include <cstdint>
 
@@ -27,6 +30,9 @@ public:
     static int32_t OutlineDebug(lua_State* L);
     // Lua: OutlineMode(bits) - test switches (Outline.cpp, s_mode)
     static int32_t OutlineMode(lua_State* L);
+    // Lua: SetUnitOutline(unit, r, g, b) / ClearUnitOutline([unit]) - an outline of its own for any unit
+    static int32_t SetUnitOutline(lua_State* L);
+    static int32_t ClearUnitOutline(lua_State* L);
 
 private:
     Outline() = delete;
