@@ -114,3 +114,22 @@ draws nothing).
 * `/run SetUnitOutline("target", 0.6, 0.2, 1)`: purple, `/run ClearUnitOutline()`.
 * `OutlineMode(4)`: a thinner, cheaper rim.
 * Alt+Tab / a resolution change: no crash, the rim still there.
+
+## SSAO (ambient occlusion)
+| CVar | Default | |
+|---|---|---|
+| `ssao` | `0` | `1` on (Video options -> Нововведения) |
+| `ssaoStrength` | `1` | darkness `0` .. `2` |
+| `ssaoRadius` | `1.5` | yards, `0.3` .. `5` |
+
+For `Config.wtf` to keep them, in `CVar::FillCustomGlueCVarVector()`:
+```cpp
+    AddToGlueCVarVector("ssao", "Ambient occlusion (SSAO): 0 off, 1 on", 1, "0", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("ssaoStrength", "SSAO darkness (0 .. 2)", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("ssaoRadius", "SSAO radius in yards (0.3 .. 5)", 1, "1.5", nullptr, 5, false, 0, false);
+```
+At `0x4F9240`, before the outline: the scene's depth buffer (multisampled) is copied into an INTZ texture by the
+drivers' RESZ, then one full-screen pass darkens the creases (pairs of depth samples around each pixel; on a
+plane their mean is the pixel's own depth, so slopes stay clean). Needs antialiasing (MSAA): RESZ copies a
+multisampled depth buffer only. `OutlineDebug()` #16: `0` off, `1` drawn, `2` no INTZ, `3` no RESZ, `4` no
+antialiasing, `5` no shader (the compiler), `6` the depth texture failed.

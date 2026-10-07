@@ -632,24 +632,35 @@ function VideoOptionsFeaturesPanel_OnLoad (self)
 	VideoOptionsPanel_OnLoad(self);
 end
 
--- fogMode: applied at once (no Okay / Cancel), saved by the client (a glue cvar)
-local function FogDropDown_Initialize (self)
-	local current = GetCVar("fogMode") or "0";
+SSAO_MODE = "Затенение (SSAO)";
+SSAO_MODE_TOOLTIP = "Мягкие тени в углах, щелях и под предметами. Требует сглаживания (MSAA): без него не работает.";
+SSAO_MODES = { [0] = "Выключено", "Включено" };
+
+-- the dropdowns: cvar and its modes; applied at once (no Okay / Cancel), saved by the client (glue cvars)
+local FEATURE_DROPDOWNS = {
+	VideoOptionsFeaturesPanelFogDropDown = { cvar = "fogMode", modes = "FOG_MODES" },
+	VideoOptionsFeaturesPanelSsaoDropDown = { cvar = "ssao", modes = "SSAO_MODES" },
+};
+
+local function FeatureDropDown_Initialize (self)
+	local setup = FEATURE_DROPDOWNS[self:GetName()];
+	local modes = _G[setup.modes];
+	local current = GetCVar(setup.cvar) or "0";
 	local info = UIDropDownMenu_CreateInfo();
-	for mode = 0, #FOG_MODES do
-		info.text = FOG_MODES[mode];
+	for mode = 0, #modes do
+		info.text = modes[mode];
 		info.value = tostring(mode);
 		info.checked = ( info.value == current ) and 1 or nil;
 		info.func = function (button)
-			SetCVar("fogMode", button.value);
+			SetCVar(setup.cvar, button.value);
 			UIDropDownMenu_SetSelectedValue(self, button.value);
 		end;
 		UIDropDownMenu_AddButton(info);
 	end
 end
 
-function VideoOptionsFeaturesPanelFogDropDown_OnShow (self)
+function VideoOptionsFeaturesPanelDropDown_OnShow (self)
 	UIDropDownMenu_SetWidth(self, 140);
-	UIDropDownMenu_Initialize(self, FogDropDown_Initialize);
-	UIDropDownMenu_SetSelectedValue(self, GetCVar("fogMode") or "0");
+	UIDropDownMenu_Initialize(self, FeatureDropDown_Initialize);
+	UIDropDownMenu_SetSelectedValue(self, GetCVar(FEATURE_DROPDOWNS[self:GetName()].cvar) or "0");
 end

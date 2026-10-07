@@ -12,6 +12,7 @@
 #include <d3dcommon.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -89,8 +90,12 @@ namespace
         { "OutlineThickness", "Outline thickness (0.5 .. 3)", "1", nullptr },
         { "OutlineStrength",  "Outline opacity (0 .. 1)", "1", nullptr },
         { "OutlineAll",       "Outline every unit around: 0 off, 1 all, 2 hostile, 3 friendly, 4 players, 5 creatures", "0", nullptr },
+        { "ssao",             "Ambient occlusion (SSAO): 0 off, 1 on", "0", nullptr },
+        { "ssaoStrength",     "SSAO darkness (0 .. 2)", "1", nullptr },
+        { "ssaoRadius",       "SSAO radius in yards (0.3 .. 5)", "1.5", nullptr },
     };
-    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL, CV_COUNT };
+    enum CVarIndex { CV_QUALITY, CV_PLAYER, CV_TARGET, CV_MOUSEOVER, CV_QUESTBOSS, CV_THICKNESS, CV_STRENGTH, CV_ALL,
+        CV_SSAO, CV_SSAO_STRENGTH, CV_SSAO_RADIUS, CV_COUNT };
     enum OutlineAllMode { ALL_OFF, ALL_EVERY, ALL_HOSTILE, ALL_FRIENDLY, ALL_PLAYERS, ALL_CREATURES };
     bool s_cvarsRegistered = false;
 
@@ -181,6 +186,15 @@ namespace
     // with antialiasing: the silhouettes go into a multisampled surface like the back buffer (the scene's depth
     // buffer fits only that), copied into the mask texture before the full-screen pass
     IDirect3DSurface9* s_maskMultisampled = nullptr;
+
+    // SSAO: the scene's depth copied (RESZ, the drivers' multisampled depth resolve) into an INTZ texture, sampled
+    IDirect3DTexture9* s_depthCopy = nullptr;           // default pool: released before a device reset
+    UINT s_depthCopyWidth = 0, s_depthCopyHeight = 0;
+    IDirect3DPixelShader9* s_ssaoShader = nullptr;
+    // 0 off, 1 drawn, 2 no INTZ, 3 no RESZ (the driver), 4 no antialiasing (needs it: RESZ copies a multisampled
+    // depth buffer), 5 no shader (the compiler), 6 the depth texture failed
+    uint32_t s_ssaoStatus = 0;
+    bool s_ssaoChecked = false, s_ssaoSupported = false;
     D3DMULTISAMPLE_TYPE s_maskSamples = D3DMULTISAMPLE_NONE;
     DWORD s_maskQuality = 0;
     UINT s_maskWidth = 0, s_maskHeight = 0;
@@ -596,7 +610,7 @@ namespace
         { D3DRS_ALPHATESTENABLE, FALSE }, { D3DRS_FOGENABLE, FALSE }, { D3DRS_COLORWRITEENABLE, 0xF },
         { D3DRS_STENCILENABLE, FALSE }, { D3DRS_SCISSORTESTENABLE, FALSE }, { D3DRS_CLIPPLANEENABLE, 0 },
         { D3DRS_CULLMODE, D3DCULL_CCW }, { D3DRS_SRGBWRITEENABLE, FALSE },
-        { D3DRS_DEPTHBIAS, 0 }, { D3DRS_SLOPESCALEDEPTHBIAS, 0 },
+        { D3DRS_DEPTHBIAS, 0 }, { D3DRS_SLOPESCALEDEPTHBIAS, 0 }, { D3DRS_POINTSIZE, 0x3F800000 },
     };
 
     void SetState(IDirect3DDevice9* device, D3DRENDERSTATETYPE state, DWORD value)
@@ -659,6 +673,10 @@ namespace
     HRESULT __stdcall ResetDetour(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* parameters)
     {
         ReleaseMask();      // a default pool resource: a reset fails while it exists
+        if (s_depthCopy)
+            s_depthCopy->Release();
+        s_depthCopy = nullptr;
+        s_depthCopyWidth = s_depthCopyHeight = 0;
         return s_reset(device, parameters);
     }
 
@@ -1051,6 +1069,8 @@ namespace
     }
 
     // ---------------------------------------------------------------- 2. the outline over the screen
+    void RestoreGx(IDirect3DDevice9* device);
+
     void Composite(IDirect3DDevice9* device)
     {
         if (!s_maskSurface || !s_frameSilhouettes || (s_mode & (2 | 8)) || !s_outlineShader || !s_outlineLowShader
@@ -1092,7 +1112,12 @@ namespace
         device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
         ++s_stats.Composites;
 
-        // Gx's back
+        RestoreGx(device);
+    }
+
+    // after a full-screen pass: exactly what Gx had set
+    void RestoreGx(IDirect3DDevice9* device)
+    {
         s_setVertexShader(device, s_shadow.VertexShader);
         RestorePixelShader(device);
         if (s_shadow.DeclarationLast)
@@ -1106,6 +1131,187 @@ namespace
         for (size_t i = 0; i < sizeof(samplers) / sizeof(samplers[0]); ++i)
             s_setSamplerState(device, 0, samplers[i], s_shadow.SamplerKnown[samplers[i]] ? s_shadow.Sampler0[samplers[i]] : samplerDefaults[i]);
         RestoreStates(device);
+    }
+
+    // ---------------------------------------------------------------- SSAO
+    // Depth only (no normals): for a pair of samples on both sides of the pixel, the depth buffer's value is affine
+    // in screen space on a plane, so their mean is the pixel's own depth on any flat surface (no darkening of
+    // slopes); in a crease it is nearer - by how much, in yards, is the occlusion. c0 texel.xy, near, far;
+    // c1 radius (yards), strength, pixels per yard at 1 yard
+    const char HLSL_SSAO_PS[] =
+        "sampler2D depthTex : register(s0);\n"
+        "float4 screen : register(c0);\n"
+        "float4 params : register(c1);\n"
+        "float Linear(float d) { return screen.z * screen.w / (screen.w - d * (screen.w - screen.z)); }\n"
+        "float4 main(float2 uv : TEXCOORD0, float2 vpos : VPOS) : COLOR\n"
+        "{\n"
+        "    float d = tex2Dlod(depthTex, float4(uv, 0, 0)).r;\n"
+        "    clip(0.99999 - d);\n"
+        "    float z = Linear(d);\n"
+        "    float radius = clamp(params.x * params.z / z, 3.0, 80.0);\n"
+        "    float angle = frac(sin(dot(vpos, float2(12.9898, 78.233))) * 43758.5453) * 6.2831853;\n"
+        "    float occlusion = 0;\n"
+        "    [unroll] for (int i = 0; i < 8; ++i)\n"
+        "    {\n"
+        "        float a = angle + i * 2.3999632;\n"
+        "        float2 offset = float2(cos(a), sin(a)) * radius * sqrt((i + 0.5) / 8) * screen.xy;\n"
+        "        float dA = tex2Dlod(depthTex, float4(uv + offset, 0, 0)).r;\n"
+        "        float dB = tex2Dlod(depthTex, float4(uv - offset, 0, 0)).r;\n"
+        "        if (dA < 0.99999 && dB < 0.99999)\n"
+        "        {\n"
+        "            float crease = z - Linear(0.5 * (dA + dB));\n"
+        "            occlusion += saturate(crease / params.x) * saturate((3.0 * params.x - crease) / (2.0 * params.x));\n"
+        "        }\n"
+        "    }\n"
+        "    return float4(0, 0, 0, saturate(occlusion / 8 * params.y));\n"
+        "}\n";
+
+    constexpr D3DFORMAT FORMAT_INTZ = static_cast<D3DFORMAT>(MAKEFOURCC('I', 'N', 'T', 'Z'));
+    constexpr D3DFORMAT FORMAT_RESZ = static_cast<D3DFORMAT>(MAKEFOURCC('R', 'E', 'S', 'Z'));
+    constexpr DWORD RESZ_CODE = 0x7FA05000;
+    constexpr uintptr_t ADDR_FARCLIP = 0xCD7748;        // the world's far clip, yards
+    constexpr float SSAO_PROJECTION = 0.625f;           // pixels per yard at 1 yard, per pixel of screen height
+                                                        // (1 / (2 tan(fov / 2)), the camera's ~77 degrees)
+
+    bool CheckSsaoSupport(IDirect3DDevice9* device)
+    {
+        if (s_ssaoChecked)
+            return s_ssaoSupported;
+        s_ssaoChecked = true;
+        IDirect3D9* d3d = nullptr;
+        if (FAILED(device->GetDirect3D(&d3d)) || !d3d)
+            return false;
+        D3DDISPLAYMODE mode = {};
+        device->GetDisplayMode(0, &mode);
+        D3DDEVICE_CREATION_PARAMETERS creation = {};
+        device->GetCreationParameters(&creation);
+        bool intz = SUCCEEDED(d3d->CheckDeviceFormat(creation.AdapterOrdinal, creation.DeviceType, mode.Format,
+            D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE, FORMAT_INTZ));
+        bool resz = SUCCEEDED(d3d->CheckDeviceFormat(creation.AdapterOrdinal, creation.DeviceType, mode.Format,
+            D3DUSAGE_RENDERTARGET, D3DRTYPE_SURFACE, FORMAT_RESZ));
+        d3d->Release();
+        s_ssaoStatus = !intz ? 2 : (!resz ? 3 : 0);
+        if (intz && resz)
+        {
+            std::vector<DWORD> code = Compile(HLSL_SSAO_PS, "ps_3_0");
+            if (code.empty() || FAILED(device->CreatePixelShader(code.data(), &s_ssaoShader)))
+            {
+                s_ssaoShader = nullptr;
+                s_ssaoStatus = 5;
+            }
+        }
+        s_ssaoSupported = intz && resz && s_ssaoShader;
+        return s_ssaoSupported;
+    }
+
+    // the scene's depth buffer, multisampled, into our INTZ texture (the drivers' RESZ: a point drawn with the
+    // texture bound, then a magic point size)
+    bool ResolveDepth(IDirect3DDevice9* device)
+    {
+        IDirect3DSurface9* depth = nullptr;
+        if (FAILED(device->GetDepthStencilSurface(&depth)) || !depth)
+            return false;
+        D3DSURFACE_DESC desc = {};
+        depth->GetDesc(&desc);
+        depth->Release();
+        if (desc.MultiSampleType == D3DMULTISAMPLE_NONE)
+        {
+            s_ssaoStatus = 4;
+            return false;
+        }
+        if (!s_depthCopy || s_depthCopyWidth != desc.Width || s_depthCopyHeight != desc.Height)
+        {
+            if (s_depthCopy)
+                s_depthCopy->Release();
+            s_depthCopy = nullptr;
+            if (FAILED(device->CreateTexture(desc.Width, desc.Height, 1, D3DUSAGE_DEPTHSTENCIL, FORMAT_INTZ,
+                D3DPOOL_DEFAULT, &s_depthCopy, nullptr)) || !s_depthCopy)
+            {
+                s_depthCopy = nullptr;
+                s_ssaoStatus = 6;
+                return false;
+            }
+            s_depthCopyWidth = desc.Width;
+            s_depthCopyHeight = desc.Height;
+        }
+
+        s_setVertexShader(device, nullptr);
+        s_setPixelShader(device, nullptr);
+        s_setFVF(device, D3DFVF_XYZ);
+        SetState(device, D3DRS_ZENABLE, FALSE);
+        SetState(device, D3DRS_ZWRITEENABLE, FALSE);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0);
+        s_setTexture(device, 0, s_depthCopy);
+        const float point[3] = { 0.0f, 0.0f, 0.0f };
+        device->DrawPrimitiveUP(D3DPT_POINTLIST, 1, point, sizeof(point));
+        SetState(device, D3DRS_ZWRITEENABLE, TRUE);
+        SetState(device, D3DRS_ZENABLE, TRUE);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0xF);
+        SetState(device, D3DRS_POINTSIZE, RESZ_CODE);
+        SetState(device, D3DRS_POINTSIZE, 0x3F800000);
+        s_setTexture(device, 0, nullptr);
+        return true;
+    }
+
+    float CVarNumber(const char* name, float fallback)
+    {
+        void* cvar = reinterpret_cast<void* (__cdecl*)(const char*)>(ADDR_CVAR_LOOKUP)(name);
+        const char* value = cvar ? *reinterpret_cast<const char**>(static_cast<uint8_t*>(cvar) + CVAR_STRING_OFFSET) : nullptr;
+        return value ? static_cast<float>(atof(value)) : fallback;
+    }
+
+    // once a frame, after the 3D scene, before the outline: the creases darkened
+    void Ssao(IDirect3DDevice9* device)
+    {
+        if (!CVarInt(CV_SSAO))
+        {
+            s_ssaoStatus = 0;
+            return;
+        }
+        if (!CheckSsaoSupport(device) || !s_quadShader || !s_quadDeclaration || !EnsureQuadBuffer(device))
+            return;
+        bool resolved = ResolveDepth(device);
+        if (!resolved)
+        {
+            RestoreGx(device);
+            return;
+        }
+
+        float nearClip = CVarNumber("nearclip", 0.2f);
+        float farClip = *reinterpret_cast<float*>(ADDR_FARCLIP);
+        float radius = CVarFloat(CV_SSAO_RADIUS);
+        float strength = CVarFloat(CV_SSAO_STRENGTH);
+        radius = radius < 0.3f ? 0.3f : (radius > 5.0f ? 5.0f : radius);
+        strength = strength < 0.0f ? 0.0f : (strength > 2.0f ? 2.0f : strength);
+        const float screen[4] = { 1.0f / s_depthCopyWidth, 1.0f / s_depthCopyHeight, nearClip > 0.01f ? nearClip : 0.2f,
+            farClip > 10.0f ? farClip : 1000.0f };
+        const float params[4] = { radius, strength, SSAO_PROJECTION * s_depthCopyHeight, 0.0f };
+
+        FillQuad(s_depthCopyWidth, s_depthCopyHeight);
+        s_setVertexShader(device, s_quadShader);
+        s_setPixelShader(device, s_ssaoShader);
+        s_setPsConstant(device, 0, screen, 1);
+        s_setPsConstant(device, 1, params, 1);
+        s_setVertexDeclaration(device, s_quadDeclaration);
+        s_setStreamSource(device, 0, s_quadBuffer, 0, sizeof(QuadVertex));
+        s_setTexture(device, 0, s_depthCopy);
+        s_setSamplerState(device, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+        s_setSamplerState(device, 0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+        s_setSamplerState(device, 0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+        s_setSamplerState(device, 0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+        s_setSamplerState(device, 0, D3DSAMP_SRGBTEXTURE, FALSE);
+
+        SetSilhouetteStates(device);
+        SetState(device, D3DRS_ALPHABLENDENABLE, TRUE);
+        SetState(device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        SetState(device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+        SetState(device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+        SetState(device, D3DRS_COLORWRITEENABLE, 0x7);
+        device->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+        s_setTexture(device, 0, nullptr);       // not bound while it is no texture of Gx's
+        s_ssaoStatus = 1;
+        RestoreGx(device);
     }
 
     template <typename Fn>
@@ -1179,6 +1385,7 @@ namespace
         IDirect3DDevice9* device = GetD3DDevice();
         if (device && (s_stats.Installed & 4))
         {
+            Ssao(device);
             Composite(device);
             if (EnsureMask(device) && EnsureQuadBuffer(device))
                 ClearMask(device);
@@ -1407,7 +1614,8 @@ int32_t Outline::OutlineDebug(lua_State* L)
         s_depthInfo.DepthWidth, s_depthInfo.DepthHeight, s_depthInfo.DepthSamples, s_depthInfo.DepthQuality,
         s_depthInfo.MaskSamples, s_depthInfo.MaskQuality, s_depthInfo.ZFunc, s_depthInfo.ZEnable, static_cast<uint32_t>(s_depthInfo.Result));
     FrameScript::PushString(L, depth);
-    return 15;
+    FrameScript::PushNumber(L, s_ssaoStatus);
+    return 16;
 }
 
 // /run OutlineMode(n): 1 no silhouettes, 2 no full-screen pass, 4 low quality, 8 stage 1 (silhouettes on the screen)

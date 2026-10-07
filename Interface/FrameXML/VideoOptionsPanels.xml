@@ -836,7 +836,7 @@
 			</CheckButton>
 		</Frames>
 	</Frame>	
-	<!-- new features (WotLKExtensions): the fog (fogMode) -->
+	<!-- new features (WotLKExtensions): the fog (fogMode), SSAO (ssao) -->
 	<Frame name="VideoOptionsFeaturesPanel" parent="VideoOptionsFramePanelContainer" hidden="true">
 		<Layers>
 			<Layer level="ARTWORK">
@@ -896,7 +896,37 @@
 						GameTooltip:SetText(FOG_MODE_TOOLTIP, nil, nil, nil, nil, 1);
 					</OnEnter>
 					<OnLeave function="GameTooltip_Hide"/>
-					<OnShow function="VideoOptionsFeaturesPanelFogDropDown_OnShow"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentSsaoDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentFogDropDown" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-24"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentLabel" text="SSAO_MODE" inherits="GameFontNormalSmall">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="3"/>
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT");
+						GameTooltip:SetText(SSAO_MODE_TOOLTIP, nil, nil, nil, nil, 1);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+					<OnShow function="VideoOptionsFeaturesPanelDropDown_OnShow"/>
 				</Scripts>
 			</Frame>
 		</Frames>
