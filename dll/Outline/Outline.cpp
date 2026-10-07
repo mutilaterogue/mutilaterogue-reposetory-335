@@ -53,13 +53,16 @@ namespace
         uint32_t Targets = 0;               // models picked for this frame
         uint32_t TargetBatches = 0;         // their batches in the last frame
         uint32_t Silhouettes = 0;           // extra draw calls in the last frame
+        uint32_t OnScreen = 0;              // of them, drawn into the back buffer
         uint32_t GxApi = 0;
         uint32_t Error = 0;                 // 1 no device, 2 shader
     } s_stats;
     uint32_t s_frameBatches = 0;
     uint32_t s_frameSilhouettes = 0;
+    uint32_t s_frameOnScreen = 0;
 
-    // OutlineMode(bits): 1 - no extra draw (find the batches only), 2 - keep the depth test
+    // OutlineMode(bits): 1 - no extra draw (find the batches only), 2 - keep the depth test,
+    //  4 - the silhouette writes depth and draws over everything (nothing drawn later covers it)
     uint32_t s_mode = 0;
 
     std::vector<Target> s_targets;
@@ -221,10 +224,14 @@ namespace
 
     // our states for the silhouette; the device defaults for the ones Gx never set since the hooks went in
     const D3DRENDERSTATETYPE SILHOUETTE_STATES[] = {
-        D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_FOGENABLE, D3DRS_COLORWRITEENABLE,
+        D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DRS_ZFUNC, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_FOGENABLE,
+        D3DRS_COLORWRITEENABLE, D3DRS_STENCILENABLE, D3DRS_SCISSORTESTENABLE, D3DRS_CLIPPLANEENABLE, D3DRS_CULLMODE,
+        D3DRS_SRGBWRITEENABLE,
     };
-    const DWORD SILHOUETTE_VALUES[] = { FALSE, FALSE, FALSE, FALSE, FALSE, 0xF };
-    const DWORD STATE_DEFAULTS[] = { D3DZB_TRUE, TRUE, FALSE, FALSE, FALSE, 0xF };
+    // mode 4: the silhouette writes depth and wins over everything drawn later at the same place
+    const DWORD SILHOUETTE_VALUES[] = { FALSE, FALSE, D3DCMP_LESSEQUAL, FALSE, FALSE, FALSE, 0xF, FALSE, FALSE, 0, D3DCULL_NONE, FALSE };
+    const DWORD SILHOUETTE_VALUES_TOP[] = { D3DZB_TRUE, TRUE, D3DCMP_ALWAYS, FALSE, FALSE, FALSE, 0xF, FALSE, FALSE, 0, D3DCULL_NONE, FALSE };
+    const DWORD STATE_DEFAULTS[] = { D3DZB_TRUE, TRUE, D3DCMP_LESSEQUAL, FALSE, FALSE, FALSE, 0xF, FALSE, FALSE, 0, D3DCULL_CCW, FALSE };
     constexpr size_t SILHOUETTE_STATE_COUNT = sizeof(SILHOUETTE_STATES) / sizeof(SILHOUETTE_STATES[0]);
 
     HRESULT __stdcall DrawIndexedPrimitiveDetour(IDirect3DDevice9* device, D3DPRIMITIVETYPE type, INT baseVertex,
@@ -237,9 +244,22 @@ namespace
         // the same draw once more: our shader and color, no depth test (stage 1: over everything)
         s_setPixelShader(device, s_flatShader);
         s_setPsConstant(device, 0, s_currentTarget->Color, 1);
+        const DWORD* values = (s_mode & 4) ? SILHOUETTE_VALUES_TOP : SILHOUETTE_VALUES;
         for (size_t i = 0; i < SILHOUETTE_STATE_COUNT; ++i)
             if (!((s_mode & 2) && SILHOUETTE_STATES[i] == D3DRS_ZENABLE))
-                s_setRenderState(device, SILHOUETTE_STATES[i], SILHOUETTE_VALUES[i]);
+                s_setRenderState(device, SILHOUETTE_STATES[i], values[i]);
+
+        // where it goes: the screen or some other render target (reflections, ...)
+        IDirect3DSurface9* renderTarget = nullptr;
+        IDirect3DSurface9* backBuffer = nullptr;
+        device->GetRenderTarget(0, &renderTarget);
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
+        if (renderTarget && renderTarget == backBuffer)
+            ++s_frameOnScreen;
+        if (renderTarget)
+            renderTarget->Release();
+        if (backBuffer)
+            backBuffer->Release();
 
         s_drawIndexed(device, type, baseVertex, minIndex, numVertices, startIndex, primitiveCount);
         ++s_frameSilhouettes;
@@ -315,7 +335,8 @@ namespace
         ++s_stats.WorldRenders;
         s_stats.TargetBatches = s_frameBatches;
         s_stats.Silhouettes = s_frameSilhouettes;
-        s_frameBatches = s_frameSilhouettes = 0;
+        s_stats.OnScreen = s_frameOnScreen;
+        s_frameBatches = s_frameSilhouettes = s_frameOnScreen = 0;
         CollectTargets();
     }
 
@@ -525,10 +546,11 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushNumber(L, s_stats.GxApi);
     FrameScript::PushNumber(L, s_stats.Error);
     FrameScript::PushNumber(L, s_mode);
-    return 9;
+    FrameScript::PushNumber(L, s_stats.OnScreen);
+    return 10;
 }
 
-// /run OutlineMode(n): 1 - no extra draw, 2 - keep the depth test
+// /run OutlineMode(n): 1 - no extra draw, 2 - keep the depth test, 4 - write depth, over everything
 int32_t Outline::OutlineMode(lua_State* L)
 {
     s_mode = static_cast<uint32_t>(FrameScript::GetNumber(L, 1));

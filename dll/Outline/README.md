@@ -58,8 +58,9 @@ No M2 / Gx function is ever called a second time: an earlier version re-ran `0x8
 | 7 | Gx API | `1` / `2` |
 | 8 | error: 1 no D3D device, 2 shader | `0` |
 | 9 | `OutlineMode` | |
+| 10 | silhouette draw calls that went to the screen (back buffer) | = #6 |
 
-`/run OutlineMode(n)`: `1` no extra draw (does the world stay fine without it?), `2` keep the depth test.
+`/run OutlineMode(n)`: `1` no extra draw (does the world stay fine without it?), `2` keep the depth test, `4` the silhouette writes depth and draws over everything (nothing drawn later can cover it).
 
 ## What to check
 * Target an NPC / hover a unit: its model (with weapons) is filled red / yellow, over walls too; the rest of the world as usual.
