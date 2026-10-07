@@ -618,23 +618,27 @@ function VideoOptionsStereoPanel_OnEvent(self, event, ...)
 end
 
 
--- [[ New features panel (WotLKExtensions) ]] --
+-- [[ New features panels (WotLKExtensions) ]] --
+-- "Нововведения" (the presets) and its children: lighting, atmosphere, water, picture. Every control applies at
+-- once (no Okay / Cancel); the controls are found by their name after "Panel" (VideoOptionsLightingPanelSsaoDropDown
+-- -> SsaoDropDown)
 
 FEATURES_LABEL = "Нововведения";
-FEATURES_SUBTEXT = "";
+FEATURES_LABEL_SUBTEXT = "Готовые наборы всех эффектов. Каждый эффект настраивается в разделах ниже.";
+FEATURES_LIGHTING = "Освещение";
+FEATURES_LIGHTING_SUBTEXT = "Затенение, свечение, лучи солнца и тонмаппинг.";
+FEATURES_ATMOSPHERE = "Атмосфера";
+FEATURES_ATMOSPHERE_SUBTEXT = "Туман, дымка у земли и размытие дали.";
+FEATURES_WATER = "Вода";
+FEATURES_WATER_SUBTEXT = "Отражения, рябь и блик солнца на воде. Требует сглаживания (MSAA).";
+FEATURES_PICTURE = "Изображение";
+FEATURES_PICTURE_SUBTEXT = "Сглаживание FXAA и цветокоррекция.";
+
 FOG_MODE = "Туман";
 FOG_MODE_TOOLTIP = "Дальность тумана: как в клиенте, в три раза дальше или без тумана.";
 FOG_MODES = { [0] = "Обычный", "Дальше", "Выключен" };
-
-function VideoOptionsFeaturesPanel_OnLoad (self)
-	self.name = FEATURES_LABEL;
-	self.options = {};
-	self.controls = {};	-- none registered (the dropdowns apply at once): Okay / Cancel / Refresh walk this table
-	VideoOptionsPanel_OnLoad(self);
-end
-
 SSAO_MODE = "Затенение (SSAO)";
-SSAO_MODE_TOOLTIP = "Мягкие тени в углах, щелях и под предметами. Требует сглаживания (MSAA): без него не работает.";
+SSAO_MODE_TOOLTIP = "Мягкие тени в углах, щелях и под предметами. Требует сглаживания (MSAA).";
 SSAO_MODES = { [0] = "Выключено", "Включено" };
 BLOOM_MODE = "Свечение (Bloom)";
 BLOOM_MODE_TOOLTIP = "Мягкий ореол вокруг ярких мест: огней, окон, эффектов.";
@@ -645,11 +649,110 @@ FXAA_MODE_TOOLTIP = "Сглаживает края после отрисовки
 TONEMAP_MODE = "Тонмаппинг";
 TONEMAP_MODE_TOOLTIP = "Кинематографичная кривая: мягкие светлые места вместо резкого белого.";
 GROUND_FOG_MODE = "Туман у земли";
-GROUND_FOG_MODE_TOOLTIP = "Дымка в низинах и над водой - ниже вашего персонажа.";
+GROUND_FOG_MODE_TOOLTIP = "Дымка в низинах и над водой - ниже вашего персонажа. Требует сглаживания (MSAA).";
 SSR_MODE = "Отражения в воде";
 SSR_MODE_TOOLTIP = "Вода отражает горы, деревья и здания (то, что видно на экране). Требует сглаживания (MSAA).";
 DOF_MODE = "Глубина резкости";
 DOF_MODE_TOOLTIP = "Даль размывается, персонаж и всё рядом остаётся резким. Требует сглаживания (MSAA).";
+
+SSAO_STRENGTH = "Сила затенения";
+SSAO_RADIUS = "Радиус затенения";
+BLOOM_STRENGTH = "Сила свечения";
+BLOOM_THRESHOLD = "Порог свечения";
+GODRAYS_STRENGTH = "Сила лучей";
+TONEMAP_EXPOSURE = "Экспозиция";
+GROUND_FOG_DENSITY = "Плотность дымки";
+GROUND_FOG_HEIGHT = "Высота дымки";
+DOF_STRENGTH = "Сила размытия";
+DOF_DISTANCE = "Дальность размытия";
+SSR_STRENGTH = "Сила отражений";
+SSR_RIPPLE = "Рябь на воде";
+SSR_SUN = "Блик солнца";
+COLOR_CONTRAST = "Контраст";
+COLOR_SATURATION = "Насыщенность";
+COLOR_BRIGHTNESS = "Яркость";
+COLOR_SHARPEN = "Резкость";
+VIGNETTE = "Виньетка";
+FILM_GRAIN = "Зерно";
+
+FEATURES_PRESET_OFF = "Выкл";
+FEATURES_PRESET_SOFT = "Мягко";
+FEATURES_PRESET_RETAIL = "Ретейл";
+FEATURES_PRESET_MAX = "Максимум";
+
+local FEATURE_DROPDOWNS = {
+	FogDropDown = { cvar = "fogMode", modes = "FOG_MODES" },
+	SsaoDropDown = { cvar = "ssao", modes = "SSAO_MODES" },
+	BloomDropDown = { cvar = "bloom", modes = "SSAO_MODES" },
+	GodRaysDropDown = { cvar = "godRays", modes = "SSAO_MODES" },
+	DofDropDown = { cvar = "dof", modes = "SSAO_MODES" },
+	SsrDropDown = { cvar = "ssr", modes = "SSAO_MODES" },
+	FxaaDropDown = { cvar = "fxaa", modes = "SSAO_MODES" },
+	TonemapDropDown = { cvar = "tonemap", modes = "SSAO_MODES" },
+	GroundFogDropDown = { cvar = "groundFog", modes = "SSAO_MODES" },
+};
+
+local FEATURE_SLIDERS = {
+	SsaoStrength = { cvar = "ssaoStrength", text = "SSAO_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1 },
+	SsaoRadius = { cvar = "ssaoRadius", text = "SSAO_RADIUS", minValue = 0.3, maxValue = 5, valueStep = 0.1 },
+	BloomStrength = { cvar = "bloomStrength", text = "BLOOM_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1 },
+	BloomThreshold = { cvar = "bloomThreshold", text = "BLOOM_THRESHOLD", minValue = 0.3, maxValue = 1, valueStep = 0.05 },
+	GodRaysStrength = { cvar = "godRaysStrength", text = "GODRAYS_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1 },
+	TonemapExposure = { cvar = "tonemapExposure", text = "TONEMAP_EXPOSURE", minValue = 0.5, maxValue = 3, valueStep = 0.1 },
+	GroundFogDensity = { cvar = "groundFogDensity", text = "GROUND_FOG_DENSITY", minValue = 0, maxValue = 1, valueStep = 0.05 },
+	GroundFogHeight = { cvar = "groundFogHeight", text = "GROUND_FOG_HEIGHT", minValue = 0, maxValue = 30, valueStep = 1 },
+	DofStrength = { cvar = "dofStrength", text = "DOF_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05 },
+	DofDistance = { cvar = "dofDistance", text = "DOF_DISTANCE", minValue = 5, maxValue = 300, valueStep = 5 },
+	SsrStrength = { cvar = "ssrStrength", text = "SSR_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05 },
+	SsrRipple = { cvar = "ssrRipple", text = "SSR_RIPPLE", minValue = 0, maxValue = 1, valueStep = 0.05 },
+	SsrSun = { cvar = "ssrSun", text = "SSR_SUN", minValue = 0, maxValue = 2, valueStep = 0.1 },
+	ColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05 },
+	ColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05 },
+	ColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05 },
+	ColorSharpen = { cvar = "colorSharpen", text = "COLOR_SHARPEN", minValue = 0, maxValue = 1, valueStep = 0.05 },
+	Vignette = { cvar = "vignette", text = "VIGNETTE", minValue = 0, maxValue = 1, valueStep = 0.05 },
+	FilmGrain = { cvar = "filmGrain", text = "FILM_GRAIN", minValue = 0, maxValue = 1, valueStep = 0.05 },
+};
+
+local FEATURE_PRESETS = {
+	PresetOff = {
+		ssao = 0, bloom = 0, godRays = 0, dof = 0, ssr = 0, fxaa = 0, tonemap = 0, groundFog = 0,
+		colorContrast = 1, colorSaturation = 1, colorBrightness = 1, colorSharpen = 0, vignette = 0, filmGrain = 0,
+	},
+	PresetSoft = {
+		ssao = 1, ssaoStrength = 0.8, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.4, bloomThreshold = 0.8,
+		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6, ssrRipple = 0.4, ssrSun = 0.8,
+		fxaa = 1, tonemap = 0, groundFog = 0,
+		colorContrast = 1.05, colorSaturation = 1.05, colorBrightness = 1, colorSharpen = 0.1, vignette = 0.2, filmGrain = 0,
+	},
+	PresetRetail = {
+		ssao = 1, ssaoStrength = 1, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.6, bloomThreshold = 0.7,
+		godRays = 1, godRaysStrength = 1, dof = 1, dofStrength = 0.6, dofDistance = 80,
+		ssr = 1, ssrStrength = 0.8, ssrRipple = 0.5, ssrSun = 1,
+		fxaa = 1, tonemap = 1, tonemapExposure = 1.4, groundFog = 1, groundFogDensity = 0.4, groundFogHeight = 4,
+		colorContrast = 1.1, colorSaturation = 1.1, colorBrightness = 1, colorSharpen = 0.2, vignette = 0.3, filmGrain = 0,
+	},
+	PresetMax = {
+		ssao = 1, ssaoStrength = 1.5, ssaoRadius = 2, bloom = 1, bloomStrength = 0.9, bloomThreshold = 0.6,
+		godRays = 1, godRaysStrength = 1.5, dof = 1, dofStrength = 1, dofDistance = 60,
+		ssr = 1, ssrStrength = 1, ssrRipple = 0.6, ssrSun = 1.5,
+		fxaa = 1, tonemap = 1, tonemapExposure = 1.6, groundFog = 1, groundFogDensity = 0.6, groundFogHeight = 6,
+		colorContrast = 1.15, colorSaturation = 1.2, colorBrightness = 1, colorSharpen = 0.4, vignette = 0.4, filmGrain = 0.2,
+	},
+};
+
+local FEATURE_SUBPANELS = {
+	VideoOptionsLightingPanel = "FEATURES_LIGHTING",
+	VideoOptionsAtmospherePanel = "FEATURES_ATMOSPHERE",
+	VideoOptionsWaterPanel = "FEATURES_WATER",
+	VideoOptionsPicturePanel = "FEATURES_PICTURE",
+};
+
+local featureControls = {};		-- the shown ones: a preset refreshes them
+
+local function FeatureKey (self)
+	return self:GetName():match("Panel(.+)$");
+end
 
 -- a cvar of the DLL that isn't there yet (an older build, or not in the glue cvar list): made here, so the
 -- control works; the DLL finds it by name
@@ -660,21 +763,24 @@ local function FeatureSetCVar (cvar, value)
 	SetCVar(cvar, value);
 end
 
--- the dropdowns: cvar and its modes; applied at once (no Okay / Cancel), saved by the client (glue cvars)
-local FEATURE_DROPDOWNS = {
-	VideoOptionsFeaturesPanelFogDropDown = { cvar = "fogMode", modes = "FOG_MODES" },
-	VideoOptionsFeaturesPanelSsaoDropDown = { cvar = "ssao", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelBloomDropDown = { cvar = "bloom", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelGodRaysDropDown = { cvar = "godRays", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelDofDropDown = { cvar = "dof", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelSsrDropDown = { cvar = "ssr", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelFxaaDropDown = { cvar = "fxaa", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelTonemapDropDown = { cvar = "tonemap", modes = "SSAO_MODES" },
-	VideoOptionsFeaturesPanelGroundFogDropDown = { cvar = "groundFog", modes = "SSAO_MODES" },
-};
+local function FeaturePanel_Setup (self, name)
+	self.name = name;
+	self.options = {};
+	self.controls = {};	-- none registered (the controls apply at once): Okay / Cancel / Refresh walk this table
+	VideoOptionsPanel_OnLoad(self);
+end
+
+function VideoOptionsFeaturesPanel_OnLoad (self)
+	FeaturePanel_Setup(self, FEATURES_LABEL);
+end
+
+function VideoOptionsFeaturesSubPanel_OnLoad (self)
+	self.parent = FEATURES_LABEL;
+	FeaturePanel_Setup(self, _G[FEATURE_SUBPANELS[self:GetName()]]);
+end
 
 local function FeatureDropDown_Initialize (self)
-	local setup = FEATURE_DROPDOWNS[self:GetName()];
+	local setup = FEATURE_DROPDOWNS[FeatureKey(self)];
 	local modes = _G[setup.modes];
 	local current = GetCVar(setup.cvar) or "0";
 	local info = UIDropDownMenu_CreateInfo();
@@ -691,65 +797,25 @@ local function FeatureDropDown_Initialize (self)
 end
 
 function VideoOptionsFeaturesPanelDropDown_OnShow (self)
+	featureControls[self] = VideoOptionsFeaturesPanelDropDown_OnShow;
 	UIDropDownMenu_SetWidth(self, 110);
 	UIDropDownMenu_Initialize(self, FeatureDropDown_Initialize);
-	UIDropDownMenu_SetSelectedValue(self, GetCVar(FEATURE_DROPDOWNS[self:GetName()].cvar) or "0");
+	UIDropDownMenu_SetSelectedValue(self, GetCVar(FEATURE_DROPDOWNS[FeatureKey(self)].cvar) or "0");
 end
 
--- the sliders: applied at once too
-SSAO_STRENGTH = "Сила затенения";
-SSAO_RADIUS = "Радиус затенения";
-COLOR_CONTRAST = "Контраст";
-TONEMAP_EXPOSURE = "Экспозиция";
-GROUND_FOG_DENSITY = "Плотность дымки";
-GROUND_FOG_HEIGHT = "Высота дымки";
-SSR_STRENGTH = "Сила отражений";
-SSR_RIPPLE = "Рябь на воде";
-SSR_SUN = "Блик солнца";
-VIGNETTE = "Виньетка";
-FILM_GRAIN = "Зерно";
-BLOOM_STRENGTH = "Сила свечения";
-BLOOM_THRESHOLD = "Порог свечения";
-GODRAYS_STRENGTH = "Сила лучей";
-DOF_STRENGTH = "Сила размытия";
-DOF_DISTANCE = "Дальность размытия";
-COLOR_SATURATION = "Насыщенность";
-COLOR_BRIGHTNESS = "Яркость";
-COLOR_SHARPEN = "Резкость";
-local FEATURE_SLIDERS = {
-	VideoOptionsFeaturesPanelSsaoStrength = { cvar = "ssaoStrength", text = "SSAO_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
-	VideoOptionsFeaturesPanelSsaoRadius = { cvar = "ssaoRadius", text = "SSAO_RADIUS", minValue = 0.3, maxValue = 5, valueStep = 0.1, low = "0.3", high = "5" },
-	VideoOptionsFeaturesPanelBloomStrength = { cvar = "bloomStrength", text = "BLOOM_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
-	VideoOptionsFeaturesPanelBloomThreshold = { cvar = "bloomThreshold", text = "BLOOM_THRESHOLD", minValue = 0.3, maxValue = 1, valueStep = 0.05, low = "0.3", high = "1" },
-	VideoOptionsFeaturesPanelGodRaysStrength = { cvar = "godRaysStrength", text = "GODRAYS_STRENGTH", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
-	VideoOptionsFeaturesPanelDofStrength = { cvar = "dofStrength", text = "DOF_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-	VideoOptionsFeaturesPanelDofDistance = { cvar = "dofDistance", text = "DOF_DISTANCE", minValue = 5, maxValue = 300, valueStep = 5, low = "5", high = "300" },
-	VideoOptionsFeaturesPanelSsrStrength = { cvar = "ssrStrength", text = "SSR_STRENGTH", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-	VideoOptionsFeaturesPanelVignette = { cvar = "vignette", text = "VIGNETTE", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-	VideoOptionsFeaturesPanelFilmGrain = { cvar = "filmGrain", text = "FILM_GRAIN", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-	VideoOptionsFeaturesPanelTonemapExposure = { cvar = "tonemapExposure", text = "TONEMAP_EXPOSURE", minValue = 0.5, maxValue = 3, valueStep = 0.1, low = "0.5", high = "3" },
-	VideoOptionsFeaturesPanelGroundFogDensity = { cvar = "groundFogDensity", text = "GROUND_FOG_DENSITY", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-	VideoOptionsFeaturesPanelGroundFogHeight = { cvar = "groundFogHeight", text = "GROUND_FOG_HEIGHT", minValue = 0, maxValue = 30, valueStep = 1, low = "0", high = "30" },
-	VideoOptionsFeaturesPanelSsrRipple = { cvar = "ssrRipple", text = "SSR_RIPPLE", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-	VideoOptionsFeaturesPanelSsrSun = { cvar = "ssrSun", text = "SSR_SUN", minValue = 0, maxValue = 2, valueStep = 0.1, low = "0", high = "2" },
-	VideoOptionsFeaturesPanelColorContrast = { cvar = "colorContrast", text = "COLOR_CONTRAST", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
-	VideoOptionsFeaturesPanelColorSaturation = { cvar = "colorSaturation", text = "COLOR_SATURATION", minValue = 0, maxValue = 2, valueStep = 0.05, low = "0", high = "2" },
-	VideoOptionsFeaturesPanelColorBrightness = { cvar = "colorBrightness", text = "COLOR_BRIGHTNESS", minValue = 0.5, maxValue = 1.5, valueStep = 0.05, low = "0.5", high = "1.5" },
-	VideoOptionsFeaturesPanelColorSharpen = { cvar = "colorSharpen", text = "COLOR_SHARPEN", minValue = 0, maxValue = 1, valueStep = 0.05, low = "0", high = "1" },
-};
-
 function VideoOptionsFeaturesPanelSlider_OnLoad (self)
-	local setup = FEATURE_SLIDERS[self:GetName()];
+	local setup = FEATURE_SLIDERS[FeatureKey(self)];
 	local name = self:GetName();
 	_G[name.."Text"]:SetText(_G[setup.text]);
-	_G[name.."Low"]:SetText(setup.low);
-	_G[name.."High"]:SetText(setup.high);
+	_G[name.."Low"]:SetText(setup.minValue);
+	_G[name.."High"]:SetText(setup.maxValue);
 	self:SetMinMaxValues(setup.minValue, setup.maxValue);
 	self:SetValueStep(setup.valueStep);
 end
 
 function VideoOptionsFeaturesPanelSlider_OnShow (self)
-	local setup = FEATURE_SLIDERS[self:GetName()];
+	featureControls[self] = VideoOptionsFeaturesPanelSlider_OnShow;
+	local setup = FEATURE_SLIDERS[FeatureKey(self)];
 	self.loading = true;
 	self:SetValue(tonumber(GetCVar(setup.cvar)) or setup.minValue);
 	self.loading = nil;
@@ -757,48 +823,16 @@ end
 
 function VideoOptionsFeaturesPanelSlider_OnValueChanged (self, value)
 	if ( not self.loading ) then
-		FeatureSetCVar(FEATURE_SLIDERS[self:GetName()].cvar, value);
+		FeatureSetCVar(FEATURE_SLIDERS[FeatureKey(self)].cvar, value);
 	end
 end
 
--- presets: every feature at once
-FEATURES_PRESET_OFF = "Выкл";
-FEATURES_PRESET_SOFT = "Мягко";
-FEATURES_PRESET_RETAIL = "Ретейл";
-FEATURES_PRESET_MAX = "Максимум";
-local FEATURE_PRESETS = {
-	VideoOptionsFeaturesPanelPresetOff = {
-		ssao = 0, bloom = 0, godRays = 0, dof = 0, ssr = 0, fxaa = 0, tonemap = 0, groundFog = 0,
-		colorContrast = 1, colorSaturation = 1, colorBrightness = 1, colorSharpen = 0, vignette = 0, filmGrain = 0,
-	},
-	VideoOptionsFeaturesPanelPresetSoft = {
-		ssao = 1, ssaoStrength = 0.8, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.4, bloomThreshold = 0.8,
-		godRays = 1, godRaysStrength = 0.7, dof = 0, ssr = 1, ssrStrength = 0.6, ssrRipple = 0.4, ssrSun = 0.8, fxaa = 1, tonemap = 0, groundFog = 0,
-		colorContrast = 1.05, colorSaturation = 1.05, colorBrightness = 1, colorSharpen = 0.1, vignette = 0.2, filmGrain = 0,
-	},
-	VideoOptionsFeaturesPanelPresetRetail = {
-		ssao = 1, ssaoStrength = 1, ssaoRadius = 1.5, bloom = 1, bloomStrength = 0.6, bloomThreshold = 0.7,
-		godRays = 1, godRaysStrength = 1, dof = 1, dofStrength = 0.6, dofDistance = 80, ssr = 1, ssrStrength = 0.8, ssrRipple = 0.5, ssrSun = 1,
-		fxaa = 1, tonemap = 1, tonemapExposure = 1.4, groundFog = 1, groundFogDensity = 0.4, groundFogHeight = 4,
-		colorContrast = 1.1, colorSaturation = 1.1, colorBrightness = 1, colorSharpen = 0.2, vignette = 0.3, filmGrain = 0,
-	},
-	VideoOptionsFeaturesPanelPresetMax = {
-		ssao = 1, ssaoStrength = 1.5, ssaoRadius = 2, bloom = 1, bloomStrength = 0.9, bloomThreshold = 0.6,
-		godRays = 1, godRaysStrength = 1.5, dof = 1, dofStrength = 1, dofDistance = 60, ssr = 1, ssrStrength = 1, ssrRipple = 0.6, ssrSun = 1.5,
-		fxaa = 1, tonemap = 1, tonemapExposure = 1.6, groundFog = 1, groundFogDensity = 0.6, groundFogHeight = 6,
-		colorContrast = 1.15, colorSaturation = 1.2, colorBrightness = 1, colorSharpen = 0.4, vignette = 0.4, filmGrain = 0.2,
-	},
-};
-
+-- presets: every effect at once (the fog stays as it is)
 function VideoOptionsFeaturesPanelPreset_OnClick (self)
-	for cvar, value in pairs(FEATURE_PRESETS[self:GetName()]) do
+	for cvar, value in pairs(FEATURE_PRESETS[FeatureKey(self)]) do
 		FeatureSetCVar(cvar, value);
 	end
-	-- the controls show the new values
-	for name in pairs(FEATURE_DROPDOWNS) do
-		VideoOptionsFeaturesPanelDropDown_OnShow(_G[name]);
-	end
-	for name in pairs(FEATURE_SLIDERS) do
-		VideoOptionsFeaturesPanelSlider_OnShow(_G[name]);
+	for control, refresh in pairs(featureControls) do
+		refresh(control);
 	end
 end
