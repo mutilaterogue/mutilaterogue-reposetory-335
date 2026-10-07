@@ -327,6 +327,97 @@ function ClassNameplateBarClassPower_Update()
 	ClassNameplateBarWarlock_Update();
 end
 
+-- ------------------------------------------------------------
+--  Spells costing a class power (as the server: class_powers.cpp): the tooltip shows the cost, the action
+--  button is unusable without it (blue, as without mana), the server's refusal says why
+-- ------------------------------------------------------------
+local CLASS_POWER_COSTS = {		-- [spell id, any rank: matched by name] = { power, amount }
+	[53600] = { SPELL_POWER_HOLY_POWER, 3 },	-- Shield of the Righteous
+	[53385] = { SPELL_POWER_HOLY_POWER, 3 },	-- Divine Storm
+	[6353]  = { SPELL_POWER_SOUL_SHARDS, 1 },	-- Soul Fire
+	[17877] = { SPELL_POWER_SOUL_SHARDS, 1 },	-- Shadowburn
+	[6789]  = { SPELL_POWER_SOUL_SHARDS, 1 },	-- Death Coil
+};
+local CLASS_POWER_NAMES = {
+	[SPELL_POWER_HOLY_POWER] = HOLY_POWER,
+	[SPELL_POWER_SOUL_SHARDS] = SOUL_SHARDS_POWER,
+};
+local CLASS_POWER_ERRORS = {
+	[SPELL_POWER_HOLY_POWER] = "Недостаточно силы Света",
+	[SPELL_POWER_SOUL_SHARDS] = "Недостаточно осколков души",
+};
+
+local costsByName;
+local function CostOf(spellName)
+	if ( not spellName ) then
+		return nil;
+	end
+	if ( not costsByName ) then
+		costsByName = {};
+		for spellID, cost in pairs(CLASS_POWER_COSTS) do
+			local name = GetSpellInfo(spellID);
+			if ( name ) then
+				costsByName[name] = cost;
+			end
+		end
+	end
+	return costsByName[spellName];
+end
+
+local function HasCost(cost)
+	return UnitPower("player", cost[1]) >= cost[2];
+end
+
+-- the action button: usable only with the power (notEnoughMana: the blue tint)
+local ClientIsUsableAction = IsUsableAction;
+function IsUsableAction(slot, ...)
+	local isUsable, notEnoughMana = ClientIsUsableAction(slot, ...);
+	if ( isUsable ) then
+		local actionType, id = GetActionInfo(slot);
+		if ( actionType == "spell" and id ) then
+			local cost = CostOf(GetSpellInfo(id));
+			if ( cost and not HasCost(cost) ) then
+				return nil, 1;
+			end
+		end
+	end
+	return isUsable, notEnoughMana;
+end
+
+local ACTION_BUTTON_BARS = { "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton",
+	"MultiBarRightButton", "MultiBarLeftButton", "BonusActionButton" };
+local function RefreshActionButtons()
+	if ( not ActionButton_UpdateUsable ) then
+		return;
+	end
+	for _, bar in ipairs(ACTION_BUTTON_BARS) do
+		for i = 1, NUM_ACTIONBAR_BUTTONS or 12 do
+			local button = _G[bar..i];
+			if ( button and button.action and button:IsVisible() ) then
+				ActionButton_UpdateUsable(button);
+			end
+		end
+	end
+end
+
+-- the tooltip: "Сила Света: 3", red without it
+GameTooltip:HookScript("OnTooltipSetSpell", function(self)
+	local cost = CostOf((self:GetSpell()));
+	if ( not cost ) then
+		return;
+	end
+	local color = HasCost(cost) and HIGHLIGHT_FONT_COLOR or RED_FONT_COLOR;
+	self:AddLine(format("%s: %d", CLASS_POWER_NAMES[cost[1]] or "", cost[2]), color.r, color.g, color.b);
+	self:Show();
+end);
+
+local function OnClassPowerError(powerType)
+	local text = CLASS_POWER_ERRORS[tonumber(powerType)];
+	if ( text ) then
+		UIErrorsFrame:AddMessage(text, 1.0, 0.1, 0.1, 1.0);
+	end
+end
+
 local function OnClassPower(powerType, value, maximum, direction)
 	powerType = tonumber(powerType);
 	if ( not powerType or not CLASS_POWER_TOKENS[powerType] ) then
@@ -340,6 +431,7 @@ local function OnClassPower(powerType, value, maximum, direction)
 		directionChanged = true;
 	end
 	RefreshBars(powerType, directionChanged);
+	RefreshActionButtons();
 end
 
 -- Server.lua (Comm_Register / Comm_Send) may load after this file: registered at login, whatever the .toc order
@@ -353,6 +445,7 @@ loader:SetScript("OnEvent", function(self, event)
 	end
 	if ( not registered ) then
 		Comm_Register("CLASS_POWER", OnClassPower);
+		Comm_Register("CLASS_POWER_ERROR", OnClassPowerError);
 		registered = true;
 	end
 	if ( event == "PLAYER_ENTERING_WORLD" ) then

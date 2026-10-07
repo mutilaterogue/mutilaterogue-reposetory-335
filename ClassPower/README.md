@@ -10,13 +10,18 @@ powers and sends them by AddonComm; the client answers `UnitPower` / `UnitPowerM
 | 9 | `HOLY_POWER` | paladin | `PaladinPowerBar` (here) |
 
 ## Mechanics (server/class_powers.cpp)
-* **Holy Power** 0..3: +1 from Crusader Strike, Holy Shock, Hammer of the Righteous (a cast). Shield of the
-  Righteous and Divine Storm spend all of it: +50% damage / healing per point.
+* **Holy Power** 0..5: +1 from Crusader Strike, Holy Shock, Hammer of the Righteous (a cast). Shield of the
+  Righteous and Divine Storm cost 3.
 * **Eclipse** -100..+100: Wrath -13 while heading to the moon, Starfire +20 while heading to the sun (either way
   at the start). At -100 Lunar Eclipse (48518), then toward the sun; at +100 Solar Eclipse (48517), then toward
   the moon. Out of combat it drifts back to 0 (10 a second).
 * **Soul Shards** 0..3: +1 when a target dies under your Drain Soul; out of combat +1 every 5 s. Soul Fire,
-  Shadowburn, Death Coil spend one: +50% damage.
+  Shadowburn, Death Coil cost 1.
+
+A spell costing a power is not cast without it: the server refuses it (`OnCheckCast`) and sends
+`CLASS_POWER_ERROR` (the client shows "Недостаточно силы Света" / "Недостаточно осколков души"). On the client
+the action button is unusable (blue, `IsUsableAction`), and the tooltip has the cost line (red without it).
+The costs are in `CLASS_POWER_COSTS` (ClassPower.lua) and the constants of class_powers.cpp: keep them alike.
 
 The numbers are constants at the top of `class_powers.cpp`.
 

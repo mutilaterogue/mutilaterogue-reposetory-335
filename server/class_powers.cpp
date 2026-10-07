@@ -10,18 +10,18 @@
  *
  * Holy Power (0 .. 5, as retail)
  *   +1: Crusader Strike, Holy Shock, Hammer of the Righteous (when they hit)
- *   spent, up to 3: Shield of the Righteous, Divine Storm - +50% damage / healing per point
+ *   cost 3 (not cast without it): Shield of the Righteous, Divine Storm
  * Eclipse (-100 lunar .. +100 solar; a balance druid: Moonkin Form known)
  *   Wrath: -13 while heading to the moon, Starfire: +20 while heading to the sun (either way at the start)
  *   at -100: Lunar Eclipse (48518), then toward the sun; at +100: Solar Eclipse (48517), then toward the moon
  *   out of combat it drifts back to 0 (10 a second) and the direction is free again
  * Soul Shards (0 .. 3)
  *   +1: a target dying under your Drain Soul; out of combat +1 every 5 seconds up to 3
- *   spent, one: Soul Fire, Shadowburn, Death Coil - +50% damage
+ *   cost 1 (not cast without it): Soul Fire, Shadowburn, Death Coil
  */
 
 #include "ScriptMgr.h"
-#include "AddonComm.h"
+#include "Custom\AddonComm\AddonComm.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "SpellAuraEffects.h"
@@ -53,7 +53,7 @@ namespace
     constexpr int32 ECLIPSE_STARFIRE    = 20;
     constexpr int32 ECLIPSE_DRIFT       = 10;       // a second, out of combat
     constexpr uint32 SHARD_REGEN_MS     = 5000;     // out of combat
-    constexpr float SPENDER_BONUS       = 0.5f;     // a point of power
+    constexpr int32 SOUL_SHARD_COST     = 1;
 
     // the direction the client shows: "none", "sun", "moon"
     enum EclipseDirection : uint8 { ECLIPSE_NONE, ECLIPSE_SUN, ECLIPSE_MOON };
@@ -81,7 +81,7 @@ namespace
 
     bool IsBalanceDruid(Player* player)
     {
-        return player->getClass() == CLASS_DRUID && player->HasSpell(SPELL_MOONKIN_FORM);
+        return player->GetClass() == CLASS_DRUID && player->HasSpell(SPELL_MOONKIN_FORM);
     }
 
     void SendPower(Player* player, uint32 type)
@@ -103,10 +103,16 @@ namespace
         }
     }
 
+    // a spell refused for want of the power: the client says why (UIErrorsFrame)
+    void SendPowerError(Player* player, uint32 type)
+    {
+        sAddonComm->Send(player, std::string("CLASS_POWER_ERROR"), type);
+    }
+
     // the power of the player's class (0: none)
     uint32 ClassPowerOf(Player* player)
     {
-        switch (player->getClass())
+        switch (player->GetClass())
         {
             case CLASS_PALADIN: return POWER_HOLY_POWER;
             case CLASS_WARLOCK: return POWER_SOUL_SHARDS;
@@ -188,38 +194,33 @@ class spell_class_power_holy_generator : public SpellScript
     bool _done = false;
 };
 
-// Shield of the Righteous, Divine Storm: every point spent, +50%
+// Shield of the Righteous, Divine Storm: cost 3 Holy Power - not cast without it
 class spell_class_power_holy_spender : public SpellScript
 {
     PrepareSpellScript(spell_class_power_holy_spender);
 
-    void HandleCast()
+    SpellCastResult CheckCast()
     {
         Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr;
-        if (!player)
-            return;
-        _spent = std::min(State(player).holyPower, HOLY_POWER_SPEND);
-        AddHolyPower(player, -_spent);
+        if (player && State(player).holyPower < HOLY_POWER_SPEND)
+        {
+            SendPowerError(player, POWER_HOLY_POWER);
+            return SPELL_FAILED_DONT_REPORT;
+        }
+        return SPELL_CAST_OK;
     }
 
-    void HandleHit()
+    void HandleCast()
     {
-        if (_spent <= 0)
-            return;
-        float multiplier = 1.0f + SPENDER_BONUS * float(_spent);
-        if (int32 damage = GetHitDamage())
-            SetHitDamage(int32(damage * multiplier));
-        if (int32 heal = GetHitHeal())
-            SetHitHeal(int32(heal * multiplier));
+        if (Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr)
+            AddHolyPower(player, -HOLY_POWER_SPEND);
     }
 
     void Register() override
     {
+        OnCheckCast += SpellCheckCastFn(spell_class_power_holy_spender::CheckCast);
         BeforeCast += SpellCastFn(spell_class_power_holy_spender::HandleCast);
-        OnHit += SpellHitFn(spell_class_power_holy_spender::HandleHit);
     }
-
-    int32 _spent = 0;
 };
 
 // ---------------------------------------------------------------- Eclipse
@@ -279,35 +280,33 @@ class spell_class_power_drain_soul : public AuraScript
     }
 };
 
-// Soul Fire, Shadowburn, Death Coil: a shard spent, +50% damage
+// Soul Fire, Shadowburn, Death Coil: cost 1 Soul Shard - not cast without it
 class spell_class_power_shard_spender : public SpellScript
 {
     PrepareSpellScript(spell_class_power_shard_spender);
 
-    void HandleCast()
+    SpellCastResult CheckCast()
     {
         Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr;
-        if (!player || State(player).soulShards <= 0)
-            return;
-        AddSoulShards(player, -1);
-        _empowered = true;
+        if (player && State(player).soulShards < SOUL_SHARD_COST)
+        {
+            SendPowerError(player, POWER_SOUL_SHARDS);
+            return SPELL_FAILED_DONT_REPORT;
+        }
+        return SPELL_CAST_OK;
     }
 
-    void HandleHit()
+    void HandleCast()
     {
-        if (!_empowered)
-            return;
-        if (int32 damage = GetHitDamage())
-            SetHitDamage(int32(damage * (1.0f + SPENDER_BONUS)));
+        if (Player* player = GetCaster() ? GetCaster()->ToPlayer() : nullptr)
+            AddSoulShards(player, -SOUL_SHARD_COST);
     }
 
     void Register() override
     {
+        OnCheckCast += SpellCheckCastFn(spell_class_power_shard_spender::CheckCast);
         BeforeCast += SpellCastFn(spell_class_power_shard_spender::HandleCast);
-        OnHit += SpellHitFn(spell_class_power_shard_spender::HandleHit);
     }
-
-    bool _empowered = false;
 };
 
 // ---------------------------------------------------------------- the players
@@ -349,7 +348,7 @@ public:
                 continue;
             ClassPowerState& state = entry.second;
 
-            if (player->getClass() == CLASS_WARLOCK && state.soulShards < SOUL_SHARDS_MAX)
+            if (player->GetClass() == CLASS_WARLOCK && state.soulShards < SOUL_SHARDS_MAX)
             {
                 state.shardTimer += diff;
                 if (state.shardTimer >= SHARD_REGEN_MS)
@@ -359,7 +358,7 @@ public:
                 }
             }
 
-            if (player->getClass() == CLASS_DRUID && (state.eclipse != 0 || state.direction != ECLIPSE_NONE))
+            if (player->GetClass() == CLASS_DRUID && (state.eclipse != 0 || state.direction != ECLIPSE_NONE))
             {
                 state.driftTimer += diff;
                 if (state.driftTimer >= 1000)
