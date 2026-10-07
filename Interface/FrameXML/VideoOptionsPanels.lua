@@ -616,3 +616,40 @@ function VideoOptionsStereoPanel_OnEvent(self, event, ...)
 			end
 	end
 end
+
+
+-- [[ New features panel (WotLKExtensions) ]] --
+
+FEATURES_LABEL = "Нововведения";
+FEATURES_SUBTEXT = "Дополнительные графические настройки, которых нет в обычном клиенте.";
+FOG_MODE = "Туман";
+FOG_MODE_TOOLTIP = "Дальность тумана: как в клиенте, в три раза дальше или без тумана.";
+FOG_MODES = { [0] = "Обычный", "Дальше", "Выключен" };
+
+function VideoOptionsFeaturesPanel_OnLoad (self)
+	self.name = FEATURES_LABEL;
+	self.options = {};
+	VideoOptionsPanel_OnLoad(self);
+end
+
+-- fogMode: applied at once (no Okay / Cancel), saved by the client (a glue cvar)
+local function FogDropDown_Initialize (self)
+	local current = GetCVar("fogMode") or "0";
+	local info = UIDropDownMenu_CreateInfo();
+	for mode = 0, #FOG_MODES do
+		info.text = FOG_MODES[mode];
+		info.value = tostring(mode);
+		info.checked = ( info.value == current ) and 1 or nil;
+		info.func = function (button)
+			SetCVar("fogMode", button.value);
+			UIDropDownMenu_SetSelectedValue(self, button.value);
+		end;
+		UIDropDownMenu_AddButton(info);
+	end
+end
+
+function VideoOptionsFeaturesPanelFogDropDown_OnShow (self)
+	UIDropDownMenu_SetWidth(self, 140);
+	UIDropDownMenu_Initialize(self, FogDropDown_Initialize);
+	UIDropDownMenu_SetSelectedValue(self, GetCVar("fogMode") or "0");
+end
