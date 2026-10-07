@@ -46,6 +46,7 @@ namespace
     constexpr uintptr_t ADDR_CVAR_REGISTER  = 0x767FC0;    // CVar::Register
     constexpr uintptr_t ADDR_CVAR_LOOKUP    = 0x767440;    // CVar::Lookup(name)
     constexpr uint32_t  CVAR_STRING_OFFSET  = 0x28;        // CVar: the value as a string
+    constexpr uint32_t  CVAR_FLAGS_OFFSET   = 0x1C;        // CVar: uint16 flags, 1 - saved to Config.wtf
     constexpr uint32_t  RANK_WORLD_BOSS     = 3;
     constexpr size_t    MAX_BOSSES          = 8;
     constexpr size_t    MAX_OUTLINED        = 64;      // models in a frame (OutlineAll)
@@ -104,6 +105,10 @@ namespace
             reinterpret_cast<int32_t (__cdecl*)(const char*, const char*, uint32_t, const char*, void*, uint32_t, bool, int32_t, bool)>(
                 ADDR_CVAR_REGISTER)(cvar.Name, cvar.Description, 1, cvar.Default, nullptr, 5, false, 0, false);
             cvar.Handle = reinterpret_cast<void* (__cdecl*)(const char*)>(ADDR_CVAR_LOOKUP)(cvar.Name);
+            // saved to Config.wtf: a cvar made by Lua's RegisterCVar (the options panel) isn't, and Register
+            // doesn't change the flags of one that exists
+            if (cvar.Handle)
+                *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(cvar.Handle) + CVAR_FLAGS_OFFSET) |= 1;
         }
     }
 
@@ -569,6 +574,7 @@ namespace
         { D3DRS_ALPHATESTENABLE, FALSE }, { D3DRS_FOGENABLE, FALSE }, { D3DRS_COLORWRITEENABLE, 0xF },
         { D3DRS_STENCILENABLE, FALSE }, { D3DRS_SCISSORTESTENABLE, FALSE }, { D3DRS_CLIPPLANEENABLE, 0 },
         { D3DRS_CULLMODE, D3DCULL_CCW }, { D3DRS_SRGBWRITEENABLE, FALSE },
+        { D3DRS_DEPTHBIAS, 0 }, { D3DRS_SLOPESCALEDEPTHBIAS, 0 },
     };
 
     void SetState(IDirect3DDevice9* device, D3DRENDERSTATETYPE state, DWORD value)
@@ -941,6 +947,11 @@ namespace
             s_depthInfo.ZEnable = s_shadow.Known[D3DRS_ZENABLE] ? s_shadow.RenderStates[D3DRS_ZENABLE] : 99;
             SetState(device, D3DRS_ZENABLE, zenable);
             SetState(device, D3DRS_ZFUNC, zfunc);
+            // the silhouette's depth comes out a hair behind the model's own: pulled toward the camera a little
+            // (a wall in front is far more in front than this)
+            const float bias = -0.0005f, slope = -2.0f;
+            SetState(device, D3DRS_DEPTHBIAS, *reinterpret_cast<const DWORD*>(&bias));
+            SetState(device, D3DRS_SLOPESCALEDEPTHBIAS, *reinterpret_cast<const DWORD*>(&slope));
         }
 
         if (depthTest)
