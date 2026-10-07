@@ -645,6 +645,15 @@ SSR_MODE_TOOLTIP = "Вода отражает горы, деревья и зда
 DOF_MODE = "Глубина резкости";
 DOF_MODE_TOOLTIP = "Даль размывается, персонаж и всё рядом остаётся резким. Требует сглаживания (MSAA).";
 
+-- a cvar of the DLL that isn't there yet (an older build, or not in the glue cvar list): made here, so the
+-- control works; the DLL finds it by name
+local function FeatureSetCVar (cvar, value)
+	if ( GetCVar(cvar) == nil ) then
+		RegisterCVar(cvar, value);
+	end
+	SetCVar(cvar, value);
+end
+
 -- the dropdowns: cvar and its modes; applied at once (no Okay / Cancel), saved by the client (glue cvars)
 local FEATURE_DROPDOWNS = {
 	VideoOptionsFeaturesPanelFogDropDown = { cvar = "fogMode", modes = "FOG_MODES" },
@@ -665,7 +674,7 @@ local function FeatureDropDown_Initialize (self)
 		info.value = tostring(mode);
 		info.checked = ( info.value == current ) and 1 or nil;
 		info.func = function (button)
-			SetCVar(setup.cvar, button.value);
+			FeatureSetCVar(setup.cvar, button.value);
 			UIDropDownMenu_SetSelectedValue(self, button.value);
 		end;
 		UIDropDownMenu_AddButton(info);
@@ -729,7 +738,7 @@ end
 
 function VideoOptionsFeaturesPanelSlider_OnValueChanged (self, value)
 	if ( not self.loading ) then
-		SetCVar(FEATURE_SLIDERS[self:GetName()].cvar, value);
+		FeatureSetCVar(FEATURE_SLIDERS[self:GetName()].cvar, value);
 	end
 end
 
@@ -762,7 +771,7 @@ local FEATURE_PRESETS = {
 
 function VideoOptionsFeaturesPanelPreset_OnClick (self)
 	for cvar, value in pairs(FEATURE_PRESETS[self:GetName()]) do
-		SetCVar(cvar, value);
+		FeatureSetCVar(cvar, value);
 	end
 	-- the controls show the new values
 	for name in pairs(FEATURE_DROPDOWNS) do
