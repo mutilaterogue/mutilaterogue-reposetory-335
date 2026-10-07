@@ -38,6 +38,7 @@ void AddSC_talent_custom();
 void AddSC_spec_primary();
 void AddSC_raid_finder();
 void AddSC_premade_groups();
+void AddSC_class_powers();
 
 void AddCustomScripts()
 {
@@ -60,4 +61,5 @@ void AddCustomScripts()
     AddSC_spec_primary();
     AddSC_raid_finder();
     AddSC_premade_groups();
+    AddSC_class_powers();
 }
