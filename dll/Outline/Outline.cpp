@@ -101,12 +101,15 @@ namespace
         s_cvarsRegistered = true;
         for (CVarDefinition& cvar : s_cvars)
         {
-            // (name, description, flags: 1 archived, default, callback, category, ...) - as CVar::AddToGlueCVarVector
-            reinterpret_cast<int32_t (__cdecl*)(const char*, const char*, uint32_t, const char*, void*, uint32_t, bool, int32_t, bool)>(
-                ADDR_CVAR_REGISTER)(cvar.Name, cvar.Description, 1, cvar.Default, nullptr, 5, false, 0, false);
+            // registered with the glue cvars (CVar::FillCustomGlueCVarVector), before Config.wtf is read: saved
+            // values are kept. Registered here only when that list lacks them (then not kept across restarts)
             cvar.Handle = reinterpret_cast<void* (__cdecl*)(const char*)>(ADDR_CVAR_LOOKUP)(cvar.Name);
-            // saved to Config.wtf: a cvar made by Lua's RegisterCVar (the options panel) isn't, and Register
-            // doesn't change the flags of one that exists
+            if (!cvar.Handle)
+            {
+                reinterpret_cast<int32_t (__cdecl*)(const char*, const char*, uint32_t, const char*, void*, uint32_t, bool, int32_t, bool)>(
+                    ADDR_CVAR_REGISTER)(cvar.Name, cvar.Description, 1, cvar.Default, nullptr, 5, false, 0, false);
+                cvar.Handle = reinterpret_cast<void* (__cdecl*)(const char*)>(ADDR_CVAR_LOOKUP)(cvar.Name);
+            }
             if (cvar.Handle)
                 *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(cvar.Handle) + CVAR_FLAGS_OFFSET) |= 1;
         }
@@ -401,12 +404,17 @@ namespace
         uint8_t* material = *reinterpret_cast<uint8_t**>(batch + BATCH_MATERIAL);
         if (!material || *reinterpret_cast<uint32_t*>(material) > MAX_BLEND_MODE || (material[8] & 1))
             return nullptr;
+        bool opaque = *reinterpret_cast<uint32_t*>(material) == 0;
         void* model = *reinterpret_cast<void**>(batch + BATCH_MODEL);
         for (int depth = 0; model && depth < 8; ++depth)
         {
             for (Target const& target : s_targets)
                 if (target.Model == model)
                     return &target;
+            // an attachment (weapon, spell effect): opaque batches only - an alpha keyed spell quad drawn flat
+            // is a square
+            if (!opaque)
+                return nullptr;
             model = *reinterpret_cast<void**>(static_cast<uint8_t*>(model) + MODEL_PARENT);
         }
         return nullptr;
@@ -919,7 +927,10 @@ namespace
             {
                 device->GetDepthStencilSurface(&depthStencil);
                 device->SetDepthStencilSurface(nullptr);
-            }
+            }}
+            // SetRenderTarget resets the viewport to the whole target with depth 0..1: the client's back (its
+            // MinZ / MaxZ), else the silhouette's depth doesn't match the scene's
+            RestoreViewport(device);
         }
         s_setPixelShader(device, s_flatShader);
         s_setPsConstant(device, 0, s_currentTarget->Color, 1);

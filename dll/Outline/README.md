@@ -50,8 +50,21 @@ Nothing to link: `d3d9.h` comes with the Windows SDK, only the device interface 
 | `OutlineThickness` | `1` | `0.5` .. `3` |
 | `OutlineStrength` | `1` | opacity `0` .. `1` |
 
-They are registered in the world (the first frame), not at the login screen (more custom glue cvars crashed the
-client, see `NamePlates.cpp`); a value saved in `Config.wtf` is kept. Your XML's texts, if `GlobalStrings` lacks them:
+Add them to `CVar::FillCustomGlueCVarVector()` (`src/Client/CVar.cpp`), so they are registered before
+`Config.wtf` is read and the saved values are kept:
+```cpp
+    AddToGlueCVarVector("OutlineQuality", "Outline: 0 off, 1 on, 2 low quality", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlinePlayer", "Outline your own character", 1, "0", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineTarget", "Outline your target", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineMouseover", "Outline the unit under the mouse", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineQuestBoss", "Outline bosses around you", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineThickness", "Outline thickness (0.5 .. 3)", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineStrength", "Outline opacity (0 .. 1)", 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineAll", "Outline every unit around: 0 off, 1 all, 2 hostile, 3 friendly, 4 players, 5 creatures", 1, "0", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("OutlineOccluded", "Outline the parts hidden behind walls too", 1, "0", nullptr, 5, false, 0, false);
+```
+Without them the DLL registers them in the world (the first frame), and the values are not kept across restarts.
+Your XML's texts, if `GlobalStrings` lacks them:
 ```lua
 OUTLINE_ENABLE = "Обводка моделей";
 OUTLINE_PLAYER = "Свой персонаж";
