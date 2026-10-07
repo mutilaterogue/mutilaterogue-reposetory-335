@@ -60,6 +60,7 @@ namespace
     uint32_t s_frameBatches = 0;
     uint32_t s_frameSilhouettes = 0;
     uint32_t s_frameOnScreen = 0;
+    uint32_t s_lastVsMajor = 0;         // OutlineDebug: the vertex shader model of the last silhouette
 
     // OutlineMode(bits): 1 - no extra draw (find the batches only), 2 - keep the depth test,
     //  4 - the silhouette writes depth and draws over everything (nothing drawn later covers it)
@@ -68,9 +69,12 @@ namespace
     std::vector<Target> s_targets;
     Target const* s_currentTarget = nullptr;    // set while the client draws a batch of an outlined model
 
-    IDirect3DPixelShader9* s_flatShader = nullptr;
-    // ps_2_0: mov oC0, c0 - the color in c0
+    // mov oC0, c0 - the color in c0. Two versions: a vs_3_0 vertex shader needs a ps_3_0 pixel shader
+    // (a ps_2_0 with it draws nothing), a vs_1/vs_2 one a ps_2_0.
+    IDirect3DPixelShader9* s_flatShader = nullptr;      // ps_2_0
+    IDirect3DPixelShader9* s_flatShader3 = nullptr;     // ps_3_0
     const DWORD FLAT_SHADER[] = { 0xFFFF0200, 0x02000001, 0x800F0800, 0xA0E40000, 0x0000FFFF };
+    const DWORD FLAT_SHADER3[] = { 0xFFFF0300, 0x02000001, 0x800F0800, 0xA0E40000, 0x0000FFFF };
 
     // ---------------------------------------------------------------- code hooks
     // jmp over the first 5 bytes; the original is called with them put back
@@ -177,6 +181,7 @@ namespace
     {
         VT_SET_RENDER_STATE  = 57,
         VT_DRAW_INDEXED      = 82,
+        VT_SET_VERTEX_SHADER = 92,
         VT_SET_PIXEL_SHADER  = 107,
         VT_SET_PS_CONSTANT_F = 109,
     };
@@ -185,11 +190,49 @@ namespace
     typedef HRESULT (__stdcall* DrawIndexedPrimitiveFn)(IDirect3DDevice9*, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
     typedef HRESULT (__stdcall* SetShaderConstantFFn)(IDirect3DDevice9*, UINT, const float*, UINT);
     typedef HRESULT (__stdcall* SetPixelShaderFn)(IDirect3DDevice9*, IDirect3DPixelShader9*);
+    typedef HRESULT (__stdcall* SetVertexShaderFn)(IDirect3DDevice9*, IDirect3DVertexShader9*);
 
     SetRenderStateFn s_setRenderState = nullptr;
     DrawIndexedPrimitiveFn s_drawIndexed = nullptr;
     SetPixelShaderFn s_setPixelShader = nullptr;
     SetShaderConstantFFn s_setPsConstant = nullptr;
+    SetVertexShaderFn s_setVertexShader = nullptr;
+    IDirect3DVertexShader9* s_vertexShader = nullptr;   // the current one (what Gx set)
+
+    // the shader model of a vertex shader (its first token), cached
+    struct VertexShaderVersion
+    {
+        IDirect3DVertexShader9* Shader;
+        uint32_t Major;
+    };
+    std::vector<VertexShaderVersion> s_vsVersions;
+
+    uint32_t VertexShaderMajor(IDirect3DVertexShader9* shader)
+    {
+        if (!shader)
+            return 0;
+        for (VertexShaderVersion const& entry : s_vsVersions)
+            if (entry.Shader == shader)
+                return entry.Major;
+        uint32_t major = 0;
+        UINT size = 0;
+        if (SUCCEEDED(shader->GetFunction(nullptr, &size)) && size >= 4)
+        {
+            std::vector<DWORD> code(size / 4);
+            if (SUCCEEDED(shader->GetFunction(code.data(), &size)))
+                major = (code[0] >> 8) & 0xFF;
+        }
+        if (s_vsVersions.size() > 4096)
+            s_vsVersions.clear();
+        s_vsVersions.push_back({ shader, major });
+        return major;
+    }
+
+    HRESULT __stdcall SetVertexShaderDetour(IDirect3DDevice9* device, IDirect3DVertexShader9* shader)
+    {
+        s_vertexShader = shader;
+        return s_setVertexShader(device, shader);
+    }
 
     struct Shadow
     {
@@ -242,7 +285,9 @@ namespace
             return result;
 
         // the same draw once more: our shader and color, no depth test (stage 1: over everything)
-        s_setPixelShader(device, s_flatShader);
+        uint32_t vsMajor = VertexShaderMajor(s_vertexShader);
+        s_lastVsMajor = vsMajor;
+        s_setPixelShader(device, vsMajor >= 3 && s_flatShader3 ? s_flatShader3 : s_flatShader);
         s_setPsConstant(device, 0, s_currentTarget->Color, 1);
         const DWORD* values = (s_mode & 4) ? SILHOUETTE_VALUES_TOP : SILHOUETTE_VALUES;
         for (size_t i = 0; i < SILHOUETTE_STATE_COUNT; ++i)
@@ -303,13 +348,16 @@ namespace
             s_stats.Error = 2;
             return;
         }
+        if (!s_flatShader3 && FAILED(device->CreatePixelShader(FLAT_SHADER3, &s_flatShader3)))
+            s_flatShader3 = nullptr;    // no shader model 3: the vertex shaders aren't vs_3_0 either
         s_stats.Error = 0;
         void** vtable = *reinterpret_cast<void***>(device);
         HookVtable(vtable, VT_SET_RENDER_STATE, s_setRenderState, reinterpret_cast<void*>(&SetRenderStateDetour));
         HookVtable(vtable, VT_SET_PIXEL_SHADER, s_setPixelShader, reinterpret_cast<void*>(&SetPixelShaderDetour));
         HookVtable(vtable, VT_SET_PS_CONSTANT_F, s_setPsConstant, reinterpret_cast<void*>(&SetPsConstantDetour));
+        HookVtable(vtable, VT_SET_VERTEX_SHADER, s_setVertexShader, reinterpret_cast<void*>(&SetVertexShaderDetour));
         HookVtable(vtable, VT_DRAW_INDEXED, s_drawIndexed, reinterpret_cast<void*>(&DrawIndexedPrimitiveDetour));
-        if (s_setRenderState && s_setPixelShader && s_setPsConstant && s_drawIndexed)
+        if (s_setRenderState && s_setPixelShader && s_setPsConstant && s_setVertexShader && s_drawIndexed)
             s_stats.Installed |= 4;
     }
 
@@ -547,7 +595,9 @@ int32_t Outline::OutlineDebug(lua_State* L)
     FrameScript::PushNumber(L, s_stats.Error);
     FrameScript::PushNumber(L, s_mode);
     FrameScript::PushNumber(L, s_stats.OnScreen);
-    return 10;
+    FrameScript::PushNumber(L, s_lastVsMajor);
+    FrameScript::PushNumber(L, s_flatShader3 ? 1 : 0);
+    return 12;
 }
 
 // /run OutlineMode(n): 1 - no extra draw, 2 - keep the depth test, 4 - write depth, over everything
