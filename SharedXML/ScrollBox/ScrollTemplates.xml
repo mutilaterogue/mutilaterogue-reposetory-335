@@ -1,0 +1,12 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<ScrollFrame name="WowScrollBoxList" inherits="ScrollBoxBaseTemplate" mixin="ScrollBoxListMixin" virtual="true"/>
+	<ScrollFrame name="WowScrollBox" inherits="ScrollBoxBaseTemplate" mixin="ScrollBoxMixin" virtual="true"/>
+
+	<Frame name="VerticalScrollBarTemplate" inherits="ScrollBarBaseTemplate" mixin="ScrollBarMixin" virtual="true"/>
+	<Frame name="HorizontalScrollBarTemplate" inherits="ScrollBarBaseTemplate" mixin="ScrollBarMixin" virtual="true">
+		<KeyValues>
+			<KeyValue key="isHorizontal" value="true" type="boolean"/>
+		</KeyValues>
+	</Frame>
+	<!-- ScrollingEditBoxTemplate / ScrollingFontTemplate не перенесены (нужен intrinsic EventEditBox) -->
+</Ui>

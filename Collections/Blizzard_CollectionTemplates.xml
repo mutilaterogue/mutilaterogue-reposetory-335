@@ -1,0 +1,195 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\UI.xsd">
+	<!--
+		Общие шаблоны коллекций.
+		CollectionsCompanionListButtonTemplate - строка списка маунтов/питомцев (MountListButtonTemplate ретейла):
+		  иконка слева от строки, фон/выделение PetList-*, звезда избранного, подпись "призван".
+		  Область нажатия расширена влево на иконку - иконка кликается и тащится вместе со строкой.
+		CollectionsComingSoonTemplate - вкладка-заглушка "В скором времени".
+	-->
+	<Button name="CollectionsCompanionListButtonTemplate" virtual="true">
+		<Size x="208" y="46"/>
+		<HitRectInsets left="-44" right="0" top="0" bottom="0"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="background"/>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentIcon" parentKey="icon">
+					<Size x="38" y="38"/>
+					<Anchors>
+						<Anchor point="LEFT" x="-42" y="0"/>
+					</Anchors>
+					<TexCoords left="0.07" right="0.93" top="0.07" bottom="0.93"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIconBorder" parentKey="iconBorder" file="Interface\Common\WhiteIconFrame">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIcon" x="-1" y="1"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentIcon" x="1" y="-1"/>
+					</Anchors>
+					<Color r="0.55" g="0.55" b="0.55"/>
+				</Texture>
+				<FontString name="$parentName" parentKey="name" inherits="GameFontNormal" justifyH="LEFT">
+					<Size x="180" y="40"/>
+					<Anchors>
+						<Anchor point="LEFT" x="10" y="1"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSummoned" parentKey="summoned" inherits="GameFontGreenSmall" justifyH="RIGHT" hidden="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="-6" y="4"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentFavorite" parentKey="favorite" hidden="true">
+					<Size x="25" y="25"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIcon" x="-6" y="6"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSelectedTexture" parentKey="selectedTexture" hidden="true"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture name="$parentIconHighlight" parentKey="iconHighlight" file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIcon"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentIcon"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<HighlightTexture name="$parentHighlight" parentKey="HighlightTexture"/>
+		<Scripts>
+			<OnLoad>
+				-- атласы ставим кодом: атлас из XML-атрибута в 3.3.5 ложится без координат (весь лист)
+				CollectionsUtil_SetAtlas(self.background, "PetList-ButtonBackground");
+				CollectionsUtil_SetAtlas(self.favorite, "collections-icon-favorites");
+				CollectionsUtil_SetAtlas(self.selectedTexture, "PetList-ButtonSelect");
+				CollectionsUtil_SetAtlas(self:GetHighlightTexture(), "PetList-ButtonHighlight");
+			</OnLoad>
+		</Scripts>
+	</Button>
+
+	<Frame name="CollectionsComingSoonTemplate" virtual="true">
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-60"/>
+					<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture name="$parentBackground" parentKey="Background">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="3" y="-3"/>
+								<Anchor point="BOTTOMRIGHT" x="-3" y="3"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture name="$parentWatermark" parentKey="Watermark" alpha="0.6" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="40"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentTitle" parentKey="Title" inherits="GameFontNormalHuge" text="В скором времени">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="-40"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentDescription" parentKey="Description" inherits="GameFontHighlight">
+							<Size x="420" y="0"/>
+							<Anchors>
+								<Anchor point="TOP" relativeTo="$parentTitle" relativePoint="BOTTOM" x="0" y="-12"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				-- атласы ставим кодом: атлас из XML-атрибута в 3.3.5 ложится без координат (весь лист)
+				CollectionsUtil_SetAtlas(self.Inset.Background, "collections-background-tile");
+				if self.watermarkAtlas and C_Texture.GetAtlasInfo(self.watermarkAtlas) then
+					self.Inset.Watermark:SetAtlas(self.watermarkAtlas, true);
+					self.Inset.Watermark:Show();
+				end
+				self.Inset.Description:SetText(self.descriptionText or "");
+			</OnLoad>
+		</Scripts>
+	</Frame>
+
+	<StatusBar name="CollectionsProgressBarTemplate" virtual="true">
+		<Size x="196" y="13"/>
+		<Anchors>
+			<Anchor point="TOP" x="0" y="-39"/>
+		</Anchors>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString parentKey="text" inherits="TextStatusBarText" justifyH="CENTER">
+					<Size x="0" y="9" />
+					<Anchors>
+						<Anchor point="CENTER" y="1" />
+					</Anchors>
+				</FontString>
+				<Texture parentKey="border" file="Interface\PaperDollInfoFrame\UI-Character-Skills-BarBorder">
+					<Size x="205" y="29" />
+					<Anchors>
+						<Anchor point="LEFT" x="-5" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer parentKey="background" level="BACKGROUND">
+				<Texture>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="-1"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="1"/>
+					</Anchors>
+					<Color r="0.0" g="0.0" b="0.0" a="1.0"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<BarTexture file="Interface\PaperDollInfoFrame\UI-Character-Skills-Bar"/>
+		<BarColor r="0.03125" g="0.85" b="0.0" />
+	</StatusBar>
+
+	<!-- Retail CollectionsBackgroundTemplate: tiled parchment, ornate corners, center shadow.
+	     Textures are set in CollectionsBackground_OnLoad (tiling + atlas coords). -->
+	<Frame name="CollectionsBackgroundTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackgroundTile" parentKey="BackgroundTile" setAllPoints="true"/>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentShadowCenter" parentKey="ShadowCenter" setAllPoints="true"/>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentBGCornerTopLeft" parentKey="BGCornerTopLeft">
+					<Size x="90" y="67"/>
+					<Anchors><Anchor point="TOPLEFT" x="-2" y="2"/></Anchors>
+				</Texture>
+				<Texture name="$parentBGCornerTopRight" parentKey="BGCornerTopRight">
+					<Size x="90" y="67"/>
+					<Anchors><Anchor point="TOPRIGHT" x="2" y="2"/></Anchors>
+				</Texture>
+				<Texture name="$parentBGCornerBottomLeft" parentKey="BGCornerBottomLeft">
+					<Size x="90" y="67"/>
+					<Anchors><Anchor point="BOTTOMLEFT" x="-2" y="-2"/></Anchors>
+				</Texture>
+				<Texture name="$parentBGCornerBottomRight" parentKey="BGCornerBottomRight">
+					<Size x="90" y="67"/>
+					<Anchors><Anchor point="BOTTOMRIGHT" x="2" y="-2"/></Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="CollectionsBackground_OnLoad"/>
+			<OnSizeChanged function="CollectionsBackground_UpdateTiling"/>
+		</Scripts>
+	</Frame>
+</Ui>

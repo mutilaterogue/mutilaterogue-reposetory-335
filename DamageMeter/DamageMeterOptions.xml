@@ -1,0 +1,25 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Script file="DamageMeterOptions.lua"/>
+
+	<Frame name="DamageMeterOptionsPanel" hidden="true">
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString inherits="GameFontNormalLarge" text="Счётчик урона">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="16" y="-16"/>
+					</Anchors>
+				</FontString>
+				<FontString inherits="GameFontHighlightSmall" justifyH="LEFT" text="Урон, исцеление и прочая статистика боя.">
+					<Size x="320" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="16" y="-40"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="DamageMeterOptionsPanel_OnLoad"/>
+			<OnShow function="DamageMeterOptionsPanel_OnShow"/>
+		</Scripts>
+	</Frame>
+</Ui>

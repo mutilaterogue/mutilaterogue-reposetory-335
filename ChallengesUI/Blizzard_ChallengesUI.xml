@@ -1,0 +1,8 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- Mythic+ client (server/mythic_plus.cpp). FrameXML.toc: ChallengesUI\Blizzard_ChallengesUI.xml
+	     before ObjectiveTracker (the scenario tracker reads MythicPlus).
+	     Windows: Blizzard_ChallengesUIFrames.xml, after the RetailPortraitFrameTemplate file. -->
+	<Script file="Blizzard_ChallengeModeCompat.lua"/>
+	<Include file="Blizzard_ChallengesKeystoneFrame.xml"/>
+	<Include file="Blizzard_ChallengeModeCompleteBanner.xml"/>
+</Ui>

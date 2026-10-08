@@ -1,0 +1,32 @@
+Shared talent points for the custom (retail style) talents: server/talent_custom.cpp.
+The points spent in the class / hero trees are counted with the 3.3.5 ones, so InitTalentForLevel
+(login, level up, spec switch) keeps them spent. Apply by hand (TrinityCore 3.3.5 context).
+
+--- a/src/server/game/Entities/Player/Player.h
++++ b/src/server/game/Entities/Player/Player.h
+@@ near InitTalentForLevel()
+         void InitTalentForLevel();
++        // custom talents (talent_custom.cpp): points spent outside of the 3.3.5 trees (active spec)
++        typedef uint32 (*ExtraUsedTalentsHook)(Player const* player);
++        static ExtraUsedTalentsHook s_extraUsedTalentsHook;
+
+--- a/src/server/game/Entities/Player/Player.cpp
++++ b/src/server/game/Entities/Player/Player.cpp
+@@ before void Player::InitTalentForLevel()
++Player::ExtraUsedTalentsHook Player::s_extraUsedTalentsHook = nullptr;
++
+ void Player::InitTalentForLevel()
+@@ in its "else" branch (level >= 10), the lines with m_usedTalentCount:
+         uint32 talentPointsForLevel = CalculateTalentsPoints();
++        uint32 usedTalents = m_usedTalentCount + (s_extraUsedTalentsHook ? s_extraUsedTalentsHook(this) : 0);
+ 
+         // if used more that have then reset
+-        if (m_usedTalentCount > talentPointsForLevel)
++        if (usedTalents > talentPointsForLevel)
+         {
+             ...
+         }
+         // else update amount of free points
+         else
+-            SetFreeTalentPoints(talentPointsForLevel - m_usedTalentCount);
++            SetFreeTalentPoints(talentPointsForLevel - usedTalents);

@@ -1,0 +1,637 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<Script file="TargetFrame.lua"/>
+	<Frame name="TargetofTargetDebuffFrameTemplate" virtual="true" enableMouse="true" hidden="true">
+		<Size x="12" y="12"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" setAllPoints="true"/>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentBorder" file="Interface\Buttons\UI-Debuff-Overlays">
+					<Size x="13" y="13"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-1" y="1"/>
+						<Anchor point="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+					<TexCoords left="0.296875" right="0.5703125" top="0" bottom="0.515625"/>
+				</Texture>	
+			</Layer>
+		</Layers>
+		<Frames>
+			<Cooldown name="$parentCooldown" inherits="CooldownFrameTemplate" reverse="true" drawEdge="true" hidden="true">
+				<Anchors>
+					<Anchor point="CENTER" x="0" y="-1"/>
+				</Anchors>
+			</Cooldown>
+		</Frames>
+		<Scripts>
+			<OnEnter>
+				if ( self:GetCenter() > GetScreenWidth()/2 ) then
+					GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+				else
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				end
+				local filter;
+				if ( GetCVarBool("showDispelDebuffs") ) then
+					filter = "RAID";
+				end
+				GameTooltip:SetUnitDebuff(self:GetParent().unit, self:GetID(), filter);
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+	</Frame>
+	<Frame name="TargetDebuffFrameTemplate" virtual="true" enableMouse="true">
+		<Size x="17" y="17"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" setAllPoints="true"/>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentBorder" file="Interface\Buttons\UI-Debuff-Overlays">
+					<Size x="17" y="17"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-1" y="1"/>
+						<Anchor point="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+					<TexCoords left="0.296875" right="0.5703125" top="0" bottom="0.515625"/>
+				</Texture>	
+				<FontString name="$parentCount" inherits="NumberFontNormalSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="5" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Cooldown name="$parentCooldown" inherits="CooldownFrameTemplate" reverse="true" drawEdge="true" hidden="true">
+				<Anchors>
+					<Anchor point="CENTER" x="0" y="-1"/>
+				</Anchors>
+			</Cooldown>
+		</Frames>
+		<Scripts>
+			<OnUpdate>
+				if ( GameTooltip:IsOwned(self) ) then
+					GameTooltip:SetUnitDebuff(self.unit, self:GetID());
+				end
+			</OnUpdate>
+			<OnEnter>
+				GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT", 15, -25);
+				GameTooltip:SetUnitDebuff(self.unit, self:GetID());
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+	</Frame>
+	<Frame name="TargetBuffFrameTemplate" virtual="true" enableMouse="true">
+		<Size x="21" y="21"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentIcon" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentCount" inherits="NumberFontNormalSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="3" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentStealable" file="Interface\TargetingFrame\UI-TargetingFrame-Stealable" hidden="true" alphaMode="ADD">
+					<Size x="24" y="24"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Cooldown name="$parentCooldown" inherits="CooldownFrameTemplate" reverse="true" drawEdge="true">
+				<Anchors>
+					<Anchor point="CENTER" x="0" y="-1"/>
+				</Anchors>
+			</Cooldown>
+		</Frames>
+		<Scripts>
+			<OnUpdate>
+				if ( GameTooltip:IsOwned(self) ) then
+					GameTooltip:SetUnitBuff(self.unit, self:GetID());
+				end
+			</OnUpdate>
+			<OnEnter>
+				GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT", 15, -25);
+				GameTooltip:SetUnitBuff(self.unit, self:GetID());
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+	</Frame>
+	<!-- The retail (12.1.5) target frame (Blizzard_UnitFrame\TargetFrame.xml TargetFrameTemplate) for the target, the focus
+	     and the boss frames: the portrait right in the round art, the bars left, the name in the reputation strip, the
+	     elite / rare dragon on the portrait, the target of target as the retail small frame. The 3.3.5 names stay
+	     (TargetFrame.lua and addons use them). -->
+	<Button name="TargetFrameTemplate" frameStrata="LOW" toplevel="true" parent="UIParent" inherits="SecureUnitButtonTemplate" virtual="true">
+		<Size x="232" y="100"/>
+		<HitRectInsets>
+			<AbsInset left="0" right="5" top="4" bottom="9"/>
+		</HitRectInsets>
+		<Layers>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture name="$parentPortrait" parentKey="portraitTexture">
+					<Size x="58" y="58"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-26" y="-19"/>
+					</Anchors>
+				</Texture>
+				<MaskTexture parentKey="PortraitMask" atlas="CircleMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Size x="57" y="57"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-27" y="-20"/>
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="portraitTexture"/>
+					</MaskedTextures>
+				</MaskTexture>
+				<!-- the reputation strip under the name (retail ReputationColor), colored by UnitSelectionColor -->
+				<Texture name="$parentNameBackground" parentKey="nameBackground" atlas="UI-HUD-UnitFrame-Target-PortraitOn-Type" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-75" y="-25"/>
+					</Anchors>
+				</Texture>
+				<!-- 3.3.5 name kept; retail has no dark box under the bars -->
+				<Texture name="$parentBackground" hidden="true">
+					<Size x="126" y="20"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="23" y="-40"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<!-- TargetFrame.lua's borderTexture (_G[name.."TextureFrameTexture"]): the frame art, under the bars, over the
+				     portrait (its own layer: the portrait's round edge goes under the ring) -->
+				<Texture name="$parentTextureFrameTexture" atlas="UI-HUD-UnitFrame-Target-PortraitOn" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture name="$parentFlash" atlas="UI-HUD-UnitFrame-Target-PortraitOn-InCombat" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="2">
+				<!-- the elite / rare dragon on the portrait (TargetFrame_CheckClassification) -->
+				<Texture name="$parentBossPortraitFrameTexture" parentKey="BossPortraitFrameTexture" atlas="UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-11" y="-8"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="$parentTextureFrame" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
+							<Size x="90" y="12"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="51" y="-26"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentLevelText" inherits="GameFontNormalSmall" justifyH="CENTER">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="24" y="-27"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentDeadText" inherits="GameFontNormalSmall" text="DEAD">
+							<Anchors>
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="86" y="-50"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentHealthBarText" inherits="TextStatusBarText">
+							<Anchors>
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="86" y="-50"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentManaBarText" inherits="TextStatusBarText">
+							<Anchors>
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="86" y="-66"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="1">
+						<Texture name="$parentHighLevelTexture" atlas="UI-HUD-UnitFrame-Target-HighLevelTarget_Icon" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentLevelText" x="4" y="2"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentLeaderIcon" atlas="UI-HUD-UnitFrame-Player-Group-LeaderIcon" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="-85" y="-8"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentPVPIcon" hidden="true">
+							<Size x="44" y="44"/>
+							<Anchors>
+								<Anchor point="TOP" relativePoint="TOPRIGHT" x="-14" y="-46"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentRaidTargetIcon" file="Interface\TargetingFrame\UI-RaidTargetingIcons" hidden="true">
+							<Size x="26" y="26"/>
+							<Anchors>
+								<!-- on the portrait's top -->
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="177" y="-19"/>
+							</Anchors>
+						</Texture>
+						<!-- the rare star under the portrait (retail BossIcon) -->
+						<Texture name="$parentBossIcon" atlas="UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Star" useAtlasSize="true" hidden="true">
+							<Anchors>
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="177" y="-77"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame name="$parentDropDown" inherits="UIDropDownMenuTemplate" id="1" hidden="true">
+				<Size x="10" y="10"/>
+				<Anchors>
+					<Anchor point="TOP" x="10" y="-60"/>
+				</Anchors>
+			</Frame>
+			<StatusBar name="$parentHealthBar" inherits="TextStatusBar">
+				<Size x="126" y="20"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="23" y="-40"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="2">
+						<MaskTexture name="$parentMask" atlas="UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health-Mask" useAtlasSize="true" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-1" y="6"/>
+							</Anchors>
+						</MaskTexture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						TextStatusBar_Initialize(self);
+						self.textLockable = 1;
+						self.lockColor = true;
+						self.cvar = "targetStatusText";
+						self.cvarLabel = "STATUS_TEXT_TARGET";
+						self.zeroText = "";
+						if self:GetStatusBarTexture().AddMaskTexture then
+							self:GetStatusBarTexture():AddMaskTexture(_G[self:GetName().."Mask"]);
+						end
+					</OnLoad>
+					<OnValueChanged>
+						UnitFrameHealthBar_OnValueChanged(self, value);
+						TargetHealthCheck(self, value);
+					</OnValueChanged>
+				</Scripts>
+				<BarTexture atlas="UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health"/>
+			</StatusBar>
+			<StatusBar name="$parentManaBar" inherits="TextStatusBar">
+				<Size x="134" y="10"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="23" y="-61"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="3">
+						<MaskTexture name="$parentMask" atlas="UI-HUD-UnitFrame-Target-PortraitOn-Bar-Mana-Mask" useAtlasSize="true" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-61" y="3"/>
+							</Anchors>
+						</MaskTexture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						TextStatusBar_Initialize(self);
+						self.textLockable = 1;
+						self.cvar = "targetStatusText";
+						self.cvarLabel = "STATUS_TEXT_TARGET";
+						if self:GetStatusBarTexture().AddMaskTexture then
+							self:GetStatusBarTexture():AddMaskTexture(_G[self:GetName().."Mask"]);
+						end
+					</OnLoad>
+				</Scripts>
+				<BarTexture atlas="UI-HUD-UnitFrame-Target-PortraitOn-Bar-Mana"/>
+			</StatusBar>
+			<Frame name="$parentBuffs" parentKey="buffs" hidden="true">
+				<Size x="10" y="10"/>
+			</Frame>
+			<Frame name="$parentDebuffs" parentKey="debuffs" hidden="true">
+				<Size x="10" y="10"/>
+			</Frame>
+			<Frame name="$parentNumericalThreat" hidden="true">
+				<Size x="49" y="18"/>
+				<Anchors>
+					<!-- over the reputation strip (retail) -->
+					<Anchor point="BOTTOM" relativeTo="$parentNameBackground" relativePoint="TOP" x="0" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentValue" inherits="GameFontHighlight" text="100%" parentKey="text">
+							<Anchors>
+								<Anchor point="TOP" x="0" y="-4"/>
+							</Anchors>
+						</FontString>
+						<Texture name="$parentBG" file="Interface\TargetingFrame\UI-StatusBar" parentKey="bg">
+							<Size x="37" y="14"/>
+							<Anchors>
+								<Anchor point="TOP" x="0" y="-3"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture file="Interface\TargetingFrame\NumericThreatBorder">
+							<TexCoords left="0" right="0.765625" top="0" bottom="0.5625"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnEvent function="TargetFrame_OnEvent"/>
+			<OnUpdate>
+				TargetFrame_OnUpdate(self, elapsed);
+				TargetFrame_HealthUpdate(self, elapsed, self.unit);
+			</OnUpdate>
+			<OnHide function="TargetFrame_OnHide"/>
+			<OnEnter function="UnitFrame_OnEnter"/>
+			<OnLeave function="UnitFrame_OnLeave"/>
+		</Scripts>
+	</Button>
+	<!-- the retail target of target (TargetofTargetFrameTemplate): the small round frame, under the target frame's right -->
+	<Button name="TargetofTargetFrameTemplate" toplevel="true" movable="true" inherits="SecureUnitButtonTemplate" virtual="true" hidden="true">
+		<Size x="120" y="49"/>
+		<Anchors>
+			<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="12" y="10"/>
+		</Anchors>
+		<HitRectInsets>
+			<AbsInset left="7" right="0" top="6" bottom="7"/>
+		</HitRectInsets>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="background" hidden="true">
+					<Size x="70" y="10"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="44" y="-17"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentPortrait" parentKey="portraitTexture">
+					<Size x="37" y="37"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="5" y="-5"/>
+					</Anchors>
+				</Texture>
+				<MaskTexture atlas="CircleMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Size x="37" y="37"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="5" y="-5"/>
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="portraitTexture"/>
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentTextureFrameTexture" atlas="UI-HUD-UnitFrame-TargetofTarget-PortraitOn" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="$parentTextureFrame" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="BOTTOM">
+							<Size x="68" y="10"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="44" y="-5"/>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentDeadText" inherits="GameFontNormalSmall" text="DEAD">
+							<Anchors>
+								<Anchor point="CENTER" relativePoint="TOPLEFT" x="79" y="-22"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad function="RaiseFrameLevel"/>
+				</Scripts>
+			</Frame>
+			<StatusBar name="$parentHealthBar" inherits="TextStatusBar">
+				<Size x="70" y="10"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="44" y="-17"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="2">
+						<MaskTexture name="$parentMask" atlas="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Health-Mask" useAtlasSize="true" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-29" y="3"/>
+							</Anchors>
+						</MaskTexture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						self.lockColor = true;
+						if self:GetStatusBarTexture().AddMaskTexture then
+							self:GetStatusBarTexture():AddMaskTexture(_G[self:GetName().."Mask"]);
+						end
+					</OnLoad>
+					<OnValueChanged>
+						TargetofTargetHealthCheck(self:GetParent());
+					</OnValueChanged>
+				</Scripts>
+				<BarTexture atlas="UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Health"/>
+			</StatusBar>
+			<StatusBar name="$parentManaBar" inherits="TextStatusBar">
+				<Size x="74" y="7"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="40" y="-28"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="2">
+						<MaskTexture name="$parentMask" atlas="UI-HUD-UnitFrame-Party-PortraitOn-Bar-Mana-Mask" useAtlasSize="true" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-27" y="4"/>
+							</Anchors>
+						</MaskTexture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						if self:GetStatusBarTexture().AddMaskTexture then
+							self:GetStatusBarTexture():AddMaskTexture(_G[self:GetName().."Mask"]);
+						end
+					</OnLoad>
+				</Scripts>
+				<BarTexture atlas="UI-HUD-UnitFrame-TargetofTarget-PortraitOn-Bar-Mana"/>
+			</StatusBar>
+			<Frame name="$parentDebuff1" inherits="TargetofTargetDebuffFrameTemplate" id="1">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="-4" y="-10"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentDebuff2" inherits="TargetofTargetDebuffFrameTemplate" id="2">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentDebuff1" relativePoint="RIGHT" x="1" y="0"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentDebuff3" inherits="TargetofTargetDebuffFrameTemplate" id="3">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentDebuff1" relativePoint="BOTTOMLEFT" x="0" y="-1"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentDebuff4" inherits="TargetofTargetDebuffFrameTemplate" id="4">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentDebuff3" relativePoint="RIGHT" x="1" y="0"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnShow>
+				TargetFrame_UpdateAuras(self:GetParent());
+			</OnShow>
+			<OnHide function="TargetofTarget_OnHide"/>
+			<OnEvent function="UnitFrame_OnEvent"/>
+			<OnUpdate function="TargetofTarget_Update"/>
+		</Scripts>
+	</Button>
+	<StatusBar name="TargetSpellBarTemplate" inherits="CastingBarFrameTemplate" hidden="true" virtual="true">
+		<Size>
+			<AbsDimension x="150" y="10"/>
+		</Size>			
+		<Scripts>
+			<OnShow function="Target_Spellbar_AdjustPosition"/>
+			<OnEvent function="Target_Spellbar_OnEvent"/>
+		</Scripts>
+	</StatusBar>
+			
+	<Button name="TargetFrame" inherits="TargetFrameTemplate">
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset>
+					<AbsDimension x="250" y="-4"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				self.noTextPrefix = true;
+				self.showLevel = true;
+				self.showPVP = true;
+				self.showLeader = true;
+				self.showThreat = true;
+				self.showPortrait = true;
+				self.showClassification = true;
+				self.showAuraCount = true;
+				self:SetHitRectInsets(96, 40, 10, 9);		-- allows mouseover over health and mana bars
+				TargetFrame_OnLoad(self, "target", TargetFrameDropDown_Initialize);
+				TargetFrame_CreateSpellbar(self, "PLAYER_TARGET_CHANGED");
+				TargetFrame_CreateTargetofTarget(self, "targettarget");
+				self:RegisterEvent("PLAYER_TARGET_CHANGED");
+			</OnLoad>
+		</Scripts>
+	</Button>
+	<Button name="FocusFrame" movable="true" inherits="TargetFrameTemplate" clampedToScreen="true">
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset>
+					<AbsDimension x="250" y="-240"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				self.noTextPrefix = true;
+				self.showLevel = true;
+				self.showPVP = true;
+				self.showLeader = true;
+				self.showThreat = true;
+				self.showPortrait = true;
+				self.showClassification = true;
+				self.showAuraCount = true;
+				TargetFrame_OnLoad(self, "focus", FocusFrameDropDown_Initialize);
+				TargetFrame_CreateSpellbar(self, "PLAYER_FOCUS_CHANGED");
+				TargetFrame_CreateTargetofTarget(self, "focus-target");
+				self:RegisterEvent("PLAYER_FOCUS_CHANGED");
+				self:RegisterEvent("VARIABLES_LOADED");
+				self:RegisterForDrag("LeftButton");
+			</OnLoad>
+			<OnDragStart function="FocusFrame_OnDragStart"/>
+			<OnDragStop function="FocusFrame_OnDragStop"/>			
+		</Scripts>
+	</Button>		
+	<Button name="Boss1TargetFrame" inherits="TargetFrameTemplate">
+		<Anchors>
+			<Anchor point="TOPRIGHT">
+				<Offset>
+					<AbsDimension x="55" y="-236"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				BossTargetFrame_OnLoad(self, "boss1", "INSTANCE_ENCOUNTER_ENGAGE_UNIT");
+			</OnLoad>
+		</Scripts>
+	</Button>
+	<Button name="Boss2TargetFrame" inherits="TargetFrameTemplate">
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="Boss1TargetFrame" relativePoint="BOTTOMLEFT">
+				<Offset>
+					<AbsDimension x="0" y="10"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				BossTargetFrame_OnLoad(self, "boss2");
+			</OnLoad>
+		</Scripts>
+	</Button>
+	<Button name="Boss3TargetFrame" inherits="TargetFrameTemplate">
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="Boss2TargetFrame" relativePoint="BOTTOMLEFT">
+				<Offset>
+					<AbsDimension x="0" y="10"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				BossTargetFrame_OnLoad(self, "boss3");
+			</OnLoad>
+		</Scripts>
+	</Button>
+	<Button name="Boss4TargetFrame" inherits="TargetFrameTemplate">
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="Boss3TargetFrame" relativePoint="BOTTOMLEFT">
+				<Offset>
+					<AbsDimension x="0" y="10"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				BossTargetFrame_OnLoad(self, "boss4");
+			</OnLoad>
+		</Scripts>
+	</Button>	
+</Ui>

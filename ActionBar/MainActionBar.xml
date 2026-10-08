@@ -1,0 +1,511 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!-- The retail (12.1.5) main action bar (Blizzard_ActionBar\MainActionBar.xml) over the stock 3.3.5 buttons:
+	     ActionButton1-12 / BonusActionButton1-12 keep their secure stock logic, MainActionBar.lua gives them the retail art
+	     and lays them out here. Load after the stock action bar files (end of FrameXML.toc). -->
+	<Script file="MainActionBar.lua"/>
+
+	<Frame name="MainActionBar" parent="MainMenuBarArtFrame">
+		<!-- 12 buttons of 45 with the retail minimum padding of 2 -->
+		<Size x="562" y="45"/>
+		<Anchors>
+			<Anchor point="BOTTOM" relativeTo="MainMenuBar" relativePoint="TOP" x="0" y="14"/>
+		</Anchors>
+		<Layers>
+			<!-- the bar's dark fill under the slots (UI-HUD-ActionBar-Frame-Background-NineSlice-Center) -->
+			<Layer level="BACKGROUND" textureSubLevel="-3">
+				<Texture name="$parentBackground" atlas="UI-HUD-ActionBar-Frame-Background-NineSlice-Center">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<!-- the bar frame: the retail nine slice pieces (UI-HUD-ActionBar-Frame-NineSlice-*), over the rect
+			     (-4, 4) - (7, -7); retail BorderArt goes to x 8, which leaves a gap on the right here -->
+			<Layer level="BORDER" textureSubLevel="2">
+				<Texture name="$parentFrameTopLeft" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerTopLeft">
+					<Size x="17" y="16"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-4" y="4"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameTopRight" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerTopRight">
+					<Size x="22" y="16"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="7" y="4"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameBottomLeft" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerBottomLeft">
+					<Size x="17" y="23"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="-4" y="-7"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameBottomRight" atlas="UI-HUD-ActionBar-Frame-NineSlice-CornerBottomRight">
+					<Size x="22" y="23"/>
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="7" y="-7"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameTop" atlas="_UI-HUD-ActionBar-Frame-NineSlice-EdgeTop" horizTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameTopLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameTopRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameBottom" atlas="_UI-HUD-ActionBar-Frame-NineSlice-EdgeBottom" horizTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameBottomLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameBottomRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameLeft" atlas="!UI-HUD-ActionBar-Frame-NineSlice-EdgeLeft" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameTopLeft" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameBottomLeft" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentFrameRight" atlas="!UI-HUD-ActionBar-Frame-NineSlice-EdgeRight" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentFrameTopRight" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentFrameBottomRight" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<!-- the empty slots: seen when a button is empty or hidden -->
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture name="$parentSlot1" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot2" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="47" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot3" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="94" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot4" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="141" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot5" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="188" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot6" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="235" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot7" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="282" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot8" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="329" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot9" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="376" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot10" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="423" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot11" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="470" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlot12" atlas="UI-HUD-ActionBar-IconFrame-Slot">
+					<Size x="45" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="517" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<!-- the slot frames (the button frame of an empty retail button), over the dividers -->
+			<Layer level="BORDER" textureSubLevel="3">
+				<Texture name="$parentSlotFrame1" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame2" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="47" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame3" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="94" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame4" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="141" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame5" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="188" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame6" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="235" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame7" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="282" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame8" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="329" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame9" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="376" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame10" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="423" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame11" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="470" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrame12" atlas="UI-HUD-ActionBar-IconFrame">
+					<Size x="46" y="45"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="517" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<!-- the dividers between the buttons (HorizontalDividerTemplate) -->
+			<Layer level="BORDER">
+				<Texture name="$parentDivider1Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="40" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider1Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="40" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider1Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider1Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider1Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider2Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="87" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider2Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="87" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider2Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider2Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider2Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider3Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="134" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider3Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="134" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider3Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider3Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider3Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider4Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="181" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider4Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="181" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider4Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider4Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider4Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider5Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="228" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider5Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="228" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider5Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider5Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider5Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider6Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="275" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider6Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="275" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider6Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider6Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider6Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider7Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="322" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider7Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="322" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider7Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider7Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider7Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider8Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="369" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider8Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="369" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider8Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider8Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider8Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider9Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="416" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider9Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="416" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider9Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider9Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider9Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider10Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="463" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider10Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="463" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider10Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider10Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider10Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider11Top" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeTop">
+					<Size x="12" y="14"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="510" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider11Bottom" atlas="UI-HUD-ActionBar-Frame-Divider-ThreeSlice-EdgeBottom">
+					<Size x="12" y="15"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="510" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentDivider11Center" atlas="!UI-HUD-ActionBar-Frame-Divider-ThreeSlice-Center" vertTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentDivider11Top" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentDivider11Bottom" relativePoint="TOPRIGHT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="EndCaps" setAllPoints="true">
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="5">
+						<Texture parentKey="LeftEndCap" atlas="UI-HUD-ActionBar-Gryphon-Left">
+							<Size x="104.5" y="98"/>
+							<Anchors>
+								<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="9" y="-22"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="RightEndCap" atlas="UI-HUD-ActionBar-Gryphon-Right">
+							<Size x="104.5" y="98"/>
+							<Anchors>
+								<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT" x="-8" y="-22"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<Frame name="$parentPageNumber" parentKey="ActionBarPageNumber">
+				<Size x="17" y="44"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="-4" y="1"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY" textureSubLevel="5">
+						<FontString parentKey="Text" inherits="GameFontNormal" justifyH="CENTER">
+							<Size x="17" y="10"/>
+							<Anchors>
+								<Anchor point="CENTER" x="-1" y="0"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button parentKey="UpButton">
+						<Size x="17" y="14"/>
+						<Anchors>
+							<Anchor point="CENTER" x="0" y="10"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ActionBar_PageUp();
+								PlaySound("UChatScrollButton");
+							</OnClick>
+						</Scripts>
+						<NormalTexture atlas="UI-HUD-ActionBar-PageUpArrow-Up"/>
+						<PushedTexture atlas="UI-HUD-ActionBar-PageUpArrow-Down"/>
+						<DisabledTexture atlas="UI-HUD-ActionBar-PageUpArrow-Disabled"/>
+						<HighlightTexture atlas="UI-HUD-ActionBar-PageUpArrow-Mouseover"/>
+					</Button>
+					<Button parentKey="DownButton">
+						<Size x="17" y="14"/>
+						<Anchors>
+							<Anchor point="CENTER" x="0" y="-10"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ActionBar_PageDown();
+								PlaySound("UChatScrollButton");
+							</OnClick>
+						</Scripts>
+						<NormalTexture atlas="UI-HUD-ActionBar-PageDownArrow-Up"/>
+						<PushedTexture atlas="UI-HUD-ActionBar-PageDownArrow-Down"/>
+						<DisabledTexture atlas="UI-HUD-ActionBar-PageDownArrow-Disabled"/>
+						<HighlightTexture atlas="UI-HUD-ActionBar-PageDownArrow-Mouseover"/>
+					</Button>
+				</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="MainActionBar_OnLoad"/>
+			<OnEvent function="MainActionBar_OnEvent"/>
+		</Scripts>
+	</Frame>
+	<!-- the extra bars: after MainActionBar, they stack on it -->
+	<Script file="MultiActionBarsRetail.lua"/>
+	<Script file="ActionBarsEditMode.lua"/>
+	<!-- the experience / reputation bars: under the main action bar -->
+	<Include file="StatusTrackingBarRetail.xml"/>
+	<!-- the bags bar -->
+	<Include file="BagsBarRetail.xml"/>
+</Ui>

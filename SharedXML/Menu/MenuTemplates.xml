@@ -1,0 +1,184 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Script file="MenuConstants.lua"/>
+	<Script file="MenuUtil.lua"/>
+	<Script file="MenuBackground.lua"/>
+	<Script file="Menu.lua"/>
+	<Script file="DropdownButton.lua"/>
+
+	<!-- элемент меню: заголовок, кнопка, галочка, переключатель, разделитель -->
+	<Button name="MenuElementTemplate" virtual="true">
+		<Size x="120" y="20"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Highlight" file="Interface\QuestFrame\UI-QuestTitleHighlight" alphaMode="ADD" hidden="true" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Tick" hidden="true">
+					<Size x="14" y="14"/>
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Arrow" file="Interface\ChatFrame\ChatFrameExpandArrow" hidden="true">
+					<Size x="16" y="16"/>
+					<Anchors>
+						<Anchor point="RIGHT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="Divider" file="Interface\Common\UI-TooltipDivider-Transparent" hidden="true">
+					<Size x="0" y="13"/>
+					<Anchors>
+						<Anchor point="LEFT"/>
+						<Anchor point="RIGHT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Check" hidden="true">
+					<Size x="14" y="14"/>
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="MIDDLE">
+					<Anchors>
+						<Anchor point="LEFT" x="6" y="0"/>
+						<Anchor point="RIGHT" x="-6" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnClick function="MenuElement_OnClick"/>
+			<OnEnter function="MenuElement_OnEnter"/>
+			<OnLeave function="MenuElement_OnLeave"/>
+		</Scripts>
+	</Button>
+
+	<!-- само меню -->
+	<Frame name="MenuTemplate" frameStrata="FULLSCREEN_DIALOG" enableMouse="true" virtual="true" hidden="true">
+		<Size x="120" y="40"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" atlas="common-dropdown-bg" alpha="0.925">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-10" y="3"/>
+						<Anchor point="BOTTOMRIGHT" x="10" y="-3"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- только стрелка, без текста: ретейловый WowStyle1ArrowDropdown -->
+	<Button name="WowStyle1ArrowDropdownTemplate" mixin="WowStyle1ArrowDropdownMixin" virtual="true">
+		<Size x="20" y="20"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Arrow" atlas="common-dropdown-a-button" setAllPoints="true"/>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnClick method="OnClick"/>
+			<OnEnter method="OnEnter"/>
+			<OnLeave method="OnLeave"/>
+			<OnMouseDown method="OnMouseDown"/>
+			<OnMouseUp method="OnMouseUp"/>
+			<OnEnable method="OnEnable"/>
+			<OnDisable method="OnDisable"/>
+		</Scripts>
+	</Button>
+
+	<!-- кнопка-выпадающий список (ретейловый WowStyle1DropdownTemplate):
+	     фон "поле для текста" common-dropdown-textholder чуть больше кнопки, справа стрелка
+	     common-dropdown-a-button в натуральный размер, текст слева. Атласы - в OnLoad. -->
+	<Button name="WowStyle1DropdownTemplate" mixin="WowStyle1DropdownMixin" virtual="true">
+		<Size x="120" y="25"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="Background">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-8" y="7"/>
+						<Anchor point="BOTTOMRIGHT" x="8" y="-9"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentArrow" parentKey="Arrow">
+					<Size x="27" y="27"/>
+					<Anchors>
+						<Anchor point="RIGHT" x="1" y="-3"/>
+					</Anchors>
+				</Texture>
+				<!-- the textholder atlas has a transparent margin: text starts inside the visible field -->
+				<FontString name="$parentText" parentKey="Text" inherits="GameFontHighlight" wordwrap="false" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" x="8" y="-1"/>
+						<Anchor point="RIGHT" x="-27" y="-1"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnShow method="OnShow"/>
+			<OnClick method="OnClick"/>
+			<OnEnter method="OnEnter"/>
+			<OnLeave method="OnLeave"/>
+			<OnMouseDown method="OnMouseDown"/>
+			<OnMouseUp method="OnMouseUp"/>
+			<OnEnable method="OnEnable"/>
+			<OnDisable method="OnDisable"/>
+		</Scripts>
+	</Button>
+
+	<!-- кнопка "Фильтр" (ретейловый WowStyle1FilterDropdownTemplate):
+	     фон common-dropdown-b-button (стрелка вправо - часть этого атласа), текст "Фильтр",
+	     красный крестик сброса. -->
+	<Button name="WowStyle1FilterDropdownTemplate" mixin="WowStyle1FilterDropdownMixin" virtual="true">
+		<Size x="93" y="22"/>
+		<Frames>
+			<Button name="$parentResetButton" parentKey="ResetButton" hidden="true">
+				<Size x="20" y="20"/>
+				<Anchors>
+					<Anchor point="CENTER" relativePoint="TOPRIGHT" x="-3" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture name="$parentTexture" parentKey="Texture" setAllPoints="true"/>
+					</Layer>
+				</Layers>
+				<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+			</Button>
+		</Frames>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="Background">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-4" y="4"/>
+						<Anchor point="BOTTOMRIGHT" x="4" y="-4"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentText" parentKey="Text" inherits="GameFontNormal" wordwrap="false">
+					<Anchors>
+						<Anchor point="CENTER" x="-6" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnShow method="OnShow"/>
+			<OnClick method="OnClick"/>
+			<OnEnter method="OnEnter"/>
+			<OnLeave method="OnLeave"/>
+			<OnMouseDown method="OnMouseDown"/>
+			<OnMouseUp method="OnMouseUp"/>
+			<OnEnable method="OnEnable"/>
+			<OnDisable method="OnDisable"/>
+		</Scripts>
+	</Button>
+</Ui>

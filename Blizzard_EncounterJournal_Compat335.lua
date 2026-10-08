@@ -149,7 +149,14 @@ local function ToIndex(difficultyID)
 	return DUNGEON_TO_INDEX[difficultyID];
 end
 
+-- The difficulty is kept as the retail ID: EJ_GetDifficulty() must not guess it back from the
+-- data index after switching between a raid and a dungeon.
+local selectedDifficultyID;
+
 function EJ_GetDifficulty()
+	if selectedDifficultyID and ToIndex(selectedDifficultyID) then
+		return selectedDifficultyID;
+	end
 	local index = orig.GetDifficulty();
 	if EJ_InstanceIsRaid() then
 		return INDEX_TO_RAID[index] or 3;
@@ -159,9 +166,11 @@ end
 
 function EJ_SetDifficulty(difficultyID)
 	local index = ToIndex(difficultyID);
-	if index then
-		orig.SetDifficulty(index);
+	if not index then
+		return;
 	end
+	selectedDifficultyID = difficultyID;
+	orig.SetDifficulty(index);
 end
 
 function EJ_IsValidInstanceDifficulty(difficultyID)
@@ -282,24 +291,53 @@ local SLOT_FILTER_NO_FILTER = 15;
 local SLOT_FILTER_OTHER = 14;
 local slotFilter = SLOT_FILTER_NO_FILTER;
 
+-- Item.dbc InventoryType -> Enum.ItemSlotFilterType; not listed = "other"
+local INVTYPE_TO_SLOT_FILTER = {
+	[1] = 0,                                  -- head
+	[2] = 1,                                  -- neck
+	[3] = 2,                                  -- shoulder
+	[16] = 3,                                 -- back
+	[5] = 4, [20] = 4,                        -- chest, robe
+	[9] = 5,                                  -- wrist
+	[10] = 6,                                 -- hand
+	[6] = 7,                                  -- waist
+	[7] = 8,                                  -- legs
+	[8] = 9,                                  -- feet
+	[13] = 10, [17] = 10, [21] = 10,          -- one-hand, two-hand, main hand
+	[15] = 10, [25] = 10, [26] = 10,          -- ranged, thrown, wand / gun
+	[14] = 11, [22] = 11, [23] = 11,          -- shield, off hand, held in off hand
+	[11] = 12,                                -- finger
+	[12] = 13,                                -- trinket
+};
+
+-- the slot comes from the local item cache (ItemCache.lua): GetItemInfo() only knows items
+-- the client has already seen, so it let almost everything through
+local function ItemSlotFilter(itemID)
+	local _, _, _, _, invType = GetItemInfoCached(itemID);
+	if invType then
+		return INVTYPE_TO_SLOT_FILTER[invType] or SLOT_FILTER_OTHER;
+	end
+	local equipLoc = select(9, GetItemInfo(itemID));
+	if not equipLoc then
+		return nil;
+	end
+	for filter, locs in pairs(SLOT_FILTER_EQUIPLOCS) do
+		if locs[equipLoc] then
+			return filter;
+		end
+	end
+	return SLOT_FILTER_OTHER;
+end
+
 local function MatchesSlotFilter(itemID)
 	if slotFilter == SLOT_FILTER_NO_FILTER then
 		return true;
 	end
-	local equipLoc = select(9, GetItemInfo(itemID));
-	if not equipLoc then
-		return true;   -- not cached yet: show
+	local filter = ItemSlotFilter(itemID);
+	if filter == nil then
+		return true;   -- unknown item: show
 	end
-	if slotFilter == SLOT_FILTER_OTHER then
-		for filter, locs in pairs(SLOT_FILTER_EQUIPLOCS) do
-			if locs[equipLoc] then
-				return false;
-			end
-		end
-		return true;
-	end
-	local locs = SLOT_FILTER_EQUIPLOCS[slotFilter];
-	return locs and locs[equipLoc] == true;
+	return filter == slotFilter;
 end
 
 -- filtered index -> index in the class-filtered list of EncounterJournalAPI.lua
@@ -409,4 +447,76 @@ end
 
 function EJ_GetContentTuningID()
 	return nil;
+end
+
+---------------------------------------------------------------------------
+-- boss pins on dungeon maps: only the bosses of the shown floor
+---------------------------------------------------------------------------
+-- EncounterJournalAPI.lua returns every boss of the instance on every floor. The data knows
+-- the floor of each boss (tools ejfloors.py: DungeonMap.dbc floorIndex = GetCurrentMapDungeonLevel()).
+-- A boss without a floor in a multi-floor instance is skipped: its x / y are not on any of the
+-- floor maps (gunship battle, bosses whose spawn was not found).
+local mapPins, mapPinsKey = {}, nil;
+
+local function InstanceForMapTexture(texture)
+	texture = strlower(texture);
+	for _, instanceID in ipairs(EJ_DATA.instanceOrder) do
+		local inst = EJ_DATA.instances[instanceID];
+		if inst and inst.mapTexture and inst.mapTexture ~= "" and strlower(inst.mapTexture) == texture then
+			return instanceID;
+		end
+	end
+	return nil;
+end
+
+local function BuildMapPins()
+	local texture = GetMapInfo and GetMapInfo();
+	local level = GetCurrentMapDungeonLevel and GetCurrentMapDungeonLevel() or 0;
+	local key = (texture or "") .. "#" .. level;
+	if key == mapPinsKey then
+		return;
+	end
+	mapPinsKey = key;
+	wipe(mapPins);
+
+	local instanceID = texture and texture ~= "" and InstanceForMapTexture(texture);
+	local list = instanceID and EJ_DATA.encountersByInstance[instanceID];
+	if not list then
+		return;
+	end
+
+	local multiFloor = false;
+	for _, encounterID in ipairs(list) do
+		local enc = EJ_DATA.encounters[encounterID];
+		if enc and (enc.floor or 0) > 0 then
+			multiFloor = true;
+			break;
+		end
+	end
+
+	for _, encounterID in ipairs(list) do
+		local enc = EJ_DATA.encounters[encounterID];
+		local floor = enc and enc.floor or 0;
+		local onFloor;
+		if multiFloor then
+			onFloor = floor > 0 and (floor == level or (level == 0 and floor == 1));
+		else
+			onFloor = true;
+		end
+		if enc and onFloor and enc.x and not (enc.x == 0 and enc.y == 0) then
+			table.insert(mapPins, { id = encounterID, instanceID = instanceID, enc = enc });
+		end
+	end
+end
+
+-- x, y, instanceID, name, description, encounterID, rootSectionID, link
+function EJ_GetMapEncounter(index)
+	BuildMapPins();
+	local pin = mapPins[index];
+	if not pin then
+		return nil;
+	end
+	local enc = pin.enc;
+	return enc.x, enc.y, pin.instanceID, enc.name, enc.desc, pin.id, enc.sectionID,
+		("|cff66bbff|Hjournal:1:%d:%d|h[%s]|h|r"):format(pin.id, EJ_GetDifficulty() or 1, enc.name);
 end

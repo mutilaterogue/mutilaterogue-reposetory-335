@@ -1,0 +1,4 @@
+## Interface: 30300
+## Title: Blizzard Scenario Saved
+## Notes: Saves the killed bosses of the dungeon tracker (ScenarioObjectiveTracker)
+## SavedVariablesPerCharacter: ScenarioCompatDB

@@ -1,0 +1,434 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!--
+		"Map & Quest Log" (Legion 7.3.5 WorldMapFrame window + QuestMapFrame) on the 3.3.5 world map.
+		FrameXML.toc, at the end (after NavigationBar.xml and SharedXML\Utils\PortraitFrameTemplates.xml):
+			WorldMap\QuestAndMap.xml
+		The quest log key (L) and the quest log micro button open this frame instead of the old quest log.
+	-->
+	<Script file="QuestMapFrame.lua"/>
+	<Script file="WorldMapLegion.lua"/>
+
+	<!-- QuestMapFrame.xml templates (renamed: 3.3.5 has its own QuestLog* templates) -->
+	<!-- retail ListHeaderVisualTemplate (QuestLogHeaderTemplate): a bar with the zone name and a +/- at the right -->
+	<Button name="QuestMapLogHeaderTemplate" virtual="true">
+		<Size x="292" y="24"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="ButtonText" inherits="GameFontHighlightMedium" justifyH="LEFT">
+					<Size x="240" y="12"/>
+					<Anchors>
+						<Anchor point="LEFT" x="9" y="1"/>
+					</Anchors>
+				</FontString>
+				<Texture parentKey="CollapseIcon" atlas="common-button-list-minus-2x" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="RIGHT" x="-8" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+			</OnLoad>
+			<OnClick>
+				QuestMapLogHeaderButton_OnClick(self, button);
+			</OnClick>
+		</Scripts>
+	</Button>
+
+	<!-- retail QuestLogTitleTemplate: the title, the tag, the tracking box at the right, the glow on hover -->
+	<Button name="QuestMapLogTitleTemplate" virtual="true">
+		<Size x="297" y="16"/>
+		<Frames>
+			<Button name="$parentCheckbox" parentKey="Checkbox">
+				<Size x="14" y="14"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-6" y="-8"/>
+				</Anchors>
+				<HitRectInsets>
+					<AbsInset left="-6" right="-6" top="-6" bottom="-6"/>
+				</HitRectInsets>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture atlas="questlog-icon-ticksquare" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture parentKey="CheckMark" atlas="questlog-icon-checkmark-yellow" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="1" y="1"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="HIGHLIGHT">
+						<Texture atlas="questlog-icon-ticksquare" useAtlasSize="true" alphaMode="ADD">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						PlaySound("igMainMenuOptionCheckBoxOn");
+						QuestMapQuestOptions_TrackQuest(self:GetParent().questID);
+					</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Text" inherits="GameFontNormalLeft" justifyH="LEFT">
+					<Size x="215" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="31" y="-8"/>
+					</Anchors>
+					<Color r="0.75" g="0.61" b="0"/>
+				</FontString>
+				<Texture parentKey="TagTexture" hidden="true">
+					<Size x="18" y="18"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-24" y="-6"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+			</OnLoad>
+			<OnClick>
+				QuestMapLogTitleButton_OnClick(self, button);
+			</OnClick>
+			<OnEnter>
+				QuestMap_ShowSlices(self.GlowSlices, true);
+				QuestMapLogTitleButton_OnEnter(self);
+			</OnEnter>
+			<OnLeave>
+				QuestMap_ShowSlices(self.GlowSlices, false);
+				QuestMapLogTitleButton_OnLeave(self);
+			</OnLeave>
+		</Scripts>
+	</Button>
+
+	<Frame name="QuestMapLogObjectiveTemplate" virtual="true">
+		<Size x="250" y="16"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Dash" inherits="GameFontHighlightSmall" text="QUEST_DASH">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Text" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Size x="240" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="8" y="0"/>
+					</Anchors>
+					<Color r="0.8" g="0.8" b="0.8"/>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- the retail portrait frame without its portrait (ButtonFrameTemplate_HidePortrait): metal nine-slice border,
+	     title, close button; layout ButtonFrameTemplateNoPortraitMinimizable (room for the maximize button) -->
+	<Frame name="RetailPortraitFrameNoPortraitTemplate" inherits="RetailPortraitFrameTemplate" virtual="true">
+		<Scripts>
+			<OnLoad function="RetailPortraitFrameNoPortrait_OnLoad"/>
+		</Scripts>
+	</Frame>
+
+	<!-- the window (Legion WorldMapFrame.BorderFrame + NavBar), shown with the windowed map -->
+	<Frame name="WorldMapLegionBorder" parent="WorldMapFrame" inherits="RetailPortraitFrameNoPortraitTemplate" hidden="true">
+		<Size x="702" y="560"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" x="0" y="0"/>
+		</Anchors>
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="2" y="-62"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="26"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentMaximizeMinimizeFrame" parentKey="MaximizeMinimizeFrame" inherits="MaximizeMinimizeButtonFrameTemplate">
+				<Anchors>
+					<Anchor point="RIGHT" relativeTo="$parentCloseButton" relativePoint="LEFT" x="10" y="0"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="WorldMapLegionBorder_OnLoad"/>
+		</Scripts>
+	</Frame>
+
+	<Frame name="WorldMapLegionNavBar" parent="WorldMapLegionBorder" inherits="NavBarTemplate">
+		<Size x="600" y="34"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="WorldMapLegionBorder" x="10" y="-23"/>
+		</Anchors>
+		<Scripts>
+			<OnLoad function="WorldMapLegionNavBar_OnLoad"/>
+		</Scripts>
+	</Frame>
+
+	<!-- the windowed map's canvas (retail MapCanvas ScrollContainer): the stock map frames move into it;
+	     the scroll frame clips, the canvas scales for the zoom and moves for the pan -->
+	<ScrollFrame name="WorldMapLegionScrollFrame" parent="WorldMapFrame" hidden="true">
+		<Size x="702" y="468"/>
+		<ScrollChild>
+			<Frame name="WorldMapLegionScrollHolder">
+				<Size x="702" y="468"/>
+				<Frames>
+					<Frame name="WorldMapLegionCanvas">
+						<Size x="702" y="468"/>
+						<Anchors>
+							<Anchor point="TOPLEFT"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+			</Frame>
+		</ScrollChild>
+	</ScrollFrame>
+
+	<Button name="WorldMapLegionQuestPanelButton" parent="WorldMapFrame" hidden="true">
+		<Size x="32" y="32"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="Icon" setAllPoints="true"/>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+		<Scripts>
+			<OnClick>
+				PlaySound("igMainMenuOptionCheckBoxOn");
+				if ( QuestMapFrame:IsShown() ) then
+					QuestMapFrame_Close(true);
+				else
+					QuestMapFrame_Open(true);
+				end
+			</OnClick>
+			<OnEnter>
+				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+				GameTooltip:SetText(QUEST_LOG);
+				GameTooltip:Show();
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+	</Button>
+
+	<!-- QuestMapFrame (Legion QuestMapFrame.xml) -->
+	<Frame name="QuestMapFrame" parent="WorldMapFrame" enableMouse="true" hidden="true">
+		<Size x="330" y="468"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="Background" atlas="QuestLog-main-background" setAllPoints="true"/>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentVerticalSeparator" parentKey="VerticalSeparator">
+					<Size x="3" y="0"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-2" y="0"/>
+						<Anchor point="BOTTOMLEFT" x="-2" y="0"/>
+					</Anchors>
+					<Color r="0.28" g="0.22" b="0.13" a="1"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="QuestMapQuestOptionsDropDown" inherits="UIDropDownMenuTemplate" hidden="true"/>
+
+			<!-- retail QuestLogBorderFrameTemplate: the metal frame and its filigree over the list -->
+			<Frame name="$parentBorderFrame" parentKey="BorderFrame">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="-5" y="4"/>
+					<Anchor point="BOTTOMRIGHT" x="0" y="-4"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture atlas="questlog-frame-filigree" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOP" x="0" y="1"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
+			<!-- retail side tab (LargeSideTabButtonTemplate): Quests -->
+			<Button name="$parentQuestsTab" parentKey="QuestsTab">
+				<Size x="43" y="55"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="0" y="-28"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Background" atlas="common-sidetab-2x" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BORDER">
+						<Texture parentKey="SelectedTexture" atlas="common-sidetab-selected-2x" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<Texture parentKey="Icon" atlas="questlog-tab-icon-quest" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="CENTER" x="-2" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="HIGHLIGHT">
+						<Texture atlas="common-sidetab-hover-2x" useAtlasSize="true" alphaMode="ADD">
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						QuestMapFrame_ReturnFromQuestDetails();
+					</OnClick>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+						GameTooltip:SetText(QUESTS_LABEL or QUEST_LOG);
+						GameTooltip:Show();
+					</OnEnter>
+					<OnLeave>
+						GameTooltip:Hide();
+					</OnLeave>
+				</Scripts>
+			</Button>
+
+			<ScrollFrame name="QuestScrollFrame" parentKey="QuestsFrame" inherits="UIPanelScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="1" y="-20"/>
+					<Anchor point="BOTTOMRIGHT" x="-30" y="20"/>
+				</Anchors>
+				<ScrollChild>
+					<Frame name="QuestScrollFrameContents" parentKey="Contents">
+						<Size x="300" y="10"/>
+						<Anchors>
+							<Anchor point="TOPLEFT"/>
+						</Anchors>
+					</Frame>
+				</ScrollChild>
+			</ScrollFrame>
+
+			<Frame name="QuestMapDetailsFrame" parentKey="DetailsFrame" enableMouse="true" hidden="true" setAllPoints="true">
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture name="$parentBackground" parentKey="Background" atlas="QuestDetailsBackgrounds" setAllPoints="true"/>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="$parentBackButton" parentKey="BackButton" inherits="UIPanelButtonTemplate" text="BACK">
+						<Size x="90" y="22"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="6" y="-6"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								PlaySound("igMainMenuOptionCheckBoxOn");
+								QuestMapFrame_ReturnFromQuestDetails();
+							</OnClick>
+						</Scripts>
+					</Button>
+					<ScrollFrame name="QuestMapDetailsScrollFrame" parentKey="ScrollFrame" inherits="UIPanelScrollFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="4" y="-52"/>
+							<Anchor point="BOTTOMRIGHT" x="-30" y="44"/>
+						</Anchors>
+						<ScrollChild>
+							<Frame name="QuestMapDetailsScrollChild" parentKey="Contents">
+								<Size x="300" y="10"/>
+								<Anchors>
+									<Anchor point="TOPLEFT"/>
+								</Anchors>
+								<Frames>
+									<!-- QUEST_TEMPLATE_MAP1 (text) and MAP2 (rewards) go into these two -->
+									<Frame name="QuestMapDetailsTextFrame">
+										<Size x="300" y="10"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" x="-25" y="0"/>
+										</Anchors>
+									</Frame>
+									<Frame name="QuestMapDetailsRewardsFrame">
+										<Size x="300" y="10"/>
+										<Anchors>
+											<Anchor point="TOPLEFT" relativeTo="QuestMapDetailsTextFrame" relativePoint="BOTTOMLEFT"/>
+										</Anchors>
+									</Frame>
+								</Frames>
+							</Frame>
+						</ScrollChild>
+					</ScrollFrame>
+					<Button name="$parentAbandonButton" parentKey="AbandonButton" inherits="UIPanelButtonTemplate" text="ABANDON_QUEST_ABBREV">
+						<Size x="109" y="22"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" x="1" y="1"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								QuestMapQuestOptions_AbandonQuest(QuestMapFrame_GetDetailQuestID());
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="$parentShareButton" parentKey="ShareButton" inherits="UIPanelButtonTemplate" text="SHARE_QUEST_ABBREV">
+						<Size x="109" y="22"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeTo="$parentAbandonButton" relativePoint="RIGHT"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								QuestMapQuestOptions_ShareQuest(QuestMapFrame_GetDetailQuestID());
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="$parentTrackButton" parentKey="TrackButton" inherits="UIPanelButtonTemplate" text="TRACK_QUEST_ABBREV">
+						<Size x="109" y="22"/>
+						<Anchors>
+							<Anchor point="LEFT" relativeTo="$parentShareButton" relativePoint="RIGHT"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								PlaySound("igMainMenuOptionCheckBoxOn");
+								QuestMapQuestOptions_TrackQuest(QuestMapFrame_GetDetailQuestID());
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
+				<Scripts>
+					<OnMouseUp>
+						if ( button == "RightButton" ) then
+							QuestMapFrame_ReturnFromQuestDetails();
+						end
+					</OnMouseUp>
+				</Scripts>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="QuestMapFrame_OnLoad"/>
+			<OnEvent function="QuestMapFrame_OnEvent"/>
+			<OnMouseUp>
+				if ( button == "RightButton" and WorldMapZoomOutButton_OnClick ) then
+					WorldMapZoomOutButton_OnClick();
+				end
+			</OnMouseUp>
+		</Scripts>
+	</Frame>
+</Ui>

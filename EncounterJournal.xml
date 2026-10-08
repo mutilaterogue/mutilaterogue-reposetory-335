@@ -2,8 +2,11 @@
 	<!--
 		Encounter journal (retail UI on the 3.3.5 data). Replaces the old EncounterJournal.xml.
 		EncounterJournalData.lua and EncounterJournalAPI.lua stay in FrameXML.toc where they are.
+		EncounterJournalModel.lua: boss models through the creature cache (Server.lua AddonComm).
 	-->
 	<Script file="Blizzard_EncounterJournal_Compat335.lua"/>
 	<Script file="Blizzard_EncounterJournal_Bootstrap.lua"/>
+	<Script file="EncounterJournalModel.lua"/>
+	<Script file="EncounterJournalItemSets.lua"/>
 	<Include file="Blizzard_EncounterJournal.xml"/>
 </Ui>

@@ -1,0 +1,10 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- В FrameXML.toc: DamageMeter\DamageMeter.xml (после ScrollBox) -->
+	<Script file="DamageMeterAPI.lua"/>
+	<Script file="DamageMeterConstants.lua"/>
+	<Include file="DamageMeterEntry.xml"/>
+	<Include file="DamageMeterSettingsDropdownButton.xml"/>
+	<Include file="DamageMeterSessionWindow.xml"/>
+	<Include file="DamageMeterSourceWindow.xml"/>
+	<Include file="DamageMeterOptions.xml"/>
+</Ui>

@@ -1,0 +1,164 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\..\UI.xsd">
+	<Script file="Blizzard_ToyBox.lua"/>
+
+	<!-- Toy button (ToySpellButtonTemplate from retail, simplified) -->
+	<Button name="ToyBoxButtonTemplate" virtual="true" hidden="true">
+		<Size x="208" y="50"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIconTexture" parentKey="iconTexture">
+					<Size x="42" y="42"/>
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0"/>
+					</Anchors>
+					<TexCoords left="0.07" right="0.93" top="0.07" bottom="0.93"/>
+				</Texture>
+				<FontString name="$parentName" parentKey="name" inherits="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE">
+					<Size x="135" y="42"/>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentIconTexture" relativePoint="RIGHT" x="12" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<!-- retail item borders: collected (gold) / uncollected (dim) + inner glow; atlases in Lua -->
+				<Texture name="$parentSlotFrameCollected" parentKey="slotFrameCollected">
+					<Size x="56" y="56"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentIconTexture" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrameUncollected" parentKey="slotFrameUncollected" hidden="true">
+					<Size x="50" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentIconTexture" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentSlotFrameUncollectedInnerGlow" parentKey="slotFrameUncollectedInnerGlow" alpha="0.18" hidden="true">
+					<Size x="42" y="41"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentIconTexture" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIconTexture"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentIconTexture"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Cooldown name="$parentCooldown" parentKey="cooldown" inherits="CooldownFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentIconTexture"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentIconTexture"/>
+				</Anchors>
+			</Cooldown>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+				CollectionsUtil_SetAtlas(self.slotFrameCollected, "collections-itemborder-collected");
+				CollectionsUtil_SetAtlas(self.slotFrameUncollected, "collections-itemborder-uncollected");
+				CollectionsUtil_SetAtlas(self.slotFrameUncollectedInnerGlow, "collections-itemborder-uncollected-innerglow");
+			</OnLoad>
+			<OnClick function="ToyBoxButton_OnClick"/>
+			<OnEnter function="ToyBoxButton_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Button>
+
+	<Frame name="ToyBox" parent="CollectionsJournal" setAllPoints="true" hidden="true">
+		<Frames>
+			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="4" y="-60"/>
+					<Anchor point="BOTTOMRIGHT" x="-6" y="26"/>
+				</Anchors>
+			</Frame>
+
+			<!-- progress "6/48" -->
+			<StatusBar name="$parentProgressBar" parentKey="ProgressBar" minValue="0" maxValue="1" defaultValue="0" inherits="CollectionsProgressBarTemplate">
+				<Size x="196" y="13"/>
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-38"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString name="$parentText" parentKey="Text" inherits="GameFontHighlightSmall">
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="1"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</StatusBar>
+
+			<EditBox name="$parentSearchBox" parentKey="SearchBox" inherits="SearchBoxTemplate" letters="40">
+				<Size x="115" y="20"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-107" y="-35"/>
+				</Anchors>
+			</EditBox>
+
+			<Button name="$parentFilterDropdown" parentKey="FilterDropdown" inherits="WowStyle1FilterDropdownTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-9" y="-34"/>
+				</Anchors>
+			</Button>
+
+			<Frame name="$parentIconsFrame" parentKey="IconsFrame" inherits="CollectionsBackgroundTemplate" enableMouseWheel="true">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="3" y="-3"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-3" y="3"/>
+				</Anchors>
+			</Frame>
+
+			<!-- paging "Стр. 1/3 < >" -->
+			<Frame name="$parentPagingFrame" parentKey="PagingFrame">
+				<Size x="140" y="30"/>
+				<Anchors>
+					<Anchor point="BOTTOM" relativeTo="$parentInset" x="20" y="14"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString name="$parentPageText" parentKey="PageText" inherits="GameFontHighlight" justifyH="RIGHT">
+							<Anchors>
+								<Anchor point="RIGHT" x="-70" y="0"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="$parentPrevPageButton" parentKey="PrevPageButton">
+						<Size x="32" y="32"/>
+						<Anchors>
+							<Anchor point="RIGHT" x="-34" y="0"/>
+						</Anchors>
+						<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Up"/>
+						<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Down"/>
+						<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-PrevPage-Disabled"/>
+						<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+					</Button>
+					<Button name="$parentNextPageButton" parentKey="NextPageButton">
+						<Size x="32" y="32"/>
+						<Anchors>
+							<Anchor point="RIGHT" x="0" y="0"/>
+						</Anchors>
+						<NormalTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Up"/>
+						<PushedTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Down"/>
+						<DisabledTexture file="Interface\Buttons\UI-SpellbookIcon-NextPage-Disabled"/>
+						<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+					</Button>
+				</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="ToyBox_OnLoad"/>
+			<OnShow function="ToyBox_OnShow"/>
+		</Scripts>
+	</Frame>
+</Ui>

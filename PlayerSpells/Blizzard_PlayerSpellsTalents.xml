@@ -1,0 +1,809 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\UI.xsd">
+	<Script file="Blizzard_PlayerSpellsTalentsDF.lua"/>
+	<Script file="Blizzard_PlayerSpellsTalents.lua"/>
+	<Script file="Blizzard_PlayerSpellsCustomTalents.lua"/>
+	<Script file="Blizzard_PlayerSpellsLoadouts.lua"/>
+
+	<!-- узел в стиле Dragonflight: рамка ставится в Blizzard_PlayerSpellsTalentsDF.lua -->
+	<Button name="PlayerSpellsTalentButtonTemplate" inherits="TalentButtonTemplate" virtual="true">
+		<Layers>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture parentKey="Node" hidden="true">
+					<Size x="50" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>PlayerSpellsTalentButton_OnLoad(self);</OnLoad>
+			<OnClick>PlayerSpellsTalentButton_OnClick(self, button);</OnClick>
+			<OnEnter>PlayerSpellsTalentButton_OnEnter(self);</OnEnter>
+			<OnLeave>GameTooltip:Hide();</OnLeave>
+		</Scripts>
+	</Button>
+
+	<Button name="PlayerSpellsTalentsBarButtonTemplate" inherits="UIPanelButtonTemplateRetail" virtual="true">
+		<Size x="175" y="36"/>
+	</Button>
+
+	<Frame name="PlayerSpellsTalentsFrame" parent="UIParent" mixin="PlayerSpellsTalentsMixin" hidden="true">
+		<Size x="1600" y="840"/>
+		<Frames>
+	<Frame name="PlayerSpellsTalentsFrameTree1" parentKey="Tree1">
+		<Size x="330" y="757"/>
+		<Anchors>
+			<Anchor point="TOP" x="-380" y="-14"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="PlayerSpellsTalentsFrameTree1HeaderBg">
+					<Size x="330" y="44"/>
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+					<Color r="0" g="0" b="0" a="0.6"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="PlayerSpellsTalentsFrameTree1BackgroundTopLeft">
+					<Size x="281.6" y="551.4"/>
+					<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree1BackgroundTopRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree1BackgroundTopLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree1BackgroundTopLeft" relativePoint="BOTTOMRIGHT" x="48.4"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree1BackgroundBottomLeft">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree1BackgroundTopLeft" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree1BackgroundTopLeft" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="0.5859375"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree1BackgroundBottomRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree1BackgroundTopLeft" relativePoint="BOTTOMRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree1BackgroundTopRight" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="0.5859375"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="PlayerSpellsTalentsFrameTree1Icon" parentKey="Icon">
+					<Size x="30" y="30"/>
+					<Anchors><Anchor point="TOPLEFT" x="8" y="-7"/></Anchors>
+				</Texture>
+				<FontString name="PlayerSpellsTalentsFrameTree1Name" parentKey="Name" inherits="GameFontNormalLarge" justifyH="LEFT">
+					<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsFrameTree1Icon" relativePoint="RIGHT" x="8" y="0"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFrameTree1Points" parentKey="Points" inherits="GameFontHighlightLarge" justifyH="RIGHT">
+					<Anchors><Anchor point="TOPRIGHT" x="-10" y="-13"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFrameTree1TalentPointsText" inherits="GameFontNormalSmall" hidden="true">
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="PlayerSpellsTalentsFrameTree1ScrollFrameScrollBarScrollDownButton" hidden="true">
+				<Size x="1" y="1"/>
+				<Anchors><Anchor point="TOPLEFT"/></Anchors>
+			</Button>
+			<Frame name="PlayerSpellsTalentsFrameTree1ScrollChildFrame">
+				<Size x="330" y="713"/>
+				<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch1" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch2" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch3" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch4" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch5" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch6" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch7" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch8" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch9" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch10" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch11" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch12" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch13" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch14" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch15" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch16" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch17" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch18" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch19" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch20" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch21" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch22" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch23" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch24" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch25" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch26" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch27" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch28" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch29" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree1Branch30" inherits="TalentBranchTemplate"/>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent1" inherits="PlayerSpellsTalentButtonTemplate" id="1"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent2" inherits="PlayerSpellsTalentButtonTemplate" id="2"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent3" inherits="PlayerSpellsTalentButtonTemplate" id="3"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent4" inherits="PlayerSpellsTalentButtonTemplate" id="4"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent5" inherits="PlayerSpellsTalentButtonTemplate" id="5"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent6" inherits="PlayerSpellsTalentButtonTemplate" id="6"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent7" inherits="PlayerSpellsTalentButtonTemplate" id="7"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent8" inherits="PlayerSpellsTalentButtonTemplate" id="8"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent9" inherits="PlayerSpellsTalentButtonTemplate" id="9"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent10" inherits="PlayerSpellsTalentButtonTemplate" id="10"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent11" inherits="PlayerSpellsTalentButtonTemplate" id="11"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent12" inherits="PlayerSpellsTalentButtonTemplate" id="12"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent13" inherits="PlayerSpellsTalentButtonTemplate" id="13"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent14" inherits="PlayerSpellsTalentButtonTemplate" id="14"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent15" inherits="PlayerSpellsTalentButtonTemplate" id="15"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent16" inherits="PlayerSpellsTalentButtonTemplate" id="16"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent17" inherits="PlayerSpellsTalentButtonTemplate" id="17"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent18" inherits="PlayerSpellsTalentButtonTemplate" id="18"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent19" inherits="PlayerSpellsTalentButtonTemplate" id="19"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent20" inherits="PlayerSpellsTalentButtonTemplate" id="20"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent21" inherits="PlayerSpellsTalentButtonTemplate" id="21"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent22" inherits="PlayerSpellsTalentButtonTemplate" id="22"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent23" inherits="PlayerSpellsTalentButtonTemplate" id="23"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent24" inherits="PlayerSpellsTalentButtonTemplate" id="24"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent25" inherits="PlayerSpellsTalentButtonTemplate" id="25"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent26" inherits="PlayerSpellsTalentButtonTemplate" id="26"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent27" inherits="PlayerSpellsTalentButtonTemplate" id="27"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent28" inherits="PlayerSpellsTalentButtonTemplate" id="28"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent29" inherits="PlayerSpellsTalentButtonTemplate" id="29"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent30" inherits="PlayerSpellsTalentButtonTemplate" id="30"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent31" inherits="PlayerSpellsTalentButtonTemplate" id="31"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent32" inherits="PlayerSpellsTalentButtonTemplate" id="32"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent33" inherits="PlayerSpellsTalentButtonTemplate" id="33"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent34" inherits="PlayerSpellsTalentButtonTemplate" id="34"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent35" inherits="PlayerSpellsTalentButtonTemplate" id="35"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent36" inherits="PlayerSpellsTalentButtonTemplate" id="36"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent37" inherits="PlayerSpellsTalentButtonTemplate" id="37"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent38" inherits="PlayerSpellsTalentButtonTemplate" id="38"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent39" inherits="PlayerSpellsTalentButtonTemplate" id="39"/>
+					<Button name="PlayerSpellsTalentsFrameTree1Talent40" inherits="PlayerSpellsTalentButtonTemplate" id="40"/>
+					<Frame name="PlayerSpellsTalentsFrameTree1ArrowFrame" setAllPoints="true">
+						<Layers>
+							<Layer level="OVERLAY">
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow1" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow2" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow3" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow4" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow5" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow6" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow7" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow8" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow9" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow10" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow11" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow12" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow13" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow14" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow15" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow16" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow17" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow18" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow19" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow20" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow21" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow22" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow23" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow24" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow25" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow26" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow27" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow28" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow29" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree1Arrow30" inherits="TalentArrowTemplate"/>
+							</Layer>
+						</Layers>
+					</Frame>
+				</Frames>
+			</Frame>
+		</Frames>
+	</Frame>
+	<Frame name="PlayerSpellsTalentsFrameTree2" parentKey="Tree2">
+		<Size x="330" y="757"/>
+		<Anchors>
+			<Anchor point="TOP" x="0" y="-14"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="PlayerSpellsTalentsFrameTree2HeaderBg">
+					<Size x="330" y="44"/>
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+					<Color r="0" g="0" b="0" a="0.6"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="PlayerSpellsTalentsFrameTree2BackgroundTopLeft">
+					<Size x="281.6" y="551.4"/>
+					<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree2BackgroundTopRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree2BackgroundTopLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree2BackgroundTopLeft" relativePoint="BOTTOMRIGHT" x="48.4"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree2BackgroundBottomLeft">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree2BackgroundTopLeft" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree2BackgroundTopLeft" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="0.5859375"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree2BackgroundBottomRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree2BackgroundTopLeft" relativePoint="BOTTOMRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree2BackgroundTopRight" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="0.5859375"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="PlayerSpellsTalentsFrameTree2Icon" parentKey="Icon">
+					<Size x="30" y="30"/>
+					<Anchors><Anchor point="TOPLEFT" x="8" y="-7"/></Anchors>
+				</Texture>
+				<FontString name="PlayerSpellsTalentsFrameTree2Name" parentKey="Name" inherits="GameFontNormalLarge" justifyH="LEFT">
+					<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsFrameTree2Icon" relativePoint="RIGHT" x="8" y="0"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFrameTree2Points" parentKey="Points" inherits="GameFontHighlightLarge" justifyH="RIGHT">
+					<Anchors><Anchor point="TOPRIGHT" x="-10" y="-13"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFrameTree2TalentPointsText" inherits="GameFontNormalSmall" hidden="true">
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="PlayerSpellsTalentsFrameTree2ScrollFrameScrollBarScrollDownButton" hidden="true">
+				<Size x="1" y="1"/>
+				<Anchors><Anchor point="TOPLEFT"/></Anchors>
+			</Button>
+			<Frame name="PlayerSpellsTalentsFrameTree2ScrollChildFrame">
+				<Size x="330" y="713"/>
+				<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch1" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch2" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch3" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch4" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch5" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch6" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch7" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch8" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch9" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch10" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch11" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch12" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch13" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch14" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch15" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch16" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch17" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch18" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch19" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch20" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch21" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch22" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch23" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch24" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch25" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch26" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch27" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch28" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch29" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree2Branch30" inherits="TalentBranchTemplate"/>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent1" inherits="PlayerSpellsTalentButtonTemplate" id="1"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent2" inherits="PlayerSpellsTalentButtonTemplate" id="2"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent3" inherits="PlayerSpellsTalentButtonTemplate" id="3"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent4" inherits="PlayerSpellsTalentButtonTemplate" id="4"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent5" inherits="PlayerSpellsTalentButtonTemplate" id="5"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent6" inherits="PlayerSpellsTalentButtonTemplate" id="6"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent7" inherits="PlayerSpellsTalentButtonTemplate" id="7"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent8" inherits="PlayerSpellsTalentButtonTemplate" id="8"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent9" inherits="PlayerSpellsTalentButtonTemplate" id="9"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent10" inherits="PlayerSpellsTalentButtonTemplate" id="10"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent11" inherits="PlayerSpellsTalentButtonTemplate" id="11"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent12" inherits="PlayerSpellsTalentButtonTemplate" id="12"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent13" inherits="PlayerSpellsTalentButtonTemplate" id="13"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent14" inherits="PlayerSpellsTalentButtonTemplate" id="14"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent15" inherits="PlayerSpellsTalentButtonTemplate" id="15"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent16" inherits="PlayerSpellsTalentButtonTemplate" id="16"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent17" inherits="PlayerSpellsTalentButtonTemplate" id="17"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent18" inherits="PlayerSpellsTalentButtonTemplate" id="18"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent19" inherits="PlayerSpellsTalentButtonTemplate" id="19"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent20" inherits="PlayerSpellsTalentButtonTemplate" id="20"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent21" inherits="PlayerSpellsTalentButtonTemplate" id="21"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent22" inherits="PlayerSpellsTalentButtonTemplate" id="22"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent23" inherits="PlayerSpellsTalentButtonTemplate" id="23"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent24" inherits="PlayerSpellsTalentButtonTemplate" id="24"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent25" inherits="PlayerSpellsTalentButtonTemplate" id="25"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent26" inherits="PlayerSpellsTalentButtonTemplate" id="26"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent27" inherits="PlayerSpellsTalentButtonTemplate" id="27"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent28" inherits="PlayerSpellsTalentButtonTemplate" id="28"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent29" inherits="PlayerSpellsTalentButtonTemplate" id="29"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent30" inherits="PlayerSpellsTalentButtonTemplate" id="30"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent31" inherits="PlayerSpellsTalentButtonTemplate" id="31"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent32" inherits="PlayerSpellsTalentButtonTemplate" id="32"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent33" inherits="PlayerSpellsTalentButtonTemplate" id="33"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent34" inherits="PlayerSpellsTalentButtonTemplate" id="34"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent35" inherits="PlayerSpellsTalentButtonTemplate" id="35"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent36" inherits="PlayerSpellsTalentButtonTemplate" id="36"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent37" inherits="PlayerSpellsTalentButtonTemplate" id="37"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent38" inherits="PlayerSpellsTalentButtonTemplate" id="38"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent39" inherits="PlayerSpellsTalentButtonTemplate" id="39"/>
+					<Button name="PlayerSpellsTalentsFrameTree2Talent40" inherits="PlayerSpellsTalentButtonTemplate" id="40"/>
+					<Frame name="PlayerSpellsTalentsFrameTree2ArrowFrame" setAllPoints="true">
+						<Layers>
+							<Layer level="OVERLAY">
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow1" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow2" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow3" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow4" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow5" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow6" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow7" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow8" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow9" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow10" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow11" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow12" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow13" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow14" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow15" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow16" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow17" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow18" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow19" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow20" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow21" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow22" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow23" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow24" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow25" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow26" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow27" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow28" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow29" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree2Arrow30" inherits="TalentArrowTemplate"/>
+							</Layer>
+						</Layers>
+					</Frame>
+				</Frames>
+			</Frame>
+		</Frames>
+	</Frame>
+	<Frame name="PlayerSpellsTalentsFrameTree3" parentKey="Tree3">
+		<Size x="330" y="757"/>
+		<Anchors>
+			<Anchor point="TOP" x="380" y="-14"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="PlayerSpellsTalentsFrameTree3HeaderBg">
+					<Size x="330" y="44"/>
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+					<Color r="0" g="0" b="0" a="0.6"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="PlayerSpellsTalentsFrameTree3BackgroundTopLeft">
+					<Size x="281.6" y="551.4"/>
+					<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree3BackgroundTopRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree3BackgroundTopLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree3BackgroundTopLeft" relativePoint="BOTTOMRIGHT" x="48.4"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree3BackgroundBottomLeft">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree3BackgroundTopLeft" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree3BackgroundTopLeft" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="0.5859375"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFrameTree3BackgroundBottomRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFrameTree3BackgroundTopLeft" relativePoint="BOTTOMRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFrameTree3BackgroundTopRight" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="0.5859375"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="PlayerSpellsTalentsFrameTree3Icon" parentKey="Icon">
+					<Size x="30" y="30"/>
+					<Anchors><Anchor point="TOPLEFT" x="8" y="-7"/></Anchors>
+				</Texture>
+				<FontString name="PlayerSpellsTalentsFrameTree3Name" parentKey="Name" inherits="GameFontNormalLarge" justifyH="LEFT">
+					<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsFrameTree3Icon" relativePoint="RIGHT" x="8" y="0"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFrameTree3Points" parentKey="Points" inherits="GameFontHighlightLarge" justifyH="RIGHT">
+					<Anchors><Anchor point="TOPRIGHT" x="-10" y="-13"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFrameTree3TalentPointsText" inherits="GameFontNormalSmall" hidden="true">
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="PlayerSpellsTalentsFrameTree3ScrollFrameScrollBarScrollDownButton" hidden="true">
+				<Size x="1" y="1"/>
+				<Anchors><Anchor point="TOPLEFT"/></Anchors>
+			</Button>
+			<Frame name="PlayerSpellsTalentsFrameTree3ScrollChildFrame">
+				<Size x="330" y="713"/>
+				<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch1" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch2" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch3" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch4" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch5" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch6" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch7" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch8" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch9" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch10" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch11" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch12" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch13" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch14" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch15" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch16" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch17" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch18" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch19" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch20" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch21" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch22" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch23" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch24" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch25" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch26" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch27" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch28" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch29" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFrameTree3Branch30" inherits="TalentBranchTemplate"/>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent1" inherits="PlayerSpellsTalentButtonTemplate" id="1"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent2" inherits="PlayerSpellsTalentButtonTemplate" id="2"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent3" inherits="PlayerSpellsTalentButtonTemplate" id="3"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent4" inherits="PlayerSpellsTalentButtonTemplate" id="4"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent5" inherits="PlayerSpellsTalentButtonTemplate" id="5"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent6" inherits="PlayerSpellsTalentButtonTemplate" id="6"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent7" inherits="PlayerSpellsTalentButtonTemplate" id="7"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent8" inherits="PlayerSpellsTalentButtonTemplate" id="8"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent9" inherits="PlayerSpellsTalentButtonTemplate" id="9"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent10" inherits="PlayerSpellsTalentButtonTemplate" id="10"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent11" inherits="PlayerSpellsTalentButtonTemplate" id="11"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent12" inherits="PlayerSpellsTalentButtonTemplate" id="12"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent13" inherits="PlayerSpellsTalentButtonTemplate" id="13"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent14" inherits="PlayerSpellsTalentButtonTemplate" id="14"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent15" inherits="PlayerSpellsTalentButtonTemplate" id="15"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent16" inherits="PlayerSpellsTalentButtonTemplate" id="16"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent17" inherits="PlayerSpellsTalentButtonTemplate" id="17"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent18" inherits="PlayerSpellsTalentButtonTemplate" id="18"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent19" inherits="PlayerSpellsTalentButtonTemplate" id="19"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent20" inherits="PlayerSpellsTalentButtonTemplate" id="20"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent21" inherits="PlayerSpellsTalentButtonTemplate" id="21"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent22" inherits="PlayerSpellsTalentButtonTemplate" id="22"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent23" inherits="PlayerSpellsTalentButtonTemplate" id="23"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent24" inherits="PlayerSpellsTalentButtonTemplate" id="24"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent25" inherits="PlayerSpellsTalentButtonTemplate" id="25"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent26" inherits="PlayerSpellsTalentButtonTemplate" id="26"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent27" inherits="PlayerSpellsTalentButtonTemplate" id="27"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent28" inherits="PlayerSpellsTalentButtonTemplate" id="28"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent29" inherits="PlayerSpellsTalentButtonTemplate" id="29"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent30" inherits="PlayerSpellsTalentButtonTemplate" id="30"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent31" inherits="PlayerSpellsTalentButtonTemplate" id="31"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent32" inherits="PlayerSpellsTalentButtonTemplate" id="32"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent33" inherits="PlayerSpellsTalentButtonTemplate" id="33"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent34" inherits="PlayerSpellsTalentButtonTemplate" id="34"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent35" inherits="PlayerSpellsTalentButtonTemplate" id="35"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent36" inherits="PlayerSpellsTalentButtonTemplate" id="36"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent37" inherits="PlayerSpellsTalentButtonTemplate" id="37"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent38" inherits="PlayerSpellsTalentButtonTemplate" id="38"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent39" inherits="PlayerSpellsTalentButtonTemplate" id="39"/>
+					<Button name="PlayerSpellsTalentsFrameTree3Talent40" inherits="PlayerSpellsTalentButtonTemplate" id="40"/>
+					<Frame name="PlayerSpellsTalentsFrameTree3ArrowFrame" setAllPoints="true">
+						<Layers>
+							<Layer level="OVERLAY">
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow1" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow2" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow3" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow4" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow5" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow6" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow7" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow8" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow9" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow10" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow11" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow12" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow13" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow14" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow15" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow16" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow17" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow18" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow19" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow20" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow21" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow22" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow23" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow24" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow25" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow26" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow27" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow28" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow29" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFrameTree3Arrow30" inherits="TalentArrowTemplate"/>
+							</Layer>
+						</Layers>
+					</Frame>
+				</Frames>
+			</Frame>
+		</Frames>
+	</Frame>
+	<Frame name="PlayerSpellsTalentsFramePetTree" parentKey="PetTree">
+		<Size x="330" y="757"/>
+		<Anchors>
+			<Anchor point="TOP" x="0" y="-14"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="PlayerSpellsTalentsFramePetTreeHeaderBg">
+					<Size x="330" y="44"/>
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+					<Color r="0" g="0" b="0" a="0.6"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="PlayerSpellsTalentsFramePetTreeBackgroundTopLeft">
+					<Size x="281.6" y="551.4"/>
+					<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFramePetTreeBackgroundTopRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFramePetTreeBackgroundTopLeft" relativePoint="TOPRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFramePetTreeBackgroundTopLeft" relativePoint="BOTTOMRIGHT" x="48.4"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="1"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFramePetTreeBackgroundBottomLeft">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFramePetTreeBackgroundTopLeft" relativePoint="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFramePetTreeBackgroundTopLeft" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="1" top="0" bottom="0.5859375"/>
+				</Texture>
+				<Texture name="PlayerSpellsTalentsFramePetTreeBackgroundBottomRight">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="PlayerSpellsTalentsFramePetTreeBackgroundTopLeft" relativePoint="BOTTOMRIGHT"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="PlayerSpellsTalentsFramePetTreeBackgroundTopRight" relativePoint="BOTTOMRIGHT" y="-161.6"/>
+					</Anchors>
+					<TexCoords left="0" right="0.6875" top="0" bottom="0.5859375"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="PlayerSpellsTalentsFramePetTreeIcon" parentKey="Icon">
+					<Size x="30" y="30"/>
+					<Anchors><Anchor point="TOPLEFT" x="8" y="-7"/></Anchors>
+				</Texture>
+				<FontString name="PlayerSpellsTalentsFramePetTreeName" parentKey="Name" inherits="GameFontNormalLarge" justifyH="LEFT">
+					<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsFramePetTreeIcon" relativePoint="RIGHT" x="8" y="0"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFramePetTreePoints" parentKey="Points" inherits="GameFontHighlightLarge" justifyH="RIGHT">
+					<Anchors><Anchor point="TOPRIGHT" x="-10" y="-13"/></Anchors>
+				</FontString>
+				<FontString name="PlayerSpellsTalentsFramePetTreeTalentPointsText" inherits="GameFontNormalSmall" hidden="true">
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="PlayerSpellsTalentsFramePetTreeScrollFrameScrollBarScrollDownButton" hidden="true">
+				<Size x="1" y="1"/>
+				<Anchors><Anchor point="TOPLEFT"/></Anchors>
+			</Button>
+			<Frame name="PlayerSpellsTalentsFramePetTreeScrollChildFrame">
+				<Size x="330" y="713"/>
+				<Anchors><Anchor point="TOPLEFT" x="0" y="-44"/></Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch1" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch2" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch3" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch4" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch5" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch6" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch7" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch8" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch9" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch10" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch11" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch12" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch13" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch14" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch15" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch16" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch17" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch18" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch19" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch20" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch21" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch22" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch23" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch24" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch25" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch26" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch27" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch28" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch29" inherits="TalentBranchTemplate"/>
+							<Texture name="PlayerSpellsTalentsFramePetTreeBranch30" inherits="TalentBranchTemplate"/>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent1" inherits="PlayerSpellsTalentButtonTemplate" id="1"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent2" inherits="PlayerSpellsTalentButtonTemplate" id="2"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent3" inherits="PlayerSpellsTalentButtonTemplate" id="3"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent4" inherits="PlayerSpellsTalentButtonTemplate" id="4"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent5" inherits="PlayerSpellsTalentButtonTemplate" id="5"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent6" inherits="PlayerSpellsTalentButtonTemplate" id="6"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent7" inherits="PlayerSpellsTalentButtonTemplate" id="7"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent8" inherits="PlayerSpellsTalentButtonTemplate" id="8"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent9" inherits="PlayerSpellsTalentButtonTemplate" id="9"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent10" inherits="PlayerSpellsTalentButtonTemplate" id="10"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent11" inherits="PlayerSpellsTalentButtonTemplate" id="11"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent12" inherits="PlayerSpellsTalentButtonTemplate" id="12"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent13" inherits="PlayerSpellsTalentButtonTemplate" id="13"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent14" inherits="PlayerSpellsTalentButtonTemplate" id="14"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent15" inherits="PlayerSpellsTalentButtonTemplate" id="15"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent16" inherits="PlayerSpellsTalentButtonTemplate" id="16"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent17" inherits="PlayerSpellsTalentButtonTemplate" id="17"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent18" inherits="PlayerSpellsTalentButtonTemplate" id="18"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent19" inherits="PlayerSpellsTalentButtonTemplate" id="19"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent20" inherits="PlayerSpellsTalentButtonTemplate" id="20"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent21" inherits="PlayerSpellsTalentButtonTemplate" id="21"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent22" inherits="PlayerSpellsTalentButtonTemplate" id="22"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent23" inherits="PlayerSpellsTalentButtonTemplate" id="23"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent24" inherits="PlayerSpellsTalentButtonTemplate" id="24"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent25" inherits="PlayerSpellsTalentButtonTemplate" id="25"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent26" inherits="PlayerSpellsTalentButtonTemplate" id="26"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent27" inherits="PlayerSpellsTalentButtonTemplate" id="27"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent28" inherits="PlayerSpellsTalentButtonTemplate" id="28"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent29" inherits="PlayerSpellsTalentButtonTemplate" id="29"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent30" inherits="PlayerSpellsTalentButtonTemplate" id="30"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent31" inherits="PlayerSpellsTalentButtonTemplate" id="31"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent32" inherits="PlayerSpellsTalentButtonTemplate" id="32"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent33" inherits="PlayerSpellsTalentButtonTemplate" id="33"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent34" inherits="PlayerSpellsTalentButtonTemplate" id="34"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent35" inherits="PlayerSpellsTalentButtonTemplate" id="35"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent36" inherits="PlayerSpellsTalentButtonTemplate" id="36"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent37" inherits="PlayerSpellsTalentButtonTemplate" id="37"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent38" inherits="PlayerSpellsTalentButtonTemplate" id="38"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent39" inherits="PlayerSpellsTalentButtonTemplate" id="39"/>
+					<Button name="PlayerSpellsTalentsFramePetTreeTalent40" inherits="PlayerSpellsTalentButtonTemplate" id="40"/>
+					<Frame name="PlayerSpellsTalentsFramePetTreeArrowFrame" setAllPoints="true">
+						<Layers>
+							<Layer level="OVERLAY">
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow1" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow2" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow3" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow4" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow5" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow6" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow7" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow8" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow9" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow10" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow11" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow12" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow13" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow14" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow15" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow16" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow17" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow18" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow19" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow20" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow21" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow22" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow23" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow24" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow25" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow26" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow27" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow28" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow29" inherits="TalentArrowTemplate"/>
+									<Texture name="PlayerSpellsTalentsFramePetTreeArrow30" inherits="TalentArrowTemplate"/>
+							</Layer>
+						</Layers>
+					</Frame>
+				</Frames>
+			</Frame>
+		</Frames>
+	</Frame>
+			<Frame parentKey="Bar">
+				<Size x="10" y="36"/>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="20" y="8"/>
+					<Anchor point="BOTTOMRIGHT" x="-20" y="8"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="PointsText" inherits="GameFontNormalLarge" justifyH="CENTER">
+							<Anchors><Anchor point="CENTER"/></Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button name="PlayerSpellsTalentsSpec1Button" parentKey="Spec1Button" inherits="PlayerSpellsTalentsBarButtonTemplate">
+						<Anchors><Anchor point="LEFT"/></Anchors>
+					</Button>
+					<Button name="PlayerSpellsTalentsSpec2Button" parentKey="Spec2Button" inherits="PlayerSpellsTalentsBarButtonTemplate">
+						<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsSpec1Button" relativePoint="RIGHT" x="6"/></Anchors>
+					</Button>
+					<Button name="PlayerSpellsTalentsPetButton" parentKey="PetButton" inherits="PlayerSpellsTalentsBarButtonTemplate">
+						<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsSpec2Button" relativePoint="RIGHT" x="6"/></Anchors>
+					</Button>
+					<Button name="PlayerSpellsTalentsActivateButton" parentKey="ActivateButton" inherits="PlayerSpellsTalentsBarButtonTemplate">
+						<Anchors><Anchor point="LEFT" relativeTo="PlayerSpellsTalentsPetButton" relativePoint="RIGHT" x="0"/></Anchors>
+					</Button>
+					<!-- ретейл: ClassTalentLoadoutDropdown - наборы талантов (Blizzard_PlayerSpellsLoadouts.lua) -->
+					<Button parentKey="LoadoutDropdown" inherits="WowStyle1DropdownTemplate">
+						<!-- внизу окна: меню открывается вверх (ретейл: menuPoint/menuRelativePoint) -->
+						<KeyValues>
+							<KeyValue key="menuPoint" value="BOTTOMLEFT" type="string"/>
+							<KeyValue key="menuRelativePoint" value="TOPLEFT" type="string"/>
+							<KeyValue key="menuPointX" value="0" type="number"/>
+							<KeyValue key="menuPointY" value="2" type="number"/>
+						</KeyValues>
+						<Size x="240" y="26"/>
+						<Anchors><Anchor point="RIGHT" x="-362" y="0"/></Anchors>
+					</Button>
+					<Button name="PlayerSpellsTalentsLearnButton" parentKey="LearnButton" inherits="PlayerSpellsTalentsBarButtonTemplate">
+						<Anchors><Anchor point="RIGHT"/></Anchors>
+					</Button>
+					<Button name="PlayerSpellsTalentsResetButton" parentKey="ResetButton" inherits="PlayerSpellsTalentsBarButtonTemplate">
+						<Anchors><Anchor point="RIGHT" relativeTo="PlayerSpellsTalentsLearnButton" relativePoint="LEFT" x="-6"/></Anchors>
+					</Button>
+				</Frames>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+			<OnShow method="OnShow"/>
+			<OnHide method="OnHide"/>
+			<OnEvent method="OnEvent"/>
+		</Scripts>
+	</Frame>
+</Ui>

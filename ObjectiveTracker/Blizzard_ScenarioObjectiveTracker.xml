@@ -1,0 +1,263 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!--
+		ScenarioObjectiveTracker (retail) for 3.3.5: the dungeon display - stage block with the dungeon
+		name and one line per boss. Data: Blizzard_ScenarioCompat335.lua (C_Scenario on the journal data).
+		No challenge mode, proving grounds, widgets, Maw buffs or scenario spells.
+		3.3.5 has no relativeKey / parentArray: anchors use $parent names, the fixed blocks are listed in Lua.
+	-->
+	<Frame name="ScenarioChallengeModeAffixTemplate" virtual="true">
+		<Size x="22" y="22"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture name="$parentBorder" parentKey="Border" atlas="ChallengeMode-AffixRing-Sm" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Portrait">
+					<Size x="20" y="20"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnEnter function="ScenarioChallengeModeAffix_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Frame>
+
+	<!-- retail ScenarioProgressBarTemplate (enemy forces), without the flare animations -->
+	<Frame name="ScenarioProgressBarTemplate" virtual="true" hidden="true">
+		<Size x="192" y="38"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Frames>
+			<StatusBar name="$parentBar" parentKey="Bar" drawLayer="BACKGROUND" minValue="0" maxValue="100" defaultValue="0">
+				<Size x="191" y="17"/>
+				<Anchors>
+					<Anchor point="LEFT" x="10" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture name="$parentBarFrame" parentKey="BarFrame" atlas="bonusobjectives-bar-frame-5" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="LEFT" x="-8" y="-1"/>
+							</Anchors>
+						</Texture>
+						<FontString parentKey="Label" inherits="GameFontHighlightMedium" justifyH="CENTER">
+							<Anchors>
+								<Anchor point="CENTER" x="-1" y="-1"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="-1">
+						<Texture parentKey="BarBG" setAllPoints="true">
+							<Color r="0.04" g="0.07" b="0.18"/>
+						</Texture>
+					</Layer>
+				</Layers>
+				<BarTexture file="Interface\TargetingFrame\UI-StatusBar"/>
+				<BarColor r="0.26" g="0.42" b="1"/>
+			</StatusBar>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				self.OnGet = ScenarioTrackerProgressBar_OnGet;
+				-- the fill between the background and the segmented frame
+				self.Bar:GetStatusBarTexture():SetDrawLayer("BORDER");
+			</OnLoad>
+		</Scripts>
+	</Frame>
+
+	<Frame name="ScenarioObjectiveTracker" mixin="ScenarioObjectiveTrackerMixin" inherits="ObjectiveTrackerModuleTemplate">
+		<Frames>
+			<Frame name="$parentObjectivesBlock" parentKey="ObjectivesBlock" inherits="ObjectiveTrackerBlockTemplate" hidden="true"/>
+
+			<!-- retail ChallengeModeBlock (ScenarioObjectiveTrackerChallengeModeMixin) 1:1, relativeKey -> $parent names -->
+			<Frame name="$parentChallengeModeBlock" parentKey="ChallengeModeBlock" hidden="true">
+				<Size x="251" y="87"/>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="TimerBGBack" atlas="ChallengeMode-TimerBG-Back" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="13"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BACKGROUND" textureSubLevel="1">
+						<Texture parentKey="TimerBG" atlas="ChallengeMode-TimerBG" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="13"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="OVERLAY">
+
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame name="$parentStartedDepleted" parentKey="StartedDepleted" hidden="true" enableMouse="true">
+						<Size x="19" y="20"/>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture atlas="ChallengeMode-icon-chest" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+							<Layer level="ARTWORK" textureSubLevel="1">
+								<Texture atlas="ChallengeMode-icon-redline" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Frame>
+					<Frame name="$parentTimesUpLootStatus" parentKey="TimesUpLootStatus" hidden="true" enableMouse="true">
+						<Size x="19" y="20"/>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture atlas="ChallengeMode-icon-chest" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+							<Layer level="ARTWORK" textureSubLevel="1">
+								<Texture parentKey="NoLoot" atlas="ChallengeMode-icon-redline" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Frame>
+					<Frame name="$parentDeathCount" parentKey="DeathCount" hidden="true" enableMouse="true">
+						<Size x="20" y="16"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" relativePoint="BOTTOMRIGHT" x="-47" y="43"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture name="$parentIcon" parentKey="Icon" atlas="poi-graveyard-neutral" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="LEFT"/>
+									</Anchors>
+								</Texture>
+								<FontString parentKey="Count" inherits="GameFontHighlightSmall">
+									<Anchors>
+										<Anchor point="LEFT" relativeTo="$parentIcon" relativePoint="RIGHT" x="1" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Frame>
+					<StatusBar parentKey="StatusBar">
+						<Size x="207" y="13"/>
+						<Anchors>
+							<Anchor point="BOTTOM" x="0" y="10"/>
+						</Anchors>
+						<BarTexture atlas="ChallengeMode-TimerFill"/>
+					</StatusBar>
+					<!-- the block frame art above the timer bar (retail: the bar uses the parent level, the art is OVERLAY) -->
+					<Frame name="$parentBorder" parentKey="Border" setAllPoints="true">
+						<Layers>
+							<Layer level="OVERLAY">
+								<Texture parentKey="Frame" atlas="challengemode-timer" setAllPoints="true"/>
+							</Layer>
+							<Layer level="OVERLAY" textureSubLevel="1">
+						<FontString name="$parentLevel" parentKey="Level" inherits="GameFontNormalLarge" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" x="28" y="-18"/>
+									</Anchors>
+								</FontString>
+								<FontString name="$parentTimeLeft" parentKey="TimeLeft" inherits="GameFontHighlightHuge" justifyH="LEFT">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeTo="$parentLevel" relativePoint="BOTTOMLEFT" x="0" y="-8"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+					</Frame>
+				</Frames>
+			</Frame>
+
+			<Frame name="$parentStageBlock" parentKey="StageBlock" hidden="true" enableMouse="true">
+				<Size x="201" y="83"/>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture name="$parentNormalBG" parentKey="NormalBG">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BORDER">
+						<Texture name="$parentFinalBG" parentKey="FinalBG" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-4" y="2"/>
+							</Anchors>
+						</Texture>
+						<Texture name="$parentGlowTexture" parentKey="GlowTexture" alphaMode="ADD" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="0" y="0"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString name="$parentStage" parentKey="Stage" inherits="QuestTitleFont" justifyH="LEFT" justifyV="TOP">
+							<Size x="210" y="36"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="15" y="-18"/>
+							</Anchors>
+							<Color r="1" g="0.914" b="0.682"/>
+							<Shadow>
+								<Offset>
+									<AbsDimension x="1" y="-1"/>
+								</Offset>
+								<Color r="0" g="0" b="0"/>
+							</Shadow>
+						</FontString>
+						<FontString name="$parentCompleteLabel" parentKey="CompleteLabel" inherits="QuestTitleFont" hidden="true">
+							<Anchors>
+								<Anchor point="LEFT" x="15" y="3"/>
+							</Anchors>
+							<Color r="1" g="0.914" b="0.682"/>
+							<Shadow>
+								<Offset>
+									<AbsDimension x="1" y="-1"/>
+								</Offset>
+								<Color r="0" g="0" b="0"/>
+							</Shadow>
+						</FontString>
+						<FontString name="$parentName" parentKey="Name" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+							<Size x="172" y="28"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentStage" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
+							</Anchors>
+							<Color r="1" g="0.831" b="0.380"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						ScenarioObjectiveTrackerStage_OnEnter(self);
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
+				</Scripts>
+			</Frame>
+		</Frames>
+	</Frame>
+</Ui>

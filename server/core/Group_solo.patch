@@ -1,0 +1,60 @@
+Groups of one (retail: the raid finder / premade groups make a group for a single player).
+Apply by hand (context from your tree: Groups/Group.h, Groups/Group.cpp, Handlers/GroupHandler.cpp).
+
+Why: LFGPlayerScript::OnMapChanged disbands any group of one on every map change (the raid finder's raid
+was gone as soon as the player was moved into it), and the 3.3.5 client sees a group with nobody else in it as "not in a group" and sends CMSG_GROUP_DISBAND
+(leave) - the group was gone at once and the raid kicked the player out ("you are not in the instance's group").
+A group marked SetAllowSolo(true) (server/raid_finder.cpp) ignores that leave while its only member is inside,
+and is not disbanded when a member leaves and only one is left.
+Leaving such a group alone goes through the script ("RF_LEAVE_RAID"), not the client's party menu.
+
+--- a/src/server/game/Groups/Group.h
++++ b/src/server/game/Groups/Group.h
+@@ class TC_GAME_API Group  (public, next to ConvertToParty)
+         void   ConvertToParty();
++        // custom: a group of one stays a group (raid finder, premade groups)
++        void   SetAllowSolo(bool allow) { m_allowSolo = allow; }
++        bool   IsSoloAllowed() const { return m_allowSolo; }
+
+@@ class TC_GAME_API Group  (protected members, next to m_isLeaderOffline)
+         bool                m_isLeaderOffline;
++        bool                m_allowSolo = false;
+
+--- a/src/server/game/Groups/Group.cpp
++++ b/src/server/game/Groups/Group.cpp
+@@ bool Group::RemoveMember(...)
+-    // remove member and change leader (if need) only if strong more 2 members _before_ member remove (BG/BF allow 1 member group)
+-    if (GetMembersCount() > ((isBGGroup() || isLFGGroup() || isBFGroup()) ? 1u : 2u))
++    // remove member and change leader (if need) only if strong more 2 members _before_ member remove (BG/BF allow 1 member group)
++    // custom: a solo-allowed group keeps its last member
++    if (GetMembersCount() > ((isBGGroup() || isLFGGroup() || isBFGroup() || m_allowSolo) ? 1u : 2u))
+
+@@ bool Group::RemoveMember(...)  (a few lines below, after "if (isLFGGroup() && GetMembersCount() == 1) { ... }")
+-        if (m_memberMgr.getSize() < ((isLFGGroup() || isBGGroup()) ? 1u : 2u))
++        if (m_memberMgr.getSize() < ((isLFGGroup() || isBGGroup() || m_allowSolo) ? 1u : 2u))
+             Disband();
+
+--- a/src/server/game/Handlers/GroupHandler.cpp
++++ b/src/server/game/Handlers/GroupHandler.cpp
+@@ void WorldSession::HandleGroupDisbandOpcode(WorldPacket & /*recvData*/)
+     if (_player->InBattleground())
+         return;
+
++    // custom: the client leaves a group it sees nobody else in - a solo-allowed group keeps its only member
++    if (grp && grp->IsSoloAllowed() && grp->GetMembersCount() <= 1)
++        return;
++
+     /** error handling **/
+
+--- a/src/server/game/DungeonFinding/LFGScripts.cpp
++++ b/src/server/game/DungeonFinding/LFGScripts.cpp
+@@ void LFGPlayerScript::OnMapChanged(Player* player)  (the "else" branch at the end)
+     else
+     {
+         Group* group = player->GetGroup();
+-        if (group && group->GetMembersCount() == 1)
++        // custom: a solo-allowed group (raid finder) is not the dungeon finder's last-member group
++        if (group && group->GetMembersCount() == 1 && !group->IsSoloAllowed())
+         {
+             sLFGMgr->LeaveLfg(group->GetGUID());
+             group->Disband();

@@ -1,0 +1,62 @@
+###################################################################################################
+# GUILD PROGRESSION (server/guild_progression.cpp) - add to worldserver.conf
+#
+#    GuildProgression.MaxLevel
+#        Description: The highest guild level (1 .. 25).
+#        Default:     25
+GuildProgression.MaxLevel = 25
+
+#    GuildProgression.UncappedLevel
+#        Description: From this guild level the daily experience has no cap.
+#        Default:     20
+GuildProgression.UncappedLevel = 20
+
+#    GuildProgression.DailyXPCap
+#        Description: The most guild experience a day below GuildProgression.UncappedLevel.
+#        Default:     7807500
+GuildProgression.DailyXPCap = 7807500
+
+#    GuildProgression.XPQuestModifier
+#        Description: A quest rewarded: its XP (* Rate.XP.Quest) times this.
+#        Default:     0.25
+GuildProgression.XPQuestModifier = 0.25
+
+#    GuildProgression.XPBaseKillModifier
+#        Description: A creature killed in a guild group: its XP times this (times the group's rate).
+#        Default:     4.0
+GuildProgression.XPBaseKillModifier = 4.0
+
+#    GuildProgression.XPHeroicDungeonModifier
+#        Description: In a heroic dungeon the kill's guild experience times this.
+#        Default:     1.25
+GuildProgression.XPHeroicDungeonModifier = 1.25
+
+#    GuildProgression.ResetHour
+#        Description: The hour (0 .. 23) the daily cap starts again.
+#        Default:     6
+GuildProgression.ResetHour = 6
+###################################################################################################
+
+#
+#    GuildProgression.WeeklyReputationCap
+#        Description: Guild reputation a member can earn a week (the week starts on Wednesday at ResetHour).
+#        Default:     4375
+#
+
+GuildProgression.WeeklyReputationCap = 4375
+
+#
+#    GuildProgression.ReputationDivider
+#        Description: Guild reputation = max(1, experience / this): a quest's XP, a guild group kill's guild XP.
+#        Default:     450
+#
+
+GuildProgression.ReputationDivider = 450
+
+#
+#    GuildNews.MinItemLevel
+#        Description: Epic items of this item level and higher (and legendaries) make the guild news.
+#        Default:     200
+#
+
+GuildNews.MinItemLevel = 200

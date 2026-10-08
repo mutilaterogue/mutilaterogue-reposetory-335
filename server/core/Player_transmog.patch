@@ -1,0 +1,36 @@
+--- a/src/server/game/Entities/Player/Player.h	2026-09-26 11:44:38.209322547 +0000
++++ b/src/server/game/Entities/Player/Player.h	2026-09-26 11:44:59.423685830 +0000
+@@ -1190,6 +1190,9 @@
+     void QuickEquipItem(uint16 pos, Item* pItem);
+     void VisualizeItem(uint8 slot, Item* pItem);
+     void SetVisibleItemSlot(uint8 slot, Item* pItem);
++    // transmog (custom scripts, transmog.cpp): replaces the visible entry / enchant of an equipped item
++    typedef void (*VisibleItemHook)(Player const* player, Item const* item, uint32& entry, uint32& enchant);
++    static VisibleItemHook s_visibleItemHook;
+     Item* BankItem(ItemPosCountVec const& dest, Item* pItem, bool update);
+     void RemoveItem(uint8 bag, uint8 slot, bool update);
+     void MoveItemFromInventory(uint8 bag, uint8 slot, bool update);
+--- a/src/server/game/Entities/Player/Player.cpp	2026-09-26 11:44:38.211798773 +0000
++++ b/src/server/game/Entities/Player/Player.cpp	2026-09-26 11:44:48.681331304 +0000
+@@ -12019,12 +12019,19 @@
+     }
+ }
+ 
++Player::VisibleItemHook Player::s_visibleItemHook = nullptr;
++
+ void Player::SetVisibleItemSlot(uint8 slot, Item* pItem)
+ {
+     if (pItem)
+     {
+-        SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), pItem->GetEntry());
+-        SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 0, pItem->GetEnchantmentId(PERM_ENCHANTMENT_SLOT));
++        uint32 entry = pItem->GetEntry();
++        uint32 enchant = pItem->GetEnchantmentId(PERM_ENCHANTMENT_SLOT);
++        if (s_visibleItemHook)
++            s_visibleItemHook(this, pItem, entry, enchant);   // transmog
++
++        SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), entry);
++        SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 0, enchant);
+         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 1, pItem->GetEnchantmentId(TEMP_ENCHANTMENT_SLOT));
+     }
+     else

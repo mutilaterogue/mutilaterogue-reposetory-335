@@ -1,0 +1,148 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\UI.xsd">
+	<!--
+		The guild invitation (retail 12.1.5 Blizzard_FrameXML\GuildInviteFrame) in place of the stock GUILD_INVITE popup.
+		Retail's achievement points: the guild's level here (guild achievements are a later stage).
+	-->
+	<Script file="GuildInviteFrame.lua"/>
+
+	<Frame name="GuildInviteFrame" toplevel="true" frameStrata="DIALOG" hidden="true" parent="UIParent" enableMouse="true">
+		<Size x="310" y="188"/>
+		<Anchors>
+			<Anchor point="CENTER" x="0" y="120"/>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" file="Interface\GuildFrame\GuildExtra">
+					<Size x="287" y="116"/>
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-12"/>
+					</Anchors>
+					<TexCoords left="0.00195313" right="0.56250000" top="0.00781250" bottom="0.91406250"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentTabardBackground" file="Interface\GuildFrame\GuildFrame">
+					<Size x="62" y="62"/>
+					<Anchors>
+						<Anchor point="BOTTOM" relativeTo="$parentBackground" x="-1" y="-4"/>
+					</Anchors>
+					<TexCoords left="0.63183594" right="0.69238281" top="0.61914063" bottom="0.74023438"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentTabardEmblem" file="Interface\GuildFrame\GuildEmblemsLG_01">
+					<Size x="56" y="64"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentTabardBackground" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentInviterName" inherits="GameFontHighlightSmall">
+					<Size x="230" y="10"/>
+					<Anchors>
+						<Anchor point="TOP" x="0" y="-28"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentInviteText" inherits="GameFontHighlightSmall" text="приглашает вас вступить в гильдию:">
+					<Size x="230" y="10"/>
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentInviterName" relativePoint="BOTTOM" x="0" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentGuildName" inherits="GameFontNormal">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="$parentInviteText" relativePoint="BOTTOM" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture name="$parentTabardBorder" file="Interface\GuildFrame\GuildFrame">
+					<Size x="61" y="60"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentTabardBackground" x="1" y="-1"/>
+					</Anchors>
+					<TexCoords left="0.63183594" right="0.69238281" top="0.74414063" bottom="0.86523438"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentTabardRing" file="Interface\GuildFrame\GuildExtra">
+					<Size x="118" y="76"/>
+					<Anchors>
+						<Anchor point="BOTTOM" relativeTo="$parentBackground" x="0" y="-12"/>
+					</Anchors>
+					<TexCoords left="0.56640625" right="0.79687500" top="0.00781250" bottom="0.60156250"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<!-- retail Points (achievement points): the guild's level -->
+			<Frame name="$parentPoints" parentKey="Points">
+				<Size x="10" y="10"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-54" y="-86"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString name="$parentTitle" parentKey="Title" inherits="GameFontHighlightSmall" text="Уровень">
+							<Anchors>
+								<Anchor point="BOTTOM" relativePoint="TOP" x="-13" y="0"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentText" parentKey="Text" inherits="GameFontNormalLarge">
+							<Anchors>
+								<Anchor point="TOP" x="-28" y="-3"/>
+							</Anchors>
+							<Color r="0" g="1" b="0"/>
+						</FontString>
+						<Texture name="$parentIcon" parentKey="Icon" file="Interface\AchievementFrame\UI-Achievement-Shields-NoPoints">
+							<Size x="30" y="30"/>
+							<Anchors>
+								<Anchor point="LEFT" relativeTo="$parentText" relativePoint="RIGHT" x="4" y="0"/>
+							</Anchors>
+							<TexCoords left="0" right=".5" top="0.5" bottom="1.0"/>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Button name="$parentJoinButton" inherits="UIPanelButtonTemplate" text="Вступить">
+				<Size x="110" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="24" y="24"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						AcceptGuild();
+						GuildInviteFrame.accepted = true;
+						GuildInviteFrame:Hide();
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentDeclineButton" inherits="UIPanelButtonTemplate" text="Отклонить приглашение">
+				<Size x="140" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" x="-24" y="24"/>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						GuildInviteFrame:Hide();
+					</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad function="GuildInviteFrame_OnLoad"/>
+			<OnEvent function="GuildInviteFrame_OnEvent"/>
+			<OnUpdate>
+				self.elapsed = (self.elapsed or 0) + elapsed;
+				if ( self.elapsed > 60 ) then
+					self:Hide();
+				end
+			</OnUpdate>
+			<OnHide function="GuildInviteFrame_OnHide"/>
+			<OnEnter function="GuildInviteFrame_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
+	</Frame>
+</Ui>

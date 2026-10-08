@@ -1,0 +1,4 @@
+-- Great Vault object: ScriptName go_mythic_plus_vault (opens the Great Vault frame).
+-- Put your own entry / model here (goober, type 10), e.g.:
+-- UPDATE `gameobject_template` SET `ScriptName` = 'go_mythic_plus_vault' WHERE `entry` = <your vault entry>;
+-- Vault options are rolled from gameobject_loot_template entry 252665 (VAULT_LOOT in mythic_plus.cpp).

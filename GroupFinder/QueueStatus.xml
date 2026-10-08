@@ -1,0 +1,162 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!-- The retail queue status button (Blizzard_QueueStatusFrame: QueueStatusButton) - the eye left of the micro menu
+	     instead of the 3.3.5 eye at the minimap: one button for the dungeon finder (the stock MiniMapLFGFrame is moved
+	     onto it) and the raid finder (RaidFinder.lua). On mouse over the dungeon finder's LFDSearchStatus and the raid
+	     finder's RaidFinderSearchStatus (laid out as LFDSearchStatus) stand left of it. Included by PVEFrame.xml. -->
+	<Script file="QueueStatus.lua"/>
+
+	<Button name="QueueStatusButton" parent="UIParent" hidden="true" frameStrata="MEDIUM">
+		<Size x="45" y="45"/>
+		<Anchors>
+			<Anchor point="BOTTOMRIGHT" x="-300" y="4"/>  <!-- QueueStatus.lua: left of the micro menu -->
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Highlight" atlas="groupfinder-eye-highlight" alphaMode="ADD" alpha="0.6" hidden="true">
+					<Size x="60" y="60"/>
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="BACKGROUND" textureSubLevel="1">
+				<Texture parentKey="GlowBack" atlas="groupfinder-eye-backglow" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<!-- the eye: groupfinder-eye-flipbook-* played frame by frame in QueueStatus.lua -->
+				<Texture parentKey="Eye">
+					<Size x="44" y="44"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+				<!-- only to read an atlas' file and coords from (never shown) -->
+				<Texture parentKey="Scratch" hidden="true">
+					<Size x="1" y="1"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="CircShine" atlas="groupfinder-eye-circshine" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="GlowFront" atlas="groupfinder-eye-frontglow" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<!-- the found shards (groupfinder-eye-flipbook-foundfx) -->
+				<Texture parentKey="Shards" hidden="true">
+					<Size x="75" y="75"/>
+					<Anchors>
+						<Anchor point="CENTER" x="-1" y="37"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad function="QueueStatusButton_OnLoad"/>
+			<OnEnter function="QueueStatusButton_OnEnter"/>
+			<OnLeave function="QueueStatusButton_OnLeave"/>
+			<OnClick function="QueueStatusButton_OnClick"/>
+			<OnUpdate function="QueueStatusButton_OnUpdate"/>
+		</Scripts>
+	</Button>
+
+	<!-- retail QueueStatusRoleCountTemplate: a role icon, "found / needed" under it -->
+	<Frame name="QueueStatusRoleCountTemplate" virtual="true">
+		<Size x="40" y="40"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="RoleIcon" setAllPoints="true"/>
+				<FontString name="$parentCount" parentKey="Count" inherits="GameFontHighlight">
+					<Anchors>
+						<Anchor point="TOP" relativePoint="BOTTOM" x="0" y="-2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- retail QueueStatusEntryTemplate: one queue in the status frame (the height set in QueueStatus.lua) -->
+	<Frame name="QueueStatusEntryTemplate" virtual="true">
+		<Size x="275" y="150"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Title" inherits="GameFontHighlightLarge" justifyH="LEFT" justifyV="TOP">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="10" y="-10"/>
+						<Anchor point="RIGHT" x="-10" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="SubTitle" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+					<Size x="260" y="0"/>
+				</FontString>
+				<FontString parentKey="Status" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+					<Size x="260" y="0"/>
+				</FontString>
+				<!-- your roles, at the top right -->
+				<Texture parentKey="RoleIcon1">
+					<Size x="23" y="23"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-7" y="-8"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="RoleIcon2">
+					<Size x="23" y="23"/>
+				</Texture>
+				<Texture parentKey="RoleIcon3">
+					<Size x="23" y="23"/>
+				</Texture>
+				<FontString parentKey="TimeInQueue" inherits="GameFontNormal" justifyH="LEFT"/>
+				<FontString parentKey="AverageWait" inherits="GameFontNormal" justifyH="LEFT"/>
+				<!-- between the entries (hidden on the first) -->
+				<Texture parentKey="EntrySeparator">
+					<Size x="275" y="2"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="4" y="0"/>
+						<Anchor point="TOPRIGHT" x="-4" y="0"/>
+					</Anchors>
+					<Color r="0.25" g="0.25" b="0.25"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="HealersFound" inherits="QueueStatusRoleCountTemplate">
+				<Anchors>
+					<Anchor point="TOP"/>
+				</Anchors>
+			</Frame>
+			<Frame parentKey="TanksFound" inherits="QueueStatusRoleCountTemplate"/>
+			<Frame parentKey="DamagersFound" inherits="QueueStatusRoleCountTemplate"/>
+		</Frames>
+	</Frame>
+
+	<!-- retail QueueStatusFrame: every queue on mouse over of the eye; its tooltip border (TooltipDefaultLayout) in QueueStatus.lua -->
+	<Frame name="QueueStatusFrame" parent="UIParent" frameStrata="TOOLTIP" hidden="true" clampedToScreen="true">
+		<Size x="275" y="150"/>
+		<Anchors>
+			<Anchor point="BOTTOMRIGHT" relativeTo="QueueStatusButton" relativePoint="TOPLEFT" x="0" y="0"/>
+		</Anchors>
+		<Frames>
+			<Frame name="$parentDungeon" parentKey="Dungeon" inherits="QueueStatusEntryTemplate">
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-2"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentRaid" parentKey="Raid" inherits="QueueStatusEntryTemplate"/>
+			<Frame name="$parentLFGList" parentKey="LFGList" inherits="QueueStatusEntryTemplate"/>
+		</Frames>
+	</Frame>
+</Ui>

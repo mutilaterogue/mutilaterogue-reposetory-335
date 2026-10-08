@@ -1,0 +1,36 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!-- The retail (12.1.5) bags bar (Blizzard_MainMenuBarBagButtons\MainMenuBarBagButtons.xml) over the stock bag buttons:
+	     the round slots (bag-border / bag-main, a circle mask), the 48 px backpack at the right, the expand arrow left of it,
+	     the four bags leftwards. BackpackFrame stays the bar (and the EditMode system). Logic: the stock bag buttons. -->
+	<Script file="BagsBarRetail.lua"/>
+
+	<Button name="BagBarExpandToggle" parent="BackpackFrame">
+		<Size x="10" y="16"/>
+		<Anchors>
+			<Anchor point="RIGHT" relativeTo="MainMenuBarBackpackButton" relativePoint="LEFT" x="0" y="0"/>
+		</Anchors>
+		<NormalTexture atlas="bag-arrow">
+			<Size x="10" y="16"/>
+			<Anchors>
+				<Anchor point="CENTER"/>
+			</Anchors>
+		</NormalTexture>
+		<PushedTexture atlas="bag-arrow">
+			<Size x="10" y="16"/>
+			<Anchors>
+				<Anchor point="CENTER"/>
+			</Anchors>
+		</PushedTexture>
+		<HighlightTexture atlas="bag-arrow" alpha=".4" alphaMode="ADD">
+			<Size x="10" y="16"/>
+			<Anchors>
+				<Anchor point="CENTER"/>
+			</Anchors>
+		</HighlightTexture>
+		<Scripts>
+			<OnLoad function="BagsBarRetail_OnLoad"/>
+			<OnClick function="BagBarExpandToggle_OnClick"/>
+		</Scripts>
+	</Button>
+</Ui>
