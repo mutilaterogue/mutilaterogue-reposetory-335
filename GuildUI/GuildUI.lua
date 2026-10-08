@@ -130,11 +130,14 @@ function GuildUI_OnLoad(self)
 			ToggleFriendsFrameOld(tab);
 		end
 	end
+	-- the Friends frame without its guild tab: the micro button "Guild" opens this window
 	if ( FriendsFrameTab3 ) then
-		FriendsFrameTab3:SetScript("OnClick", function()
-			HideUIPanel(FriendsFrame);
-			ShowUIPanel(CommunitiesFrame);
-		end);
+		FriendsFrameTab3:Hide();
+		FriendsFrameTab3:SetScript("OnShow", FriendsFrameTab3.Hide);
+		if ( FriendsFrameTab4 ) then
+			FriendsFrameTab4:ClearAllPoints();
+			FriendsFrameTab4:SetPoint("LEFT", FriendsFrameTab2, "RIGHT", -15, 0);
+		end
 	end
 
 	SLASH_GUILDUI1 = "/guildui";
@@ -629,7 +632,7 @@ function GuildUIInfo_Save()
 		GuildSetMOTD(info.MOTD:GetText());
 	end
 	if ( CanEditGuildInfo() ) then
-		GuildSetInfoText(info.DetailsScroll.Details:GetText());
+		SetGuildInfoText(info.DetailsScroll.Details:GetText());
 	end
 	GuildRoster();
 end
