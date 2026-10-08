@@ -24,6 +24,17 @@ Server:
 
 Client: `GuildProgression.lua` into `Interface\FrameXML\` and `FrameXML.toc` (anywhere; it waits for `Server.lua`).
 
+## GM commands (`server/cs_guild.cpp`, yours + `.guild level`)
+| Command | |
+|---|---|
+| `.guild level info ["Guild"]` | level, experience, today's |
+| `.guild level set <1..25> ["Guild"]` | the level (experience 0); perks follow at once |
+| `.guild level xp <amount> ["Guild"]` | experience as earned (the daily cap ignored), levels up |
+| `.guild level reset ["Guild"]` | today's experience back to 0 |
+
+Without a guild name: the selected player's guild (or yours). `guild_progression.h` goes next to
+`guild_progression.cpp` (`scripts\Custom\Guild\`).
+
 ## Lua API (Cataclysm's / retail's)
 | Function | Returns |
 |---|---|

@@ -21,6 +21,7 @@
  */
 
 #include "ScriptMgr.h"
+#include "guild_progression.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Chat.h"
 #include "Config.h"
@@ -183,7 +184,7 @@ namespace
         });
     }
 
-    void GiveXP(uint32 guildId, uint64 xp, Player* source)
+    void GiveXP(uint32 guildId, uint64 xp, Player* source, bool ignoreCap = false)
     {
         if (!guildId || !xp)
             return;
@@ -191,7 +192,7 @@ namespace
         if (progress.level >= GUILD_MAX_LEVEL)
             return;
 
-        if (progress.level < GUILD_EXPERIENCE_UNCAPPED_LEVEL)
+        if (progress.level < GUILD_EXPERIENCE_UNCAPPED_LEVEL && !ignoreCap)
             xp = std::min<uint64>(xp, progress.today < GUILD_DAILY_XP_CAP ? GUILD_DAILY_XP_CAP - progress.today : 0);
         if (!xp)
             return;
@@ -239,6 +240,59 @@ namespace
             case 5:  return 1.25f;
             default: return 0.0f;
         }
+    }
+}
+
+// ------------------------------------------------------------ for the GM commands (guild_progression.h)
+namespace GuildProgression
+{
+    Info GetInfo(uint32 guildId)
+    {
+        GuildProgress& progress = Progress(guildId);
+        Info info;
+        info.Level = progress.level;
+        info.Experience = progress.experience;
+        info.ToNextLevel = XpForLevel(progress.level);
+        info.Today = progress.today;
+        info.DailyCap = progress.level < GUILD_EXPERIENCE_UNCAPPED_LEVEL ? GUILD_DAILY_XP_CAP : 0;
+        return info;
+    }
+
+    void SetLevel(uint32 guildId, uint8 level)
+    {
+        GuildProgress& progress = Progress(guildId);
+        uint8 oldLevel = progress.level;
+        progress.level = std::max<uint8>(1, std::min(level, GUILD_MAX_LEVEL));
+        progress.experience = 0;
+        Save(guildId, progress);
+        if (progress.level > oldLevel)
+            LevelUp(guildId, progress.level);
+        else
+            ForEachOnlineMember(guildId, [guildId](Player* member)
+            {
+                UpdatePerks(member, guildId);
+                SendProgress(member);
+            });
+    }
+
+    void AddExperience(uint32 guildId, uint64 experience, bool ignoreCap)
+    {
+        GiveXP(guildId, experience, nullptr, ignoreCap);
+        Save(guildId, Progress(guildId));
+        ForEachOnlineMember(guildId, [](Player* member) { SendProgress(member); });
+    }
+
+    void ResetToday(uint32 guildId)
+    {
+        GuildProgress& progress = Progress(guildId);
+        progress.today = 0;
+        Save(guildId, progress);
+        ForEachOnlineMember(guildId, [](Player* member) { SendProgress(member); });
+    }
+
+    uint8 GetMaxLevel()
+    {
+        return GUILD_MAX_LEVEL;
     }
 }
 
