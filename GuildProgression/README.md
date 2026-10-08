@@ -46,6 +46,6 @@ Without a guild name: the selected player's guild (or yours). `guild_progression
 | `GuildProgression_RegisterCallback(func)` | `func("GUILD_XP_UPDATE")`, `func("GUILD_PERK_UPDATE")` |
 
 ## Next stages
-2. The retail Communities guild UI (roster, info, perks, rewards, news).
+2. ~~The retail Communities guild UI~~ — `GuildUI/` (roster, info, perks, guild finder).
 3. Guild reputation, rewards, news.
 4. Guild challenges, guild achievements.

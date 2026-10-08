@@ -1,0 +1,24 @@
+-- Guild Finder (server/guild_finder.cpp), characters database
+
+CREATE TABLE IF NOT EXISTS `guild_finder_guild_settings` (
+  `guildId` INT UNSIGNED NOT NULL,
+  `listed` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `availability` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `classRoles` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `interests` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `level` TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  `team` INT UNSIGNED NOT NULL DEFAULT 0,
+  `comment` VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`guildId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `guild_finder_applicant` (
+  `guildId` INT UNSIGNED NOT NULL,
+  `playerGuid` INT UNSIGNED NOT NULL,
+  `availability` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `classRole` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `interests` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `comment` VARCHAR(255) NOT NULL DEFAULT '',
+  `submitTime` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`guildId`, `playerGuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -40,6 +40,7 @@ void AddSC_raid_finder();
 void AddSC_premade_groups();
 void AddSC_class_powers();
 void AddSC_guild_progression();
+void AddSC_guild_finder();
 
 void AddCustomScripts()
 {
@@ -64,4 +65,5 @@ void AddCustomScripts()
     AddSC_premade_groups();
     AddSC_class_powers();
     AddSC_guild_progression();
+    AddSC_guild_finder();
 }
