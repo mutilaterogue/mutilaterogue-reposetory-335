@@ -98,27 +98,51 @@ function GuildUI_OnLoad(self)
 	finderEntry.Name:SetText("Поиск гильдии");
 	finderEntry.Sub:SetText("Найти гильдию");
 
-	-- the roster: column titles, rows
+	-- the roster: column titles (retail order), rows, the last column's dropdown
 	local roster = self.Roster;
+	roster.ColumnLevel.Label:SetText("Ур.");
+	roster.ColumnClass.Label:SetText("Класс");
 	roster.ColumnName.Label:SetText("Имя");
-	roster.ColumnLevel.Label:SetText(LEVEL_ABBR);
-	roster.ColumnZone.Label:SetText(ZONE);
-	roster.ColumnRank.Label:SetText(RANK);
-	roster.ColumnNote.Label:SetText(LABEL_NOTE);
+	roster.ColumnZone.Label:SetText("Зона");
+	roster.ColumnRank.Label:SetText("Звание");
+	roster.ColumnNote.Label:SetText("Заметка");
 	GuildUI_MakeList(roster.List, "GuildUIRosterRowTemplate", ROSTER_ROW_HEIGHT, 13, GuildUIRoster_Update, function(row, i)
-		row.Name:SetPoint("LEFT", row.Class, "RIGHT", 4, 0);
-		row.Name:SetWidth(134);
-		row.Level:SetPoint("LEFT", row, "LEFT", 168, 0);
-		row.Level:SetWidth(34);
+		row.Level:SetPoint("LEFT", row, "LEFT", 8, 0);
+		row.Level:SetWidth(30);
 		row.Level:SetJustifyH("LEFT");
-		row.Zone:SetPoint("LEFT", row, "LEFT", 210, 0);
-		row.Zone:SetWidth(124);
-		row.Rank:SetPoint("LEFT", row, "LEFT", 342, 0);
-		row.Rank:SetWidth(104);
-		row.Note:SetPoint("LEFT", row, "LEFT", 454, 0);
-		row.Note:SetPoint("RIGHT", row, "RIGHT", -4, 0);
+		row.Class:ClearAllPoints();
+		row.Class:SetPoint("LEFT", row, "LEFT", 52, 0);
+		row.Name:SetPoint("LEFT", row, "LEFT", 86, 0);
+		row.Name:SetWidth(104);
+		row.Zone:SetPoint("LEFT", row, "LEFT", 198, 0);
+		row.Zone:SetWidth(102);
+		row.Rank:SetPoint("LEFT", row, "LEFT", 308, 0);
+		row.Rank:SetWidth(88);
+		row.Note:SetPoint("LEFT", row, "LEFT", 402, 0);
+		row.Note:SetWidth(88);
+		row.Extra = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall");
+		row.Extra:SetJustifyH("LEFT");
+		row.Extra:SetPoint("LEFT", row, "LEFT", 496, 0);
+		row.Extra:SetPoint("RIGHT", row, "RIGHT", -4, 0);
 		row.Stripe:SetShown(i % 2 == 0);
 	end);
+	UIDropDownMenu_SetWidth(roster.ColumnDropDown, 130);
+	UIDropDownMenu_Initialize(roster.ColumnDropDown, GuildUIRosterColumnDropDown_Initialize);
+	GuildUIRoster_SetExtraColumn(CanViewOfficerNote() and "officer" or "online");
+
+	-- the info: section titles, challenges, news rows
+	local info = self.Info;
+	info.Header1.Label:SetText("Испытания гильдии");
+	info.Header2.Label:SetText("Сообщение дня");
+	info.Header3.Label:SetText("Информация о гильдии");
+	info.NewsHeader.Label:SetText("Новости гильдии");
+	for i, challenge in ipairs(GUILD_CHALLENGES) do
+		info["Challenge"..i].Label:SetText(challenge.name);
+	end
+	GuildUI_MakeList(info.News, "GuildUINewsRowTemplate", 18, 17, GuildUIInfo_UpdateLog);
+
+	-- the guild entry's right click: leave / disband (retail: the guild's menu in the list)
+	self.List.Guild:RegisterForClicks("LeftButtonUp", "RightButtonUp");
 
 	-- the perks
 	GuildUI_MakeList(self.Perks.List, "GuildUIPerkRowTemplate", PERK_ROW_HEIGHT, 6, GuildUIPerks_Update);
@@ -293,9 +317,27 @@ function GuildUITab_OnEnter(self)
 end
 
 -- the left list: 1 the guild (its last tab), 2 the guild finder
-function GuildUIListEntry_OnClick(self)
+local guildMenuFrame = CreateFrame("Frame", "GuildUIGuildMenu", UIParent, "UIDropDownMenuTemplate");
+
+function GuildUIListEntry_OnClick(self, button)
 	PlaySound("igMainMenuOptionCheckBoxOn");
 	local frame = CommunitiesFrame;
+	if ( self:GetID() == 1 and button == "RightButton" ) then
+		local menu = {
+			{ text = (GetGuildInfo("player")), isTitle = true, notCheckable = true },
+			{ text = "Покинуть гильдию", notCheckable = true, func = function()
+				StaticPopup_Show("CONFIRM_GUILD_LEAVE", (GetGuildInfo("player")));
+			end },
+		};
+		if ( IsGuildLeader() ) then
+			tinsert(menu, { text = "Распустить гильдию", notCheckable = true, func = function()
+				StaticPopup_Show("CONFIRM_GUILD_DISBAND");
+			end });
+		end
+		tinsert(menu, { text = CANCEL, notCheckable = true, func = function() CloseDropDownMenus(); end });
+		EasyMenu(menu, guildMenuFrame, "cursor", 0, 0, "MENU");
+		return;
+	end
 	if ( self:GetID() == 1 ) then
 		GuildUI_SetView(lastGuildView);
 	else
@@ -415,6 +457,63 @@ end
 
 -- ------------------------------------------------------------ 1: roster
 
+-- the last column (retail GuildMemberListDropdown): officer note / last online
+local extraColumn = "online";
+local EXTRA_COLUMNS = {
+	{ key = "officer", text = "Офицерская заметка", allowed = function() return CanViewOfficerNote(); end },
+	{ key = "online", text = "Последний вход" },
+};
+
+-- "3 дн.", "5 ч." since the last login (retail's zone column of the offline)
+local function LastOnline(index)
+	local years, months, days, hours = GetGuildRosterLastOnline(index);
+	if ( not years ) then
+		return "";
+	end
+	if ( years > 0 ) then
+		return format("%d г.", years);
+	elseif ( months > 0 ) then
+		return format("%d мес.", months);
+	elseif ( days > 0 ) then
+		return format("%d дн.", days);
+	elseif ( hours > 0 ) then
+		return format("%d ч.", hours);
+	end
+	return "< 1 ч.";
+end
+
+local function ExtraText(info)
+	if ( extraColumn == "officer" ) then
+		return info.officerNote;
+	end
+	return info.online and "В сети" or info.lastOnline;
+end
+
+function GuildUIRoster_SetExtraColumn(key)
+	extraColumn = key;
+	for _, column in ipairs(EXTRA_COLUMNS) do
+		if ( column.key == key ) then
+			CommunitiesFrame.Roster.ColumnExtra.Label:SetText(column.text);
+			UIDropDownMenu_SetText(CommunitiesFrame.Roster.ColumnDropDown, column.text);
+		end
+	end
+	if ( CommunitiesFrame.Roster:IsShown() ) then
+		GuildUIRoster_Update();
+	end
+end
+
+function GuildUIRosterColumnDropDown_Initialize()
+	for _, column in ipairs(EXTRA_COLUMNS) do
+		if ( not column.allowed or column.allowed() ) then
+			local item = UIDropDownMenu_CreateInfo();
+			item.text = column.text;
+			item.checked = column.key == extraColumn;
+			item.func = function() GuildUIRoster_SetExtraColumn(column.key); end;
+			UIDropDownMenu_AddButton(item);
+		end
+	end
+end
+
 local function MemberMatches(info, filter)
 	if ( filter == "" ) then
 		return true;
@@ -430,9 +529,11 @@ end
 local SORTERS = {
 	name = function(a, b) return a.name < b.name; end,
 	level = function(a, b) if ( a.level ~= b.level ) then return a.level > b.level; end return a.name < b.name; end,
+	class = function(a, b) if ( (a.class or "") ~= (b.class or "") ) then return (a.class or "") < (b.class or ""); end return a.name < b.name; end,
 	zone = function(a, b) if ( a.zone ~= b.zone ) then return a.zone < b.zone; end return a.name < b.name; end,
 	rank = function(a, b) if ( a.rankIndex ~= b.rankIndex ) then return a.rankIndex < b.rankIndex; end return a.name < b.name; end,
 	note = function(a, b) if ( a.note ~= b.note ) then return a.note > b.note; end return a.name < b.name; end,
+	extra = function(a, b) local x, y = ExtraText(a), ExtraText(b); if ( x ~= y ) then return x > y; end return a.name < b.name; end,
 };
 
 local function BuildMembers()
@@ -453,6 +554,11 @@ local function BuildMembers()
 			end
 			local info = { index = i, name = name, rank = rank or "", rankIndex = rankIndex or 0, level = level or 0, class = class,
 				zone = zone or "", note = note or "", officerNote = officerNote or "", online = isOnline, status = status, classFile = classFile };
+			if ( not isOnline ) then
+				-- retail: the offline's zone column tells how long ago
+				info.lastOnline = LastOnline(i);
+				info.zone = info.lastOnline;
+			end
 			if ( (isOnline or showOffline) and MemberMatches(info, filter) ) then
 				tinsert(members, info);
 			end
@@ -491,21 +597,19 @@ function GuildUIRoster_Update()
 			row.Zone:SetText(info.zone);
 			row.Rank:SetText(info.rank);
 			row.Note:SetText(info.note);
+			row.Extra:SetText(ExtraText(info));
+			local c = info.online and 1 or 0.5;
 			if ( info.online ) then
 				row.Name:SetTextColor(ClassColor(info.classFile));
-				row.Level:SetTextColor(1, 1, 1);
-				row.Zone:SetTextColor(1, 1, 1);
-				row.Rank:SetTextColor(1, 1, 1);
-				row.Note:SetTextColor(1, 1, 1);
-				row.Class:SetDesaturated(false);
 			else
 				row.Name:SetTextColor(0.5, 0.5, 0.5);
-				row.Level:SetTextColor(0.5, 0.5, 0.5);
-				row.Zone:SetTextColor(0.5, 0.5, 0.5);
-				row.Rank:SetTextColor(0.5, 0.5, 0.5);
-				row.Note:SetTextColor(0.5, 0.5, 0.5);
-				row.Class:SetDesaturated(true);
 			end
+			row.Level:SetTextColor(c, c, c);
+			row.Zone:SetTextColor(c, c, c);
+			row.Rank:SetTextColor(c, c, c);
+			row.Note:SetTextColor(c, c, c);
+			row.Extra:SetTextColor(c, c, c);
+			row.Class:SetDesaturated(not info.online);
 			row.Selected:SetShown(info.name == selectedName);
 			row:Show();
 		else
@@ -657,41 +761,74 @@ end
 
 -- ------------------------------------------------------------ 2: info
 
+-- the guild challenges (retail GuildChallenges): the counts come with the guild challenges stage
+GUILD_CHALLENGES = {
+	{ name = "Подземелье", max = 7 },
+	{ name = "Эпохальный+", max = 3 },
+	{ name = "Рейд", max = 1 },
+	{ name = "Поле боя", max = 3 },
+};
+
 function GuildUIInfo_Update()
 	local info = CommunitiesFrame.Info;
-	if ( not info.MOTD:HasFocus() ) then
-		info.MOTD:SetText(GetGuildRosterMOTD() or "");
+	for i, challenge in ipairs(GUILD_CHALLENGES) do
+		info["Challenge"..i].Count:SetFormattedText("%d / %d", challenge.count or 0, challenge.max);
 	end
-	if ( not info.DetailsScroll.Details:HasFocus() ) then
-		info.DetailsScroll.Details:SetText(GetGuildInfoText() or "");
-	end
-	local canMOTD, canInfo = CanEditMOTD(), CanEditGuildInfo();
-	info.MOTD:EnableMouse(canMOTD);
-	info.MOTD:EnableKeyboard(canMOTD);
-	info.DetailsScroll.Details:EnableMouse(canInfo);
-	info.DetailsScroll.Details:EnableKeyboard(canInfo);
-	info.Save:SetShown(canMOTD or canInfo);
-	info.Disband:SetShown(IsGuildLeader());
+	local motd = GetGuildRosterMOTD() or "";
+	info.MOTDText:SetText(motd);
+	local details = GetGuildInfoText() or "";
+	GuildUIInfoDetailsText:SetText(details);
+	GuildUIInfoDetailsScrollChild:SetHeight(math.max(10, GuildUIInfoDetailsText:GetHeight()));
+	info.DetailsScroll:UpdateScrollChildRect();
+	info.EditMOTD:SetShown(CanEditMOTD());
+	info.EditDetails:SetShown(CanEditGuildInfo());
+	GuildUIInfo_UpdateLog();
 end
 
-function GuildUIInfo_SaveMOTD()
-	if ( CanEditMOTD() ) then
-		GuildSetMOTD(CommunitiesFrame.Info.MOTD:GetText());
-	end
+-- ---- the MOTD / info editor
+
+function GuildUIPopup_OnLoad(self)
+	self:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	});
+	self:SetBackdropColor(0.05, 0.05, 0.05, 0.95);
+	self:SetBackdropBorderColor(0.6, 0.6, 0.6);
 end
 
-function GuildUIInfo_Save()
-	local info = CommunitiesFrame.Info;
-	info.MOTD:ClearFocus();
-	info.DetailsScroll.Details:ClearFocus();
-	if ( CanEditMOTD() and info.MOTD:GetText() ~= (GetGuildRosterMOTD() or "") ) then
-		GuildSetMOTD(info.MOTD:GetText());
+function GuildUITextEdit_Show(kind)
+	local frame = GuildUITextEditFrame;
+	frame.kind = kind;
+	if ( kind == "motd" ) then
+		GuildUITextEditFrameTitle:SetText("Сообщение дня");
+		GuildUITextEditBox:SetMaxLetters(128);
+		GuildUITextEditBox:SetText(GetGuildRosterMOTD() or "");
+	else
+		GuildUITextEditFrameTitle:SetText("Информация о гильдии");
+		GuildUITextEditBox:SetMaxLetters(500);
+		GuildUITextEditBox:SetText(GetGuildInfoText() or "");
 	end
-	if ( CanEditGuildInfo() ) then
-		SetGuildInfoText(info.DetailsScroll.Details:GetText());
+	frame:Show();
+	GuildUITextEditBox:SetFocus();
+end
+
+function GuildUITextEdit_Accept()
+	local frame = GuildUITextEditFrame;
+	local text = GuildUITextEditBox:GetText();
+	if ( frame.kind == "motd" ) then
+		if ( CanEditMOTD() ) then
+			GuildSetMOTD(text);
+		end
+	elseif ( CanEditGuildInfo() ) then
+		SetGuildInfoText(text);
 	end
+	frame:Hide();
 	GuildRoster();
 end
+
+-- ---- the event log: the news list (until the guild news stage) and the log window
 
 local EVENT_FORMATS = {
 	invite = function(p1, p2) return format(GUILDEVENT_TYPE_INVITE, p1, p2); end,
@@ -702,17 +839,86 @@ local EVENT_FORMATS = {
 	quit = function(p1) return format(GUILDEVENT_TYPE_QUIT, p1); end,
 };
 
-function GuildUIInfo_UpdateLog()
-	local log = CommunitiesFrame.Info.Log;
-	log:Clear();
-	-- insertMode TOP: the oldest first, the newest ends up on top
-	for i = 1, GetNumGuildEvents() do
+-- the newest first: { text, ago, days }
+local function GetEvents()
+	local events = {};
+	for i = GetNumGuildEvents(), 1, -1 do
 		local eventType, player1, player2, rank, year, month, day, hour = GetGuildEventInfo(i);
 		local make = EVENT_FORMATS[eventType];
 		if ( make ) then
-			local msg = make(player1 or UNKNOWN, player2 or UNKNOWN, rank);
-			log:AddMessage(msg.."|cff009999  "..format(GUILD_BANK_LOG_TIME, RecentTimeDate(year, month, day, hour)).."|r");
+			tinsert(events, { text = make(player1 or UNKNOWN, player2 or UNKNOWN, rank),
+				ago = RecentTimeDate(year, month, day, hour), days = (year or 0) * 365 + (month or 0) * 30 + (day or 0) });
 		end
+	end
+	return events;
+end
+
+local function DayTitle(days)
+	if ( days == 0 ) then
+		return "Сегодня";
+	elseif ( days == 1 ) then
+		return "Вчера";
+	end
+	return format("%d дн. назад", days);
+end
+
+function GuildUIInfo_UpdateLog()
+	local list = CommunitiesFrame.Info.News;
+	if ( not list.rows ) then
+		return;
+	end
+	-- retail news: the MOTD on top, then the days' headers and their lines
+	local lines = {};
+	local motd = GetGuildRosterMOTD();
+	if ( motd and motd ~= "" ) then
+		tinsert(lines, { text = "|cffffd200Сообщение дня:|r "..motd });
+	end
+	local lastDays;
+	for _, event in ipairs(GetEvents()) do
+		if ( event.days ~= lastDays ) then
+			tinsert(lines, { text = DayTitle(event.days), header = true });
+			lastDays = event.days;
+		end
+		tinsert(lines, { text = event.text });
+	end
+	local offset = FauxScrollFrame_GetOffset(list);
+	for i, row in ipairs(list.rows) do
+		local line = lines[offset + i];
+		if ( line ) then
+			row.Text:SetText(line.text);
+			row.Header:SetShown(line.header);
+			if ( line.header ) then
+				row.Text:SetFontObject("GameFontNormalSmall");
+			else
+				row.Text:SetFontObject("GameFontHighlightSmall");
+			end
+			row:Show();
+		else
+			row:Hide();
+		end
+	end
+	FauxScrollFrame_Update(list, #lines, #list.rows, list.rowHeight);
+	if ( GuildUILogFrame:IsShown() ) then
+		GuildUILog_Update();
+	end
+end
+
+function GuildUILog_Toggle()
+	if ( GuildUILogFrame:IsShown() ) then
+		GuildUILogFrame:Hide();
+	else
+		GuildUITextEditFrame:Hide();
+		GuildUILogFrame:Show();
+	end
+end
+
+function GuildUILog_Update()
+	local text = GuildUILogFrame.Text;
+	text:Clear();
+	local events = GetEvents();
+	-- insertMode TOP: the oldest added first, the newest ends up on top
+	for i = #events, 1, -1 do
+		text:AddMessage(events[i].text.."|cff009999  "..format(GUILD_BANK_LOG_TIME, events[i].ago).."|r");
 	end
 end
 

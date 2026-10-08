@@ -8,15 +8,18 @@ the guild's level and experience bar (`GuildProgression.lua`); the bottom bar �
 list, «Набор в гильдию» and «Управление гильдией» on the right.
 
 Side tabs (retail order):
-1. **Состав** — search (name / zone / rank / note / class), show offline, sortable columns, class icons,
-   online first. Right click: whisper, invite to group, promote, demote, note, officer note, remove.
+1. **Состав** (retail columns: Ур., Класс, Имя, Зона, Звание, Заметка + a dropdown column — officer note /
+   last online) — show offline (their zone column: how long ago), search, sortable columns, online first. Right click: whisper, invite to group, promote, demote, note, officer note, remove.
    Bottom: «Пригласить», «Управление гильдией» (the stock rank window).
 2. **Преимущества** — the perks (`GetGuildPerkInfo`), inactive ones grey, the next one on top.
-3. **Информация** — MOTD and guild info (editable with the rights, «Сохранить»), event log, leave / disband.
+3. **Информация** (retail GuildInfo) — guild challenges (counts: a later stage), MOTD and guild info with
+   «[Изменить]» (an editor window), news on the right (until the news stage: the MOTD and the event log by day),
+   «Журнал» (the event log window). Leave / disband: right click on the guild in the left list.
 
 **Поиск гильдии / Набор в гильдию** — `GuildFinder.lua` + `server/guild_finder.cpp`:
-   * no guild: the window opens on the guild finder. Filters (time, roles, interests, level) → «Найти»;
-     a guild → «Подать заявку» with a comment; «Мои заявки» → cancel. At most 10, they last 30 days.
+   * no guild: the window opens on the guild finder. Retail's top bar: «Интересы» and «Время и уровень»
+     dropdowns, the role buttons, the search box (by name / description), «Найти»; guild cards with a green «+»
+     (apply with a comment); «Мои заявки» → cancel. At most 10, they last 30 days.
    * in a guild: recruitment settings (listed, filters, comment; rank right "edit guild info" / leader),
      applicants (rank right "invite"): «Пригласить» (the normal guild invite, the player online) / «Отклонить».
      Joining a guild removes all the player's applications.

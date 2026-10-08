@@ -6,7 +6,7 @@
 --  interests 1 questing 2 dungeons 4 raids 8 pvp 16 role playing; level 1 any 2 max.
 -- ============================================================
 
-local FINDER_ROW_HEIGHT = 44;
+local FINDER_ROW_HEIGHT = 64;
 
 local MODE_SEARCH, MODE_APPS, MODE_REQUESTS = 1, 2, 3;
 local mode = MODE_SEARCH;
@@ -15,7 +15,11 @@ local results, apps, requests = {}, {}, {};
 local settings = { canEdit = false, listed = false, availability = 0, roles = 0, interests = 0, level = 1, comment = "" };
 local searched = false;
 
-local CHECKS = { "Weekdays", "Weekends", "Tank", "Healer", "Damage", "Questing", "Dungeons", "Raids", "PvP", "RP", "AnyLevel", "MaxLevel" };
+-- the filters (retail: the Filter / Sort By dropdowns and the role buttons); a new player: everything
+local flags = { availability = 3, roles = 7, interests = 31, level = 3 };
+local ROLES = { "Tank", "Healer", "Damage" };
+local INTEREST_ITEMS = { { 1, "Задания" }, { 2, "Подземелья" }, { 4, "Рейды" }, { 8, "PvP" }, { 16, "Отыгрыш роли" } };
+local OPTION_ITEMS = { { "availability", 1, "Будни" }, { "availability", 2, "Выходные" }, { "level", 1, "Любой уровень" }, { "level", 2, "Максимальный уровень" } };
 
 local CLASS_FILES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "DEATHKNIGHT", "SHAMAN", "MAGE", "WARLOCK", nil, "DRUID" };
 
@@ -75,36 +79,97 @@ local function Send(...)
 	end
 end
 
--- ------------------------------------------------------------ the filter boxes
+-- ------------------------------------------------------------ the filters
 
 local function Finder()
 	return CommunitiesFrame.Finder;
 end
 
--- the ticked flags of a field ("availability", "roles", "interests", "level")
-local function GetFlags(field)
-	local flags = 0;
-	for _, key in ipairs(CHECKS) do
-		local check = Finder()[key];
-		if ( check.field == field and check:GetChecked() ) then
-			flags = flags + check:GetID();
-		end
-	end
-	return flags;
+local function HasFlag(value, bit)
+	return value % (bit * 2) >= bit;
 end
 
-local function SetFlags(field, flags)
-	for _, key in ipairs(CHECKS) do
-		local check = Finder()[key];
-		if ( check.field == field ) then
-			check:SetChecked(flags % (check:GetID() * 2) >= check:GetID());
+local function ToggleFlag(field, bit)
+	if ( HasFlag(flags[field], bit) ) then
+		flags[field] = flags[field] - bit;
+	else
+		flags[field] = flags[field] + bit;
+	end
+end
+
+local function GetFlags(field)
+	return flags[field];
+end
+
+local function SetFlags(field, value)
+	flags[field] = value;
+end
+
+-- the dropdowns' texts and the role buttons follow the flags
+local function UpdateFilters()
+	local finder = Finder();
+	local count = 0;
+	for _, item in ipairs(INTEREST_ITEMS) do
+		if ( HasFlag(flags.interests, item[1]) ) then
+			count = count + 1;
 		end
 	end
+	UIDropDownMenu_SetText(finder.InterestsDropDown, count == #INTEREST_ITEMS and "Все интересы" or format("Интересы: %d", count));
+	local times = {};
+	if ( HasFlag(flags.availability, 1) ) then tinsert(times, "будни"); end
+	if ( HasFlag(flags.availability, 2) ) then tinsert(times, "выходные"); end
+	UIDropDownMenu_SetText(finder.OptionsDropDown, #times > 0 and table.concat(times, ", ") or "Время не выбрано");
+	for _, key in ipairs(ROLES) do
+		local button = finder[key];
+		local on = HasFlag(flags.roles, button:GetID());
+		button:SetChecked(on);
+		button.Icon:SetDesaturated(not on);
+		button.Icon:SetAlpha(on and 1 or 0.4);
+	end
+end
+
+local function InterestsDropDown_Initialize()
+	for _, item in ipairs(INTEREST_ITEMS) do
+		local info = UIDropDownMenu_CreateInfo();
+		info.text = item[2];
+		info.checked = HasFlag(flags.interests, item[1]);
+		info.keepShownOnClick = 1;
+		info.func = function() ToggleFlag("interests", item[1]); UpdateFilters(); end;
+		UIDropDownMenu_AddButton(info);
+	end
+end
+
+local function OptionsDropDown_Initialize()
+	for _, item in ipairs(OPTION_ITEMS) do
+		local info = UIDropDownMenu_CreateInfo();
+		info.text = item[3];
+		info.checked = HasFlag(flags[item[1]], item[2]);
+		info.keepShownOnClick = 1;
+		info.func = function() ToggleFlag(item[1], item[2]); UpdateFilters(); end;
+		UIDropDownMenu_AddButton(info);
+	end
+end
+
+function GuildFinderRole_OnLoad(self)
+	self.Icon:SetTexCoord(GetTexCoordsForRole(self.role));
+end
+
+function GuildFinderRole_OnClick(self)
+	PlaySound("igMainMenuOptionCheckBoxOn");
+	ToggleFlag("roles", self:GetID());
+	UpdateFilters();
 end
 
 local function EnableChecks(enable)
 	local finder = Finder();
-	for _, key in ipairs(CHECKS) do
+	for _, dropdown in ipairs({ finder.InterestsDropDown, finder.OptionsDropDown }) do
+		if ( enable ) then
+			UIDropDownMenu_EnableDropDown(dropdown);
+		else
+			UIDropDownMenu_DisableDropDown(dropdown);
+		end
+	end
+	for _, key in ipairs(ROLES) do
 		if ( enable ) then
 			finder[key]:Enable();
 		else
@@ -126,6 +191,7 @@ end
 local function SetupRow(row)
 	row.Button1:SetScript("OnClick", function(self) GuildFinderRow_OnButton(self:GetParent(), 1); end);
 	row.Button2:SetScript("OnClick", function(self) GuildFinderRow_OnButton(self:GetParent(), 2); end);
+	row.Plus:SetScript("OnClick", function(self) GuildFinderRow_OnButton(self:GetParent(), 2); end);
 end
 
 local function Init()
@@ -133,17 +199,36 @@ local function Init()
 	if ( finder.List.rows ) then
 		return;
 	end
-	GuildUI_MakeList(finder.List, "GuildUIFinderRowTemplate", FINDER_ROW_HEIGHT, 6, GuildFinder_UpdateList, SetupRow);
-	for _, key in ipairs(CHECKS) do
-		local check = finder[key];
-		_G[check:GetName().."Text"]:SetText(check.label);
-	end
+	GuildUI_MakeList(finder.List, "GuildUIFinderRowTemplate", FINDER_ROW_HEIGHT, 4, GuildFinder_UpdateList, SetupRow);
+	UIDropDownMenu_SetWidth(finder.InterestsDropDown, 130);
+	UIDropDownMenu_Initialize(finder.InterestsDropDown, InterestsDropDown_Initialize);
+	UIDropDownMenu_SetWidth(finder.OptionsDropDown, 130);
+	UIDropDownMenu_Initialize(finder.OptionsDropDown, OptionsDropDown_Initialize);
 	_G[finder.Listed:GetName().."Text"]:SetText("Гильдия ищет игроков");
-	-- a new player: what he plays (all ticked)
-	for _, field in ipairs({ "availability", "roles", "interests" }) do
-		SetFlags(field, 31);
+	UpdateFilters();
+end
+
+-- the search box: the found guilds by name / comment
+local function SearchFilter()
+	local text = (Finder().SearchBox:GetText() or ""):lower();
+	if ( text == SEARCH:lower() ) then
+		return "";
 	end
-	SetFlags("level", 3);
+	return text;
+end
+
+local function FilteredResults()
+	local filter = SearchFilter();
+	if ( filter == "" ) then
+		return results;
+	end
+	local out = {};
+	for _, entry in ipairs(results) do
+		if ( entry.name:lower():find(filter, 1, true) or entry.comment:lower():find(filter, 1, true) ) then
+			tinsert(out, entry);
+		end
+	end
+	return out;
 end
 
 function GuildFinder_UpdateList()
@@ -152,50 +237,54 @@ function GuildFinder_UpdateList()
 	if ( not list.rows ) then
 		return;
 	end
-	local data = mode == MODE_SEARCH and results or mode == MODE_APPS and apps or requests;
+	local data = mode == MODE_SEARCH and FilteredResults() or mode == MODE_APPS and apps or requests;
 	local offset = FauxScrollFrame_GetOffset(list);
 	for i, row in ipairs(list.rows) do
 		local entry = data[offset + i];
 		row.entry = entry;
 		if ( entry ) then
-			if ( mode == MODE_SEARCH ) then
-				row.Icon:SetTexture("Interface\\Icons\\INV_Shirt_GuildTabard_01");
-				row.Icon:SetTexCoord(0, 1, 0, 1);
-				row.Name:SetText(entry.name);
-				row.Info:SetText(entry.comment ~= "" and entry.comment or ("Интересы: "..FlagNames(entry.interests, INTEREST_NAMES)));
-				row.Right:SetFormattedText("Ур. %d  |cffffffff%d чел.|r", entry.level, entry.members);
-				row.Button1:Hide();
-				row.Button2:SetText(entry.applied and "Отозвать" or "Подать заявку");
-				row.Button2:Show();
-			elseif ( mode == MODE_APPS ) then
-				row.Icon:SetTexture("Interface\\Icons\\INV_Shirt_GuildTabard_01");
-				row.Icon:SetTexCoord(0, 1, 0, 1);
-				row.Name:SetText(entry.name);
-				row.Info:SetText(entry.comment ~= "" and entry.comment or "Без комментария");
-				row.Right:SetText("Осталось: "..TimeLeft(entry.secondsLeft));
-				row.Button1:Hide();
-				row.Button2:SetText("Отозвать");
-				row.Button2:Show();
-			else
+			row.Name:SetTextColor(1, 1, 1);
+			if ( mode == MODE_REQUESTS ) then
 				row.Icon:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes");
 				local coords = entry.classFile and CLASS_ICON_TCOORDS[entry.classFile];
 				if ( coords ) then
 					row.Icon:SetTexCoord(unpack(coords));
 				end
 				local color = entry.classFile and RAID_CLASS_COLORS[entry.classFile];
-				row.Name:SetText(entry.name);
 				if ( color ) then
 					row.Name:SetTextColor(color.r, color.g, color.b);
 				end
-				row.Info:SetText(entry.comment ~= "" and entry.comment or ("Роли: "..FlagNames(entry.roles, ROLE_NAMES)));
-				row.Right:SetFormattedText("Ур. %d  |cffffffff%s|r", entry.level, TimeLeft(entry.secondsLeft));
+			else
+				SetPortraitToTexture(row.Icon, "Interface\\Icons\\INV_Shirt_GuildTabard_01");
+				row.Icon:SetTexCoord(0, 1, 0, 1);
+			end
+			row.Name:SetText(entry.name);
+			if ( mode == MODE_SEARCH ) then
+				row.Info:SetText(entry.comment ~= "" and entry.comment or "Без описания");
+				row.Members:SetFormattedText("%d |cffffffffучастн.|r   Ур. %d", entry.members, entry.level);
+				row.Right:SetText("Интересы: "..FlagNames(entry.interests, INTEREST_NAMES));
+				row.Button1:Hide();
+				-- retail: the green "+" applies; applied - "Отозвать"
+				row.Plus:SetShown(not entry.applied);
+				row.Button2:SetShown(entry.applied);
+				row.Button2:SetText("Отозвать");
+			elseif ( mode == MODE_APPS ) then
+				row.Info:SetText(entry.comment ~= "" and entry.comment or "Без комментария");
+				row.Members:SetText("");
+				row.Right:SetText("Осталось: "..TimeLeft(entry.secondsLeft));
+				row.Button1:Hide();
+				row.Plus:Hide();
+				row.Button2:SetText("Отозвать");
+				row.Button2:Show();
+			else
+				row.Info:SetText(entry.comment ~= "" and entry.comment or "Без комментария");
+				row.Members:SetFormattedText("%s %d %s", LEVEL, entry.level, entry.class or "");
+				row.Right:SetText("Роли: "..FlagNames(entry.roles, ROLE_NAMES).."   осталось "..TimeLeft(entry.secondsLeft));
+				row.Plus:Hide();
 				row.Button1:SetText("Пригласить");
 				row.Button1:Show();
 				row.Button2:SetText("Отклонить");
 				row.Button2:Show();
-			end
-			if ( mode ~= MODE_REQUESTS ) then
-				row.Name:SetTextColor(1, 0.82, 0);
 			end
 			row:Show();
 		else
@@ -206,7 +295,7 @@ function GuildFinder_UpdateList()
 
 	if ( #data == 0 ) then
 		if ( mode == MODE_SEARCH ) then
-			finder.Empty:SetText(searched and "Подходящих гильдий не найдено." or "Отметьте свои интересы и нажмите «Найти».");
+			finder.Empty:SetText(searched and "Подходящих гильдий не найдено." or "Выберите интересы и роли и нажмите «Найти».");
 		elseif ( mode == MODE_APPS ) then
 			finder.Empty:SetText("У вас нет заявок.");
 		elseif ( GuildFinder_CanInvite() ) then
@@ -312,11 +401,11 @@ function GuildFinder_Show(recruit)
 	local finder = Finder();
 	if ( recruit and IsInGuild() ) then
 		mode = MODE_REQUESTS;
-		finder.FilterTitle:SetText("Набор в гильдию");
-		finder.ListTitle:SetText("Заявки в гильдию");
+		finder.ListTitle:SetText("");
+		finder.SearchBox:Hide();
 		finder.Listed:Show();
 		finder.Comment:Show();
-		finder.Action:SetText("Сохранить");
+		finder.Action:SetText("Сохранить набор");
 		finder.Mode:Hide();
 		GuildFinder_ApplySettings();
 		Send("GF_SETTINGS_GET");
@@ -325,10 +414,11 @@ function GuildFinder_Show(recruit)
 		if ( mode == MODE_REQUESTS ) then
 			mode = MODE_SEARCH;
 		end
-		finder.FilterTitle:SetText("Что вы ищете");
 		finder.Listed:Hide();
 		finder.Comment:Hide();
 		finder.Action:SetText("Найти");
+		finder.SearchBox:Show();
+		UpdateFilters();
 		finder.Action:Enable();
 		finder.Mode:Show();
 		EnableChecks(true);
@@ -384,6 +474,7 @@ function GuildFinder_ApplySettings()
 	SetFlags("roles", settings.roles);
 	SetFlags("interests", settings.interests);
 	SetFlags("level", settings.level);
+	UpdateFilters();
 	finder.Listed:SetChecked(settings.listed);
 	finder.Comment:SetText(settings.comment);
 	EnableChecks(settings.canEdit);
