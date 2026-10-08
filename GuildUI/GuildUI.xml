@@ -364,8 +364,32 @@
 				</Anchors>
 				<Layers>
 					<Layer level="BACKGROUND">
-						<Texture setAllPoints="true">
-							<Color r="0" g="0" b="0" a="0.6"/>
+						<Texture file="Interface\GuildFrame\GuildFrame" setAllPoints="true">
+							<TexCoords left="0.39843750" right="0.41210938" top="0.96875000" bottom="0.99609375"/>
+						</Texture>
+					</Layer>
+					<!-- retail CommunitiesGuildProgressBarTemplate's frame (Interface\GuildFrame\GuildFrame) -->
+					<Layer level="ARTWORK">
+						<Texture name="$parentBorderLeft" file="Interface\GuildFrame\GuildFrame">
+							<Size x="18" y="18"/>
+							<Anchors>
+								<Anchor point="LEFT" x="-2" y="0"/>
+							</Anchors>
+							<TexCoords left="0.60742188" right="0.62500000" top="0.78710938" bottom="0.82226563"/>
+						</Texture>
+						<Texture name="$parentBorderRight" file="Interface\GuildFrame\GuildFrame">
+							<Size x="18" y="18"/>
+							<Anchors>
+								<Anchor point="RIGHT" x="2" y="0"/>
+							</Anchors>
+							<TexCoords left="0.60742188" right="0.62500000" top="0.82617188" bottom="0.86132813"/>
+						</Texture>
+						<Texture name="$parentBorderMiddle" file="Interface\GuildFrame\GuildFrame">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentBorderLeft" relativePoint="TOPRIGHT"/>
+								<Anchor point="BOTTOMRIGHT" relativeTo="$parentBorderRight" relativePoint="BOTTOMLEFT"/>
+							</Anchors>
+							<TexCoords left="0.60742188" right="0.62500000" top="0.74804688" bottom="0.78320313"/>
 						</Texture>
 					</Layer>
 					<Layer level="OVERLAY">

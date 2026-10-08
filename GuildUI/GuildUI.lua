@@ -89,18 +89,18 @@ function GuildUI_OnLoad(self)
 	local guildEntry = self.List.Guild;
 	guildEntry.Banner:Show();
 	guildEntry.BannerBorder:Show();
-	guildEntry.Icon:SetSize(34, 34);
+	guildEntry.Icon:SetSize(26, 26);
 	guildEntry.Icon:ClearAllPoints();
-	guildEntry.Icon:SetPoint("CENTER", guildEntry.Banner, "CENTER", 0, 2);
+	guildEntry.Icon:SetPoint("CENTER", guildEntry.Banner, "CENTER", 0, 3);
 	SetPortraitToTexture(guildEntry.Icon, "Interface\\Icons\\INV_Shirt_GuildTabard_01");
 	local finderEntry = self.List.Finder;
 	SetPortraitToTexture(finderEntry.Icon, "Interface\\Icons\\INV_Misc_Spyglass_03");
 	finderEntry.Name:SetText("Поиск гильдии");
-	finderEntry.Sub:SetText("Найдите гильдию по себе");
+	finderEntry.Sub:SetText("Найти гильдию");
 
 	-- the roster: column titles, rows
 	local roster = self.Roster;
-	roster.ColumnName.Label:SetText(NAME);
+	roster.ColumnName.Label:SetText("Имя");
 	roster.ColumnLevel.Label:SetText(LEVEL_ABBR);
 	roster.ColumnZone.Label:SetText(ZONE);
 	roster.ColumnRank.Label:SetText(RANK);
@@ -108,8 +108,9 @@ function GuildUI_OnLoad(self)
 	GuildUI_MakeList(roster.List, "GuildUIRosterRowTemplate", ROSTER_ROW_HEIGHT, 13, GuildUIRoster_Update, function(row, i)
 		row.Name:SetPoint("LEFT", row.Class, "RIGHT", 4, 0);
 		row.Name:SetWidth(134);
-		row.Level:SetPoint("LEFT", row, "LEFT", 162, 0);
-		row.Level:SetWidth(40);
+		row.Level:SetPoint("LEFT", row, "LEFT", 168, 0);
+		row.Level:SetWidth(34);
+		row.Level:SetJustifyH("LEFT");
 		row.Zone:SetPoint("LEFT", row, "LEFT", 210, 0);
 		row.Zone:SetWidth(124);
 		row.Rank:SetPoint("LEFT", row, "LEFT", 342, 0);
