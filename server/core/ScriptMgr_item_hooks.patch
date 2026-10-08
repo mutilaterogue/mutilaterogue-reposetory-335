@@ -1,0 +1,42 @@
+PlayerScript::OnLootItem / OnCreateItem / OnQuestRewardItem reach the scripts.
+Apply by hand (context from your tree: Scripting/ScriptMgr.h, Scripting/ScriptMgr.cpp).
+
+Why: ScriptMgr declares these three with empty bodies ({}), so Player::StoreNewItem / Spell::DoCreateItem call
+them and nothing happens; the guild news (server/guild_news.cpp: epic items looted / crafted) need them.
+
+--- a/src/server/game/Scripting/ScriptMgr.h
++++ b/src/server/game/Scripting/ScriptMgr.h
+@@ class TC_GAME_API ScriptMgr  (public: /* PlayerScript */, next to OnPlayerRepop)
+         void OnPlayerRepop(Player* player);
+-        void OnLootItem(Player* /*player*/, Item* /*item*/, uint32 /*count*/, ObjectGuid /*lootGuid*/) {}
+-        void OnCreateItem(Player* /*player*/, Item* /*item*/, uint32 /*count*/) {}
+-        void OnQuestRewardItem(Player* /*player*/, Item* /*item*/, uint32 /*count*/) {}
++        void OnLootItem(Player* player, Item* item, uint32 count, ObjectGuid lootGuid);
++        void OnCreateItem(Player* player, Item* item, uint32 count);
++        void OnQuestRewardItem(Player* player, Item* item, uint32 count);
+
+--- a/src/server/game/Scripting/ScriptMgr.cpp
++++ b/src/server/game/Scripting/ScriptMgr.cpp
+@@ after void ScriptMgr::OnPlayerRepop(Player* player) { ... }
+ void ScriptMgr::OnPlayerRepop(Player* player)
+ {
+     FOREACH_SCRIPT(PlayerScript)->OnPlayerRepop(player);
+ }
++
++void ScriptMgr::OnLootItem(Player* player, Item* item, uint32 count, ObjectGuid lootGuid)
++{
++    FOREACH_SCRIPT(PlayerScript)->OnLootItem(player, item, count, lootGuid);
++}
++
++void ScriptMgr::OnCreateItem(Player* player, Item* item, uint32 count)
++{
++    FOREACH_SCRIPT(PlayerScript)->OnCreateItem(player, item, count);
++}
++
++void ScriptMgr::OnQuestRewardItem(Player* player, Item* item, uint32 count)
++{
++    FOREACH_SCRIPT(PlayerScript)->OnQuestRewardItem(player, item, count);
++}
+
+Note: Spell::DoCreateItem calls OnCreateItem(player, nullptr, 1) for an item it could not create (SpellEffects.cpp):
+the scripts check the item for nullptr.

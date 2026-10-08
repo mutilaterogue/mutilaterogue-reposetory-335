@@ -41,6 +41,8 @@ void AddSC_premade_groups();
 void AddSC_class_powers();
 void AddSC_guild_progression();
 void AddSC_guild_finder();
+void AddSC_guild_news();
+void AddSC_guild_rewards();
 
 void AddCustomScripts()
 {
@@ -66,4 +68,6 @@ void AddCustomScripts()
     AddSC_class_powers();
     AddSC_guild_progression();
     AddSC_guild_finder();
+    AddSC_guild_news();
+    AddSC_guild_rewards();
 }

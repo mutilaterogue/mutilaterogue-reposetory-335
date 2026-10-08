@@ -36,3 +36,27 @@ GuildProgression.XPHeroicDungeonModifier = 1.25
 #        Default:     6
 GuildProgression.ResetHour = 6
 ###################################################################################################
+
+#
+#    GuildProgression.WeeklyReputationCap
+#        Description: Guild reputation a member can earn a week (the week starts on Wednesday at ResetHour).
+#        Default:     4375
+#
+
+GuildProgression.WeeklyReputationCap = 4375
+
+#
+#    GuildProgression.ReputationDivider
+#        Description: Guild reputation = max(1, experience / this): a quest's XP, a guild group kill's guild XP.
+#        Default:     450
+#
+
+GuildProgression.ReputationDivider = 450
+
+#
+#    GuildNews.MinItemLevel
+#        Description: Epic items of this item level and higher (and legendaries) make the guild news.
+#        Default:     200
+#
+
+GuildNews.MinItemLevel = 200

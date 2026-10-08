@@ -246,8 +246,8 @@ function GuildUI_OnEvent(self, event, ...)
 			GuildUIInfo_Update();
 		end
 	elseif ( event == "GUILD_EVENT_LOG_UPDATE" ) then
-		if ( self.Info:IsShown() ) then
-			GuildUIInfo_UpdateLog();
+		if ( GuildUILogFrame:IsShown() ) then
+			GuildUILog_Update();
 		end
 	end
 end
@@ -297,9 +297,15 @@ function GuildUI_SetView(view)
 		GuildUIRoster_Update();
 	elseif ( view == VIEW_INFO ) then
 		GuildUIInfo_Update();
-		GuildUIInfo_UpdateLog();
+		GuildNews_Request();
 	elseif ( view == VIEW_PERKS ) then
 		GuildUIPerks_Update();
+		GuildRewards_Init();
+		GuildRewards_Update();
+		if ( Comm_Send ) then
+			Comm_Send("GUILD_REWARDS_GET");
+			Comm_Send("GUILD_REP_GET");
+		end
 	elseif ( view == VIEW_FINDER ) then
 		GuildFinder_Show(frame.recruiting);
 	end
@@ -862,28 +868,38 @@ local function DayTitle(days)
 	return format("%d дн. назад", days);
 end
 
+local function DaysAgo(seconds)
+	return math.floor(seconds / 86400);
+end
+
 function GuildUIInfo_UpdateLog()
 	local list = CommunitiesFrame.Info.News;
 	if ( not list.rows ) then
 		return;
 	end
-	-- retail news: the MOTD on top, then the days' headers and their lines
+	-- retail news: the MOTD on top, then the days' headers and their news (GuildNews.lua)
 	local lines = {};
 	local motd = GetGuildRosterMOTD();
 	if ( motd and motd ~= "" ) then
 		tinsert(lines, { text = "|cffffd200Сообщение дня:|r "..motd });
 	end
 	local lastDays;
-	for _, event in ipairs(GetEvents()) do
-		if ( event.days ~= lastDays ) then
-			tinsert(lines, { text = DayTitle(event.days), header = true });
-			lastDays = event.days;
+	for i = 1, GetNumGuildNews() do
+		local entry = GetGuildNewsInfo(i);
+		local days = DaysAgo(entry.secondsAgo + (time() - entry.received));
+		if ( days ~= lastDays ) then
+			tinsert(lines, { text = DayTitle(days), header = true });
+			lastDays = days;
 		end
-		tinsert(lines, { text = event.text });
+		tinsert(lines, { text = GuildNews_GetText(entry), entry = entry });
+	end
+	if ( GetNumGuildNews() == 0 ) then
+		tinsert(lines, { text = "|cff808080Новостей пока нет.|r" });
 	end
 	local offset = FauxScrollFrame_GetOffset(list);
 	for i, row in ipairs(list.rows) do
 		local line = lines[offset + i];
+		row.entry = line and line.entry;
 		if ( line ) then
 			row.Text:SetText(line.text);
 			row.Header:SetShown(line.header);
@@ -898,8 +914,15 @@ function GuildUIInfo_UpdateLog()
 		end
 	end
 	FauxScrollFrame_Update(list, #lines, #list.rows, list.rowHeight);
-	if ( GuildUILogFrame:IsShown() ) then
-		GuildUILog_Update();
+end
+
+-- a news line's item: its tooltip
+function GuildUINewsRow_OnEnter(self)
+	local entry = self.entry;
+	if ( entry and entry.newsType >= NEWS_ITEM_LOOTED and entry.newsType <= NEWS_ITEM_PURCHASED ) then
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		GameTooltip:SetHyperlink("item:"..entry.value);
+		GameTooltip:Show();
 	end
 end
 

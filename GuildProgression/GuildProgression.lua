@@ -2,13 +2,19 @@
 --  Guild progression (server/guild_progression.cpp), stage 1: guild level, experience, perks.
 --  The 3.3.5a client has none of it: the values come from the server by AddonComm and are given to the UI
 --  through Cataclysm's / retail's API (GetGuildLevel, UnitGetGuildXP, GetNumGuildPerks, GetGuildPerkInfo).
---  The UI listens with GuildProgression_RegisterCallback(func): func("GUILD_XP_UPDATE") / ("GUILD_PERK_UPDATE").
+--  Stage 3: the member's guild reputation (GetGuildFactionInfo, GetGuildRepWeekly).
+--  The UI listens with GuildProgression_RegisterCallback(func): func("GUILD_XP_UPDATE") / ("GUILD_PERK_UPDATE") /
+--  ("GUILD_REP_UPDATE").
 -- ============================================================
 
 GUILD_MAX_LEVEL = 25;
 
 local progress = { level = 0, experience = 0, toNext = 0, today = 0, dailyCap = 0 };
 local perks = {};			-- { level = , spellID = }, by level
+local reputation = { total = 0, weekly = 0, cap = 0 };
+
+-- Cataclysm's guild faction: Neutral 0, Friendly 3000, Honored 9000, Revered 21000, Exalted 42000
+local STANDINGS = { { 4, 0, 3000 }, { 5, 3000, 9000 }, { 6, 9000, 21000 }, { 7, 21000, 42000 }, { 8, 42000, 43000 } };
 local callbacks = {};
 
 function GuildProgression_RegisterCallback(func)
@@ -55,6 +61,30 @@ function IsGuildPerkActive(index)
 	return perk and progress.level >= perk.level;
 end
 
+-- Cataclysm's: guildName, description, standingID, barMin, barMax, barValue
+function GetGuildFactionInfo()
+	local total = reputation.total;
+	local standing = STANDINGS[1];
+	for _, entry in ipairs(STANDINGS) do
+		if ( total >= entry[2] ) then
+			standing = entry;
+		end
+	end
+	return (GetGuildInfo("player")), "Репутация с вашей гильдией.", standing[1], standing[2], standing[3], total;
+end
+
+-- this week's reputation, the weekly cap
+function GetGuildRepWeekly()
+	return reputation.weekly, reputation.cap;
+end
+
+local function OnReputation(total, weekly, cap)
+	reputation.total = tonumber(total) or 0;
+	reputation.weekly = tonumber(weekly) or 0;
+	reputation.cap = tonumber(cap) or 0;
+	Fire("GUILD_REP_UPDATE");
+end
+
 local function OnProgress(level, experience, toNext, today, dailyCap)
 	local oldLevel = progress.level;
 	progress.level = tonumber(level) or 0;
@@ -93,8 +123,10 @@ loader:SetScript("OnEvent", function(self, event)
 	if ( not registered ) then
 		Comm_Register("GUILD_PROG", OnProgress);
 		Comm_Register("GUILD_PERKS", OnPerks);
+		Comm_Register("GUILD_REP", OnReputation);
 		registered = true;
 		Comm_Send("GUILD_PERKS_GET");
 	end
 	Comm_Send("GUILD_PROG_GET");
+	Comm_Send("GUILD_REP_GET");
 end);

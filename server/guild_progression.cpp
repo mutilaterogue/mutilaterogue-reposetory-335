@@ -13,15 +13,23 @@
  * Perks: guild_perk_spells (world, GuildPerkSpells.dbc): the members know the spells of the guild's level;
  *   learnt at login, on joining, at a level up; unlearnt on leaving / disbanding.
  *
+ * Reputation (stage 3; Cataclysm's Guild::GiveReputation, per member, faction-less here):
+ *   a quest: max(1, its XP / 450); a guild group kill: max(1, the guild XP / 450)  (GuildProgression.ReputationDivider)
+ *   + SPELL_AURA_MOD_REPUTATION_GAIN %; at most 4375 a week (GuildProgression.WeeklyReputationCap; the week
+ *   starts on Wednesday at the reset hour); Neutral 0, Friendly 3000, Honored 9000, Revered 21000, Exalted 42000.
+ *   Lost on leaving the guild. guild_member_reputation (characters).
+ *
  * Client (GuildProgression/GuildProgression.lua) by AddonComm:
  *   "GUILD_PROG_GET"   -> "GUILD_PROG"  : level : experience : to next level : today : daily cap
  *   "GUILD_PERKS_GET"  -> "GUILD_PERKS" : level : spell : level : spell ...
+ *   "GUILD_REP_GET"    -> "GUILD_REP"   : reputation : this week's : weekly cap
  * Saved: guild_progression (characters), every minute when changed and at shutdown.
  * Settings: worldserver.conf, GuildProgression.* (sql/worldserver_guild_progression.conf.dist).
  */
 
 #include "ScriptMgr.h"
 #include "guild_progression.h"
+#include "guild_news.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Chat.h"
 #include "Config.h"
@@ -38,6 +46,7 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "QuestDef.h"
+#include "SpellAuraDefines.h"
 #include "SpellMgr.h"
 #include "StringFormat.h"
 #include "World.h"
@@ -56,6 +65,9 @@ namespace
     float  GUILD_XP_KILL_MODIFIER           = 4.0f;
     float  GUILD_XP_HEROIC_DUNGEON          = 1.25f;
     uint32 GUILD_RESET_HOUR                 = 6;
+    uint32 GUILD_WEEKLY_REP_CAP             = 4375;
+    uint32 GUILD_REP_DIVIDER                = 450;
+    uint32 const GUILD_REP_MAX              = 42999;   // the top of Exalted
 
     void LoadConfig()
     {
@@ -66,6 +78,8 @@ namespace
         GUILD_XP_KILL_MODIFIER          = sConfigMgr->GetFloatDefault("GuildProgression.XPBaseKillModifier", 4.0f);
         GUILD_XP_HEROIC_DUNGEON         = sConfigMgr->GetFloatDefault("GuildProgression.XPHeroicDungeonModifier", 1.25f);
         GUILD_RESET_HOUR                = uint32(std::max(0, std::min(23, sConfigMgr->GetIntDefault("GuildProgression.ResetHour", 6))));
+        GUILD_WEEKLY_REP_CAP            = uint32(std::max(0, sConfigMgr->GetIntDefault("GuildProgression.WeeklyReputationCap", 4375)));
+        GUILD_REP_DIVIDER               = uint32(std::max(1, sConfigMgr->GetIntDefault("GuildProgression.ReputationDivider", 450)));
     }
     constexpr uint32 SAVE_INTERVAL_MS               = 60 * IN_MILLISECONDS;
 
@@ -83,6 +97,15 @@ namespace
     uint32 s_resetDay = 0;
     uint32 s_saveTimer = 0;
 
+    struct MemberReputation
+    {
+        uint32 guildId = 0;
+        uint32 total = 0;
+        uint32 weekly = 0;              // earned this week (the weekly cap)
+        uint32 week = 0;
+    };
+    std::unordered_map<uint32, MemberReputation> s_reputation;       // character guid (online members)
+
     GuildProgress& Progress(uint32 guildId)
     {
         return s_progress[guildId];
@@ -97,6 +120,12 @@ namespace
     uint32 ResetDay()
     {
         return uint32((GameTime::GetGameTime() - GUILD_RESET_HOUR * HOUR) / DAY);
+    }
+
+    // the week of the weekly reputation cap: from Wednesday, GUILD_RESET_HOUR (the epoch's day 0 is a Thursday)
+    uint32 ResetWeek()
+    {
+        return (ResetDay() + 1) / 7;
     }
 
     void Save(uint32 guildId, GuildProgress& progress)
@@ -140,6 +169,72 @@ namespace
         sAddonComm->Send(player, std::string("GUILD_PERKS"), list.str());
     }
 
+    // ------------------------------------------------------------ reputation
+    MemberReputation& Reputation(Player* player)
+    {
+        MemberReputation& rep = s_reputation[player->GetGUID().GetCounter()];
+        if (rep.guildId != player->GetGuildId())
+            rep = MemberReputation{ player->GetGuildId(), 0, 0, ResetWeek() };
+        if (rep.week != ResetWeek())
+        {
+            rep.week = ResetWeek();
+            rep.weekly = 0;
+        }
+        return rep;
+    }
+
+    void SaveReputation(Player* player, MemberReputation const& rep)
+    {
+        CharacterDatabase.Execute(Trinity::StringFormat("REPLACE INTO guild_member_reputation (guid, guildid, reputation, weekly, week) "
+            "VALUES ({}, {}, {}, {}, {})", player->GetGUID().GetCounter(), rep.guildId, rep.total, rep.weekly, rep.week).c_str());
+    }
+
+    void LoadReputation(Player* player)
+    {
+        MemberReputation rep{ player->GetGuildId(), 0, 0, ResetWeek() };
+        if (QueryResult result = CharacterDatabase.Query(Trinity::StringFormat("SELECT guildid, reputation, weekly, week FROM guild_member_reputation "
+            "WHERE guid = {}", player->GetGUID().GetCounter()).c_str()))
+        {
+            Field* fields = result->Fetch();
+            if (fields[0].GetUInt32() == player->GetGuildId())
+            {
+                rep.total = fields[1].GetUInt32();
+                rep.weekly = fields[3].GetUInt32() == rep.week ? fields[2].GetUInt32() : 0;
+            }
+        }
+        s_reputation[player->GetGUID().GetCounter()] = rep;
+    }
+
+    void SendReputation(Player* player)
+    {
+        if (!player->GetGuildId())
+        {
+            sAddonComm->Send(player, std::string("GUILD_REP"), 0, 0, 0);
+            return;
+        }
+        MemberReputation& rep = Reputation(player);
+        sAddonComm->Send(player, std::string("GUILD_REP"), rep.total, rep.weekly, GUILD_WEEKLY_REP_CAP);
+    }
+
+    // Cataclysm's Guild::GiveReputation / Member::AddReputation
+    void GiveReputation(Player* player, uint32 amount)
+    {
+        if (!player->GetGuildId() || !amount)
+            return;
+        int32 bonus = player->GetTotalAuraModifier(SPELL_AURA_MOD_REPUTATION_GAIN);
+        if (bonus > 0)
+            amount += amount * uint32(bonus) / 100;
+        MemberReputation& rep = Reputation(player);
+        amount = std::min(amount, GUILD_WEEKLY_REP_CAP > rep.weekly ? GUILD_WEEKLY_REP_CAP - rep.weekly : 0u);
+        amount = std::min(amount, GUILD_REP_MAX > rep.total ? GUILD_REP_MAX - rep.total : 0u);
+        if (!amount)
+            return;
+        rep.total += amount;
+        rep.weekly += amount;
+        SaveReputation(player, rep);
+        SendReputation(player);
+    }
+
     template <typename Fn>
     void ForEachOnlineMember(uint32 guildId, Fn&& fn)
     {
@@ -174,6 +269,7 @@ namespace
     // ------------------------------------------------------------ experience
     void LevelUp(uint32 guildId, uint8 level)
     {
+        GuildNews::Add(guildId, GuildNews::LEVEL_UP, 0, level, std::string());
         Guild* guild = sGuildMgr->GetGuildById(guildId);
         std::string name = guild ? guild->GetName() : std::string();
         ForEachOnlineMember(guildId, [&](Player* member)
@@ -294,6 +390,26 @@ namespace GuildProgression
     {
         return GUILD_MAX_LEVEL;
     }
+
+    uint32 GetReputation(Player* player)
+    {
+        return player->GetGuildId() ? Reputation(player).total : 0;
+    }
+
+    uint8 GetStanding(Player* player)
+    {
+        uint32 rep = GetReputation(player);
+        if (rep >= 42000) return 8;     // Exalted
+        if (rep >= 21000) return 7;     // Revered
+        if (rep >= 9000)  return 6;     // Honored
+        if (rep >= 3000)  return 5;     // Friendly
+        return 4;                       // Neutral
+    }
+
+    bool IsGuildGroup(Player* player)
+    {
+        return player->GetGuildId() && GuildGroupRate(player, player->GetGroup()) > 0.0f;
+    }
 }
 
 class guild_progression_player : public PlayerScript
@@ -309,11 +425,21 @@ public:
         {
             SendPerks(player);
         });
+        sAddonComm->Register(std::string("GUILD_REP_GET"), [](Player* player, std::vector<std::string> const&)
+        {
+            SendReputation(player);
+        });
     }
 
     void OnLogin(Player* player, bool /*firstLogin*/) override
     {
         UpdatePerks(player, player->GetGuildId());
+        LoadReputation(player);
+    }
+
+    void OnLogout(Player* player) override
+    {
+        s_reputation.erase(player->GetGUID().GetCounter());
     }
 
     // a quest rewarded: its XP (Cataclysm's Player::RewardQuest)
@@ -331,6 +457,7 @@ public:
             return;
         uint32 xp = quest->GetXPReward(player) * sWorld->getRate(RATE_XP_QUEST);
         GiveXP(guildId, uint64(xp * GUILD_XP_QUEST_MODIFIER), player);
+        GiveReputation(player, std::max<uint32>(1, quest->GetXPReward(player) / GUILD_REP_DIVIDER));
     }
 
     // a creature killed in a guild group: every member of the guild in reward range (KillRewarder)
@@ -351,6 +478,7 @@ public:
             if (member->GetMap()->IsNonRaidDungeon() && member->GetMap()->IsHeroic())
                 xp *= GUILD_XP_HEROIC_DUNGEON;
             GiveXP(member->GetGuildId(), uint64(xp), member);
+            GiveReputation(member, std::max<uint32>(1, uint32(xp / GUILD_REP_DIVIDER)));
         }
     }
 
@@ -367,6 +495,9 @@ public:
     {
         UpdatePerks(player, guild->GetId());
         SendProgress(player);
+        // a new guild: its reputation from Neutral
+        s_reputation[player->GetGUID().GetCounter()] = MemberReputation{ guild->GetId(), 0, 0, ResetWeek() };
+        SendReputation(player);
     }
 
     void OnRemoveMember(Guild* /*guild*/, Player* player, bool /*isDisbanding*/, bool /*isKicked*/) override
@@ -375,6 +506,10 @@ public:
         {
             UpdatePerks(player, 0);
             SendProgress(player);
+            // the guild's reputation is lost on leaving it
+            s_reputation.erase(player->GetGUID().GetCounter());
+            CharacterDatabase.Execute(Trinity::StringFormat("DELETE FROM guild_member_reputation WHERE guid = {}", player->GetGUID().GetCounter()).c_str());
+            SendReputation(player);
         }
     }
 
@@ -384,6 +519,7 @@ public:
         ForEachOnlineMember(guildId, [](Player* member) { UpdatePerks(member, 0); });
         s_progress.erase(guildId);
         CharacterDatabase.Execute(Trinity::StringFormat("DELETE FROM guild_progression WHERE guildid = {}", guildId).c_str());
+        CharacterDatabase.Execute(Trinity::StringFormat("DELETE FROM guild_member_reputation WHERE guildid = {}", guildId).c_str());
     }
 };
 

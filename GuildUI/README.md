@@ -39,3 +39,31 @@ Retail's frame in place of the stock popup: the inviter, the guild's name, its t
 achievement points place) the guild's level from the server (`GF_GUILD_INFO`); «Вступить» / «Отклонить
 приглашение», 60 seconds. Textures: `Interface\GuildFrame\GuildExtra`, `GuildFrame`, `GuildEmblemsLG_01`
 (Cataclysm / retail).
+
+## Stage 3: guild reputation, rewards, news
+**Reputation** (`server/guild_progression.cpp`, Cataclysm's `Guild::GiveReputation`): each member's own, from
+Neutral (0) to Exalted (42000). A quest: max(1, its XP / 450); a kill in a guild group: max(1, its guild XP / 450);
++ the reputation gain auras; at most 4375 a week (from Wednesday, the reset hour). Lost on leaving the guild.
+The bar is under the rewards (tooltip: this week's / the cap). Lua: `GetGuildFactionInfo()`, `GetGuildRepWeekly()`.
+
+**Rewards** (`server/guild_rewards.cpp`, `world.guild_rewards`): an item, the reputation's standing (4..8), the
+races, the price, the guild's level (in place of Cataclysm's achievement). «Преимущества»: perks on the left, the
+rewards on the right — the requirements in red while not met, a click buys (confirmed; shift-click links).
+Lua: `GetNumGuildRewards()`, `GetGuildRewardInfo(i)`, `BuyGuildReward(itemID)`.
+
+**News** (`server/guild_news.cpp`, the last 250 of a guild): bosses killed by a guild group, epics (item level 200+,
+`GuildNews.MinItemLevel`) and legendaries looted in a dungeon / raid, crafted, bought among the rewards, the guild's
+level ups. «Информация» → «Новости гильдии» by day, «[Фильтры]» (retail's filters window); the event log stays
+in «Журнал». Achievements (guild / members) come with stage 4.
+
+### Hooking it up
+Server:
+1. `server/core/ScriptMgr_item_hooks.patch` (the loot / craft hooks are empty in your ScriptMgr: without it no
+   looted / crafted news).
+2. `guild_news.cpp`, `guild_news.h`, `guild_rewards.cpp` into `scripts\Custom\Guild\` (with the new
+   `guild_progression.cpp` / `.h`); `custom_script_loader.cpp` calls `AddSC_guild_news`, `AddSC_guild_rewards`.
+3. `sql/characters_guild_stage3.sql` (characters), `sql/world_guild_rewards.sql` (world; your items there).
+4. `worldserver.conf`: the new lines of `sql/worldserver_guild_progression.conf.dist`.
+
+Client: `GuildRewards.lua`, `GuildNews.lua` next to `GuildUI.lua` (`GuildUI.xml` loads them); the new
+`GuildProgression.lua`.
