@@ -133,7 +133,7 @@ local function Init()
 	if ( finder.List.rows ) then
 		return;
 	end
-	GuildUI_MakeList(finder.List, "GuildUIFinderRowTemplate", FINDER_ROW_HEIGHT, 8, GuildFinder_UpdateList, SetupRow);
+	GuildUI_MakeList(finder.List, "GuildUIFinderRowTemplate", FINDER_ROW_HEIGHT, 6, GuildFinder_UpdateList, SetupRow);
 	for _, key in ipairs(CHECKS) do
 		local check = finder[key];
 		_G[check:GetName().."Text"]:SetText(check.label);
@@ -306,10 +306,11 @@ end
 
 -- ------------------------------------------------------------ the tab
 
-function GuildFinder_Show()
+-- recruit: the guild's recruitment (settings, applicants); else the search (a guild member may browse too)
+function GuildFinder_Show(recruit)
 	Init();
 	local finder = Finder();
-	if ( IsInGuild() ) then
+	if ( recruit and IsInGuild() ) then
 		mode = MODE_REQUESTS;
 		finder.FilterTitle:SetText("Набор в гильдию");
 		finder.ListTitle:SetText("Заявки в гильдию");
@@ -366,7 +367,7 @@ end
 -- the button under the filters: search / save the settings
 function GuildFinder_Action()
 	local finder = Finder();
-	if ( IsInGuild() ) then
+	if ( mode == MODE_REQUESTS ) then
 		Send("GF_SETTINGS_SET", finder.Listed:GetChecked() and 1 or 0, GetFlags("availability"), GetFlags("roles"),
 			GetFlags("interests"), GetFlags("level"), Encode(finder.Comment:GetText()));
 	else
@@ -425,7 +426,7 @@ local function OnApps(list)
 			end
 		end
 	end
-	if ( Visible() and not IsInGuild() ) then
+	if ( Visible() and mode ~= MODE_REQUESTS ) then
 		GuildFinder_UpdateMode();
 		GuildFinder_UpdateList();
 	end
@@ -439,7 +440,7 @@ local function OnSettings(canEdit, listed, availability, roles, interests, level
 	settings.interests = tonumber(interests) or 0;
 	settings.level = tonumber(level) or 1;
 	settings.comment = Decode(comment);
-	if ( Visible() and IsInGuild() ) then
+	if ( Visible() and mode == MODE_REQUESTS ) then
 		GuildFinder_ApplySettings();
 	end
 end
@@ -453,7 +454,7 @@ local function OnRequests(list)
 			level = tonumber(f[4]) or 0, availability = tonumber(f[5]) or 0, roles = tonumber(f[6]) or 0,
 			interests = tonumber(f[7]) or 0, comment = Decode(f[8]), secondsLeft = tonumber(f[9]) or 0 });
 	end
-	if ( Visible() and IsInGuild() ) then
+	if ( Visible() and mode == MODE_REQUESTS ) then
 		GuildFinder_UpdateList();
 	end
 end
@@ -463,7 +464,7 @@ local function OnResult(text)
 end
 
 local function OnNewRequest()
-	if ( Visible() and IsInGuild() ) then
+	if ( Visible() and mode == MODE_REQUESTS ) then
 		Send("GF_REQUESTS");
 	end
 end

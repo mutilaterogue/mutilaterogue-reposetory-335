@@ -13,7 +13,7 @@
 	<CheckButton name="GuildUITabTemplate" virtual="true">
 		<Size x="32" y="32"/>
 		<Layers>
-			<Layer level="BACKGROUND">
+			<Layer level="BORDER">
 				<Texture file="Interface\SpellBook\SpellBook-SkillLineTab">
 					<Size x="64" y="64"/>
 					<Anchors>
@@ -22,7 +22,13 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<Texture name="$parentIcon" parentKey="Icon" setAllPoints="true"/>
+				<Texture name="$parentIcon" parentKey="Icon">
+					<Size x="30" y="30"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<TexCoords left="0.03125" right="0.96875" top="0.03125" bottom="0.96875"/>
+				</Texture>
 			</Layer>
 		</Layers>
 		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
@@ -234,33 +240,127 @@
 		<HitRectInsets left="0" right="-90" top="0" bottom="0"/>
 	</CheckButton>
 
-	<!-- ============================================================ the window -->
+	<!-- an entry of the left list (retail CommunitiesListEntryTemplate): the guild, the guild finder -->
+	<Button name="GuildUIListEntryTemplate" virtual="true">
+		<Size x="166" y="68"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" parentKey="Background" file="Interface\Common\bluemenu-main">
+					<Size x="0" y="80"/>
+					<Anchors>
+						<Anchor point="LEFT"/>
+						<Anchor point="RIGHT"/>
+					</Anchors>
+					<TexCoords left="0.00390625" right="0.87890625" top="0.75195313" bottom="0.83007813"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentSelection" parentKey="Selection" file="Interface\Common\bluemenu-main" hidden="true">
+					<Size x="0" y="80"/>
+					<Anchors>
+						<Anchor point="LEFT"/>
+						<Anchor point="RIGHT"/>
+					</Anchors>
+					<TexCoords left="0.00390625" right="0.87890625" top="0.59179688" bottom="0.66992188"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentBanner" parentKey="Banner" atlas="communities-guildbanner-background" hidden="true">
+					<Size x="52" y="51"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="6" y="-9"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentIcon" parentKey="Icon">
+					<Size x="38" y="38"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="13" y="-15"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentName" parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="64" y="-18"/>
+						<Anchor point="RIGHT" x="-8" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSub" parentKey="Sub" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
+						<Anchor point="RIGHT" x="-8" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture name="$parentBannerBorder" parentKey="BannerBorder" atlas="communities-guildbanner-border" hidden="true">
+					<Size x="52" y="51"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="6" y="-9"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<HighlightTexture file="Interface\Common\bluemenu-main" alphaMode="ADD">
+			<Size x="0" y="80"/>
+			<Anchors>
+				<Anchor point="LEFT"/>
+				<Anchor point="RIGHT"/>
+			</Anchors>
+			<TexCoords left="0.00390625" right="0.87890625" top="0.59179688" bottom="0.66992188"/>
+		</HighlightTexture>
+		<Scripts>
+			<OnClick function="GuildUIListEntry_OnClick"/>
+		</Scripts>
+	</Button>
+
+	<!-- ============================================================ the window (retail CommunitiesFrame: 814 x 426) -->
 	<Frame name="CommunitiesFrame" inherits="RetailPortraitFrameTemplate" parent="UIParent" enableMouse="true" movable="true" hidden="true" toplevel="true">
-		<Size x="760" y="500"/>
+		<Size x="814" y="426"/>
 		<Anchors>
 			<Anchor point="TOPLEFT" x="16" y="-116"/>
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<!-- the guild's level and experience (Cataclysm's GuildXPBar) -->
+				<!-- the guild's level and experience (Cataclysm's GuildXPBar) over the content -->
 				<FontString name="$parentGuildLevel" parentKey="GuildLevel" inherits="GameFontNormalLarge" justifyH="LEFT">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="64" y="-32"/>
-					</Anchors>
-				</FontString>
-				<FontString name="$parentMOTD" parentKey="MOTD" inherits="GameFontHighlightSmall" justifyH="LEFT" wordwrap="false">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="64" y="-56"/>
-						<Anchor point="RIGHT" x="-16" y="0"/>
+						<Anchor point="TOPLEFT" x="194" y="-33"/>
 					</Anchors>
 				</FontString>
 			</Layer>
 		</Layers>
 		<Frames>
-			<StatusBar name="$parentXPBar" parentKey="XPBar">
-				<Size x="420" y="14"/>
+			<!-- the left list (retail CommunitiesList) -->
+			<Frame name="$parentList" parentKey="List">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="190" y="-34"/>
+					<Anchor point="TOPLEFT" x="4" y="-23"/>
+					<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="174" y="29"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture file="Interface\Common\bluemenu-main" setAllPoints="true">
+							<TexCoords left="0.00390625" right="0.82421875" top="0.18554688" bottom="0.58984375"/>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame name="$parentInset" inherits="InsetFrameTemplate" setAllPoints="true"/>
+					<Button name="$parentGuild" parentKey="Guild" inherits="GuildUIListEntryTemplate" id="1">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="2" y="-4"/>
+						</Anchors>
+					</Button>
+					<Button name="$parentFinder" parentKey="Finder" inherits="GuildUIListEntryTemplate" id="2">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="2" y="-74"/>
+						</Anchors>
+					</Button>
+				</Frames>
+			</Frame>
+
+			<StatusBar name="$parentXPBar" parentKey="XPBar">
+				<Size x="300" y="14"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="300" y="-35"/>
 				</Anchors>
 				<Layers>
 					<Layer level="BACKGROUND">
@@ -289,36 +389,32 @@
 				</Scripts>
 			</StatusBar>
 
+			<!-- the content's place; its border only under the roster (the other views have their own insets, as retail) -->
 			<Frame name="$parentInset" parentKey="Inset" inherits="InsetFrameTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="8" y="-72"/>
-					<Anchor point="BOTTOMRIGHT" x="-8" y="34"/>
+					<Anchor point="TOPLEFT" x="190" y="-58"/>
+					<Anchor point="BOTTOMRIGHT" x="-9" y="29"/>
 				</Anchors>
 			</Frame>
 
-			<!-- the side tabs (retail CommunitiesFrame: ChatTab, RosterTab, GuildBenefitsTab, GuildInfoTab) -->
+			<!-- the side tabs (retail RosterTab, GuildBenefitsTab, GuildInfoTab) -->
 			<CheckButton name="$parentTab1" inherits="GuildUITabTemplate" id="1">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="1" y="-40"/>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="0" y="-36"/>
 				</Anchors>
 			</CheckButton>
 			<CheckButton name="$parentTab2" inherits="GuildUITabTemplate" id="2">
 				<Anchors>
-					<Anchor point="TOP" relativeTo="$parentTab1" relativePoint="BOTTOM" x="0" y="-18"/>
+					<Anchor point="TOPLEFT" relativeTo="$parentTab1" relativePoint="BOTTOMLEFT" x="0" y="-20"/>
 				</Anchors>
 			</CheckButton>
 			<CheckButton name="$parentTab3" inherits="GuildUITabTemplate" id="3">
 				<Anchors>
-					<Anchor point="TOP" relativeTo="$parentTab2" relativePoint="BOTTOM" x="0" y="-18"/>
-				</Anchors>
-			</CheckButton>
-			<CheckButton name="$parentTab4" inherits="GuildUITabTemplate" id="4">
-				<Anchors>
-					<Anchor point="TOP" relativeTo="$parentTab3" relativePoint="BOTTOM" x="0" y="-18"/>
+					<Anchor point="TOPLEFT" relativeTo="$parentTab2" relativePoint="BOTTOMLEFT" x="0" y="-20"/>
 				</Anchors>
 			</CheckButton>
 
-			<!-- ======================================== 1: roster (retail GuildRoster / CommunitiesMemberList) -->
+			<!-- ======================================== roster (retail GuildRoster / CommunitiesMemberList) -->
 			<Frame name="GuildUIRoster" parentKey="Roster" hidden="true">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="4" y="-4"/>
@@ -335,7 +431,7 @@
 				</Layers>
 				<Frames>
 					<EditBox name="$parentSearchBox" parentKey="SearchBox" inherits="SearchBoxTemplate" letters="40" autoFocus="false">
-						<Size x="200" y="20"/>
+						<Size x="190" y="20"/>
 						<Anchors>
 							<Anchor point="TOPLEFT" x="10" y="-4"/>
 						</Anchors>
@@ -362,7 +458,7 @@
 						<KeyValues>
 							<KeyValue key="sortType" value="name" type="string"/>
 						</KeyValues>
-						<Size x="180" y="24"/>
+						<Size x="162" y="24"/>
 						<Anchors>
 							<Anchor point="TOPLEFT" x="2" y="-30"/>
 						</Anchors>
@@ -371,7 +467,7 @@
 						<KeyValues>
 							<KeyValue key="sortType" value="level" type="string"/>
 						</KeyValues>
-						<Size x="48" y="24"/>
+						<Size x="44" y="24"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentColumnName" relativePoint="RIGHT" x="-2" y="0"/>
 						</Anchors>
@@ -380,7 +476,7 @@
 						<KeyValues>
 							<KeyValue key="sortType" value="zone" type="string"/>
 						</KeyValues>
-						<Size x="150" y="24"/>
+						<Size x="134" y="24"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentColumnLevel" relativePoint="RIGHT" x="-2" y="0"/>
 						</Anchors>
@@ -389,7 +485,7 @@
 						<KeyValues>
 							<KeyValue key="sortType" value="rank" type="string"/>
 						</KeyValues>
-						<Size x="120" y="24"/>
+						<Size x="114" y="24"/>
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentColumnZone" relativePoint="RIGHT" x="-2" y="0"/>
 						</Anchors>
@@ -412,41 +508,40 @@
 				</Frames>
 			</Frame>
 
-			<!-- ======================================== 2: info (retail GuildInfo: MOTD, details, news / log) -->
+			<!-- ======================================== info (retail GuildInfo: details on the left, news / log on the right) -->
 			<Frame name="GuildUIInfo" parentKey="Info" hidden="true">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="4" y="-4"/>
-					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-4" y="4"/>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="0" y="0"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="0" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
 						<FontString inherits="GameFontNormal" text="Сообщение дня" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-8"/>
+								<Anchor point="TOPLEFT" x="6" y="-4"/>
 							</Anchors>
 						</FontString>
 						<FontString inherits="GameFontNormal" text="Информация о гильдии" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-104"/>
+								<Anchor point="TOPLEFT" x="6" y="-96"/>
 							</Anchors>
 						</FontString>
 						<FontString inherits="GameFontNormal" text="Журнал событий" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="372" y="-8"/>
+								<Anchor point="TOPLEFT" x="310" y="-4"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
 				<Frames>
-					<!-- MOTD -->
 					<Frame name="$parentMOTDBg" parentKey="MOTDBg" inherits="InsetFrameTemplate">
-						<Size x="350" y="68"/>
+						<Size x="296" y="66"/>
 						<Anchors>
-							<Anchor point="TOPLEFT" x="6" y="-26"/>
+							<Anchor point="TOPLEFT" x="0" y="-22"/>
 						</Anchors>
 					</Frame>
 					<EditBox name="$parentMOTD" parentKey="MOTD" multiLine="true" letters="128" autoFocus="false">
-						<Size x="334" y="60"/>
+						<Size x="280" y="58"/>
 						<Anchors>
 							<Anchor point="TOPLEFT" relativeTo="$parentMOTDBg" x="8" y="-6"/>
 						</Anchors>
@@ -462,11 +557,10 @@
 							</OnEnterPressed>
 						</Scripts>
 					</EditBox>
-					<!-- info text -->
 					<Frame name="$parentDetailsBg" parentKey="DetailsBg" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="6" y="-122"/>
-							<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="356" y="36"/>
+							<Anchor point="TOPLEFT" x="0" y="-114"/>
+							<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="296" y="28"/>
 						</Anchors>
 					</Frame>
 					<ScrollFrame name="$parentDetailsScroll" parentKey="DetailsScroll" inherits="UIPanelScrollFrameTemplate">
@@ -476,7 +570,7 @@
 						</Anchors>
 						<ScrollChild>
 							<EditBox name="$parentDetails" parentKey="Details" multiLine="true" letters="500" autoFocus="false">
-								<Size x="310" y="200"/>
+								<Size x="256" y="200"/>
 								<FontString inherits="GameFontHighlightSmall"/>
 								<Scripts>
 									<OnEscapePressed>
@@ -496,17 +590,16 @@
 					<Button name="$parentSave" parentKey="Save" inherits="UIPanelButtonTemplate" text="Сохранить">
 						<Size x="110" y="22"/>
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" x="6" y="8"/>
+							<Anchor point="BOTTOMLEFT" x="0" y="2"/>
 						</Anchors>
 						<Scripts>
 							<OnClick function="GuildUIInfo_Save"/>
 						</Scripts>
 					</Button>
-					<!-- event log -->
 					<Frame name="$parentLogBg" parentKey="LogBg" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="368" y="-26"/>
-							<Anchor point="BOTTOMRIGHT" x="-6" y="36"/>
+							<Anchor point="TOPLEFT" x="306" y="-22"/>
+							<Anchor point="BOTTOMRIGHT" x="0" y="28"/>
 						</Anchors>
 					</Frame>
 					<ScrollingMessageFrame name="$parentLog" parentKey="Log" fade="false" maxLines="200" insertMode="TOP" enableMouse="true">
@@ -524,7 +617,7 @@
 					<Button name="$parentDisband" parentKey="Disband" inherits="UIPanelButtonTemplate" text="Распустить гильдию">
 						<Size x="150" y="22"/>
 						<Anchors>
-							<Anchor point="BOTTOMRIGHT" x="-6" y="8"/>
+							<Anchor point="BOTTOMRIGHT" x="0" y="2"/>
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -535,7 +628,7 @@
 					<Button name="$parentLeave" parentKey="Leave" inherits="UIPanelButtonTemplate" text="Покинуть гильдию">
 						<Size x="150" y="22"/>
 						<Anchors>
-							<Anchor point="RIGHT" relativeTo="$parentDisband" relativePoint="LEFT" x="-6" y="0"/>
+							<Anchor point="RIGHT" relativeTo="$parentDisband" relativePoint="LEFT" x="-4" y="0"/>
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -546,77 +639,83 @@
 				</Frames>
 			</Frame>
 
-			<!-- ======================================== 3: benefits (retail GuildBenefitsFrame: perks) -->
+			<!-- ======================================== benefits (retail GuildBenefitsFrame: perks) -->
 			<Frame name="GuildUIPerks" parentKey="Perks" hidden="true">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="4" y="-4"/>
-					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-4" y="4"/>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="0" y="0"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="0" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" parentKey="Title" inherits="GameFontNormalLarge" text="Преимущества гильдии" justifyH="LEFT">
+						<FontString name="$parentTitle" parentKey="Title" inherits="GameFontNormal" text="Преимущества гильдии" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-8"/>
+								<Anchor point="TOPLEFT" x="6" y="-4"/>
 							</Anchors>
 						</FontString>
 						<FontString name="$parentNext" parentKey="Next" inherits="GameFontHighlightSmall" justifyH="RIGHT">
 							<Anchors>
-								<Anchor point="TOPRIGHT" x="-10" y="-12"/>
+								<Anchor point="TOPRIGHT" x="-6" y="-6"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
 				<Frames>
+					<Frame name="$parentBg" inherits="InsetFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="0" y="-22"/>
+							<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+						</Anchors>
+					</Frame>
 					<ScrollFrame name="$parentList" parentKey="List" inherits="GuildUIListTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="2" y="-34"/>
-							<Anchor point="BOTTOMRIGHT" x="-26" y="2"/>
+							<Anchor point="TOPLEFT" x="4" y="-26"/>
+							<Anchor point="BOTTOMRIGHT" x="-26" y="4"/>
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
 			</Frame>
 
-			<!-- ======================================== 4: recruitment (in a guild) / guild finder (no guild): GuildFinder.lua -->
+			<!-- ======================================== recruitment (in a guild) / guild finder: GuildFinder.lua -->
 			<Frame name="GuildUIFinder" parentKey="Finder" hidden="true">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="4" y="-4"/>
-					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="-4" y="4"/>
+					<Anchor point="TOPLEFT" relativeTo="$parentInset" x="0" y="0"/>
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parentInset" x="0" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
 						<FontString name="$parentFilterTitle" parentKey="FilterTitle" inherits="GameFontNormal" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-8"/>
+								<Anchor point="TOPLEFT" x="6" y="-4"/>
 							</Anchors>
 						</FontString>
 						<FontString inherits="GameFontNormalSmall" text="Время игры" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-30"/>
+								<Anchor point="TOPLEFT" x="10" y="-28"/>
 							</Anchors>
 						</FontString>
 						<FontString inherits="GameFontNormalSmall" text="Роли" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-82"/>
+								<Anchor point="TOPLEFT" x="10" y="-62"/>
 							</Anchors>
 						</FontString>
 						<FontString inherits="GameFontNormalSmall" text="Интересы" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-156"/>
+								<Anchor point="TOPLEFT" x="10" y="-128"/>
 							</Anchors>
 						</FontString>
 						<FontString inherits="GameFontNormalSmall" text="Уровень" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="10" y="-276"/>
+								<Anchor point="TOPLEFT" x="10" y="-226"/>
 							</Anchors>
 						</FontString>
 						<FontString name="$parentListTitle" parentKey="ListTitle" inherits="GameFontNormal" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="190" y="-8"/>
+								<Anchor point="TOPLEFT" x="190" y="-4"/>
 							</Anchors>
 						</FontString>
 						<FontString name="$parentEmpty" parentKey="Empty" inherits="GameFontDisable" justifyH="CENTER">
 							<Anchors>
-								<Anchor point="CENTER" x="90" y="40"/>
+								<Anchor point="CENTER" x="92" y="10"/>
 							</Anchors>
 						</FontString>
 					</Layer>
@@ -624,65 +723,74 @@
 				<Frames>
 					<Frame name="$parentFilterBg" inherits="InsetFrameTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="4" y="-24"/>
-							<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="180" y="2"/>
+							<Anchor point="TOPLEFT" x="0" y="-22"/>
+							<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="180" y="0"/>
 						</Anchors>
 					</Frame>
 					<CheckButton name="$parentWeekdays" parentKey="Weekdays" inherits="GuildUICheckTemplate" id="1">
 						<KeyValues><KeyValue key="field" value="availability" type="string"/><KeyValue key="label" value="Будни" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-44"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-40"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentWeekends" parentKey="Weekends" inherits="GuildUICheckTemplate" id="2">
 						<KeyValues><KeyValue key="field" value="availability" type="string"/><KeyValue key="label" value="Выходные" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-62"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="84" y="-40"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentTank" parentKey="Tank" inherits="GuildUICheckTemplate" id="1">
 						<KeyValues><KeyValue key="field" value="roles" type="string"/><KeyValue key="label" value="Танк" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-96"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-74"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentHealer" parentKey="Healer" inherits="GuildUICheckTemplate" id="2">
 						<KeyValues><KeyValue key="field" value="roles" type="string"/><KeyValue key="label" value="Лекарь" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-114"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="84" y="-74"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentDamage" parentKey="Damage" inherits="GuildUICheckTemplate" id="4">
 						<KeyValues><KeyValue key="field" value="roles" type="string"/><KeyValue key="label" value="Боец" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-132"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-92"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentQuesting" parentKey="Questing" inherits="GuildUICheckTemplate" id="1">
 						<KeyValues><KeyValue key="field" value="interests" type="string"/><KeyValue key="label" value="Задания" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-170"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-140"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentDungeons" parentKey="Dungeons" inherits="GuildUICheckTemplate" id="2">
 						<KeyValues><KeyValue key="field" value="interests" type="string"/><KeyValue key="label" value="Подземелья" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-188"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-156"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentRaids" parentKey="Raids" inherits="GuildUICheckTemplate" id="4">
 						<KeyValues><KeyValue key="field" value="interests" type="string"/><KeyValue key="label" value="Рейды" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-206"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-172"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentPvP" parentKey="PvP" inherits="GuildUICheckTemplate" id="8">
 						<KeyValues><KeyValue key="field" value="interests" type="string"/><KeyValue key="label" value="PvP" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-224"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-188"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentRP" parentKey="RP" inherits="GuildUICheckTemplate" id="16">
 						<KeyValues><KeyValue key="field" value="interests" type="string"/><KeyValue key="label" value="Отыгрыш роли" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-242"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-204"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentAnyLevel" parentKey="AnyLevel" inherits="GuildUICheckTemplate" id="1">
 						<KeyValues><KeyValue key="field" value="level" type="string"/><KeyValue key="label" value="Любой" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-290"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-238"/></Anchors>
 					</CheckButton>
 					<CheckButton name="$parentMaxLevel" parentKey="MaxLevel" inherits="GuildUICheckTemplate" id="2">
-						<KeyValues><KeyValue key="field" value="level" type="string"/><KeyValue key="label" value="Максимальный" type="string"/></KeyValues>
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-308"/></Anchors>
+						<KeyValues><KeyValue key="field" value="level" type="string"/><KeyValue key="label" value="Макс." type="string"/></KeyValues>
+						<Anchors><Anchor point="TOPLEFT" x="84" y="-238"/></Anchors>
 					</CheckButton>
 					<!-- recruitment only: listed, the comment -->
 					<CheckButton name="$parentListed" parentKey="Listed" inherits="GuildUICheckTemplate">
-						<Anchors><Anchor point="TOPLEFT" x="14" y="-332"/></Anchors>
+						<Anchors><Anchor point="TOPLEFT" x="10" y="-264"/></Anchors>
 					</CheckButton>
 					<EditBox name="$parentComment" parentKey="Comment" inherits="InputBoxTemplate" letters="255" autoFocus="false">
-						<Size x="150" y="20"/>
-						<Anchors><Anchor point="TOPLEFT" x="18" y="-358"/></Anchors>
+						<Size x="250" y="20"/>
+						<Anchors><Anchor point="TOPRIGHT" x="-8" y="-1"/></Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString inherits="GameFontNormalSmall" text="Комментарий:" justifyH="RIGHT">
+									<Anchors>
+										<Anchor point="RIGHT" relativePoint="LEFT" x="-10" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
 						<Scripts>
 							<OnEscapePressed>
 								self:ClearFocus();
@@ -694,21 +802,26 @@
 					</EditBox>
 					<Button name="$parentAction" parentKey="Action" inherits="UIPanelButtonTemplate">
 						<Size x="160" y="22"/>
-						<Anchors><Anchor point="BOTTOMLEFT" x="10" y="8"/></Anchors>
+						<Anchors><Anchor point="BOTTOMLEFT" x="10" y="6"/></Anchors>
 						<Scripts>
 							<OnClick function="GuildFinder_Action"/>
 						</Scripts>
 					</Button>
-					<!-- found guilds / my applications / the guild's applicants -->
+					<Frame name="$parentListBg" inherits="InsetFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="186" y="-22"/>
+							<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+						</Anchors>
+					</Frame>
 					<ScrollFrame name="$parentList" parentKey="List" inherits="GuildUIListTemplate">
 						<Anchors>
-							<Anchor point="TOPLEFT" x="186" y="-26"/>
-							<Anchor point="BOTTOMRIGHT" x="-26" y="2"/>
+							<Anchor point="TOPLEFT" x="190" y="-26"/>
+							<Anchor point="BOTTOMRIGHT" x="-26" y="4"/>
 						</Anchors>
 					</ScrollFrame>
 					<Button name="$parentMode" parentKey="Mode" inherits="UIPanelButtonTemplate">
 						<Size x="140" y="20"/>
-						<Anchors><Anchor point="TOPRIGHT" x="-8" y="-3"/></Anchors>
+						<Anchors><Anchor point="TOPRIGHT" x="0" y="0"/></Anchors>
 						<Scripts>
 							<OnClick function="GuildFinder_ToggleMode"/>
 						</Scripts>
@@ -716,11 +829,11 @@
 				</Frames>
 			</Frame>
 
-			<!-- the bottom bar -->
-			<Button name="$parentInviteButton" parentKey="InviteButton" inherits="UIPanelButtonTemplate" text="Пригласить">
-				<Size x="120" y="22"/>
+			<!-- the bottom bar (retail: InviteButton under the list, GuildControlButton / GuildRecruitmentButton on the right) -->
+			<Button name="$parentInviteButton" parentKey="InviteButton" inherits="UIPanelButtonTemplate" text="Пригласить в гильдию">
+				<Size x="166" y="22"/>
 				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="8" y="8"/>
+					<Anchor point="BOTTOMLEFT" x="6" y="4"/>
 				</Anchors>
 				<Scripts>
 					<OnClick>
@@ -729,12 +842,21 @@
 				</Scripts>
 			</Button>
 			<Button name="$parentControlButton" parentKey="ControlButton" inherits="UIPanelButtonTemplate" text="Управление гильдией">
-				<Size x="160" y="22"/>
+				<Size x="150" y="22"/>
 				<Anchors>
-					<Anchor point="LEFT" relativeTo="$parentInviteButton" relativePoint="RIGHT" x="6" y="0"/>
+					<Anchor point="BOTTOMRIGHT" x="-8" y="4"/>
 				</Anchors>
 				<Scripts>
 					<OnClick function="GuildUI_ToggleControl"/>
+				</Scripts>
+			</Button>
+			<Button name="$parentRecruitmentButton" parentKey="RecruitmentButton" inherits="UIPanelButtonTemplate" text="Набор в гильдию">
+				<Size x="150" y="22"/>
+				<Anchors>
+					<Anchor point="RIGHT" relativeTo="$parentControlButton" relativePoint="LEFT" x="-2" y="0"/>
+				</Anchors>
+				<Scripts>
+					<OnClick function="GuildUI_ShowRecruitment"/>
 				</Scripts>
 			</Button>
 		</Frames>

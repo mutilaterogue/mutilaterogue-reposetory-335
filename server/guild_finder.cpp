@@ -25,12 +25,14 @@
  *       "GF_SETTINGS_SET" : listed : availability : roles : interests : level : comment
  *       "GF_REQUESTS"                                                -> "GF_REQUESTS"
  *       "GF_DECLINE" : playerGuid
+ *       "GF_GUILD_INFO" : guildName                                  -> "GF_GUILD_INFO" (the guild invitation frame)
  *  S->C "GF_RESULTS" : guildId;name;level;members;comment;availability;roles;interests;level flag;applied,...
  *       "GF_APPS" : guildId;name;comment;seconds left,...
  *       "GF_SETTINGS" : canEdit : listed : availability : roles : interests : level : comment
  *       "GF_REQUESTS" : playerGuid;name;class;level;availability;roles;interests;comment;seconds left,...
  *       "GF_RESULT" : message
  *       "GF_NEW_REQUEST"                                             (to the guild's online inviters)
+ *       "GF_GUILD_INFO" : guildName : level : members
  *  ("-" for an empty list)
  *
  * Setup: sql/characters_guild_finder.sql, AddSC_guild_finder() in custom_script_loader.cpp.
@@ -481,6 +483,17 @@ namespace
         if (Player* applicant = ObjectAccessor::FindConnectedPlayer(ObjectGuid::Create<HighGuid::Player>(target)))
             SendApps(applicant);
     }
+
+    // the guild invitation frame: the inviting guild's level and size
+    void HandleGuildInfo(Player* player, std::vector<std::string> const& args)
+    {
+        std::string name = args.empty() ? std::string() : Decode(args[0]);
+        Guild* guild = sGuildMgr->GetGuildByName(name);
+        if (!guild)
+            return;
+        sAddonComm->Send(player, std::string("GF_GUILD_INFO"), Encode(guild->GetName()), uint32(GuildProgression::GetInfo(guild->GetId()).Level),
+            guild->GetMemberCount());
+    }
 }
 
 class guild_finder_world : public WorldScript
@@ -507,6 +520,7 @@ public:
         sAddonComm->Register(std::string("GF_SETTINGS_SET"), &HandleSettingsSet);
         sAddonComm->Register(std::string("GF_REQUESTS"), &HandleRequests);
         sAddonComm->Register(std::string("GF_DECLINE"), &HandleDecline);
+        sAddonComm->Register(std::string("GF_GUILD_INFO"), &HandleGuildInfo);
     }
 };
 

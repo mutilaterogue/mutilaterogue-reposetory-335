@@ -1,28 +1,25 @@
 -- ============================================================
 --  The guild window (retail 12.1.5 Blizzard_Communities) for 3.3.5a: CommunitiesFrame.
---  Tabs: 1 roster, 2 info (MOTD, details, event log), 3 benefits (perks), 4 recruitment / guild finder.
---  The level, experience and perks come from GuildProgression.lua; the finder from GuildFinder.lua.
+--  The left list: the guild, the guild finder. The side tabs (the guild): roster, benefits (perks), info
+--  (MOTD, details, event log). The bottom bar: invite, recruitment (GuildFinder.lua), guild control.
+--  The level, experience and perks come from GuildProgression.lua.
 --  Without a guild the window shows the guild finder only.
 -- ============================================================
 
-local TAB_ROSTER, TAB_INFO, TAB_PERKS, TAB_FINDER = 1, 2, 3, 4;
+local VIEW_ROSTER, VIEW_PERKS, VIEW_INFO, VIEW_FINDER = 1, 2, 3, 4;
 
+-- the side tabs (retail order: roster, benefits, info) and the views they show
 local TABS = {
-	{ name = "Состав", icon = "Interface\\Icons\\Achievement_GuildPerk_EverybodysFriend", frame = "Roster" },
-	{ name = "Информация", icon = "Interface\\Icons\\INV_Misc_Note_01", frame = "Info" },
-	{ name = "Преимущества", icon = "Interface\\Icons\\Achievement_GuildPerk_MrPopularity", frame = "Perks" },
-	{ name = "Набор в гильдию", icon = "Interface\\Icons\\INV_Misc_GroupLooking", frame = "Finder" },
+	{ name = "Состав", icon = "Interface\\Icons\\Achievement_GuildPerk_EverybodysFriend", fallback = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
+	{ name = "Преимущества гильдии", icon = "Interface\\Icons\\Achievement_GuildPerk_HonorableMention", fallback = "Interface\\Icons\\Spell_Holy_SealOfSacrifice" },
+	{ name = "Информация о гильдии", icon = "Interface\\Icons\\INV_Misc_ScrollUnrolled01", fallback = "Interface\\Icons\\INV_Misc_Note_01" },
 };
-local TAB_FALLBACK_ICONS = {
-	"Interface\\Icons\\INV_Shirt_GuildTabard_01",
-	"Interface\\Icons\\INV_Misc_Note_01",
-	"Interface\\Icons\\Spell_Holy_SealOfSacrifice",
-	"Interface\\Icons\\INV_Misc_GroupLooking",
-};
+local VIEW_FRAMES = { "Roster", "Perks", "Info", "Finder" };
 
 local ROSTER_ROW_HEIGHT, PERK_ROW_HEIGHT = 20, 50;
 
-local selectedTab = TAB_ROSTER;
+local selectedView = VIEW_ROSTER;
+local lastGuildView = VIEW_ROSTER;		-- the guild entry opens the last tab
 local members = {};			-- the filtered, sorted roster
 local selectedName;
 local sortType, sortReverse = "rank", false;
@@ -84,9 +81,22 @@ function GuildUI_OnLoad(self)
 		tab.tooltip = info.name;
 		tab.Icon:SetTexture(info.icon);
 		if ( not tab.Icon:GetTexture() ) then
-			tab.Icon:SetTexture(TAB_FALLBACK_ICONS[i]);
+			tab.Icon:SetTexture(info.fallback);
 		end
 	end
+
+	-- the left list: the guild (its banner), the guild finder
+	local guildEntry = self.List.Guild;
+	guildEntry.Banner:Show();
+	guildEntry.BannerBorder:Show();
+	guildEntry.Icon:SetSize(34, 34);
+	guildEntry.Icon:ClearAllPoints();
+	guildEntry.Icon:SetPoint("CENTER", guildEntry.Banner, "CENTER", 0, 2);
+	SetPortraitToTexture(guildEntry.Icon, "Interface\\Icons\\INV_Shirt_GuildTabard_01");
+	local finderEntry = self.List.Finder;
+	SetPortraitToTexture(finderEntry.Icon, "Interface\\Icons\\INV_Misc_Spyglass_03");
+	finderEntry.Name:SetText("Поиск гильдии");
+	finderEntry.Sub:SetText("Найдите гильдию по себе");
 
 	-- the roster: column titles, rows
 	local roster = self.Roster;
@@ -95,22 +105,22 @@ function GuildUI_OnLoad(self)
 	roster.ColumnZone.Label:SetText(ZONE);
 	roster.ColumnRank.Label:SetText(RANK);
 	roster.ColumnNote.Label:SetText(LABEL_NOTE);
-	GuildUI_MakeList(roster.List, "GuildUIRosterRowTemplate", ROSTER_ROW_HEIGHT, 16, GuildUIRoster_Update, function(row, i)
+	GuildUI_MakeList(roster.List, "GuildUIRosterRowTemplate", ROSTER_ROW_HEIGHT, 13, GuildUIRoster_Update, function(row, i)
 		row.Name:SetPoint("LEFT", row.Class, "RIGHT", 4, 0);
-		row.Name:SetWidth(150);
-		row.Level:SetPoint("LEFT", row, "LEFT", 180, 0);
-		row.Level:SetWidth(46);
-		row.Zone:SetPoint("LEFT", row, "LEFT", 230, 0);
-		row.Zone:SetWidth(142);
-		row.Rank:SetPoint("LEFT", row, "LEFT", 380, 0);
-		row.Rank:SetWidth(112);
-		row.Note:SetPoint("LEFT", row, "LEFT", 500, 0);
+		row.Name:SetWidth(134);
+		row.Level:SetPoint("LEFT", row, "LEFT", 162, 0);
+		row.Level:SetWidth(40);
+		row.Zone:SetPoint("LEFT", row, "LEFT", 210, 0);
+		row.Zone:SetWidth(124);
+		row.Rank:SetPoint("LEFT", row, "LEFT", 342, 0);
+		row.Rank:SetWidth(104);
+		row.Note:SetPoint("LEFT", row, "LEFT", 454, 0);
 		row.Note:SetPoint("RIGHT", row, "RIGHT", -4, 0);
 		row.Stripe:SetShown(i % 2 == 0);
 	end);
 
 	-- the perks
-	GuildUI_MakeList(self.Perks.List, "GuildUIPerkRowTemplate", PERK_ROW_HEIGHT, 7, GuildUIPerks_Update);
+	GuildUI_MakeList(self.Perks.List, "GuildUIPerkRowTemplate", PERK_ROW_HEIGHT, 6, GuildUIPerks_Update);
 
 	if ( GuildProgression_RegisterCallback ) then
 		GuildProgression_RegisterCallback(function(event)
@@ -207,7 +217,6 @@ function GuildUI_OnEvent(self, event, ...)
 			GuildUIInfo_Update();
 		end
 	elseif ( event == "GUILD_MOTD" ) then
-		GuildUI_UpdateHeader();
 		if ( self.Info:IsShown() ) then
 			GuildUIInfo_Update();
 		end
@@ -218,43 +227,62 @@ function GuildUI_OnEvent(self, event, ...)
 	end
 end
 
--- the tabs for a guild member / the finder alone
+-- the list, the tabs for a guild member / the finder alone
 function GuildUI_Refresh()
 	local frame = CommunitiesFrame;
 	local inGuild = IsInGuild();
 	for i = 1, #TABS do
 		_G["CommunitiesFrameTab"..i]:SetShown(inGuild);
 	end
-	if ( not inGuild ) then
-		selectedTab = TAB_FINDER;
+	frame.List.Guild:SetShown(inGuild);
+	frame.List.Finder:ClearAllPoints();
+	if ( inGuild ) then
+		frame.List.Finder:SetPoint("TOPLEFT", frame.List.Guild, "BOTTOMLEFT", 0, -2);
+	else
+		frame.List.Finder:SetPoint("TOPLEFT", frame.List, "TOPLEFT", 2, -4);
+		selectedView = VIEW_FINDER;
 	end
-	GuildUI_SetTab(selectedTab);
+	if ( inGuild and selectedView == VIEW_FINDER and not frame.recruiting and not frame.browsing ) then
+		selectedView = lastGuildView;
+	end
+	GuildUI_SetView(selectedView);
 	GuildUI_UpdateHeader();
 	GuildUI_UpdateButtons();
 end
 
-function GuildUI_SetTab(index)
-	selectedTab = index;
+function GuildUI_SetView(view)
 	local frame = CommunitiesFrame;
-	for i, info in ipairs(TABS) do
-		_G["CommunitiesFrameTab"..i]:SetChecked(i == index);
-		frame[info.frame]:SetShown(i == index);
+	selectedView = view;
+	if ( view ~= VIEW_FINDER ) then
+		lastGuildView = view;
+		frame.recruiting = nil;
+		frame.browsing = nil;
 	end
-	if ( index == TAB_ROSTER ) then
+	for i = 1, #TABS do
+		_G["CommunitiesFrameTab"..i]:SetChecked(i == view);
+	end
+	for i, key in ipairs(VIEW_FRAMES) do
+		frame[key]:SetShown(i == view);
+	end
+	-- the content's border: the roster's only (the other views have their own insets)
+	frame.Inset:SetShown(view == VIEW_ROSTER);
+	frame.List.Guild.Selection:SetShown(view ~= VIEW_FINDER);
+	frame.List.Finder.Selection:SetShown(view == VIEW_FINDER and not frame.recruiting);
+	if ( view == VIEW_ROSTER ) then
 		GuildUIRoster_Update();
-	elseif ( index == TAB_INFO ) then
+	elseif ( view == VIEW_INFO ) then
 		GuildUIInfo_Update();
 		GuildUIInfo_UpdateLog();
-	elseif ( index == TAB_PERKS ) then
+	elseif ( view == VIEW_PERKS ) then
 		GuildUIPerks_Update();
-	elseif ( index == TAB_FINDER ) then
-		GuildFinder_Show();
+	elseif ( view == VIEW_FINDER ) then
+		GuildFinder_Show(frame.recruiting);
 	end
 end
 
 function GuildUITab_OnClick(self)
 	PlaySound("igMainMenuOptionCheckBoxOn");
-	GuildUI_SetTab(self:GetID());
+	GuildUI_SetView(self:GetID());
 end
 
 function GuildUITab_OnEnter(self)
@@ -263,25 +291,50 @@ function GuildUITab_OnEnter(self)
 	GameTooltip:Show();
 end
 
--- the guild's name, level, experience, MOTD
+-- the left list: 1 the guild (its last tab), 2 the guild finder
+function GuildUIListEntry_OnClick(self)
+	PlaySound("igMainMenuOptionCheckBoxOn");
+	local frame = CommunitiesFrame;
+	if ( self:GetID() == 1 ) then
+		GuildUI_SetView(lastGuildView);
+	else
+		frame.recruiting = nil;
+		frame.browsing = IsInGuild() or nil;
+		GuildUI_SetView(VIEW_FINDER);
+	end
+end
+
+-- the guild's recruitment settings and applicants (the bottom bar's button)
+function GuildUI_ShowRecruitment()
+	local frame = CommunitiesFrame;
+	if ( frame.recruiting and frame.Finder:IsShown() ) then
+		GuildUI_SetView(lastGuildView);
+		return;
+	end
+	frame.recruiting = true;
+	frame.browsing = nil;
+	GuildUI_SetView(VIEW_FINDER);
+end
+
+-- the guild's name, level, experience
 function GuildUI_UpdateHeader()
 	local frame = CommunitiesFrame;
 	if ( not IsInGuild() ) then
 		frame:SetTitle("Поиск гильдии");
 		frame.GuildLevel:SetText("");
-		frame.MOTD:SetText("Вы не состоите в гильдии: найдите гильдию по своим интересам.");
 		frame.XPBar:Hide();
 		return;
 	end
 	local guildName = GetGuildInfo("player");
 	frame:SetTitle(guildName or GUILD);
-	frame.MOTD:SetText(GUILD_MOTD_LABEL.." |cffffffff"..(GetGuildRosterMOTD() or "").."|r");
 
 	local level, maxLevel = 0, 25;
 	if ( GetGuildLevel ) then
 		level, maxLevel = GetGuildLevel();
 	end
 	frame.GuildLevel:SetFormattedText("Уровень %d", level);
+	frame.List.Guild.Name:SetText(guildName or GUILD);
+	frame.List.Guild.Sub:SetFormattedText("Уровень %d", level);
 	local bar = frame.XPBar;
 	bar:Show();
 	local experience, toNext, today, cap = 0, 0, 0, 0;
@@ -327,6 +380,7 @@ function GuildUI_UpdateButtons()
 	local inGuild = IsInGuild();
 	frame.InviteButton:SetShown(inGuild);
 	frame.ControlButton:SetShown(inGuild);
+	frame.RecruitmentButton:SetShown(inGuild);
 	if ( CanGuildInvite() ) then
 		frame.InviteButton:Enable();
 	else
@@ -338,6 +392,7 @@ function GuildUI_UpdateButtons()
 		frame.ControlButton:Disable();
 	end
 end
+
 
 -- the stock rank control window, next to this one
 function GuildUI_ToggleControl()
