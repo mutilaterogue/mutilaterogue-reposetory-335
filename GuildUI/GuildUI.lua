@@ -75,7 +75,7 @@ function GuildUI_OnLoad(self)
 	self:RegisterEvent("GUILD_MOTD");
 	self:RegisterEvent("GUILD_EVENT_LOG_UPDATE");
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
-	UIPanelWindows["CommunitiesFrame"] = { area = "left", pushable = 1, whileDead = 1 };
+	UIPanelWindows["CommunitiesFrame"] = { area = "left", pushable = 1, whileDead = 1, xOffset = "15", yOffset = "-10" };
 
 	SetPortraitToTexture(self.PortraitContainer.portrait, "Interface\\Icons\\INV_Shirt_GuildTabard_01");
 
@@ -347,6 +347,8 @@ function GuildUI_ToggleControl()
 		return;
 	end
 	popup.guildUI = true;
+	-- the stock guild tab initializes it on GUILD_ROSTER_UPDATE: it never shows here
+	GuildControlPopupFrame_Initialize();
 	popup:ClearAllPoints();
 	popup:SetPoint("TOPLEFT", CommunitiesFrame, "TOPRIGHT", 36, 0);
 	popup:Show();
