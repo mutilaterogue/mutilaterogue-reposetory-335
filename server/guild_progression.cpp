@@ -17,11 +17,13 @@
  *   "GUILD_PROG_GET"   -> "GUILD_PROG"  : level : experience : to next level : today : daily cap
  *   "GUILD_PERKS_GET"  -> "GUILD_PERKS" : level : spell : level : spell ...
  * Saved: guild_progression (characters), every minute when changed and at shutdown.
+ * Settings: worldserver.conf, GuildProgression.* (sql/worldserver_guild_progression.conf.dist).
  */
 
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Chat.h"
+#include "Config.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "Formulas.h"
@@ -45,13 +47,25 @@
 
 namespace
 {
-    constexpr uint8  GUILD_MAX_LEVEL                = 25;
-    constexpr uint8  GUILD_EXPERIENCE_UNCAPPED_LEVEL = 20;     // from here no daily cap (Cataclysm's client)
-    constexpr uint64 GUILD_DAILY_XP_CAP             = 7807500;
-    constexpr float  GUILD_XP_QUEST_MODIFIER        = 0.25f;
-    constexpr float  GUILD_XP_KILL_MODIFIER         = 4.0f;
-    constexpr float  GUILD_XP_HEROIC_DUNGEON        = 1.25f;
-    constexpr uint32 GUILD_RESET_HOUR               = 6;
+    // worldserver.conf (GuildProgression.*), read at startup and on .reload config
+    uint8  GUILD_MAX_LEVEL                  = 25;
+    uint8  GUILD_EXPERIENCE_UNCAPPED_LEVEL  = 20;      // from here no daily cap (Cataclysm's client)
+    uint64 GUILD_DAILY_XP_CAP               = 7807500;
+    float  GUILD_XP_QUEST_MODIFIER          = 0.25f;
+    float  GUILD_XP_KILL_MODIFIER           = 4.0f;
+    float  GUILD_XP_HEROIC_DUNGEON          = 1.25f;
+    uint32 GUILD_RESET_HOUR                 = 6;
+
+    void LoadConfig()
+    {
+        GUILD_MAX_LEVEL                 = uint8(std::max(1, std::min(25, sConfigMgr->GetIntDefault("GuildProgression.MaxLevel", 25))));
+        GUILD_EXPERIENCE_UNCAPPED_LEVEL = uint8(std::max(1, sConfigMgr->GetIntDefault("GuildProgression.UncappedLevel", 20)));
+        GUILD_DAILY_XP_CAP              = uint64(std::max(0, sConfigMgr->GetIntDefault("GuildProgression.DailyXPCap", 7807500)));
+        GUILD_XP_QUEST_MODIFIER         = sConfigMgr->GetFloatDefault("GuildProgression.XPQuestModifier", 0.25f);
+        GUILD_XP_KILL_MODIFIER          = sConfigMgr->GetFloatDefault("GuildProgression.XPBaseKillModifier", 4.0f);
+        GUILD_XP_HEROIC_DUNGEON         = sConfigMgr->GetFloatDefault("GuildProgression.XPHeroicDungeonModifier", 1.25f);
+        GUILD_RESET_HOUR                = uint32(std::max(0, std::min(23, sConfigMgr->GetIntDefault("GuildProgression.ResetHour", 6))));
+    }
     constexpr uint32 SAVE_INTERVAL_MS               = 60 * IN_MILLISECONDS;
 
     struct GuildProgress
@@ -214,7 +228,8 @@ namespace
                     ++count;
         if (map->IsRaid())
         {
-            uint32 needed = std::max<uint32>(1, uint32(map->GetMaxPlayers() * 0.8f));
+            InstanceMap* instance = map->ToInstanceMap();
+            uint32 needed = std::max<uint32>(1, uint32((instance ? instance->GetMaxPlayers() : 10) * 0.8f));
             return count >= needed ? 1.0f : 0.0f;
         }
         switch (count)
@@ -322,6 +337,11 @@ class guild_progression_world : public WorldScript
 {
 public:
     guild_progression_world() : WorldScript("guild_progression_world") { }
+
+    void OnConfigLoad(bool /*reload*/) override
+    {
+        LoadConfig();
+    }
 
     void OnStartup() override
     {

@@ -1,0 +1,38 @@
+###################################################################################################
+# GUILD PROGRESSION (server/guild_progression.cpp) - add to worldserver.conf
+#
+#    GuildProgression.MaxLevel
+#        Description: The highest guild level (1 .. 25).
+#        Default:     25
+GuildProgression.MaxLevel = 25
+
+#    GuildProgression.UncappedLevel
+#        Description: From this guild level the daily experience has no cap.
+#        Default:     20
+GuildProgression.UncappedLevel = 20
+
+#    GuildProgression.DailyXPCap
+#        Description: The most guild experience a day below GuildProgression.UncappedLevel.
+#        Default:     7807500
+GuildProgression.DailyXPCap = 7807500
+
+#    GuildProgression.XPQuestModifier
+#        Description: A quest rewarded: its XP (* Rate.XP.Quest) times this.
+#        Default:     0.25
+GuildProgression.XPQuestModifier = 0.25
+
+#    GuildProgression.XPBaseKillModifier
+#        Description: A creature killed in a guild group: its XP times this (times the group's rate).
+#        Default:     4.0
+GuildProgression.XPBaseKillModifier = 4.0
+
+#    GuildProgression.XPHeroicDungeonModifier
+#        Description: In a heroic dungeon the kill's guild experience times this.
+#        Default:     1.25
+GuildProgression.XPHeroicDungeonModifier = 1.25
+
+#    GuildProgression.ResetHour
+#        Description: The hour (0 .. 23) the daily cap starts again.
+#        Default:     6
+GuildProgression.ResetHour = 6
+###################################################################################################

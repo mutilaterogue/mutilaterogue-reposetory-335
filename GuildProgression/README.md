@@ -10,7 +10,7 @@ built on script hooks: the core's `Guild` is not patched.
   range: the kill's XP * 4 * the group rate (dungeon 3: 0.5, 4: 1, 5: 1.25; raid 1) * 1.25 in a heroic dungeon
 * below level 20 at most 7 807 500 a day (the day starts at 06:00)
 
-The constants are at the top of `server/guild_progression.cpp`.
+The settings: `worldserver.conf`, `GuildProgression.*` (`server/sql/worldserver_guild_progression.conf.dist`).
 
 ## Perks
 `guild_perk_spells` (made from `GuildPerkSpells.dbc`): the members know the spells of their guild's level -
