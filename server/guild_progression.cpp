@@ -180,7 +180,7 @@ namespace
         {
             UpdatePerks(member, guildId);
             SendProgress(member);
-            ChatHandler(member->GetSession()).PSendSysMessage("|cff40c040Гильдия <%s> достигла %u-го уровня!|r", name.c_str(), uint32(level));
+            ChatHandler(member->GetSession()).PSendSysMessage("|cff40c040\xd0\x93\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd1\x8f <%s> \xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb8\xd0\xb3\xd0\xbb\xd0\xb0 %u-\xd0\xb3\xd0\xbe \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xbd\xd1\x8f!|r", name.c_str(), uint32(level));
         });
     }
 

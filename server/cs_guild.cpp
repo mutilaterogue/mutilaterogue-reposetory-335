@@ -327,7 +327,7 @@ public:
         Guild* guild = ExtractLevelGuild(handler, rest);
         if (!guild)
         {
-            handler->SendSysMessage("Гильдия не найдена: укажите \"Название гильдии\" или выберите её участника.");
+            handler->SendSysMessage("\xd0\x93\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd1\x8f \xd0\xbd\xd0\xb5 \xd0\xbd\xd0\xb0\xd0\xb9\xd0\xb4\xd0\xb5\xd0\xbd\xd0\xb0: \xd1\x83\xd0\xba\xd0\xb0\xd0\xb6\xd0\xb8\xd1\x82\xd0\xb5 \"\xd0\x9d\xd0\xb0\xd0\xb7\xd0\xb2\xd0\xb0\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xb3\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd0\xb8\" \xd0\xb8\xd0\xbb\xd0\xb8 \xd0\xb2\xd1\x8b\xd0\xb1\xd0\xb5\xd1\x80\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xb5\xd1\x91 \xd1\x83\xd1\x87\xd0\xb0\xd1\x81\xd1\x82\xd0\xbd\xd0\xb8\xd0\xba\xd0\xb0.");
             handler->SetSentErrorMessage(true);
         }
         return guild;
@@ -336,10 +336,10 @@ public:
     static void PrintLevel(ChatHandler* handler, Guild* guild)
     {
         GuildProgression::Info info = GuildProgression::GetInfo(guild->GetId());
-        handler->PSendSysMessage("Гильдия <%s>: уровень %u/%u, опыт %llu / %llu, сегодня %llu%s",
+        handler->PSendSysMessage("\xd0\x93\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd1\x8f <%s>: \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c %u/%u, \xd0\xbe\xd0\xbf\xd1\x8b\xd1\x82 %llu / %llu, \xd1\x81\xd0\xb5\xd0\xb3\xd0\xbe\xd0\xb4\xd0\xbd\xd1\x8f %llu%s",
             guild->GetName().c_str(), uint32(info.Level), uint32(GuildProgression::GetMaxLevel()),
             (unsigned long long)info.Experience, (unsigned long long)info.ToNextLevel, (unsigned long long)info.Today,
-            info.DailyCap ? Trinity::StringFormat(" / {}", info.DailyCap).c_str() : " (без лимита)");
+            info.DailyCap ? Trinity::StringFormat(" / {}", info.DailyCap).c_str() : " (\xd0\xb1\xd0\xb5\xd0\xb7 \xd0\xbb\xd0\xb8\xd0\xbc\xd0\xb8\xd1\x82\xd0\xb0)");
     }
 
     // .guild level set <level> ["Guild Name"]
@@ -352,7 +352,7 @@ public:
         int32 level = levelStr ? atoi(levelStr) : 0;
         if (level < 1 || level > GuildProgression::GetMaxLevel())
         {
-            handler->PSendSysMessage("Уровень гильдии: 1 .. %u", uint32(GuildProgression::GetMaxLevel()));
+            handler->PSendSysMessage("\xd0\xa3\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c \xd0\xb3\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd0\xb8: 1 .. %u", uint32(GuildProgression::GetMaxLevel()));
             handler->SetSentErrorMessage(true);
             return false;
         }
@@ -374,7 +374,7 @@ public:
         long long amount = amountStr ? atoll(amountStr) : 0;
         if (amount <= 0)
         {
-            handler->SendSysMessage("Укажите опыт больше 0.");
+            handler->SendSysMessage("\xd0\xa3\xd0\xba\xd0\xb0\xd0\xb6\xd0\xb8\xd1\x82\xd0\xb5 \xd0\xbe\xd0\xbf\xd1\x8b\xd1\x82 \xd0\xb1\xd0\xbe\xd0\xbb\xd1\x8c\xd1\x88\xd0\xb5 0.");
             handler->SetSentErrorMessage(true);
             return false;
         }
