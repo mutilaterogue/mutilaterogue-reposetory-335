@@ -30,6 +30,7 @@
 #include "ScriptMgr.h"
 #include "guild_progression.h"
 #include "guild_news.h"
+#include "guild_achievements.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Chat.h"
 #include "Config.h"
@@ -270,6 +271,7 @@ namespace
     void LevelUp(uint32 guildId, uint8 level)
     {
         GuildNews::Add(guildId, GuildNews::LEVEL_UP, 0, level, std::string());
+        GuildAchievements::Evaluate(guildId);
         Guild* guild = sGuildMgr->GetGuildById(guildId);
         std::string name = guild ? guild->GetName() : std::string();
         ForEachOnlineMember(guildId, [&](Player* member)
@@ -406,6 +408,11 @@ namespace GuildProgression
         return 4;                       // Neutral
     }
 
+    uint32 GetWeek()
+    {
+        return ResetWeek();
+    }
+
     bool IsGuildGroup(Player* player)
     {
         return player->GetGuildId() && GuildGroupRate(player, player->GetGroup()) > 0.0f;
@@ -458,6 +465,7 @@ public:
         uint32 xp = quest->GetXPReward(player) * sWorld->getRate(RATE_XP_QUEST);
         GiveXP(guildId, uint64(xp * GUILD_XP_QUEST_MODIFIER), player);
         GiveReputation(player, std::max<uint32>(1, quest->GetXPReward(player) / GUILD_REP_DIVIDER));
+        GuildAchievements::AddProgress(guildId, GuildAchievements::CRITERIA_QUESTS, 0, 1);
     }
 
     // a creature killed in a guild group: every member of the guild in reward range (KillRewarder)

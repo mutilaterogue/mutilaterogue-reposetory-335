@@ -87,9 +87,9 @@ function GuildNews_GetText(entry)
 	elseif ( entry.newsType == NEWS_GUILD_LEVEL ) then
 		return format("|cff40c040Гильдия достигла %d-го уровня!|r", entry.value);
 	elseif ( entry.newsType == NEWS_PLAYER_ACHIEVEMENT ) then
-		return format("%s получает достижение %s", who, entry.text);
+		return format("%s получает достижение %s", who, GetAchievementLink(entry.value) or entry.text);
 	elseif ( entry.newsType == NEWS_GUILD_ACHIEVEMENT ) then
-		return format("Гильдия получает достижение %s", entry.text);
+		return format("Гильдия получает достижение |cffffff00[%s]|r", entry.text);
 	end
 	return entry.text;
 end

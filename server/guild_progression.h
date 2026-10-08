@@ -32,6 +32,8 @@ namespace GuildProgression
     uint8 GetStanding(Player* player);
     // a guild group (a dungeon: 3+ of the player's guild, a raid: 80%)
     bool IsGuildGroup(Player* player);
+    // the week of the weekly caps / challenges (from Wednesday, the reset hour)
+    uint32 GetWeek();
 }
 
 #endif

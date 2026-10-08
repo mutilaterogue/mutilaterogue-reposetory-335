@@ -43,6 +43,7 @@ void AddSC_guild_progression();
 void AddSC_guild_finder();
 void AddSC_guild_news();
 void AddSC_guild_rewards();
+void AddSC_guild_achievements();
 
 void AddCustomScripts()
 {
@@ -70,4 +71,5 @@ void AddCustomScripts()
     AddSC_guild_finder();
     AddSC_guild_news();
     AddSC_guild_rewards();
+    AddSC_guild_achievements();
 }

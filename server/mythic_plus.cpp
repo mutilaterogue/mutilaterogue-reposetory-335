@@ -70,6 +70,7 @@
 #include "Custom\ItemScalling\item_scaling.h"
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
+#include "Custom\Guild\guild_achievements.h"
 #include "Bag.h"
 #include "CharacterCache.h"
 #include "DBCStores.h"
@@ -1084,6 +1085,9 @@ namespace
         bool timed = timeMs <= limitMs;
         uint32 upgrade = !timed ? 0 : timeMs <= limitMs * 6 / 10 ? 3 : timeMs <= limitMs * 8 / 10 ? 2 : 1;
         run.State = timed ? RUN_DONE_TIMED : RUN_DONE_LATE;
+        // the guild challenge "mythic+" for each guild group in it (guild_achievements.cpp)
+        if (timed)
+            GuildAchievements::OnMythicPlusCompleted(map);
 
         // the owner's key: in time - up and a new dungeon, late - already lowered when the time ran out
         uint32 newLevel = run.Level;

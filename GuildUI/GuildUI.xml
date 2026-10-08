@@ -8,6 +8,8 @@
 	<Script file="GuildFinder.lua"/>
 	<Script file="GuildRewards.lua"/>
 	<Script file="GuildNews.lua"/>
+	<Script file="GuildEmblem.lua"/>
+	<Script file="GuildAchievements.lua"/>
 
 	<!-- ============================================================ templates -->
 
@@ -251,10 +253,26 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
+				<Texture name="$parentBanner" parentKey="Banner" atlas="communities-guildbanner-background" hidden="true">
+					<Size x="52" y="51"/>
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
 				<Texture name="$parentIcon" parentKey="Icon">
 					<Size x="44" y="44"/>
 					<Anchors>
 						<Anchor point="LEFT" x="8" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="2">
+				<Texture name="$parentBannerBorder" parentKey="BannerBorder" atlas="communities-guildbanner-border" hidden="true">
+					<Size x="52" y="51"/>
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0"/>
 					</Anchors>
 				</Texture>
 				<FontString name="$parentName" parentKey="Name" inherits="GameFontNormalLarge" justifyH="LEFT" wordwrap="false">
@@ -341,7 +359,7 @@
 	</Button>
 
 	<!-- a guild challenge (retail GuildChallengeTemplate) -->
-	<Frame name="GuildUIChallengeTemplate" virtual="true">
+	<Frame name="GuildUIChallengeTemplate" enableMouse="true" virtual="true">
 		<Size x="280" y="21"/>
 		<Layers>
 			<Layer level="ARTWORK">
@@ -357,7 +375,62 @@
 				</FontString>
 			</Layer>
 		</Layers>
+		<Scripts>
+			<OnEnter function="GuildUIChallenge_OnEnter"/>
+			<OnLeave function="GameTooltip_Hide"/>
+		</Scripts>
 	</Frame>
+
+	<!-- a guild achievement (retail AchievementTemplateFull, as a row) -->
+	<Button name="GuildUIAchievementRowTemplate" virtual="true">
+		<Size x="10" y="46"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg" setAllPoints="true">
+					<Color r="0.10" g="0.08" b="0.05" a="0.9"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" parentKey="Icon">
+					<Size x="38" y="38"/>
+					<Anchors>
+						<Anchor point="LEFT" x="4" y="0"/>
+					</Anchors>
+				</Texture>
+				<FontString name="$parentName" parentKey="Name" inherits="GameFontNormal" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="50" y="-6"/>
+						<Anchor point="RIGHT" x="-90" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentDesc" parentKey="Desc" inherits="GameFontHighlightSmall" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="50" y="8"/>
+						<Anchor point="RIGHT" x="-90" y="0"/>
+					</Anchors>
+				</FontString>
+				<Texture name="$parentShield" file="Interface\AchievementFrame\UI-Achievement-Shields">
+					<Size x="32" y="32"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-8" y="-2"/>
+					</Anchors>
+					<TexCoords left="0" right="0.5" top="0" bottom="0.5"/>
+				</Texture>
+				<FontString name="$parentStatus" parentKey="Status" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="-6" y="5"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentPoints" parentKey="Points" inherits="GameFontNormal">
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentShield" x="0" y="2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Button>
 
 	<!-- "[Изменить]" on a section's header (retail EditMOTDButton / EditDetailsButton) -->
 	<Button name="GuildUIEditLinkTemplate" text="[Изменить]" virtual="true">
@@ -470,6 +543,14 @@
 						<Anchor point="RIGHT" x="-8" y="0"/>
 					</Anchors>
 				</FontString>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture name="$parentEmblem" parentKey="Emblem" hidden="true">
+					<Size x="36" y="42"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeTo="$parentBanner" x="0" y="2"/>
+					</Anchors>
+				</Texture>
 			</Layer>
 			<Layer level="OVERLAY">
 				<Texture name="$parentBannerBorder" parentKey="BannerBorder" atlas="communities-guildbanner-border" hidden="true">
@@ -968,6 +1049,41 @@
 							</ScrollFrame>
 						</Frames>
 					</Frame>
+					<Button name="$parentAchievementPoints" parentKey="AchievementPoints">
+						<Size x="110" y="22"/>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-4" y="1"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture name="$parentIcon" file="Interface\AchievementFrame\UI-Achievement-Shields-NoPoints">
+									<Size x="22" y="22"/>
+									<Anchors>
+										<Anchor point="RIGHT"/>
+									</Anchors>
+									<TexCoords left="0" right=".5" top="0.5" bottom="1.0"/>
+								</Texture>
+								<FontString name="$parentText" parentKey="Text" inherits="GameFontNormal" justifyH="RIGHT">
+									<Anchors>
+										<Anchor point="RIGHT" relativeTo="$parentIcon" relativePoint="LEFT" x="-2" y="0"/>
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD"/>
+						<Scripts>
+							<OnClick>
+								GuildAchievementsFrame_Toggle();
+							</OnClick>
+							<OnEnter>
+								GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
+								GameTooltip:SetText("Достижения гильдии");
+								GameTooltip:AddLine("Нажмите, чтобы открыть список.", 1, 1, 1);
+								GameTooltip:Show();
+							</OnEnter>
+							<OnLeave function="GameTooltip_Hide"/>
+						</Scripts>
+					</Button>
 					<StatusBar name="$parentRepBar" parentKey="RepBar">
 						<Size x="200" y="14"/>
 						<Anchors>
@@ -1326,6 +1442,43 @@
 		<Scripts>
 			<OnLoad function="GuildNewsFilters_OnLoad"/>
 			<OnShow function="GuildNewsFilters_OnShow"/>
+		</Scripts>
+	</Frame>
+	<!-- the guild achievements (retail AchievementFrame's guild tab, as a window next to the guild window) -->
+	<Frame name="GuildUIAchievementsFrame" parent="CommunitiesFrame" toplevel="true" frameStrata="DIALOG" enableMouse="true" hidden="true">
+		<Size x="420" y="426"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="CommunitiesFrame" relativePoint="TOPRIGHT" x="40" y="0"/>
+		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString inherits="GameFontNormalLarge" text="Достижения гильдии">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="16" y="-14"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSummary" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="16" y="-36"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parentClose" inherits="UIPanelCloseButton">
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-2" y="-2"/>
+				</Anchors>
+			</Button>
+			<ScrollFrame name="$parentList" inherits="GuildUIListTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="12" y="-54"/>
+					<Anchor point="BOTTOMRIGHT" x="-34" y="12"/>
+				</Anchors>
+			</ScrollFrame>
+		</Frames>
+		<Scripts>
+			<OnLoad function="GuildAchievementsFrame_OnLoad"/>
 		</Scripts>
 	</Frame>
 </Ui>

@@ -2,7 +2,7 @@
 --  The guild rewards (retail GuildRewards) on server/guild_rewards.cpp, and the guild reputation's bar.
 --  API (Cataclysm's / retail's, + the guild level that stands for the achievement):
 --    GetNumGuildRewards(), GetGuildRewardInfo(i) -> achievementID (0), itemID, itemName, iconTexture,
---    repLevel, moneyCost, guildLevel;  BuyGuildReward(itemID)
+--    repLevel, moneyCost, guildLevel, achievementName;  BuyGuildReward(itemID)
 -- ============================================================
 
 local REWARD_ROW_HEIGHT = 44;
@@ -23,7 +23,8 @@ function GetGuildRewardInfo(index)
 		return;
 	end
 	local name, _, _, _, _, _, _, _, _, icon = GetItemInfo(reward.item);
-	return 0, reward.item, name or ("item:"..reward.item), icon or "Interface\\Icons\\INV_Misc_QuestionMark", reward.standing, reward.price, reward.level;
+	local achievementName = reward.achievement > 0 and (select(2, GetGuildAchievementByID(reward.achievement)) or ("#"..reward.achievement)) or nil;
+	return reward.achievement, reward.item, name or ("item:"..reward.item), icon or "Interface\\Icons\\INV_Misc_QuestionMark", reward.standing, reward.price, reward.level, achievementName;
 end
 
 function BuyGuildReward(itemID)
@@ -32,11 +33,12 @@ function BuyGuildReward(itemID)
 	end
 end
 
--- the reward can be bought now: the standing and the guild's level
+-- the reward can be bought now: the standing, the guild's level, the guild achievement
 local function IsAvailable(reward)
 	local _, _, standing = GetGuildFactionInfo();
 	local level = GetGuildLevel and GetGuildLevel() or 0;
-	return standing >= reward.standing and level >= reward.level, standing >= reward.standing, level >= reward.level;
+	local achievementOk = reward.achievement == 0 or reward.achievementDone;
+	return standing >= reward.standing and level >= reward.level and achievementOk, standing >= reward.standing, level >= reward.level, achievementOk;
 end
 
 -- ------------------------------------------------------------ the list
@@ -72,11 +74,15 @@ function GuildRewards_Update()
 			row.Name:SetText(name);
 			local r, g, b = GetItemQualityColor(quality or 1);
 			row.Name:SetTextColor(r, g, b);
-			local available, standingOk, levelOk = IsAvailable(reward);
+			local available, standingOk, levelOk, achievementOk = IsAvailable(reward);
+			local _, _, _, _, _, _, _, achievementName = GetGuildRewardInfo(offset + i);
 			local needs = {};
 			tinsert(needs, (standingOk and "|cffffffff" or "|cffff2020").._G["FACTION_STANDING_LABEL"..standing].."|r");
 			if ( level > 0 ) then
 				tinsert(needs, (levelOk and "|cffffffff" or "|cffff2020").."уровень гильдии "..level.."|r");
+			end
+			if ( achievementName ) then
+				tinsert(needs, (achievementOk and "|cffffffff" or "|cffff2020").."«"..achievementName.."»|r");
 			end
 			row.Needs:SetText("Требуется: "..table.concat(needs, ", "));
 			row.Money:SetText(price > 0 and GetCoinTextureString(price) or "");
@@ -128,7 +134,11 @@ function GuildRewardRow_OnEnter(self)
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 	GameTooltip:SetHyperlink("item:"..self.reward.item);
-	local _, standingOk, levelOk = IsAvailable(self.reward);
+	local _, standingOk, levelOk, achievementOk = IsAvailable(self.reward);
+	if ( not achievementOk ) then
+		local _, name = GetGuildAchievementByID(self.reward.achievement);
+		GameTooltip:AddLine("Требуется достижение гильдии: "..(name or ("#"..self.reward.achievement)), 1, 0.1, 0.1);
+	end
 	if ( not standingOk ) then
 		GameTooltip:AddLine("Требуется репутация с гильдией: ".._G["FACTION_STANDING_LABEL"..self.reward.standing], 1, 0.1, 0.1);
 	end
@@ -177,8 +187,9 @@ local function OnRewards(list)
 	wipe(rewards);
 	if ( list and list ~= "-" ) then
 		for entry in list:gmatch("[^,]+") do
-			local item, standing, price, level = strsplit(";", entry);
-			tinsert(rewards, { item = tonumber(item), standing = tonumber(standing) or 4, price = tonumber(price) or 0, level = tonumber(level) or 0 });
+			local item, standing, price, level, achievement, achievementDone = strsplit(";", entry);
+			tinsert(rewards, { item = tonumber(item), standing = tonumber(standing) or 4, price = tonumber(price) or 0, level = tonumber(level) or 0,
+				achievement = tonumber(achievement) or 0, achievementDone = achievementDone == "1" });
 		end
 	end
 	if ( CommunitiesFrame and CommunitiesFrame.Perks:IsShown() ) then

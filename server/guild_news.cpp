@@ -22,6 +22,7 @@
 #include "Custom\AddonComm\AddonComm.h"
 #include "guild_news.h"
 #include "guild_progression.h"
+#include "guild_achievements.h"
 #include "CharacterCache.h"
 #include "Config.h"
 #include "Creature.h"
@@ -216,7 +217,10 @@ public:
             return;
         ItemTemplate const* proto = item->GetTemplate();
         if (IsNewsItem(proto))
+        {
             GuildNews::Add(player->GetGuildId(), GuildNews::ITEM_LOOTED, player->GetGUID().GetCounter(), proto->ItemId, proto->Name1);
+            GuildAchievements::AddProgress(player->GetGuildId(), GuildAchievements::CRITERIA_EPICS_LOOTED, 0, 1);
+        }
     }
 
     void OnCreateItem(Player* player, Item* item, uint32 /*count*/) override
@@ -225,7 +229,10 @@ public:
             return;
         ItemTemplate const* proto = item->GetTemplate();
         if (IsNewsItem(proto))
+        {
             GuildNews::Add(player->GetGuildId(), GuildNews::ITEM_CRAFTED, player->GetGUID().GetCounter(), proto->ItemId, proto->Name1);
+            GuildAchievements::AddProgress(player->GetGuildId(), GuildAchievements::CRITERIA_EPICS_CRAFTED, 0, 1);
+        }
     }
 };
 

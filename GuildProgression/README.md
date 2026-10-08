@@ -48,4 +48,4 @@ Without a guild name: the selected player's guild (or yours). `guild_progression
 ## Next stages
 2. ~~The retail Communities guild UI~~ — `GuildUI/` (roster, info, perks, guild finder).
 3. ~~Guild reputation, rewards, news~~ — see `GuildUI/README.md` (Stage 3).
-4. Guild challenges, guild achievements.
+4. ~~Guild challenges, guild achievements~~ — see `GuildUI/README.md` (Stage 4).

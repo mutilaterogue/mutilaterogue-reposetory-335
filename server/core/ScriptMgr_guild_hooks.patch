@@ -1,0 +1,59 @@
+Two PlayerScript hooks for the guild system, stage 4 (server/guild_achievements.cpp):
+  OnAchievementComplete - a member's achievement goes into the guild news (Cataclysm's GUILD_NEWS_PLAYER_ACHIEVEMENT);
+  OnBattlegroundEnd     - a battleground won by a guild group counts for the guild challenge "Поле боя".
+Apply by hand (context from your tree: Scripting/ScriptMgr.h, Scripting/ScriptMgr.cpp,
+Achievements/AchievementMgr.cpp, Battlegrounds/Battleground.cpp).
+
+--- a/src/server/game/Scripting/ScriptMgr.h
++++ b/src/server/game/Scripting/ScriptMgr.h
+@@ (the forward declarations at the top, next to "struct AreaTriggerEntry;")
++struct AchievementEntry;
++class Battleground;          (already there in most trees: "class Battleground;" - keep one)
+
+@@ class TC_GAME_API PlayerScript  (after OnQuestRewardItem)
+         virtual void OnQuestRewardItem(Player* /*player*/, Item* /*item*/, uint32 /*count*/) {}
++
++        // Called when a player completes an achievement (custom)
++        virtual void OnAchievementComplete(Player* /*player*/, AchievementEntry const* /*achievement*/) { }
++
++        // Called for each player in a battleground when it ends (custom; won: his team won)
++        virtual void OnBattlegroundEnd(Player* /*player*/, Battleground* /*bg*/, bool /*won*/) { }
+ };
+
+@@ class TC_GAME_API ScriptMgr  (public: /* PlayerScript */, after OnQuestRewardItem)
+         void OnQuestRewardItem(Player* player, Item* item, uint32 count);
++        void OnAchievementComplete(Player* player, AchievementEntry const* achievement);
++        void OnBattlegroundEnd(Player* player, Battleground* bg, bool won);
+
+--- a/src/server/game/Scripting/ScriptMgr.cpp
++++ b/src/server/game/Scripting/ScriptMgr.cpp
+@@ after void ScriptMgr::OnQuestRewardItem(...) { ... }
++void ScriptMgr::OnAchievementComplete(Player* player, AchievementEntry const* achievement)
++{
++    FOREACH_SCRIPT(PlayerScript)->OnAchievementComplete(player, achievement);
++}
++
++void ScriptMgr::OnBattlegroundEnd(Player* player, Battleground* bg, bool won)
++{
++    FOREACH_SCRIPT(PlayerScript)->OnBattlegroundEnd(player, bg, won);
++}
+
+--- a/src/server/game/Achievements/AchievementMgr.cpp
++++ b/src/server/game/Achievements/AchievementMgr.cpp
+@@ void AchievementMgr::CompletedAchievement(AchievementEntry const* achievement)
+     m_achievementPoints += achievement->Points;
++
++    sScriptMgr->OnAchievementComplete(m_player, achievement);
+
+     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ACHIEVEMENT, achievement->ID);
+
+--- a/src/server/game/Battlegrounds/Battleground.cpp
++++ b/src/server/game/Battlegrounds/Battleground.cpp
+@@ void Battleground::EndBattleground(uint32 winner)  (in the loop over m_Players, right after)
+         Player* player = _GetPlayer(itr, "EndBattleground");
+         if (!player)
+             continue;
++
++        sScriptMgr->OnBattlegroundEnd(player, this, team == winner);
+
+(Battleground.cpp and AchievementMgr.cpp already include ScriptMgr.h.)

@@ -1,6 +1,6 @@
 -- ============================================================
 --  The guild invitation (retail GuildInviteFrame) for 3.3.5a: GUILD_INVITE_REQUEST gives the inviter and
---  the guild's name only; the guild's level comes from the server (guild_finder.cpp, "GF_GUILD_INFO").
+--  the guild's name only; its achievement points and emblem come from the server (guild_finder.cpp, "GF_GUILD_INFO").
 --  The stock StaticPopup "GUILD_INVITE" (UIParent_OnEvent) is not shown any more.
 -- ============================================================
 
@@ -31,12 +31,14 @@ function GuildInviteFrame_OnLoad(self)
 	UIParent:UnregisterEvent("GUILD_INVITE_CANCEL");
 end
 
-local function OnGuildInfo(name, level, members)
+local function OnGuildInfo(name, level, members, points, ...)
 	local frame = GuildInviteFrame;
 	if ( frame:IsShown() and frame.guildName == name ) then
-		frame.Points.Text:SetText(tonumber(level) or 0);
+		frame.Points.Text:SetText(tonumber(points) or 0);
+		frame.level = tonumber(level);
 		frame.members = tonumber(members);
 		frame.Points:Show();
+		GuildEmblem_Set(GuildInviteFrameTabardEmblem, GuildInviteFrameTabardBackground, GuildInviteFrameTabardBorder, GuildEmblem_Make(...));
 	end
 end
 
@@ -54,6 +56,8 @@ function GuildInviteFrame_OnEvent(self, event, ...)
 		self.inviter = inviterName;
 		self.guildName = guildName;
 		self.members = nil;
+		self.level = nil;
+		GuildEmblem_Set(GuildInviteFrameTabardEmblem, GuildInviteFrameTabardBackground, GuildInviteFrameTabardBorder, nil);
 		GuildInviteFrameInviterName:SetText(inviterName);
 		GuildInviteFrameGuildName:SetText(guildName);
 		self.Points.Text:SetText("");
@@ -83,6 +87,9 @@ function GuildInviteFrame_OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_CURSOR");
 	GameTooltip:SetText(self.guildName or GUILD, 1, 0.82, 0);
 	GameTooltip:AddLine(format("Приглашает: %s", self.inviter or ""), 1, 1, 1);
+	if ( self.level ) then
+		GameTooltip:AddLine(format("Уровень гильдии: %d", self.level), 1, 1, 1);
+	end
 	if ( self.members ) then
 		GameTooltip:AddLine(format("Участников: %d", self.members), 1, 1, 1);
 	end

@@ -255,8 +255,19 @@ function GuildFinder_UpdateList()
 					row.Name:SetTextColor(color.r, color.g, color.b);
 				end
 			else
-				SetPortraitToTexture(row.Icon, "Interface\\Icons\\INV_Shirt_GuildTabard_01");
-				row.Icon:SetTexCoord(0, 1, 0, 1);
+				-- the guild's emblem on its banner (GuildEmblem.lua); my applications: the tabard icon
+				if ( entry.emblem ) then
+					GuildEmblem_Set(row.Icon, row.Banner, row.BannerBorder, entry.emblem);
+				else
+					SetPortraitToTexture(row.Icon, "Interface\\Icons\\INV_Shirt_GuildTabard_01");
+					row.Icon:SetTexCoord(0, 1, 0, 1);
+					row.Icon:SetVertexColor(1, 1, 1);
+				end
+			end
+			row.Banner:SetShown(entry.emblem ~= nil);
+			row.BannerBorder:SetShown(entry.emblem ~= nil);
+			if ( mode == MODE_REQUESTS ) then
+				row.Icon:SetVertexColor(1, 1, 1);
 			end
 			row.Name:SetText(entry.name);
 			if ( mode == MODE_SEARCH ) then
@@ -496,7 +507,8 @@ local function OnResults(list)
 	for _, f in ipairs(Split(list)) do
 		tinsert(results, { guildId = tonumber(f[1]), name = Decode(f[2]), level = tonumber(f[3]) or 0, members = tonumber(f[4]) or 0,
 			comment = Decode(f[5]), availability = tonumber(f[6]) or 0, roles = tonumber(f[7]) or 0, interests = tonumber(f[8]) or 0,
-			levelFlags = tonumber(f[9]) or 0, applied = f[10] == "1" });
+			levelFlags = tonumber(f[9]) or 0, applied = f[10] == "1",
+			emblem = GuildEmblem_Make(f[11], f[12], f[13], f[14], f[15]), points = tonumber(f[16]) or 0 });
 	end
 	if ( Visible() ) then
 		GuildFinder_UpdateList();

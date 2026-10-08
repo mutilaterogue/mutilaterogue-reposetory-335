@@ -75,7 +75,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<!-- retail Points (achievement points): the guild's level -->
+			<!-- retail Points: the guild's achievement points -->
 			<Frame name="$parentPoints" parentKey="Points">
 				<Size x="10" y="10"/>
 				<Anchors>
@@ -83,7 +83,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" parentKey="Title" inherits="GameFontHighlightSmall" text="Уровень">
+						<FontString name="$parentTitle" parentKey="Title" inherits="GameFontHighlightSmall" text="Достижения">
 							<Anchors>
 								<Anchor point="BOTTOM" relativePoint="TOP" x="-13" y="0"/>
 							</Anchors>

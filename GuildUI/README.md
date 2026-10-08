@@ -67,3 +67,32 @@ Server:
 
 Client: `GuildRewards.lua`, `GuildNews.lua` next to `GuildUI.lua` (`GuildUI.xml` loads them); the new
 `GuildProgression.lua`.
+
+## Stage 4: guild challenges, guild achievements, the emblem
+**Challenges** (`server/guild_achievements.cpp`, `world.guild_challenges`: the count a week, guild XP and gold into
+the guild bank for each one): «Подземелье» 7 (a dungeon boss by a guild group, once for each instance), «Эпохальный+» 3
+(finished in time by a guild group, `mythic_plus.cpp`), «Рейд» 1 (a raid boss by a guild group), «Поле боя» 3 (won with
+`GuildChallenges.BattlegroundMembers` = 5 of the guild in the team). The week from Wednesday, the reset hour.
+«Информация» shows them (tooltip: the rewards).
+
+**Guild achievements** (`world.guild_achievements`: name, description, points, icon, criteria): the guild's level,
+boss kills (any / a creature), members' quests, challenges, members, epics looted / crafted, battlegrounds won. Done:
+guild news, a chat line. «Преимущества» → the points (top right) → the achievements window (progress / when).
+Guild rewards may need one (`guild_rewards.achievement`). The invitation shows the guild's points (retail).
+Members' achievements make the guild news (`GetAchievementLink`).
+
+**Emblem** (`GuildEmblem.lua`): the colors of `GuildColor*.dbc`, the emblems of `Interface\GuildFrame\GuildEmblemsLG_01`
+— on the guild's banner in the list, in the invitation, on the guild finder's cards.
+
+### Hooking it up
+Server:
+1. `server/core/ScriptMgr_guild_hooks.patch` (OnAchievementComplete, OnBattlegroundEnd).
+2. `guild_achievements.cpp`, `guild_achievements.h` into `scripts\Custom\Guild\`; the new `guild_progression.*`,
+   `guild_news.cpp`, `guild_rewards.cpp`, `guild_finder.cpp`, `mythic_plus.cpp`, `custom_script_loader.cpp`.
+3. `sql/characters_guild_stage4.sql` (characters), `sql/world_guild_stage4.sql` (world: the challenges, sample
+   achievements, `guild_rewards.achievement`).
+4. `worldserver.conf`: `GuildChallenges.BattlegroundMembers`.
+
+Client: `GuildEmblem.lua`, `GuildAchievements.lua` next to `GuildUI.lua` (`GuildUI.xml` loads them); the new
+`GuildUI.xml` / `.lua`, `GuildFinder.lua`, `GuildRewards.lua`, `GuildNews.lua`, `GuildInviteFrame.xml` / `.lua`.
+Textures: `Interface\GuildFrame\GuildEmblemsLG_01` (Cataclysm / retail).

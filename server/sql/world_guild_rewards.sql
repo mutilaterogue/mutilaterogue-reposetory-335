@@ -18,3 +18,4 @@ CREATE TABLE IF NOT EXISTS `guild_rewards` (
 -- (12345, 5, 0, 1500000, 5),     -- Friendly, guild level 5, 150 gold
 -- (12346, 6, 0, 3000000, 10),    -- Honored, guild level 10, 300 gold
 -- (12347, 8, 1101, 10000000, 25);  -- Exalted, guild level 25, Alliance, 1000 gold
+-- (an `achievement` column: sql/world_guild_stage4.sql)

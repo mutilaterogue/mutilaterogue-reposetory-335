@@ -147,6 +147,18 @@ function GuildUI_OnLoad(self)
 	-- the perks
 	GuildUI_MakeList(self.Perks.List, "GuildUIPerkRowTemplate", PERK_ROW_HEIGHT, 6, GuildUIPerks_Update);
 
+	-- the guild's emblem, challenges, achievements (GuildEmblem.lua, GuildAchievements.lua)
+	GuildEmblem_RegisterCallback(GuildUI_UpdateHeader);
+	GuildAchievements_RegisterCallback(function(event)
+		if ( self.Info:IsShown() ) then
+			GuildUIInfo_Update();
+		end
+		if ( self.Perks:IsShown() ) then
+			GuildUIPerks_Update();
+			GuildRewards_Update();
+		end
+	end);
+
 	if ( GuildProgression_RegisterCallback ) then
 		GuildProgression_RegisterCallback(function(event)
 			GuildUI_UpdateHeader();
@@ -197,6 +209,7 @@ function GuildUI_OnShow(self)
 	if ( IsInGuild() ) then
 		GuildRoster();
 		QueryGuildEventLog();
+		GuildAchievements_Request();
 	end
 	GuildUI_Refresh();
 	if ( UpdateMicroButtons ) then
@@ -383,6 +396,12 @@ function GuildUI_UpdateHeader()
 	end
 	frame.GuildLevel:SetFormattedText("Уровень %d", level);
 	frame.List.Guild.Name:SetText(guildName or GUILD);
+	-- the guild's emblem on its banner (no design yet: the tabard icon)
+	local emblem = GetGuildEmblemInfo();
+	local entry = frame.List.Guild;
+	GuildEmblem_Set(entry.Emblem, entry.Banner, entry.BannerBorder, emblem);
+	entry.Emblem:SetShown(emblem ~= nil);
+	entry.Icon:SetShown(emblem == nil);
 	frame.List.Guild.Sub:SetFormattedText("Уровень %d", level);
 	local bar = frame.XPBar;
 	bar:Show();
@@ -767,18 +786,53 @@ end
 
 -- ------------------------------------------------------------ 2: info
 
--- the guild challenges (retail GuildChallenges): the counts come with the guild challenges stage
+-- the guild challenges (retail GuildChallenges; server/guild_achievements.cpp: type, the week's count)
 GUILD_CHALLENGES = {
-	{ name = "Подземелье", max = 7 },
-	{ name = "Эпохальный+", max = 3 },
-	{ name = "Рейд", max = 1 },
-	{ name = "Поле боя", max = 3 },
+	{ type = 1, name = "Подземелье", max = 7, text = "Подземелье, пройденное гильдейской группой." },
+	{ type = 2, name = "Эпохальный+", max = 3, text = "Эпохальное+ подземелье, пройденное гильдейской группой в срок." },
+	{ type = 3, name = "Рейд", max = 1, text = "Рейдовый босс, побеждённый гильдейской группой." },
+	{ type = 4, name = "Поле боя", max = 3, text = "Поле боя, выигранное командой, в которой много участников гильдии." },
 };
+
+function GuildUIChallenge_OnEnter(self)
+	local challenge;
+	for _, c in ipairs(GUILD_CHALLENGES) do
+		if ( c.type == self.challengeType ) then
+			challenge = c;
+		end
+	end
+	if ( not challenge ) then
+		return;
+	end
+	local _, done, count, xp, gold = GetGuildChallengeInfo(challenge.type);
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+	GameTooltip:SetText("Испытание гильдии: "..challenge.name);
+	GameTooltip:AddLine(challenge.text, 1, 1, 1, true);
+	GameTooltip:AddLine(format("На этой неделе: %d / %d", done, count), 1, 0.82, 0);
+	if ( xp > 0 ) then
+		GameTooltip:AddLine(format("Награда за каждое: %d опыта гильдии", xp), 0.25, 1, 0.25);
+	end
+	if ( gold > 0 ) then
+		GameTooltip:AddLine("и в банк гильдии: "..GetCoinTextureString(gold), 0.25, 1, 0.25);
+	end
+	GameTooltip:Show();
+end
 
 function GuildUIInfo_Update()
 	local info = CommunitiesFrame.Info;
 	for i, challenge in ipairs(GUILD_CHALLENGES) do
-		info["Challenge"..i].Count:SetFormattedText("%d / %d", challenge.count or 0, challenge.max);
+		local _, done, count = GetGuildChallengeInfo(challenge.type);
+		if ( count == 0 ) then
+			count = challenge.max;
+		end
+		local row = info["Challenge"..i];
+		row.challengeType = challenge.type;
+		row.Count:SetFormattedText("%d / %d", done, count);
+		if ( done >= count and count > 0 ) then
+			row.Count:SetTextColor(0.25, 1, 0.25);
+		else
+			row.Count:SetTextColor(1, 0.82, 0);
+		end
 	end
 	local motd = GetGuildRosterMOTD() or "";
 	info.MOTDText:SetText(motd);
@@ -949,6 +1003,7 @@ end
 
 function GuildUIPerks_Update()
 	local perks = CommunitiesFrame.Perks;
+	perks.AchievementPoints.Text:SetText(GetGuildAchievementPoints());
 	local list = perks.List;
 	if ( not list.rows ) then
 		return;

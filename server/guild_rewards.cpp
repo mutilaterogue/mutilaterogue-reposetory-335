@@ -3,10 +3,10 @@
  *
  * world.guild_rewards: an item, the guild reputation's standing it needs (4 Neutral .. 8 Exalted), the races
  * (a mask, 0: all), its price (copper) and the guild's level it needs (Cataclysm: an achievement; the guild
- * achievements are a later stage). Bought from the guild window (Cataclysm: the guild vendors).
+ * achievements: guild_achievements.cpp) and / or a guild achievement. Bought from the guild window (Cataclysm: the guild vendors).
  *
  * AddonComm (client: GuildUI\GuildRewards.lua):
- *  C->S "GUILD_REWARDS_GET"            -> "GUILD_REWARDS" : item;standing;price;guildLevel,...   (for my race; "-": none)
+ *  C->S "GUILD_REWARDS_GET"            -> "GUILD_REWARDS" : item;standing;price;guildLevel;achievement;achievement done,...   (for my race; "-": none)
  *       "GUILD_REWARD_BUY" : item      -> "GUILD_REWARD_RESULT" : 1 / 0 : message
  *
  * Setup: sql/world_guild_rewards.sql, AddSC_guild_rewards() in custom_script_loader.cpp.
@@ -16,6 +16,7 @@
 #include "Custom\AddonComm\AddonComm.h"
 #include "guild_news.h"
 #include "guild_progression.h"
+#include "guild_achievements.h"
 #include "Chat.h"
 #include "DatabaseEnv.h"
 #include "ItemTemplate.h"
@@ -35,6 +36,7 @@ namespace
         uint32 RaceMask = 0;
         uint32 Price = 0;
         uint8 GuildLevel = 0;
+        uint32 Achievement = 0;
     };
 
     std::vector<Reward> s_rewards;
@@ -60,7 +62,7 @@ namespace
     void Load()
     {
         s_rewards.clear();
-        if (QueryResult result = WorldDatabase.Query("SELECT item, standing, race_mask, price, guild_level FROM guild_rewards ORDER BY standing, guild_level, item"))
+        if (QueryResult result = WorldDatabase.Query("SELECT item, standing, race_mask, price, guild_level, achievement FROM guild_rewards ORDER BY standing, guild_level, item"))
         {
             do
             {
@@ -71,6 +73,7 @@ namespace
                 reward.RaceMask = fields[2].GetUInt32();
                 reward.Price = fields[3].GetUInt32();
                 reward.GuildLevel = fields[4].GetUInt8();
+                reward.Achievement = fields[5].GetUInt32();
                 if (!sObjectMgr->GetItemTemplate(reward.Item))
                 {
                     TC_LOG_ERROR("sql.sql", "guild_rewards: item {} does not exist, skipped", reward.Item);
@@ -95,7 +98,8 @@ namespace
         {
             if (!ForRace(reward, player))
                 continue;
-            list << (first ? "" : ",") << reward.Item << ';' << uint32(reward.Standing) << ';' << reward.Price << ';' << uint32(reward.GuildLevel);
+            list << (first ? "" : ",") << reward.Item << ';' << uint32(reward.Standing) << ';' << reward.Price << ';' << uint32(reward.GuildLevel) << ';'
+                 << reward.Achievement << ';' << (GuildAchievements::HasAchievement(player->GetGuildId(), reward.Achievement) ? 1 : 0);
             first = false;
         }
         sAddonComm->Send(player, std::string("GUILD_REWARDS"), first ? std::string("-") : list.str());
@@ -127,6 +131,11 @@ namespace
         if (GuildProgression::GetInfo(guildId).Level < reward->GuildLevel)
         {
             Result(player, false, "\xd0\x9d\xd0\xb5\xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb0\xd1\x82\xd0\xbe\xd1\x87\xd0\xbd\xd0\xbe \xd0\xb2\xd1\x8b\xd1\x81\xd0\xbe\xd0\xba\xd0\xb8\xd0\xb9 \xd1\x83\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb5\xd0\xbd\xd1\x8c \xd0\xb3\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd0\xb8.");
+            return;
+        }
+        if (reward->Achievement && !GuildAchievements::HasAchievement(guildId, reward->Achievement))
+        {
+            Result(player, false, "\xd0\x9d\xd1\x83\xd0\xb6\xd0\xbd\xd0\xbe \xd0\xb4\xd0\xbe\xd1\x81\xd1\x82\xd0\xb8\xd0\xb6\xd0\xb5\xd0\xbd\xd0\xb8\xd0\xb5 \xd0\xb3\xd0\xb8\xd0\xbb\xd1\x8c\xd0\xb4\xd0\xb8\xd0\xb8.");
             return;
         }
         if (!player->HasEnoughMoney(int64(reward->Price)))

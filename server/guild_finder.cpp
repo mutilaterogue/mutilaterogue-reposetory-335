@@ -26,13 +26,14 @@
  *       "GF_REQUESTS"                                                -> "GF_REQUESTS"
  *       "GF_DECLINE" : playerGuid
  *       "GF_GUILD_INFO" : guildName                                  -> "GF_GUILD_INFO" (the guild invitation frame)
- *  S->C "GF_RESULTS" : guildId;name;level;members;comment;availability;roles;interests;level flag;applied,...
+ *  S->C "GF_RESULTS" : guildId;name;level;members;comment;availability;roles;interests;level flag;applied;
+ *                      emblem style;color;border style;border color;background;achievement points,...
  *       "GF_APPS" : guildId;name;comment;seconds left,...
  *       "GF_SETTINGS" : canEdit : listed : availability : roles : interests : level : comment
  *       "GF_REQUESTS" : playerGuid;name;class;level;availability;roles;interests;comment;seconds left,...
  *       "GF_RESULT" : message
  *       "GF_NEW_REQUEST"                                             (to the guild's online inviters)
- *       "GF_GUILD_INFO" : guildName : level : members
+ *       "GF_GUILD_INFO" : guildName : level : members : achievement points : emblem style : color : border style : border color : background
  *  ("-" for an empty list)
  *
  * Setup: sql/characters_guild_finder.sql, AddSC_guild_finder() in custom_script_loader.cpp.
@@ -41,6 +42,7 @@
 #include "ScriptMgr.h"
 #include "Custom\AddonComm\AddonComm.h"
 #include "Custom\Guild\guild_progression.h"
+#include "Custom\Guild\guild_achievements.h"
 #include "DatabaseEnv.h"
 #include "GameTime.h"
 #include "Guild.h"
@@ -327,6 +329,9 @@ namespace
             list << (first ? "" : ",") << guildId << ';' << Encode(guild->GetName()) << ';' << guildLevel << ';' << guild->GetMemberCount() << ';'
                  << Encode(s.Comment) << ';' << uint32(s.Availability) << ';' << uint32(s.Roles) << ';' << uint32(s.Interests) << ';'
                  << uint32(s.Level) << ';' << (applied ? 1 : 0);
+            EmblemInfo const& emblem = guild->GetEmblemInfo();
+            list << ';' << int32(emblem.GetStyle()) << ';' << int32(emblem.GetColor()) << ';' << int32(emblem.GetBorderStyle()) << ';'
+                 << int32(emblem.GetBorderColor()) << ';' << int32(emblem.GetBackgroundColor()) << ';' << GuildAchievements::GetPoints(guildId);
             first = false;
         }
         sAddonComm->Send(player, std::string("GF_RESULTS"), first ? std::string("-") : list.str());
@@ -491,8 +496,10 @@ namespace
         Guild* guild = sGuildMgr->GetGuildByName(name);
         if (!guild)
             return;
+        EmblemInfo const& emblem = guild->GetEmblemInfo();
         sAddonComm->Send(player, std::string("GF_GUILD_INFO"), Encode(guild->GetName()), uint32(GuildProgression::GetInfo(guild->GetId()).Level),
-            guild->GetMemberCount());
+            guild->GetMemberCount(), GuildAchievements::GetPoints(guild->GetId()), int32(emblem.GetStyle()), int32(emblem.GetColor()),
+            int32(emblem.GetBorderStyle()), int32(emblem.GetBorderColor()), int32(emblem.GetBackgroundColor()));
     }
 }
 

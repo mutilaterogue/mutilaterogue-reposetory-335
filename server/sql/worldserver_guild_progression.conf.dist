@@ -60,3 +60,12 @@ GuildProgression.ReputationDivider = 450
 #
 
 GuildNews.MinItemLevel = 200
+
+#
+#    GuildChallenges.BattlegroundMembers
+#        Description: Members of one guild in the winning team for the challenge "Поле боя"
+#                     (Cataclysm's rated battleground: 8 of 10).
+#        Default:     5
+#
+
+GuildChallenges.BattlegroundMembers = 5
